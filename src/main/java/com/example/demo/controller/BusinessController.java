@@ -29,7 +29,7 @@ import com.google.gson.JsonObject;
 @RestController
 @CrossOrigin(origins = {
     "http://localhost:3000",       // 개발용
-    "http://192.168.0.5:8090"      // 운영 React
+    "http://172.30.1.48:8080"      // 운영 React
 })
 public class BusinessController {
 
