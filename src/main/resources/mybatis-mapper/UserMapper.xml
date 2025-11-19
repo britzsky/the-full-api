@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.UserMapper">
+
+	<select id="Login" parameterType="map" resultType="map">
+		call tb_user_login(#{userId}, #{password})
+	</select>
+
+	<insert id="UserRgt">
+        insert into tb_member(name, phone, address, address_detail, zip_code, latitude, longitude, user_id, password, auto_login) 
+        values(#{name}, #{phone}, #{address}, #{address_detail}, #{zip_code}, #{latitude}, #{longitude}, #{user_id}, #{password}, #{auto_login})
+    </insert>
+    
+    <select id="UserRecordSheetList" parameterType="map" resultType="hashmap">
+    	SELECT T.user_id, T.user_name, T2.year, T2.month, T2.record_date, T2.start_time, T2.end_time, ifnull(T2.leave_use,"") as leave_use, ifnull(T2.leave_type,"") as leave_type
+			FROM tb_user T
+			JOIN tb_user_record T2
+			ON T.user_id = T2.user_id
+			JOIN tb_user_attendance_management T3
+			ON T.user_id = T3.user_id
+			WHERE T.department = 1
+			AND T.del_yn = 'N'
+			ORDER BY T.user_id, record_date
+    </select>
+    
+    <select id="UserMemberList" parameterType="map" resultType="hashmap">
+    	SELECT T.user_id, 
+    		   T.user_name,
+    		   DATE_FORMAT(T.join_dt, '%Y-%m-%d') as join_dt,
+    		   T.position, 
+    		   T2.total_leave, 
+    		   T2.leave_remain, 
+    		   T2.leave_use
+			FROM tb_user T
+			JOIN tb_user_attendance_management T2
+			ON T.user_id = T2.user_id
+			WHERE T.del_yn = 'N'
+			ORDER BY position
+    </select>
+</mapper>

@@ -1,0 +1,579 @@
+package com.example.demo.controller;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.example.demo.WebConfig;
+import com.example.demo.service.OperateService;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
+@RestController
+@CrossOrigin(origins = "http://localhost:3000")
+public class OperateController {
+
+	private final OperateService operateService;
+	
+    @Autowired
+    public OperateController(OperateService operateService, WebConfig webConfig) {
+    	this.operateService = operateService;
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountTallySheetList
+     * comment 	: 운영파트 -> 집계표 조회
+     */
+    @GetMapping("/Operate/TallySheetList")
+    public String TallySheetList(@RequestParam Map<String, Object> paramMap) {
+    	int digits = 2; // 원하는 자릿수
+
+        // String.format()을 사용하여 숫자 앞에 0 추가
+    	// 1. Map에서 "month" 값을 String으로 가져옵니다. (확실하게 String임을 가정)
+    	String monthString = paramMap.get("month").toString(); // 안전하게 toString() 호출
+
+    	// 2. String을 정수(int)로 변환합니다.
+    	int monthValue = Integer.parseInt(monthString); // 이 부분에서 d 타입에 맞는 정수가 됨
+
+    	// 3. String.format()을 사용하여 숫자 앞에 0 추가
+    	String formattedNumber = String.format("%0" + digits + "d", monthValue);
+    	
+    	paramMap.put("month", formattedNumber);
+        
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.TallySheetList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * method 	: NowDateKey
+     * comment 	: 거래처 저장을 위한 key 생성 
+     */
+    private String NowDateKey() {
+    	String accountKey = operateService.NowDateKey();
+    	return accountKey;
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: TallySheetSave
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표 저장
+     */
+    @SuppressWarnings("unchecked")
+	@PostMapping("Operate/TallySheetSave")
+    private String TallySheetSave(@RequestBody Map<String, Object> payload) {
+    	
+    	int iResult = 0;
+    	
+    	List<Map<String, Object>> nowList = (List<Map<String, Object>>) payload.get("nowList");
+        List<Map<String, Object>> beforeList = (List<Map<String, Object>>) payload.get("beforeList");
+
+        // 본월 집계표 저장
+        if (!nowList.isEmpty()) {
+        	for (Map<String, Object> paramMap : nowList) {
+                iResult += operateService.TallyNowMonthSave(paramMap);
+                iResult += operateService.processProfitLoss(paramMap);
+            }
+        }
+    	
+        // 이월 집계표 저장
+        if (!beforeList.isEmpty()) {
+        	for (Map<String, Object> paramMap : beforeList) {
+                iResult += operateService.TallyBeforeMonthSave(paramMap);
+                iResult += operateService.processProfitLoss(paramMap);
+        	}
+        }
+        
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: PropertiesSave
+     * comment 	: 급식사업부 -> 운영관리 -> 기물리스트 저장
+     */
+    @PostMapping("Operate/PropertiesSave")
+    private String PropertiesSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += operateService.PropertiesSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountPropertiesList
+     * comment 	: 급식사업부 -> 운영관리 -> 기물리스트 조회
+     */
+    @GetMapping("Operate/PropertiesList")
+    public String AccountPropertiesList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.PropertiesList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountPropertiesList
+     * comment 	: 급식사업부 -> 운영관리 -> 위생관리 조회
+     */
+    @GetMapping("Operate/HygieneList")
+    public String HygieneList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.HygieneList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: saveFile
+     * comment 	: 급식사업부 -> 운영관리 -> 파일업로드
+     */
+    @PostMapping("Operate/OperateImgUpload")
+    private String saveFile( @RequestParam("file") MultipartFile file,
+    	    @RequestParam("type") String type,
+    	    @RequestParam("gubun") String gubun,
+    	    @RequestParam("folder") String folder) throws IOException {
+    	
+    	int iResult = 0;
+    	String resultPath = "";
+    	
+        // 프로젝트 루트 대신 static 폴더 경로 사용
+        String staticPath = new File("src/main/resources/static").getAbsolutePath();
+        String basePath = staticPath + "/image/" + type + "/" + gubun + "/"+ folder +  "/";
+        Path dirPath = Paths.get(basePath);
+        Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+        String originalFileName = file.getOriginalFilename();
+        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+        Path filePath = dirPath.resolve(uniqueFileName);
+
+        file.transferTo(filePath.toFile()); // 파일 저장
+        
+        // 브라우저 접근용 경로 반환
+        resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
+        System.out.println("resultPath :: " + resultPath);
+        // Map을 MyBatis로 저장
+        Map<String, Object> paramMap = new HashMap<>();
+        
+        JsonObject obj = new JsonObject();
+    	
+    	if(!resultPath.isEmpty()) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+			obj.addProperty("image_path", resultPath);
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+        //businessService.insertOrUpdateFile(paramMap);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: HygieneSave
+     * comment 	: 급식사업부 -> 운영관리 -> 위생관리 저장
+     */
+    @PostMapping("Operate/HygieneSave")
+    private String HygieneSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += operateService.HygieneSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: HandOverSearch
+     * comment 	: 급식사업부 -> 운영관리 -> 인수인계서 조회
+     */
+    @GetMapping("Operate/HandOverSearch")
+    public String HandOverSearch(@RequestParam Map<String, Object> paramMap) {
+    	Map<String, Object> resultMap = new HashMap<String, Object>();
+    	resultMap = operateService.HandOverSearch(paramMap);
+    	
+    	return new Gson().toJson(resultMap);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: HygieneSave
+     * comment 	: 급식사업부 -> 운영관리 -> 인수인계서 저장
+     */
+    @PostMapping("Operate/HandOverSave")
+    private String HandOverSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	int iResult = 0;
+    	
+    	iResult += operateService.HandOverSave(paramMap);
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountMappingList
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 조회
+     */
+    @GetMapping("Operate/AccountMappingList")
+    public String AccountMappingList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountMappingList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountMappingListV2
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 조회 V2
+     */
+    @GetMapping("Operate/AccountMappingV2List")
+    public String AccountMappingV2List(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountMappingV2List(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountMappingSave
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 저장
+     */
+    @PostMapping("Operate/AccountMappingSave")
+    private String AccountMappingSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += operateService.AccountMappingSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountCreateSave
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표, 거래처 관리 Modal 거래처 저장
+     */
+    @PostMapping("Operate/AccountRetailBusinessSave")
+    private String AccountRetailBusinessSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	int iResult = 0;
+    	iResult = operateService.AccountRetailBusinessSave(paramMap);
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountCreateSave
+     * comment 	: 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 저장
+     */
+    @PostMapping("Operate/AccountRetailBusinessSaveV2")
+    private String AccountRetailBusinessSaveV2(@RequestBody List<Map<String, Object>> list) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> row : list) {
+    		iResult += operateService.AccountRetailBusinessSave(row);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountRetailBusinessList
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 거래처관리 조회
+     */
+    @GetMapping("Operate/AccountRetailBusinessList")
+    public String AccountRetailBusinessList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountRetailBusinessList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountMembersFilesList
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증 조회
+     */
+    @GetMapping("Operate/AccountMembersFilesList")
+    public String AccountMembersFilesList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountMembersFilesList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountMembersFilesList
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증 타입별 조회
+     */
+    @GetMapping("Operate/AccountTypeForFileList")
+    public String AccountTypeForFileList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountTypeForFileList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountMembersFilesSave
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증 저장
+     */
+    @PostMapping("Operate/AccountMembersFilesSave")
+    private String AccountMembersFilesSave(@RequestBody List<Map<String, Object>> list) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> row : list) {
+    		iResult += operateService.AccountMembersFilesSave(row);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountSubRestaurantList
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 조회
+     */
+    @GetMapping("Operate/AccountSubRestaurantList")
+    public String AccountSubRestaurantList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountSubRestaurantList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 운영
+     * method 	: AccountSubRestaurantSave
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 저장
+     */
+    @PostMapping("Operate/AccountSubRestaurantSave")
+    private String AccountSubRestaurantSave(@RequestBody List<Map<String, Object>> list) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> row : list) {
+    		iResult += operateService.AccountSubRestaurantSave(row);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountRecordMemberList
+     * comment 	: 급식사업부 -> 운영관리 -> 고객사관리 -> 인사기록카드 조회
+     */
+    @GetMapping("Operate/AccountMemberSheetList")
+    public String AccountMemberSheetList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountMemberSheetList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountMemberAllList
+     * comment 	: 급식사업부 -> 운영관리 -> 직원관리 조회
+     */
+    @GetMapping("Operate/AccountMemberAllList")
+    public String AccountMemberAllList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountMemberAllList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountSubRestaurantSave
+     * comment 	: 급식사업부 -> 운영관리 -> 직원관리 저장
+     */
+    @PostMapping("Operate/AccountMembersSave")
+    private String AccountMembersSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	List<Map<String, Object>> data = (List<Map<String, Object>>) paramMap.get("data");
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> row : data) {
+    		iResult += operateService.AccountMembersSave(row);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountDinnersNumberList
+     * comment 	: 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황 조회
+     */
+    @GetMapping("Operate/AccountDinnersNumberList")
+    public String AccountDinnersNumberList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountDinnersNumberList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountDinnersNumberSave
+     * comment 	: 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황 저장
+     */
+    @PostMapping("Operate/AccountDinnersNumberSave")
+    private String AccountDinnersNumberSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += operateService.AccountDinnersNumberSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+}

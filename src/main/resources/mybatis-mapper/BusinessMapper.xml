@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.BusinessMapper">
+	
+	<select id="NowDateKey" resultType="String">
+		SELECT DATE_FORMAT(now(), '%Y%m%d%H%i%s')
+	</select>
+	
+	<select id="BusinessTeleAccountList" parameterType="map" resultType="hashmap">
+		SELECT T.idx,
+			   T.account_name,
+			   T.sales_root,
+			   T.manager,
+			   T.region,
+			   T.now_consignor,
+			   T.end_dt,
+			   T.contract_type,
+			   T2.act_type,
+			   T2.act_idx,
+			   DATE_FORMAT(T2.act_dt, '%Y-%m-%d') as act_dt,
+			   T2.memo
+		FROM tb_tele_sales_account_info T
+		LEFT JOIN tb_tele_sales_activities T2
+		ON T2.idx = T.idx
+		AND DATE_FORMAT(T2.act_dt, '%Y') = #{year}
+	</select>
+	
+	<select id="AccountBusinessImgList" parameterType="map" resultType="hashmap">
+		SELECT business_report,
+		       business_regist,
+		       kitchen_drawing
+		FROM tb_account_info
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="insertOrUpdateFile" parameterType="map">
+		INSERT INTO tb_account_info
+			( account_id, business_report, business_regist, kitchen_drawing )
+			VALUES
+			( #{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing} )
+			ON DUPLICATE KEY UPDATE
+			business_report = #{business_report},
+			business_regist = #{business_regist},
+			kitchen_drawing = #{kitchen_drawing}
+	</insert>
+	
+	<insert id="BusinessTeleInfoSave" parameterType="map">
+		INSERT INTO tb_tele_sales_account_info(idx,account_name,sales_root,manager,region,now_consignor,end_dt,contract_type)
+		VALUES
+		(#{idx},#{account_name},#{sales_root},#{manager},#{region},#{now_consignor},#{end_dt},#{contract_type})
+		ON DUPLICATE KEY UPDATE
+		<trim suffixOverrides=",">
+			<if test="account_name != null">
+				account_name = #{account_name},
+			</if>
+			<if test="sales_root != null">
+				sales_root = #{sales_root},
+			</if>
+			<if test="manager != null">
+				manager = #{manager},
+			</if>
+			<if test="region != null">
+				region = #{region},
+			</if>
+			<if test="now_consignor != null">
+				now_consignor = #{now_consignor},
+			</if>
+			<if test="end_dt != null">
+				end_dt = #{end_dt},
+			</if>
+			<if test="contract_type != null">
+				contract_type = #{contract_type},
+			</if>
+		</trim>
+	</insert>
+	
+	<insert id="BusinessDailySave" parameterType="map">
+		INSERT INTO tb_tele_sales_activities(act_idx,idx,act_type,act_dt,memo)
+		VALUES
+		(null,#{idx},#{act_type},DATE_FORMAT(#{act_dt}, '%Y-%m-%d'),#{memo})
+		ON DUPLICATE KEY UPDATE
+		act_type = ${act_type},
+		memo = #{memo}
+	</insert>
+	
+	<insert id="BusinessContractSuccessSave" parameterType="map">
+		INSERT INTO tb_account(account_id,account_name, account_type, meal_type)
+		VALUES
+		(#{account_id},#{account_name},1,3)
+	</insert>
+	
+	<insert id="BusinessContractSuccessSave_2" parameterType="map">
+		<if test='manager_name != null'>
+			INSERT INTO tb_account(account_id,manager_name)
+			VALUES
+			(#{account_id},#{manager_name})
+ 		</if>
+		<if test='manager_name == null'>
+			INSERT INTO tb_account(account_id)
+			VALUES
+			(#{account_id})
+ 		</if>
+	</insert>
+	
+	<select id="CarList" parameterType="map" resultType="map">
+		SELECT car_number,
+			   car_name,
+			   CONCAT(car_name, ' ', car_number) as full_name,
+			   DATE_FORMAT(service_dt, '%Y-%m-%d') as service_dt,
+			   service_note,
+			   service_amt,
+			   mileage,
+			   comment,
+			   exterior_image,
+			   exterior_note
+		FROM tb_thefull_car_management
+		<if test="car_number != null">
+		WHERE car_number = #{car_number}
+		</if>
+	</select>
+	
+	<select id="CarSelectList" parameterType="map" resultType="map">
+		SELECT car_number,
+			   CONCAT(car_name, ' ', car_number) as full_name
+		FROM tb_thefull_car_list
+		GROUP BY car_number, car_name
+	</select>
+	
+	<insert id="CarNewSave" parameterType="map">
+		INSERT INTO tb_thefull_car_list(car_number,reg_dt,car_name)
+		VALUES
+		(#{car_number},DATE_FORMAT(now(), '%Y-%m-%d'),#{car_name})
+		ON DUPLICATE KEY UPDATE
+		car_name = VALUES(car_name)
+	</insert>
+	
+	<insert id="CarSave" parameterType="map">
+		INSERT INTO tb_thefull_car_management(car_number,service_dt,car_name,service_note,service_amt,mileage,comment,exterior_image,exterior_note)
+		VALUES
+		(#{car_number},DATE_FORMAT(#{service_dt}, '%Y-%m-%d'),#{car_name},#{service_note},#{service_amt},#{mileage},#{comment},#{exterior_image},#{exterior_note})
+		ON DUPLICATE KEY UPDATE
+		car_number = VALUES(car_number),
+		service_dt = VALUES(service_dt),
+		car_name = VALUES(car_name),
+		service_note = VALUES(service_note),
+		service_amt = VALUES(service_amt),
+		mileage = VALUES(mileage),
+		comment = VALUES(comment),
+		exterior_image = VALUES(exterior_image),
+		exterior_note = VALUES(exterior_note)
+	</insert>
+	
+	<select id="CookWearList" parameterType="map" resultType="map">
+		SELECT type,
+			   CASE type WHEN 1 THEN 'M'
+						 WHEN 2 THEN 'L'
+		                 WHEN 3 THEN 'XL'
+		                 WHEN 4 THEN 'XXL'
+		                 ELSE '조리모' END AS item,
+			  ifnull(current_qty, 0) as current_qty,
+		      ifnull(new_qty, 0) as new_qty,
+		      ifnull(out_qty, 0) as out_qty,
+		      ifnull(remain_qty, 0) as remain_qty,
+		      ifnull(before_qty, 0) as before_qty
+		FROM tb_account_cook_wear_inventory
+	</select>
+	
+	<select id="CookWearOutList" parameterType="map" resultType="map">
+		SELECT type,
+				CASE type WHEN 1 THEN 'M'
+						 WHEN 2 THEN 'L'
+		                 WHEN 3 THEN 'XL'
+		                 WHEN 4 THEN 'XXL'
+		                 ELSE '조리모' END AS item,
+			  account_id,
+			  DATE_FORMAT(out_dt, '%Y-%m-%d') as out_dt,
+		      ifnull(out_qty, 0) as out_qty,
+		      note
+		FROM tb_account_cook_wear_out_history
+	</select>
+	
+	<select id="CookWearNewList" parameterType="map" resultType="map">
+		SELECT type,
+				CASE type WHEN 1 THEN 'M'
+						 WHEN 2 THEN 'L'
+		                 WHEN 3 THEN 'XL'
+		                 WHEN 4 THEN 'XXL'
+		                 ELSE '조리모' END AS item,
+			  account_id,
+			  DATE_FORMAT(new_dt, '%Y-%m-%d') as new_dt,
+		      ifnull(new_qty, 0) as new_qty,
+		      note
+		FROM tb_account_cook_wear_new_history
+	</select>
+	
+	<!-- 현재고는 이전 재고로, 남은 재고는 현재고로 저장되어야 전에 몇개가 재고였는지 확인 할 수 있음 -->
+	<insert id="CookWearSave" parameterType="map">
+		INSERT INTO tb_account_cook_wear_inventory(type,before_qty,current_qty,remain_qty)
+		VALUES
+		(#{type},#{orign_qty},#{remain_qty},#{remain_qty})
+		ON DUPLICATE KEY UPDATE
+		type = VALUES(type),
+		before_qty = #{orign_qty},
+		current_qty = VALUES(remain_qty),
+		remain_qty = VALUES(remain_qty)
+	</insert>
+	
+	<insert id="CookWearOutSave" parameterType="map">
+		INSERT INTO tb_account_cook_wear_out_history(type,account_id,out_dt,out_qty)
+		VALUES
+		(#{type},#{account_id},DATE_FORMAT(#{out_dt}, '%Y-%m-%d'),#{out_qty})
+		ON DUPLICATE KEY UPDATE
+		type = VALUES(type),
+		account_id = VALUES(account_id),
+		out_dt = VALUES(out_dt),
+		out_qty = VALUES(out_qty)
+	</insert>
+	
+	<insert id="CookWearNewSave" parameterType="map">
+		INSERT INTO tb_account_cook_wear_new_history(type,account_id,new_dt,new_qty)
+		VALUES
+		(#{type},#{account_id},DATE_FORMAT(#{new_dt}, '%Y-%m-%d'),#{new_qty})
+		ON DUPLICATE KEY UPDATE
+		type = VALUES(type),
+		account_id = VALUES(account_id),
+		new_dt = VALUES(new_dt),
+		new_qty = VALUES(new_qty)
+	</insert>
+	
+	<select id="AccountEventList" parameterType="map" resultType="map">
+		SELECt account_id,
+			   event_id,
+		       event_name,
+		       DATE_FORMAT(event_dt, '%Y-%m-%d') as event_dt
+		FROM tb_account_event_management
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<select id="EventFileList" parameterType="int" resultType="map">
+		SELECt event_id,
+			   image_path,
+		       image_order,
+		       image_name
+		FROM tb_account_event_file_management
+		WHERE event_id = #{event_id}
+	</select>
+	
+	<insert id="AccountEventFileDelete" parameterType="map">
+		DELETE FROM tb_account_event_file_management 
+		WHERE event_id = #{event_id}
+		AND image_order = #{image_order}
+	</insert>
+	
+	<insert id="EventSave" parameterType="map" useGeneratedKeys="true" keyProperty="event_id">
+	    INSERT INTO tb_account_event_management (
+	        account_id, event_name, event_dt, update_dt, user_id
+	    )
+	    VALUES (
+	        #{account_id},
+	        #{event_name},
+	        DATE_FORMAT(#{event_dt}, '%Y-%m-%d'),
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id}
+	    )
+	</insert>
+	
+	<update id="EventUpdate" parameterType="map">
+	    UPDATE tb_account_event_management
+	    SET event_name = #{event_name},
+	        event_dt = #{event_dt},
+	        update_dt = NOW(),
+	        user_id = #{user_id}
+	    WHERE event_id = #{event_id}
+	      AND account_id = #{account_id}
+	</update>
+	
+	<select id="GetMaxImageOrder" parameterType="int" resultType="int">
+	    SELECT MAX(image_order)
+	    FROM tb_account_event_file_management
+	    WHERE event_id = #{event_id}
+	</select>
+	
+	<insert id="SaveEventFile" parameterType="map">
+	    INSERT INTO tb_account_event_file_management (
+	        event_id, image_order, image_path, image_name
+	    )
+	    VALUES (
+	        #{event_id},
+	        #{image_order},
+	        #{image_path},
+	        #{image_name}
+	    )
+	</insert>
+	
+</mapper>

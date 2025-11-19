@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.HeadOfficeMapper">
+	<insert id="WeekMenuSave">
+        INSERT INTO tb_week_menu
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        menu_date,
+	        content,
+	        type,
+	        update_dt,
+	        reg_dt,
+	        del_yn,
+	        user_id,
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	    	DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	        #{content},
+	        #{type},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        #{del_yn},
+	        #{user_id},
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	idx=#{idx},
+	        menu_date=DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	        content=#{content},
+	        type=#{type},
+	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        del_yn=#{del_yn},
+	        user_id=#{user_id},
+	    </trim>
+    </insert>
+    
+    <select id="WeekMenuList" parameterType="map" resultType="hashmap">
+    	SELECT idx,
+    		   DATE_FORMAT(menu_date, '%Y-%m-%d') as menu_date,
+    		   content,
+    		   type,
+    		   del_yn,
+    		   update_dt,
+    		   reg_dt,
+    		   user_id
+			FROM tb_week_menu 
+			WHERE DATE_FORMAT(menu_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			AND type = #{type}
+			AND del_yn = 'N'
+    </select>
+    
+    <insert id="EventSave">
+        INSERT INTO tb_week_menu
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        menu_date,
+	        content,
+	        type,
+	        update_dt,
+	        reg_dt,
+	        del_yn,
+	        user_id,
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	    	DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	        #{content},
+	        #{type},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        #{del_yn},
+	        #{user_id},
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	idx=#{idx},
+	        menu_date=DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	        content=#{content},
+	        type=#{type},
+	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        del_yn=#{del_yn},
+	        user_id=#{user_id},
+	    </trim>
+    </insert>
+    
+    <select id="EventList" parameterType="map" resultType="hashmap">
+    	SELECT idx,
+    		   DATE_FORMAT(menu_date, '%Y-%m-%d') as menu_date,
+    		   content,
+    		   type,
+    		   del_yn,
+    		   update_dt,
+    		   reg_dt,
+    		   user_id
+			FROM tb_week_menu 
+			WHERE DATE_FORMAT(menu_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			AND del_yn = 'N'
+			AND type != 1
+    </select>
+    
+    <select id="PeopleCountingList" parameterType="map" resultType="hashmap">
+    	SELECT a.account_id
+			 , a.account_name
+		     , adn.diner_date
+		     , ifnull(adn.total,0) as total
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_diners_number adn
+		ON adn.account_id = a.account_id
+		AND adn.diner_year = #{year}
+		AND adn.diner_month = #{month}
+		ORDER BY a.account_id, diner_date ASC
+    </select>
+    
+    <insert id="ProfitLossTableSave" parameterType="map">
+    	INSERT INTO tb_account_managerment_table (
+		    account_id,
+		    year,
+		    month,
+		    living_estimate,
+		    living_estimate_ratio,
+		    basic_estimate,
+		    basic_estimate_ratio,
+		    living_cost,
+		    living_ratio,
+		    basic_cost,
+		    basic_ratio,
+		    employ_cost,
+		    employ_ratio,
+		    daycare_cost,
+		    daycare_ratio,
+		    daycare_emp_cost,
+		    daycare_emp_ratio,
+		    payback_price,
+		    payback_ratio,
+		    duty_secure,
+		    duty_secure_ratio,
+		    food_process,
+		    food_trash_ratio,
+		    dishwasher,
+		    dishwasher_ratio,
+		    cesco,
+		    cesco_ratio,
+		    water_puri,
+		    water_ratio,
+		    utility_bills,
+		    utility_ratio,
+		    food_cost,
+		    food_ratio,
+		    etc_cost,
+		    etc_ratio,
+		    estimate_total,
+		    estimate_total_ratio,
+		    dispatch_cost,
+		    dispatch_ratio,
+		    person_cost,
+		    person_ratio,
+		    sales_total,
+		    sales_total_ratio,
+		    purchase_total,
+		    purchase_total_ratio,
+		    person_total,
+		    person_total_ratio,
+		    indirect_total,
+		    indirect_total_ratio,
+		    business_profit,
+		    business_profit_ratio,
+		    update_dt
+		)
+		VALUES
+		(
+		    #{account_id},
+		    #{year},
+		    #{month},
+		    #{living_estimate},
+		    #{living_estimate_ratio},
+		    #{basic_estimate},
+		    #{basic_estimate_ratio},
+		    #{living_cost},
+		    #{living_ratio},
+		    #{basic_cost},
+		    #{basic_ratio},
+		    #{employ_cost},
+		    #{employ_ratio},
+		    #{daycare_cost},
+		    #{daycare_ratio},
+		    #{daycare_emp_cost},
+		    #{daycare_emp_ratio},
+		    #{payback_price},
+		    #{payback_ratio},
+		    #{duty_secure},
+		    #{duty_secure_ratio},
+		    #{food_process},
+		    #{food_trash_ratio},
+		    #{dishwasher},
+		    #{dishwasher_ratio},
+		    #{cesco},
+		    #{cesco_ratio},
+		    #{water_puri},
+		    #{water_ratio},
+		    #{utility_bills},
+		    #{utility_ratio},
+		    #{food_cost},
+		    #{food_ratio},
+		    #{etc_cost},
+		    #{etc_ratio},
+		    #{estimate_total},
+		    #{estimate_total_ratio},
+		    #{dispatch_cost},
+		    #{dispatch_ratio},
+		    #{person_cost},
+		    #{person_ratio},
+		    #{sales_total},
+		    #{sales_total_ratio},
+		    #{purchase_total},
+		    #{purchase_total_ratio},
+		    #{person_total},
+		    #{person_total_ratio},
+		    #{indirect_total},
+		    #{indirect_total_ratio},
+		    #{business_profit},
+		    #{business_profit_ratio},
+		    NOW() 
+		)
+		ON DUPLICATE KEY UPDATE
+		<trim suffixOverrides=",">
+		    <if test="living_estimate != null">
+		        living_estimate = #{living_estimate},
+		    </if>
+		    <if test="living_estimate_ratio != null">
+		        living_estimate_ratio = #{living_estimate_ratio},
+		    </if>
+		    <if test="basic_estimate != null">
+		        basic_estimate = #{basic_estimate},
+		    </if>
+		    <if test="basic_estimate_ratio != null">
+		        basic_estimate_ratio = #{basic_estimate_ratio},
+		    </if>
+		    <if test="living_cost != null">
+		        living_cost = #{living_cost},
+		    </if>
+		    <if test="living_ratio != null">
+		        living_ratio = #{living_ratio},
+		    </if>
+		    <if test="basic_cost != null">
+		        basic_cost = #{basic_cost},
+		    </if>
+		    <if test="basic_ratio != null">
+		        basic_ratio = #{basic_ratio},
+		    </if>
+		    <if test="employ_cost != null">
+		        employ_cost = #{employ_cost},
+		    </if>
+		    <if test="employ_ratio != null">
+		        employ_ratio = #{employ_ratio},
+		    </if>
+		    <if test="daycare_cost != null">
+		        daycare_cost = #{daycare_cost},
+		    </if>
+		    <if test="daycare_ratio != null">
+		        daycare_ratio = #{daycare_ratio},
+		    </if>
+		    <if test="daycare_emp_cost != null">
+		        daycare_emp_cost = #{daycare_emp_cost},
+		    </if>
+		    <if test="daycare_emp_ratio != null">
+		        daycare_emp_ratio = #{daycare_emp_ratio},
+		    </if>
+		    <if test="payback_price != null">
+		        payback_price = #{payback_price},
+		    </if>
+		    <if test="payback_ratio != null">
+		        payback_ratio = #{payback_ratio},
+		    </if>
+		    <if test="duty_secure != null">
+		        duty_secure = #{duty_secure},
+		    </if>
+		    <if test="duty_secure_ratio != null">
+		        duty_secure_ratio = #{duty_secure_ratio},
+		    </if>
+		    <if test="food_process != null">
+		        food_process = #{food_process},
+		    </if>
+		    <if test="food_trash_ratio != null">
+		        food_trash_ratio = #{food_trash_ratio},
+		    </if>
+		    <if test="dishwasher != null">
+		        dishwasher = #{dishwasher},
+		    </if>
+		    <if test="dishwasher_ratio != null">
+		        dishwasher_ratio = #{dishwasher_ratio},
+		    </if>
+		    <if test="cesco != null">
+		        cesco = #{cesco},
+		    </if>
+		    <if test="cesco_ratio != null">
+		        cesco_ratio = #{cesco_ratio},
+		    </if>
+		    <if test="water_puri != null">
+		        water_puri = #{water_puri},
+		    </if>
+		    <if test="water_ratio != null">
+		        water_ratio = #{water_ratio},
+		    </if>
+		    <if test="utility_bills != null">
+		        utility_bills = #{utility_bills},
+		    </if>
+		    <if test="utility_ratio != null">
+		        utility_ratio = #{utility_ratio},
+		    </if>
+		    <if test="food_cost != null">
+		        food_cost = #{food_cost},
+		    </if>
+		    <if test="food_ratio != null">
+		        food_ratio = #{food_ratio},
+		    </if>
+		    <if test="etc_cost != null">
+		        etc_cost = #{etc_cost},
+		    </if>
+		    <if test="etc_ratio != null">
+		        etc_ratio = #{etc_ratio},
+		    </if>
+		    <if test="estimate_total != null">
+		        estimate_total = #{estimate_total},
+		    </if>
+		    <if test="estimate_total_ratio != null">
+		        estimate_total_ratio = #{estimate_total_ratio},
+		    </if>
+		    <if test="dispatch_cost != null">
+		        dispatch_cost = #{dispatch_cost},
+		    </if>
+		    <if test="dispatch_ratio != null">
+		        dispatch_ratio = #{dispatch_ratio},
+		    </if>
+		    <if test="person_cost != null">
+		        person_cost = #{person_cost},
+		    </if>
+		    <if test="person_ratio != null">
+		        person_ratio = #{person_ratio},
+		    </if>
+		    <if test="sales_total != null">
+		        sales_total = #{sales_total},
+		    </if>
+		    <if test="sales_total_ratio != null">
+		        sales_total_ratio = #{sales_total_ratio},
+		    </if>
+		    <if test="purchase_total != null">
+		        purchase_total = #{purchase_total},
+		    </if>
+		    <if test="purchase_total_ratio != null">
+		        purchase_total_ratio = #{purchase_total_ratio},
+		    </if>
+		    <if test="person_total != null">
+		        person_total = #{person_total},
+		    </if>
+		    <if test="person_total_ratio != null">
+		        person_total_ratio = #{person_total_ratio},
+		    </if>
+		    <if test="indirect_total != null">
+		        indirect_total = #{indirect_total},
+		    </if>
+		    <if test="indirect_total_ratio != null">
+		        indirect_total_ratio = #{indirect_total_ratio},
+		    </if>
+		    <if test="business_profit != null">
+		        business_profit = #{business_profit},
+		    </if>
+		    <if test="business_profit_ratio != null">
+		        business_profit_ratio = #{business_profit_ratio},
+		    </if>
+		    update_dt = NOW()
+		</trim>
+    </insert>
+    
+    <select id="ProfitLossTableList" parameterType="map" resultType="hashmap">
+    	SELECT account_id,
+			    year,
+			    month,
+			    ifnull(living_estimate,0) as living_estimate,
+			    ifnull(living_estimate_ratio,0) as living_estimate_ratio,
+			    ifnull(basic_estimate,0) as basic_estimate,
+			    ifnull(basic_estimate_ratio,0) as basic_estimate_ratio,
+			    ifnull(living_cost,0) as living_cost,
+			    ifnull(living_ratio,0) as living_ratio,
+			    ifnull(basic_cost,0) as basic_cost,
+			    ifnull(basic_ratio,0) as basic_ratio,
+			    ifnull(employ_cost,0) as employ_cost,
+			    ifnull(employ_ratio,0) as employ_ratio,
+			    ifnull(daycare_cost,0) as daycare_cost,
+			    ifnull(daycare_ratio,0) as daycare_ratio,
+			    ifnull(daycare_emp_cost,0) as daycare_emp_cost,
+			    ifnull(daycare_emp_ratio,0) as daycare_emp_ratio,
+			    ifnull(payback_price,0) as payback_price,
+			    ifnull(payback_ratio,0) as payback_ratio,
+			    ifnull(duty_secure,0) as duty_secure,
+			    ifnull(duty_secure_ratio,0) as duty_secure_ratio,
+			    ifnull(food_process,0) as food_process,
+			    ifnull(food_trash_ratio,0) as food_trash_ratio,
+			    ifnull(dishwasher,0) as dishwasher,
+			    ifnull(dishwasher_ratio,0) as dishwasher_ratio,
+			    ifnull(cesco,0) as cesco,
+			    ifnull(cesco_ratio,0) as cesco_ratio,
+			    ifnull(water_puri,0) as water_puri,
+			    ifnull(water_ratio,0) as water_ratio,
+			    ifnull(utility_bills,0) as utility_bills,
+			    ifnull(utility_ratio,0) as utility_ratio,
+			    ifnull(food_cost,0) as food_cost,
+			    ifnull(food_ratio,0) as food_ratio,
+			    ifnull(etc_cost,0) as etc_cost,
+			    ifnull(etc_ratio,0) as etc_ratio,
+			    ifnull(estimate_total,0) as estimate_total,
+			    ifnull(estimate_total_ratio,0) as estimate_total_ratio,
+			    ifnull(dispatch_cost,0) as dispatch_cost,
+			    ifnull(dispatch_ratio,0) as dispatch_ratio,
+			    ifnull(person_cost,0) as person_cost,
+			    ifnull(person_ratio,0) as person_ratio,
+			    ifnull(sales_total,0) as sales_total,
+			    ifnull(sales_total_ratio,0) as sales_total_ratio,
+			    ifnull(purchase_total,0) as purchase_total,
+			    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
+			    ifnull(person_total,0) as person_total,
+			    ifnull(person_total_ratio,0) as person_total_ratio,
+			    ifnull(indirect_total,0) as indirect_total,
+			    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
+			    ifnull(business_profit,0) as business_profit,
+			    ifnull(business_profit_ratio,0) as business_profit_ratio,
+			    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt
+			FROM the_full.tb_account_managerment_table
+			WHERE year = #{year}
+			AND account_id = #{account_id}
+    </select>
+    
+    <select id="ProfitLossTotalSave" statementType="CALLABLE" parameterType="map">
+	    { CALL ProfitLossTotalSave(
+	        #{year, mode=IN, jdbcType=INTEGER},
+	        #{month, mode=IN, jdbcType=INTEGER},
+	        #{account_id, mode=IN, jdbcType=VARCHAR},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
+	
+	<select id="AccountManagermentTableList" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+		    year,
+		    month,
+		    living_estimate,
+		    living_estimate_ratio,
+		    basic_estimate,
+		    basic_estimate_ratio,
+		    living_cost,
+		    living_ratio,
+		    basic_cost,
+		    basic_ratio,
+		    employ_cost,
+		    employ_ratio,
+		    daycare_cost,
+		    daycare_ratio,
+		    daycare_emp_cost,
+		    daycare_emp_ratio,
+		    payback_price,
+		    payback_ratio,
+		    duty_secure,
+		    duty_secure_ratio,
+		    food_process,
+		    food_trash_ratio,
+		    dishwasher,
+		    dishwasher_ratio,
+		    cesco,
+		    cesco_ratio,
+		    water_puri,
+		    water_ratio,
+		    utility_bills,
+		    utility_ratio,
+		    food_cost,
+		    food_ratio,
+		    etc_cost,
+		    etc_ratio,
+		    estimate_total,
+		    estimate_total_ratio,
+		    dispatch_cost,
+		    dispatch_ratio,
+		    person_cost,
+		    person_ratio,
+		    sales_total,
+		    sales_total_ratio,
+		    purchase_total,
+		    purchase_total_ratio,
+		    person_total,
+		    person_total_ratio,
+		    indirect_total,
+		    indirect_total_ratio,
+		    business_profit,
+		    business_profit_ratio,
+		    update_dt
+		FROM the_full.tb_account_managerment_table
+	</select>
+</mapper>

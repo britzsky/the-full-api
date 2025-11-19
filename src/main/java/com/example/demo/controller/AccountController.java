@@ -1,0 +1,735 @@
+package com.example.demo.controller;
+
+import java.io.File;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.example.demo.WebConfig;
+import com.example.demo.service.AccountService;
+import com.example.demo.service.HeadOfficeService;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
+@RestController
+@CrossOrigin(origins = "http://localhost:3000")
+public class AccountController {
+
+	private final AccountService accountService;
+	private final HeadOfficeService headOfficeService;
+	private final String BASE_PATH = "/image"; // 실제 서버 경로 (이미지 저장을 위한)
+	
+    @Autowired
+    public AccountController(AccountService accountService, HeadOfficeService headOfficeService, WebConfig webConfig) {
+    	this.accountService = accountService;
+    	this.headOfficeService = headOfficeService;
+    }
+    
+    /*
+     * method 	: AccountList
+     * comment 	: 거래처 조회
+     */
+    @GetMapping("/Account/AccountList")
+    public String AccountList(@RequestParam(required = false) Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
+    	resultList = accountService.AccountMemberList(iAccountType);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * method 	: AccountDirectList
+     * comment 	: 신사업팀 -> 직영점 조회
+     */
+    @GetMapping("/Account/AccountDirectList")
+    public String AccountDirectList() {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountDirectList();
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountTallySheetList
+     * comment 	: 거래처 -> 집계표 조회
+     */
+    @GetMapping("/Account/AccountTallySheetList")
+    public String AccountTallySheetList(@RequestParam Map<String, Object> paramMap) {
+    	int digits = 2; // 원하는 자릿수
+
+        // String.format()을 사용하여 숫자 앞에 0 추가
+    	// 1. Map에서 "month" 값을 String으로 가져옵니다. (확실하게 String임을 가정)
+    	String monthString = paramMap.get("month").toString(); // 안전하게 toString() 호출
+
+    	// 2. String을 정수(int)로 변환합니다.
+    	int monthValue = Integer.parseInt(monthString); // 이 부분에서 d 타입에 맞는 정수가 됨
+
+    	// 3. String.format()을 사용하여 숫자 앞에 0 추가
+    	String formattedNumber = String.format("%0" + digits + "d", monthValue);
+    	
+    	paramMap.put("month", formattedNumber);
+        
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountTallySheetList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountSave
+     * comment 	: 거래처 -> 집계표 저장
+     */
+    @PostMapping("Account/AccountSave")
+    public String AccountSave(@RequestParam Map<String, Object> paramMap) {
+    	
+    	JsonObject obj =new JsonObject();
+    	
+    	if(accountService.AccountSave(paramMap) > 0) {
+    		obj.addProperty("code", 200);
+    		obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+    		obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountRecordDispatchList
+     * comment 	: 거래처 -> 출근부 -> 파출직원 조회
+     */
+    @GetMapping("Account/AccountRecordDispatchList")
+    public String AccountRecordDispatchList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountRecordDispatchList(paramMap);
+    	
+    	return new Gson().toJson(resultList); 
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountRecordMemberList
+     * comment 	: 거래처 -> 출근부 -> 직원 조회
+     */
+    @GetMapping("Account/AccountRecordMemberList")
+    public String AccountRecordMemberList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountRecordMemberList(paramMap);
+    	
+    	return new Gson().toJson(resultList); 
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountRecordMemberList
+     * comment 	: 거래처 -> 출근부 -> 출근현황 조회
+     */
+    @GetMapping("Account/AccountRecordSheetList")
+    public String AccountRecordSheetList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountRecordSheetList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    @GetMapping("Account/AccountMemberRecordTime")
+    public String AccountMemberRecordTime(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountMemberRecordTime(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountMemberRecordSave
+     * comment 	: 거래처 -> 출근부 -> 출근부 정보 저장
+     */
+    @PostMapping("Account/AccountRecordSave")
+    public String AccountMemberRecordSave(@RequestBody Map<String, List<Map<String, Object>>> payload) {
+    	
+    	int iResult = 0;
+    	
+    	List<Map<String, Object>> normalRecords = payload.get("normalRecords");
+        List<Map<String, Object>> type5Records = payload.get("type5Records");
+        
+        for (Map<String, Object> row : normalRecords) {	
+        	iResult += accountService.AccountMemberRecordSave(row);
+        	iResult += accountService.processProfitLossV2(row);
+        }
+        for (Map<String, Object> row : type5Records) {	
+        	iResult += accountService.AccountDispatchRecordSave(row);
+        	iResult += accountService.processProfitLossV2(row);
+        }
+    	
+        JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+    		obj.addProperty("code", 200);
+    		obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+    		obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 현장
+     * method 	: AccountMemberRecordSave
+     * comment 	: 거래처 -> 출근부 -> 파출직원 저장
+     */
+    @PostMapping("Account/AccountDispatchMemberSave")
+    public String AccountDispatchMemberSave(@RequestParam Map<String, Object> paramMap) {
+    	
+    	System.out.println("account_id :: " + paramMap.get("account_id"));
+    	System.out.println("name :: " + paramMap.get("name"));
+    	System.out.println("rrn :: " + paramMap.get("rrn"));
+    	System.out.println("account_number :: " + paramMap.get("account_number"));
+    	
+    	int iResult = 0;
+    	
+    	iResult = accountService.AccountDispatchMemberSave(paramMap);
+    	
+        JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+    		obj.addProperty("code", 200);
+    		obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+    		obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    
+    
+    /*
+     * part		: 영업
+     * method 	: AccountInfoList
+     * comment 	: 거래처 -> 거래처 상세 조회
+     */
+    @GetMapping("Account/AccountInfoList")
+    public String AccountInfoList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountInfoList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 영업
+     * method 	: AccountInfoList_2
+     * comment 	: 거래처 -> 거래처 상세 조회
+     */
+    @GetMapping("Account/AccountInfoList_2")
+    public String AccountInfoList_2(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountInfoList_2(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 영업
+     * method 	: AccountInfoList_3
+     * comment 	: 거래처 -> 거래처 상세 조회
+     */
+    @GetMapping("Account/AccountInfoList_3")
+    public String AccountInfoList_3(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountInfoList_3(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 영업
+     * method 	: AccountInfoList_4
+     * comment 	: 거래처 -> 거래처 상세 조회
+     */
+    @GetMapping("Account/AccountInfoList_4")
+    public String AccountInfoList_4(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountInfoList_4(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 영업
+     * method 	: AccountInfoList_5
+     * comment 	: 거래처 -> 거래처 상세 조회
+     */
+    @GetMapping("Account/AccountInfoList_5")
+    public String AccountInfoList_5(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountInfoList_5(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 영업
+     * method 	: AccountMemberRecordSave
+     * comment 	: 거래처 -> 거래처 상세 저장
+     */
+    @SuppressWarnings("unchecked")
+	@PostMapping("Account/AccountInfoSave")
+    public String AccountInfoSave(@RequestBody Map<String, Object> payload) {
+    	
+    	int iResult = 0;
+    	
+    	//List<Map<String, Object>> payloadList = new ArrayList<>();
+    	
+    	Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
+        Map<String, Object> payloadMap = new HashMap<String, Object>();
+        
+        payloadMap.putAll(formData);
+        
+        List<Map<String, Object>> priceData = (List<Map<String, Object>>) payload.get("priceData");
+        List<Map<String, Object>> etcData = (List<Map<String, Object>>) payload.get("etcData");
+        List<Map<String, Object>> managerData = (List<Map<String, Object>>) payload.get("managerData");
+        List<Map<String, Object>> eventData = (List<Map<String, Object>>) payload.get("eventData");
+        
+        for (Map<String, Object> row : etcData) {	
+        	payloadMap.putAll(row);
+        }
+        for (Map<String, Object> row : eventData) {	
+        	payloadMap.putAll(row);
+        }
+        for (Map<String, Object> row : managerData) {	
+        	payloadMap.putAll(row);
+        }
+        for (Map<String, Object> row : priceData) {	
+        	payloadMap.putAll(row);
+        }
+        
+        iResult = accountService.AccountInfoSave(payloadMap);
+        
+        JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+    		obj.addProperty("code", 200);
+    		obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+    		obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 영업
+     * method 	: AccountBusinessImgList
+     * comment 	: 거래처 -> 거래처 상세 이미지 조회
+     */
+    @GetMapping("Account/AccountBusinessImgList")
+    public String AccountBusinessImgList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountBusinessImgList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    @PostMapping("Account/AccountBusinessImgUpload")
+    public void uploadFiles(
+            @RequestParam("account_id") String accountId,
+            @RequestParam(value = "business_report", required = false) MultipartFile businessReport,
+            @RequestParam(value = "business_regist", required = false) MultipartFile businessRegist,
+            @RequestParam(value = "kitchen_drawing", required = false) MultipartFile kitchenDrawing
+    ) throws IOException {
+        Map<String, String> filePathMap = new HashMap<>();
+
+        if (businessReport != null && !businessReport.isEmpty()) {
+            String path = saveFile(accountId, "business_report", businessReport);
+            filePathMap.put("business_report", path);
+        }
+
+        if (businessRegist != null && !businessRegist.isEmpty()) {
+            String path = saveFile(accountId, "business_regist", businessRegist);
+            filePathMap.put("business_regist", path);
+        }
+
+        if (kitchenDrawing != null && !kitchenDrawing.isEmpty()) {
+            String path = saveFile(accountId, "kitchen_drawing", kitchenDrawing);
+            filePathMap.put("kitchen_drawing", path);
+        }
+
+        // Map을 MyBatis로 저장
+        Map<String, Object> paramMap = new HashMap<>();
+        paramMap.put("account_id", accountId);
+        paramMap.putAll(filePathMap);
+
+        accountService.insertOrUpdateFile(paramMap);
+    }
+
+    private String saveFile(String accountId, String type, MultipartFile file) throws IOException {
+        // 프로젝트 루트 대신 static 폴더 경로 사용
+        String staticPath = new File("src/main/resources/static").getAbsolutePath();
+        String basePath = staticPath + "/image/" + accountId + "/" + type + "/";
+        Path dirPath = Paths.get(basePath);
+        Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+        String originalFileName = file.getOriginalFilename();
+        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+        Path filePath = dirPath.resolve(uniqueFileName);
+
+        file.transferTo(filePath.toFile()); // 파일 저장
+
+        // 브라우저 접근용 경로 반환
+        return "/image/" + accountId + "/" + type + "/" + uniqueFileName;
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineBalanceList
+     * comment 	: 회계 -> 매출마감/미수잔액 조회
+     */
+    @GetMapping("Account/AccountDeadlineBalanceList")
+    public String AccountDeadlineBalanceList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountDeadlineBalanceList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineBalanceList
+     * comment 	: 회계 -> 매출마감/미수잔액 입금내역 조회
+     */
+    @GetMapping("Account/AccountDepositHistoryList")
+    public String AccountDepositHistoryList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountDepositHistoryList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineBalanceSave
+     * comment 	: 회계 -> 매출마감/미수잔액 저장
+     */
+    @PostMapping("Account/AccountDeadlineBalanceSave")
+    private String AccountDeadlineBalanceSave(@RequestBody Map<String, Object> paramMap) {
+        
+    	// 월의 총 일수 구함.
+    	LocalDate today = LocalDate.now();
+        int lastDay = today.lengthOfMonth(); // 이 달의 마지막 일자 (28,29,30,31 중 하나)
+    	
+        int iResult = 0;
+        
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) paramMap.get("rows");
+        
+        if (rows == null || rows.isEmpty()) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "데이터(rows)가 누락되었거나 비어있습니다.");
+            return obj.toString();
+        }
+
+        for (Map<String, Object> param : rows) {
+        	// accountDataMap을 사용하여 로직 처리
+            if(param.get("balance_price") != null || param.get("before_price") != null) {
+                Map<String, Object> balanceMap = new HashMap<String, Object>();
+                balanceMap.put("balance_price", param.get("balance_price"));
+                balanceMap.put("before_price", param.get("before_price"));
+                balanceMap.put("account_id", param.get("account_id")); // account_id 정상 추출!
+                
+                // 총 미수잔액 저장
+                iResult += accountService.AccountBalancePriceSave(balanceMap);
+            }
+            
+            iResult += accountService.processProfitLoss(param);
+        }
+        
+        JsonObject obj = new JsonObject();
+        
+        if(iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "실패");
+        }
+        
+        return obj.toString();
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountBalancePriceSave
+     * comment 	: 회계 -> 매출마감/미수잔액 총 미수금액 저장
+     */
+    @PostMapping("Account/AccountBalancePriceSave")
+    private String AccountBalancePriceSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += accountService.AccountBalancePriceSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDepositHistorySave
+     * comment 	: 회계 -> 매출마감/미수잔액 입금내역 저장
+     */
+    @PostMapping("Account/AccountDepositHistorySave")
+    private String AccountDepositHistorySave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	int iResult = 0;
+    	
+    	iResult += accountService.AccountDepositHistorySave(paramMap);
+    	iResult += accountService.AccountBalancePriceSave(paramMap);
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineDifferencePriceSearch
+     * comment 	: 회계 -> 타입별 차액 조회
+     */
+    @GetMapping("Account/AccountDeadlineDifferencePriceSearch")
+    public String AccountDeadlineDifferencePriceSearch(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountDeadlineDifferencePriceSearch(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineFilesList
+     * comment 	: 회계 -> 마감자료 조회
+     */
+    @GetMapping("Account/AccountDeadlineFilesList")
+    public String AccountDeadlineFilesList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountDeadlineFilesList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 회계
+     * method 	: AccountDeadlineFilesSave
+     * comment 	: 회계 -> 마감자료 저장
+     */
+    @PostMapping("Account/AccountDeadlineFilesSave")
+    private String AccountDeadlineFilesSave(@RequestParam("file") MultipartFile file,
+								    	    @RequestParam("account_id") String accountId,
+								    	    @RequestParam("year") String year,
+								    	    @RequestParam("month") String month,
+    										@RequestParam("file_yn") String file_yn) {
+    	
+    	Map<String, Object> paramMap = new HashMap<String, Object>();
+    	
+    	paramMap.put("account_id", accountId);
+    	paramMap.put("year", year);
+    	paramMap.put("month", month);
+    	paramMap.put("file_yn", file_yn);
+    	
+    	try {
+    		paramMap.put("deadline_file", saveFile(file, "deadline", "files", accountId));
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	
+    	int iResult = 0;
+    	
+    	iResult = accountService.AccountDeadlineFilesSave(paramMap);
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
+    /*
+     * method 	: saveFile
+     * comment 	: 거래처 파일업로드 공통
+     */
+    private String saveFile(MultipartFile file, String type, String gubun, String folder) throws IOException {
+    	
+    	String resultPath = "";
+    	
+        // 프로젝트 루트 대신 static 폴더 경로 사용
+        String staticPath = new File("src/main/resources/static").getAbsolutePath();
+        String basePath = staticPath + "/image/" + type + "/" + gubun + "/"+ folder +  "/";
+        Path dirPath = Paths.get(basePath);
+        Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+        String originalFileName = file.getOriginalFilename();
+        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+        Path filePath = dirPath.resolve(uniqueFileName);
+
+        file.transferTo(filePath.toFile()); // 파일 저장
+        
+        // 브라우저 접근용 경로 반환
+        resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
+        System.out.println("resultPath :: " + resultPath);
+        
+        return resultPath;
+    }
+    
+    @DeleteMapping("Account/AccountDeadlineFilesDelete")
+    public String deleteDeadlineFile(@RequestParam("account_id") String accountId,
+						             @RequestParam("year") String year,
+						             @RequestParam("month") String month,
+						             @RequestParam("filePath") String filePath,
+						             @RequestParam("file_yn") String file_yn) {
+        JsonObject obj = new JsonObject();
+        try {
+            // ✅ 삭제할 파일 경로 구성
+            Path filePath2 = Paths.get("src/main/resources/static" + filePath);
+            File file = filePath2.toFile();
+
+            if (!file.exists()) {
+                obj.addProperty("code", 404);
+                obj.addProperty("message", "파일이 존재하지 않습니다: " + filePath2);
+                return obj.toString();
+            }
+
+            boolean deleted = file.delete();
+            
+            Map<String, Object> paramMap = new HashMap<String, Object>();
+        	
+        	paramMap.put("account_id", accountId);
+        	paramMap.put("year", year);
+        	paramMap.put("month", month);
+        	paramMap.put("file_yn", file_yn);
+        	paramMap.put("deadline_file", null);
+        	
+        	int iResult = 0;
+        	
+        	iResult = accountService.AccountDeadlineFilesSave(paramMap);
+
+            if (deleted && iResult > 0) {
+                obj.addProperty("code", 200);
+                obj.addProperty("message", "파일 삭제 성공");
+            } else {
+                obj.addProperty("code", 500);
+                obj.addProperty("message", "파일 삭제 실패 (삭제 권한 또는 잠금 확인)");
+            }
+
+        } catch (Exception e) {
+            obj.addProperty("code", 500);
+            obj.addProperty("message", "서버 오류: " + e.getMessage());
+        }
+
+        return obj.toString();
+    }
+    
+    /*
+     * part		: 운영,회계
+     * method 	: AccountIssueList
+     * comment 	: 운영,회계 -> 거래처 이슈 조회
+     */
+    @GetMapping("Account/AccountIssueList")
+    public String AccountDeadlineIssueList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountIssueList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영,회계
+     * method 	: AccountDeadlineIssueSave
+     * comment 	: 운영,회계 -> 거래처 이슈 저장
+     */
+    @PostMapping("Account/AccountIssueSave")
+    private String AccountIssueSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	// ✅ data 리스트 꺼내기
+        List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+
+        int iResult = 0;
+        
+        for (Map<String, Object> row : dataList) {
+        	iResult += accountService.AccountIssueSave(row);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    public double roundHalfUpToFirstDecimalSafe(double value) {
+        // 1. double 값을 BigDecimal로 변환
+        BigDecimal bd = new BigDecimal(String.valueOf(value));
+        
+        // 2. 소수점 1자리까지 반올림 (HALF_UP 모드)
+        bd = bd.setScale(1, RoundingMode.HALF_UP);
+        
+        // 3. 다시 double로 변환하여 반환
+        return bd.doubleValue();
+    }
+}

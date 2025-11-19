@@ -1,0 +1,1052 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.AccountMapper">
+	
+	<select id="AccountList" parameterType="int" resultType="hashmap">
+		SELECT account_id, 
+			   account_name, 
+			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address,
+			   case account_type when 1 then '위탁급식' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '미분류' end as account_type, 
+			   account_rqd_member,
+			   account_headcount
+		FROM tb_account
+		<if test='accountType == 0'>
+			WHERE account_type in (1,2,4)
+ 		</if>
+ 		<if test='accountType != 0'>
+			WHERE account_type = #{accountType}
+ 		</if>
+		ORDER BY account_type DESC
+	</select>
+	
+	<select id="AccountDirectList" resultType="hashmap">
+		SELECT account_id, 
+			   account_name, 
+			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address
+		FROM tb_account
+		WHERE account_type = 3
+		ORDER BY account_type DESC
+	</select>
+	
+	<select id="AccountMemberList" parameterType="map" resultType="map">
+		SELECT user_name, user_type
+		FROM tb_user
+		WHERE user_id = #{userId}
+		AND password = #{password}
+	</select>
+	
+	<insert id="AccountMemberSave" parameterType="map">
+		INSERT INTO tb_account_members
+		(member_id,account_id,name,join_dt,del_dt,del_yn,position,work_system,start_time,end_time,salary,relation,del_note,rct_notice,note,position_type,address,rrn,account_number,phone,contract_type,act_join_dt,ret_set_dt,national_pension,health_insurance,industrial_insurance,employment_insurance,employment_contract,subsidy,headoffice_note,loss_major_insurances)
+		VALUES
+		#{member_id},
+		#{account_id},
+		#{name},
+		DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
+		DATE_FORMAT(#{del_dt}, '%Y-%m-%d'),
+		#{del_yn},
+		#{position},
+		#{work_system},
+		#{start_time},
+		#{end_time},
+		#{salary},
+		#{relation},
+		#{del_note},
+		#{rct_notice},
+		#{note},
+		#{position_type},
+		#{address},
+		#{rrn},
+		#{account_number},
+		#{phone},
+		#{contract_type},
+		DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d'),
+		DATE_FORMAT(#{ret_set_dt}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{national_pension}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{health_insurance}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{industrial_insurance}, '%Y-%m-%d', '%Y-%m-%d')),
+		DATE_FORMAT(#{employment_insurance}, '%Y-%m-%d'),
+		#{employment_contract},
+		#{subsidy},
+		#{headoffice_note},
+		DATE_FORMAT(#{loss_major_insurances}, '%Y-%m-%d')
+		ON DUPLICATE KEY UPDATE
+		#{account_id},
+		#{name},
+		DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
+		DATE_FORMAT(#{del_dt}, '%Y-%m-%d'),
+		#{del_yn},
+		#{position},
+		#{work_system},
+		#{start_time},
+		#{end_time},
+		#{salary},
+		#{relation},
+		#{del_note},
+		#{rct_notice},
+		#{note},
+		#{position_type},
+		#{address},
+		#{rrn},
+		#{account_number},
+		#{phone},
+		#{contract_type},
+		DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d'),
+		DATE_FORMAT(#{ret_set_dt}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{national_pension}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{health_insurance}, '%Y-%m-%d'), '%Y-%m-%d'),
+		DATE_FORMAT(#{industrial_insurance}, '%Y-%m-%d', '%Y-%m-%d')),
+		DATE_FORMAT(#{employment_insurance}, '%Y-%m-%d'),
+		#{employment_contract},
+		#{subsidy},
+		#{headoffice_note},
+		DATE_FORMAT(#{loss_major_insurances}, '%Y-%m-%d')
+	</insert>
+	
+	<select id="AccountTallySheetList" parameterType="map" resultType="hashmap">
+		SELECT (SELECT name FROM tb_account_mapping WHERE type = amv.type) as name, 
+			amv.type,
+			amv.account_id,
+			#{year} as count_year,
+			#{month} as count_month,
+		   	ifnull(FORMAT(ats.day_1, 0), 0) as day_1,
+			ifnull(FORMAT(ats.day_2, 0), 0) as day_2,
+			ifnull(FORMAT(ats.day_3, 0), 0) as day_3,
+			ifnull(FORMAT(ats.day_4, 0), 0) as day_4,
+			ifnull(FORMAT(ats.day_5, 0), 0) as day_5,
+			ifnull(FORMAT(ats.day_6, 0), 0) as day_6,
+			ifnull(FORMAT(ats.day_7, 0), 0) as day_7,
+			ifnull(FORMAT(ats.day_8, 0), 0) as day_8,
+			ifnull(FORMAT(ats.day_9, 0), 0) as day_9,
+			ifnull(FORMAT(ats.day_10, 0), 0) as day_10,
+			ifnull(FORMAT(ats.day_11, 0), 0) as day_11,
+			ifnull(FORMAT(ats.day_12, 0), 0) as day_12,
+			ifnull(FORMAT(ats.day_13, 0), 0) as day_13,
+			ifnull(FORMAT(ats.day_14, 0), 0) as day_14,
+			ifnull(FORMAT(ats.day_15, 0), 0) as day_15,
+			ifnull(FORMAT(ats.day_16, 0), 0) as day_16,
+			ifnull(FORMAT(ats.day_17, 0), 0) as day_17,
+			ifnull(FORMAT(ats.day_18, 0), 0) as day_18,
+			ifnull(FORMAT(ats.day_19, 0), 0) as day_19,
+			ifnull(FORMAT(ats.day_20, 0), 0) as day_20,
+			ifnull(FORMAT(ats.day_21, 0), 0) as day_21,
+			ifnull(FORMAT(ats.day_22, 0), 0) as day_22,
+			ifnull(FORMAT(ats.day_23, 0), 0) as day_23,
+			ifnull(FORMAT(ats.day_24, 0), 0) as day_24,
+			ifnull(FORMAT(ats.day_25, 0), 0) as day_25,
+			ifnull(FORMAT(ats.day_26, 0), 0) as day_26,
+			ifnull(FORMAT(ats.day_27, 0), 0) as day_27,
+			ifnull(FORMAT(ats.day_28, 0), 0) as day_28,
+			ifnull(FORMAT(ats.day_29, 0), 0) as day_29,
+			ifnull(FORMAT(ats.day_30, 0), 0) as day_30,
+			ifnull(FORMAT(ats.day_31, 0), 0) as day_31
+		FROM tb_account_mapping_v2 amv  
+		LEFT OUTER JOIN tb_account_tally_sheet ats
+		ON ats.account_id = amv.account_id
+        AND ats.type = amv.type
+		AND ats.count_year = #{year}
+		AND ats.count_month = #{month}
+		WHERE amv.account_id = #{account_id}
+        AND amv.del_yn = 'N'
+		ORDER BY amv.type asc
+	</select>
+	
+	<insert id="TallySheetSave" parameterType="map">
+		INSERT INTO tb_account_tally_sheet
+		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31)
+		VALUES
+		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31})
+		ON DUPLICATE KEY UPDATE
+		account_id = #{business_report}, type = #{business_report}, count_year = #{business_report}, count_month = #{business_report}, 
+		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
+		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
+		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31}
+	</insert>
+	
+	<insert id="AccountSave" parameterType="map">
+		INSERT INTO tb_account
+		(account_id, account_name, account_address, account_address_detail, account_rqd_member, account_headcount, phone, account_type, reg_dt, meal_type)
+		VALUES
+		(DATE_FORMAT(now(), '%Y%m%d%H%i%s'), #{account_name}, #{account_address}, #{account_address_detail}, #{account_rqd_member}, #{account_headcount}, #{phone}, #{account_type}, DATE_FORMAT(now(), '%Y-%m-%d %H:%i:%s'), #{meal_type})
+		ON DUPLICATE KEY UPDATE
+	    account_id = #{account_id},
+	    account_name = #{account_name},
+	    account_address = #{account_address},
+	    account_address_detail = #{account_address_detail},
+	    account_rqd_member = #{account_rqd_member},
+	    account_headcount = #{account_headcount},
+	    phone = #{phone},
+	    account_type = #{account_type},
+	    reg_dt = DATE_FORMAT(now(), '%Y-%m-%d %H:%i:%s'),
+	    meal_type = #{meal_type}
+	</insert>
+	
+	<select id="AccountRecordSheetList" parameterType="map" resultType="hashmap">
+		SELECT X.account_id
+			 , X.member_id
+			 , X.position
+			 , X.name
+			 , X.record_year
+			 , X.record_month
+			 , X.record_date
+			 , X.type
+			 , X.start_time
+			 , X.end_time
+			 , X.salary
+		     , X.note
+		FROM
+		(
+			SELECT
+		    T2.account_id,
+		    T2.member_id,
+		    T2.position,
+		    T2.name,
+		    T.record_year,
+		    T.record_month,
+		    T.record_date,
+		    T.type,
+		    T.start_time,
+		    T.end_time,
+		    CASE WHEN T.type = 6 THEN T.salary ELSE 0 END AS salary,
+		    T.note
+		FROM tb_account_members T2 
+		LEFT JOIN tb_account_record T
+		    ON T.account_id = T2.account_id
+		    AND T.member_id = T2.member_id
+		    AND T.record_year = #{year}  
+		    AND T.record_month = #{month}
+		WHERE T2.account_id = #{account_id}
+		AND T2.del_yn = 'N' 
+		UNION ALL
+		SELECT
+		    T2.account_id,
+		    T2.member_id,
+			'' as position,
+		    T2.name,
+		    T.record_year,
+		    T.record_month,
+		    T.record_date,
+		    T2.type,
+		    T.start_time,
+		    T.end_time,
+		    T.salary,
+		    T.note
+		FROM tb_account_members_dispatch T2  
+		LEFT JOIN tb_account_record_dispatch T
+		    ON T.account_id = T2.account_id
+		    AND T.member_id = T2.member_id
+		    AND T.record_year = #{year}  
+		    AND T.record_month = #{month}
+		WHERE T2.account_id = #{account_id}
+		AND T2.del_yn = 'N' 
+		) as X
+		ORDER BY CASE X.position WHEN '영양사' THEN 1
+				 WHEN '조리팀장' THEN 2
+				 WHEN '조리사' THEN 3
+				 ELSE 4 END,X.member_id
+	</select>
+	
+	<select id="AccountRecordDispatchList" parameterType="map" resultType="hashmap">
+		SELECT
+		    subquery.member_id,
+		    subquery.account_id,
+		    subquery.name,
+		    subquery.max_salary,
+		    subquery.count_max,
+		    subquery.min_salary,
+		    subquery.count_min,
+		    CASE WHEN ifnull(subquery.max_salary,0) != 0 THEN CONCAT(FORMAT(ifnull(subquery.max_salary,0),0), "원 ", FORMAT(ifnull(subquery.count_max,0),0), "회, 총 ", FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0), "원")
+				 WHEN ifnull(subquery.min_salary,0) != 0 THEN CONCAT(FORMAT(ifnull(subquery.max_salary,0),0), "원 ", FORMAT(ifnull(subquery.count_max,0),0), "회", FORMAT(ifnull(subquery.min_salary,0),0), "원 ", FORMAT(ifnull(subquery.count_min,0),0), "회, 총 ", FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0), "원")
+                 ELSE '' END AS total,
+		    --FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0) AS total,
+		    subquery.rrn,
+		    subquery.account_number
+		FROM (
+		    SELECT
+		        T.member_id,
+		        T.account_id,
+		        T.name,
+		        T.rrn,
+		        T.account_number,
+		        MAX(T2.salary) AS max_salary,
+		        SUM(CASE WHEN T2.salary = (SELECT MAX(salary) FROM tb_account_record_dispatch WHERE account_id = T.account_id AND member_id = T.member_id  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END) AS count_max,
+		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
+		             THEN MIN(T2.salary)
+		             ELSE NULL
+		        END AS min_salary,
+		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
+		             THEN SUM(CASE WHEN T2.salary = (SELECT MIN(salary) FROM tb_account_record_dispatch WHERE account_id = T.account_id AND member_id = T.member_id AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END)
+		             ELSE NULL
+		        END AS count_min
+		    FROM tb_account_members_dispatch AS T
+		    LEFT JOIN tb_account_record_dispatch AS T2
+		    ON T.account_id = T2.account_id 
+		    AND T.member_id = T2.member_id
+		    WHERE T.account_id = #{account_id} 
+		    AND T.del_yn = 'N'
+		    GROUP BY T.member_id, T.account_id, T.name, T.rrn, T.account_number
+		) AS subquery
+		ORDER BY subquery.member_id
+	</select>
+	
+	<select id="AccountRecordMemberList" parameterType="map" resultType="hashmap">
+		SELECT
+		    subquery.member_id,
+		    subquery.account_id,
+		    subquery.name,
+		    subquery.position,
+		    -- subquery.max_salary,
+		    -- subquery.count_max,
+		    -- subquery.min_salary,
+		    -- subquery.count_min,
+		    CONCAT('총 ',ifnull(subquery.count_max,0) + ifnull(subquery.count_min,0), '회,', ' 합계금액 : ', FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0)) AS employ_dispatch,
+		    CONCAT('초과 : ', ifnull(subquery.over_work,0), '회') as over_work,
+		    subquery.over_work AS over_count,
+		    CONCAT('결근 : ', ifnull(subquery.non_work,0), '회') as non_work,
+		    subquery.non_work AS non_count,
+		    subquery.note,
+		    (ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)),0) AS total
+		FROM (
+		    SELECT
+		        T.member_id,
+		        T.account_id,
+		        T.name,
+		        T.position,
+		        MAX(T2.salary) AS max_salary,
+		        CASE WHEN MAX(T2.salary) IS NOT NULL THEN SUM(CASE WHEN T2.salary = (SELECT MAX(T3.salary) FROM tb_account_record AS T3 WHERE T3.account_id = T.account_id AND T3.member_id = T.member_id AND T3.type = 6  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END) 
+					 ELSE NULL 
+				END AS count_max,
+		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
+		             THEN MIN(T2.salary)
+		             ELSE NULL
+		        END AS min_salary,
+		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
+		             THEN SUM(CASE WHEN T2.salary = (SELECT MIN(T4.salary) FROM tb_account_record AS T4 WHERE T4.account_id = T.account_id AND T4.member_id = T.member_id AND T4.type = 6  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END)
+		             ELSE NULL
+		        END AS count_min,
+		        (SELECT count(1)
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type = 3
+				) AS over_work,
+		        (SELECT count(1)
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type = 4
+				) AS non_work,
+		        T.note
+		    FROM tb_account_members AS T
+		    LEFT JOIN tb_account_record AS T2
+		    ON T.account_id = T2.account_id 
+		    AND T.member_id = T2.member_id
+		    WHERE T.account_id = #{account_id}
+		    AND T.del_yn = 'N'
+		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position
+		) AS subquery
+		ORDER BY CASE subquery.position WHEN '영양사' THEN 1
+				 WHEN '조리팀장' THEN 2
+                 WHEN '조리사' THEN 3
+                 ELSE 4 END,subquery.member_id
+	</select>
+	
+	<select id="AccountMemberRecordTime" parameterType="map" resultType="hashmap">
+		SELECT member_id,
+			   account_id,
+			   start_time,
+			   end_time
+		FROM tb_account_members
+		WHERE account_id = #{account_id}
+		AND del_yn = 'N'
+	</select>
+	
+	<insert id="AccountMemberRecordSave" parameterType="map">
+		INSERT INTO tb_account_record
+		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)
+		VALUES
+		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary})
+		ON DUPLICATE KEY UPDATE
+		type = #{type},
+		start_time = #{start_time},
+		end_time = #{end_time},
+		note = #{note},
+		salary = #{salary}
+	</insert>
+	
+	<insert id="AccountDispatchRecordSave" parameterType="map">
+		INSERT INTO tb_account_record_dispatch
+		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)
+		VALUES
+		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary})
+		ON DUPLICATE KEY UPDATE
+		type = #{type},
+		start_time = #{start_time},
+		end_time = #{end_time},
+		note = #{note},
+		salary = #{salary}
+	</insert>
+	
+	<insert id="AccountDispatchMemberSave" parameterType="map">
+		INSERT INTO tb_account_members_dispatch
+		(account_id, member_id, name, rrn, account_number, note)
+		VALUES
+		(#{account_id}, DATE_FORMAT(now(), '%Y%m%d%H%i%s'),#{name}, #{rrn}, #{account_number}, #{note})
+	</insert>
+	
+	<select id="AccountPropertiesList" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM tb_account_property
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<select id="AccountInfoList" parameterType="map" resultType="hashmap">
+		SELECT T.account_id, 
+				T.account_name, 
+		        T.account_address, 
+		        account_address_detail,
+		        T2.manager_name, 
+		        T2.manager_tel,
+		        T2.manager_name2,
+		        T2.manager_tel2,
+		        T2.closing_name,
+		        T2.closing_tel,
+		        T2.property_note,
+		        T2.property_as_note,
+		        T2.business_note,
+		        DATE_FORMAT(T2.contract_start, '%Y-%m-%d') as contract_start, 
+        		DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end,
+        		T.account_type,
+        		T.meal_type,
+        		T2.industry_note
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_info T2
+		ON T.account_id = T2.account_id
+		WHERE T.account_id = #{account_id}
+	</select>
+	
+	<select id="AccountInfoList_2" parameterType="map" resultType="hashmap">
+		SELECT T.account_id, 
+				T2.diet_price,
+				T2.basic_price,
+		        T2.before_diet_price,
+		        DATE_FORMAT(T2.after_dt, '%Y-%m-%d') as after_dt,
+		        T2.elderly,
+		        T2.snack,
+		        T2.employ,
+		        T2.full_room,
+		        T2.basic,
+		        T2.normal,
+		        T2.eat_snack,
+		        T2.ceremony,
+		        T2.eat_employ,
+		        T2.food_process,
+		        T2.dishwasher,
+		        T2.cesco,
+		        T2.water_puri,
+		        T2.utility_bills,
+		        T.account_type,
+		        T2.industry_note,
+		        T2.expenses_note
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_info T2
+		ON T.account_id = T2.account_id
+		WHERE T.account_id = #{account_id}
+	</select>
+	
+	<select id="AccountInfoList_3" parameterType="map" resultType="hashmap">
+		SELECT	subquery.account_id,
+				subquery.setting_item,
+				subquery.cuisine,
+				subquery.cuisine_note,
+				subquery.name,
+		        subquery.budget_note,
+		        CONCAT(
+					CASE WHEN SUM(subquery2.kitchen_cnt1) != 0
+						 THEN CONCAT("조리팀장 : ", SUM(subquery2.kitchen_cnt1), "명\n")
+		                 ELSE ''
+		                 END,
+		            CASE WHEN SUM(subquery2.kitchen_cnt2) != 0
+						 THEN CONCAT("조리장 : ", SUM(subquery2.kitchen_cnt2), "명\n")
+		                 ELSE ''
+		                 END,
+					CASE WHEN SUM(subquery2.kitchen_cnt3) != 0
+						 THEN CONCAT("조리사 : ", SUM(subquery2.kitchen_cnt3), "명\n")
+		                 ELSE ''  
+		                 END,
+					CASE WHEN SUM(subquery2.kitchen_cnt4) != 0
+						 THEN CONCAT("조리원 : ", SUM(subquery2.kitchen_cnt4), "명")
+		                 ELSE ''
+		                 END
+		        ) As members,
+		        REPLACE(GROUP_CONCAT(DISTINCT subquery3.work_system, " : ", subquery3.work_cnt, "명 \n"), ',', '') as work_system
+				-- subquery3.note
+		        FROM (
+				    SELECT
+				        T.account_id,
+		                T1.setting_item,
+				        T1.cuisine,
+				        T1.cuisine_note,
+				        T2.name,
+		                T1.budget_note
+					FROM tb_account T
+				    LEFT OUTER JOIN tb_account_info AS T1
+                    ON T1.account_id = T.account_id
+				    LEFT OUTER JOIN tb_account_members AS T2
+				    ON T2.account_id = T1.account_id 
+				    AND T2.del_yn = 'N'
+		            AND T2.position = '영양사'
+                    WHERE T.account_id = #{account_id}
+				    GROUP BY T.account_id,
+							T1.setting_item,
+							T1.cuisine,
+							T1.cuisine_note,
+							T2.name,
+							T1.budget_note
+				) AS subquery,
+		        (
+				    SELECT
+				        T.account_id,
+		                CASE WHEN T2.position_type = 5
+				             THEN count(1)
+				             ELSE 0
+				        END AS kitchen_cnt4,
+		                CASE WHEN T2.position_type = 4
+				             THEN count(1)
+				             ELSE 0
+				        END AS kitchen_cnt3,
+				        CASE WHEN T2.position_type = 3
+				             THEN count(1)
+				             ELSE 0
+				        END AS kitchen_cnt2,
+		                CASE WHEN T2.position_type = 2
+				             THEN count(1)
+				             ELSE 0
+				        END AS kitchen_cnt1
+				    FROM tb_account T
+				    LEFT OUTER JOIN tb_account_info AS T1
+                    ON T1.account_id = T.account_id
+				    LEFT OUTER JOIN tb_account_members AS T2
+				    ON T2.account_id = T1.account_id 
+				    AND T2.del_yn = 'N'
+                    WHERE T.account_id = #{account_id}
+				    GROUP BY T.account_id, T2.position_type
+				) AS subquery2,
+		        (
+				    SELECT
+				        T.account_id,
+		                T2.work_system, 
+		                count(1) as work_cnt
+				    FROM tb_account T
+				    LEFT OUTER JOIN tb_account_info AS T1
+                    ON T1.account_id = T.account_id
+				    LEFT OUTER JOIN tb_account_members AS T2
+				    ON T2.account_id = T1.account_id 
+                    AND T2.del_yn = 'N'
+				    WHERE T.account_id = #{account_id}
+				    GROUP BY T.account_id, T2.work_system
+				) AS subquery3
+		        GROUP BY subquery.account_id,
+						 subquery.setting_item,
+						 subquery.cuisine,
+						 subquery.cuisine_note,
+						 subquery.name,
+						 subquery.budget_note
+				ORDER BY subquery.account_id;
+	</select>
+	
+	<select id="AccountInfoList_4" parameterType="map" resultType="hashmap">
+		SELECT puri_type,
+			   gas_type,
+			   business_type,
+			   insurance_note,
+			   finish_note
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_info T1
+        ON T1.account_id = T.account_id
+		WHERE T.account_id = #{account_id}
+	</select>
+	
+	<select id="AccountInfoList_5" parameterType="map" resultType="hashmap">
+		SELECT ifnull(T1.satis_note, '') as satis_note,
+			   ifnull(T1.hygiene_note, '') as hygiene_note,
+			   ifnull(T1.event_note, '') as event_note
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_info T1
+        ON T1.account_id = T.account_id
+		WHERE T.account_id = #{account_id}
+	</select>
+	
+	<insert id="AccountInfoSave" parameterType="map">
+		INSERT INTO tb_account_info
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        manager_name,
+	        manager_tel,
+	        manager_name2,
+	        manager_tel2,
+	        closing_name,
+	        closing_tel,
+	        business_note,
+	        property_note,
+	        property_as_note,
+	        contract_start,
+	        contract_end,
+	        setting_item,
+	        cuisine,
+	        cuisine_note,
+	        budget_note,
+	        food_process,
+	        dishwasher,
+	        cesco,
+	        water_puri,
+	        utility_bills,
+	        diet_price,
+	        basic_price,
+	        before_diet_price,
+	        
+	        <if test="after_dt != null and after_dt != ''">
+	        after_dt,
+	        </if>
+	        
+	        elderly,
+	        snack,
+	        employ,
+	        note,
+	        full_room,
+	        basic,
+	        normal,
+	        eat_snack,
+	        ceremony,
+	        eat_employ,
+	        puri_type,
+	        gas_type,
+	        business_type,
+	        insurance_note,
+	        finish_note,
+	        satis_note,
+	        hygiene_note,
+	        event_note,
+	        industry_note,
+	        business_report,
+	        business_regist,
+	        kitchen_drawing,
+	        expenses_note,
+	        update_dt
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{manager_name},
+	        #{manager_tel},
+	        #{manager_name2},
+	        #{manager_tel2},
+	        #{closing_name},
+	        #{closing_tel},
+	        #{business_note},
+	        #{property_note},
+	        #{property_as_note},
+	        #{contract_start},
+	        #{contract_end},
+	        #{setting_item},
+	        #{cuisine},
+	        #{cuisine_note},
+	        #{budget_note},
+	        #{food_process},
+	        #{dishwasher},
+	        #{cesco},
+	        #{water_puri},
+	        #{utility_bills},
+	        #{diet_price},
+	        #{basic_price},
+	        #{before_diet_price},
+	        
+	        <if test="after_dt != null and after_dt != ''">
+	        DATE_FORMAT(#{after_dt}, '%Y-%m-%d'),
+	        </if>
+	        
+	        #{elderly},
+	        #{snack},
+	        #{employ},
+	        #{note},
+	        #{full_room},
+	        #{basic},
+	        #{normal},
+	        #{eat_snack},
+	        #{ceremony},
+	        #{eat_employ},
+	        #{puri_type},
+	        #{gas_type},
+	        #{business_type},
+	        #{insurance_note},
+	        #{finish_note},
+	        #{satis_note},
+	        #{hygiene_note},
+	        #{event_note},
+	        #{industry_note},
+	        #{business_report},
+	        #{business_regist},
+	        #{kitchen_drawing},
+	        #{expenses_note},
+	        DATE_FORMAT(now(), '%Y-%m-%d')
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        manager_name=#{manager_name},
+	        manager_tel=#{manager_tel},
+	        manager_name2=#{manager_name2},
+	        manager_tel2=#{manager_tel2},
+	        closing_name=#{closing_name},
+	        closing_tel=#{closing_tel},
+	        business_note=#{business_note},
+	        property_note=#{property_note},
+	        property_as_note=#{property_as_note},
+	        contract_start=#{contract_start},
+	        contract_end=#{contract_end},
+	        setting_item=#{setting_item},
+	        cuisine=#{cuisine},
+	        cuisine_note=#{cuisine_note},
+	        budget_note=#{budget_note},
+	        food_process=#{food_process},
+	        dishwasher=#{dishwasher},
+	        cesco=#{cesco},
+	        water_puri=#{water_puri},
+	        utility_bills=#{utility_bills},
+	        diet_price=#{diet_price},
+	        basic_price=#{basic_price},
+	        before_diet_price=#{before_diet_price},
+	        
+	        <if test="after_dt != null and after_dt != ''">
+	        after_dt=DATE_FORMAT(#{after_dt}, '%Y-%m-%d'),
+	        </if>
+	        
+	        elderly=#{elderly},
+	        snack=#{snack},
+	        employ=#{employ},
+	        note=#{note},
+	        full_room=#{full_room},
+	        basic=#{basic},
+	        normal=#{normal},
+	        eat_snack=#{eat_snack},
+	        ceremony=#{ceremony},
+	        eat_employ=#{eat_employ},
+	        puri_type=#{puri_type},
+	        gas_type=#{gas_type},
+	        business_type=#{business_type},
+	        insurance_note=#{insurance_note},
+	        finish_note=#{finish_note},
+	        satis_note=#{satis_note},
+	        hygiene_note=#{hygiene_note},
+	        event_note=#{event_note},
+	        industry_note=#{industry_note},
+	        business_report=#{business_report},
+	        business_regist=#{business_regist},
+	        kitchen_drawing=#{kitchen_drawing},
+	        expenses_note=#{expenses_note},
+	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d')
+	    </trim>
+	</insert>
+	
+	<select id="AccountBusinessImgList" parameterType="map" resultType="hashmap">
+		SELECT business_report,
+		       business_regist,
+		       kitchen_drawing
+		FROM tb_account_info
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="insertOrUpdateFile" parameterType="map">
+		INSERT INTO tb_account_info
+			( account_id, business_report, business_regist, kitchen_drawing )
+			VALUES
+			( #{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing} )
+			ON DUPLICATE KEY UPDATE
+			business_report = #{business_report},
+			business_regist = #{business_regist},
+			kitchen_drawing = #{kitchen_drawing}
+	</insert>
+	
+	<select id="AccountDeadlineBalanceList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name,
+		       adb.year, 
+			   adb.month, 
+			   adb.balance_file,
+			   ifnull(adb.living_cost,0) as living_cost,
+		       ifnull(adb.basic_cost,0) as basic_cost,
+		       ifnull(adb.employ_cost,0) as employ_cost,
+		       adb.input_exp,
+		       ifnull(abp.balance_price,0) as balance_price,
+		       ifnull(abp.balance_price,0) as before_price,
+		       ifnull(abp.before_price,0) as before_price2
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_deadline_balance adb
+		ON adb.account_id = a.account_id
+		AND adb.year = #{year}
+		AND adb.month = #{month}
+		LEFT OUTER JOIN tb_account_balance_price abp
+		ON abp.account_id = a.account_id
+	</select>
+	
+	<select id="AccountDepositHistoryList" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+			   CASE WHEN type = 1 
+			   		THEN '생계비'
+			   		WHEN type = 2 
+			   		THEN '일반식대'
+			   		WHEN type = 3 
+			   		THEN '직원식대'
+			   		ELSE '미수잔액'
+			   		END AS type,
+			   DATE_FORMAT(input_dt, '%Y-%m-%d') as input_dt,
+			   DATE_FORMAT(balance_dt, '%Y-%m-%d') as balance_dt,
+			   difference_price,
+			   input_price,
+			   note,
+			   deposit_amount
+		FROM tb_account_deposit_history
+		WHERE account_id = #{account_id}
+		AND DATE_FORMAT(input_dt, '%Y') = #{year}
+	</select>
+	
+	<insert id="AccountDeadlineBalanceSave" parameterType="map">
+		INSERT INTO tb_account_deadline_balance
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        year,
+	        month,
+	        balance_file,
+	        living_cost,
+	        basic_cost,
+	        employ_cost,
+	        input_exp,
+	        update_dt
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{year},
+	        #{month},
+	        #{balance_file},
+	        #{living_cost},
+	        #{basic_cost},
+	        #{employ_cost},
+	        #{input_exp},
+	        DATE_FORMAT(now(), '%Y-%m-%d')
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        year=#{year},
+	        month=#{month},
+	        balance_file=#{balance_file},
+	        living_cost=#{living_cost},
+	        basic_cost=#{basic_cost},
+	        employ_cost=#{employ_cost},
+	        input_exp=#{input_exp}
+	    </trim>
+	</insert>
+	
+	<insert id="AccountBalancePriceSave" parameterType="map">
+		INSERT INTO tb_account_balance_price
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        balance_price,
+	        update_dt,
+	        before_price
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{balance_price},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        #{before_price},
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        balance_price=#{balance_price},
+	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        before_price=#{before_price},
+	    </trim>
+	</insert>
+	
+	<insert id="AccountDepositHistorySave" parameterType="map">
+		INSERT INTO tb_account_deposit_history
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        type,
+	        input_dt,
+	        <if test="balance_dt != null and balance_dt != ''">
+	        balance_dt,
+	        </if>
+	        difference_price,
+	        input_price,
+	        note,
+	        deposit_amount
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{type},
+	        CONCAT(
+		      DATE_FORMAT(#{input_dt}, '%Y-%m-%d'),
+		      ' ',
+		      DATE_FORMAT(NOW(), '%H:%i:%s')),
+	        <if test="balance_dt != null and balance_dt != ''">
+	        CONCAT(
+		      DATE_FORMAT(#{balance_dt}, '%Y-%m-%d'),
+		      ' ',
+		      DATE_FORMAT(NOW(), '%H:%i:%s')),
+	        </if>
+	        #{difference_price},
+	        #{input_price},
+	        #{note},
+	        #{deposit_amount}
+	    </trim>
+	</insert>
+	
+	<select id="AccountDeadlineDifferencePriceSearch" parameterType="map" resultType="hashmap">
+		SELECT ifnull(difference_price,0) as difference_price
+		FROM tb_account_deposit_history
+		WHERE account_id = #{account_id}
+		AND DATE_FORMAT(input_dt, '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		AND type = #{type}
+		ORDER BY input_dt DESC
+		LIMIT 1
+	</select>
+	
+	<select id="AccountDeadlineFilesList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name,
+		       adf.year, 
+			   adf.month, 
+			   adf.deadline_file,
+			   adf.file_yn
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_deadline_files adf
+		ON adf.account_id = a.account_id
+		AND adf.year = #{year}
+		AND adf.file_yn = 'Y'
+	</select>
+	
+	<insert id="AccountDeadlineFilesSave" parameterType="map">
+		INSERT INTO tb_account_deadline_files
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        year,
+	        month,
+	        deadline_file,
+	        file_yn
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{year},
+	        #{month},
+	        #{deadline_file},
+	        #{file_yn}
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        year=#{year},
+	        month=#{month},
+	        deadline_file=#{deadline_file},
+	        file_yn=#{file_yn}
+	    </trim>
+	</insert>
+	
+	<select id="AccountIssueList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name,
+		       adi.year, 
+			   adi.month, 
+			   adi.note
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_issue adi
+		ON adi.account_id = a.account_id
+		AND adi.year = #{year}
+		AND adi.type = #{type}
+	</select>
+	
+	<insert id="AccountIssueSave" parameterType="map">
+		INSERT INTO tb_account_issue
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        year,
+	        month,
+	        note,
+	        type,
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{year},
+	        #{month},
+	        #{note},
+	        #{type},
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        year=#{year},
+	        month=#{month},
+	        note=#{note},
+	        type=#{type},
+	    </trim>
+	</insert>
+	
+	<!-- 배치성 데이터 -->
+	<select id="BatchForPayBack" parameterType="map" resultType="hashmap">
+		SELECT 
+		    account_id,
+		    total_days,
+		    total_days * 0.15 AS payback_price,
+		    count_year as year,
+			count_month as month
+		FROM (
+		    SELECT 
+		        account_id,
+		       (COALESCE(day_1, 0) + COALESCE(day_2, 0) + COALESCE(day_3, 0) + COALESCE(day_4, 0) +
+				 COALESCE(day_5, 0) + COALESCE(day_6, 0) + COALESCE(day_7, 0) + COALESCE(day_8, 0) +
+				 COALESCE(day_9, 0) + COALESCE(day_10, 0) + COALESCE(day_11, 0) + COALESCE(day_12, 0) +
+				 COALESCE(day_13, 0) + COALESCE(day_14, 0) + COALESCE(day_15, 0) + COALESCE(day_16, 0) +
+				 COALESCE(day_17, 0) + COALESCE(day_18, 0) + COALESCE(day_19, 0) + COALESCE(day_20, 0) +
+				 COALESCE(day_21, 0) + COALESCE(day_22, 0) + COALESCE(day_23, 0) + COALESCE(day_24, 0) +
+				 COALESCE(day_25, 0) + COALESCE(day_26, 0) + COALESCE(day_27, 0) + COALESCE(day_28, 0) +
+				 COALESCE(day_29, 0) + COALESCE(day_30, 0) + COALESCE(day_31, 0)
+				) AS total_days,
+				count_year,
+				count_month
+		    FROM tb_account_tally_sheet
+		    WHERE count_year = #{count_year}
+		    AND count_month = #{count_month}
+		    AND type = 2
+		) AS t
+	</select>
+</mapper>

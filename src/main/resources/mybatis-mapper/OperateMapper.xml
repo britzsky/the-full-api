@@ -1,0 +1,1005 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.OperateMapper">
+	
+	<select id="NowDateKey" resultType="String">
+		SELECT DATE_FORMAT(now(), '%Y%m%d%H%i%s')
+	</select>
+	
+	<select id="TallySheetList" parameterType="map" resultType="hashmap">
+		SELECT (SELECT name FROM tb_account_mapping WHERE type = amv.type) as name, 
+			amv.type,
+			amv.account_id,
+			#{year} as count_year,
+			#{month} as count_month,
+		   	ifnull(FORMAT(ats.day_1, 0), 0) as day_1,
+			ifnull(FORMAT(ats.day_2, 0), 0) as day_2,
+			ifnull(FORMAT(ats.day_3, 0), 0) as day_3,
+			ifnull(FORMAT(ats.day_4, 0), 0) as day_4,
+			ifnull(FORMAT(ats.day_5, 0), 0) as day_5,
+			ifnull(FORMAT(ats.day_6, 0), 0) as day_6,
+			ifnull(FORMAT(ats.day_7, 0), 0) as day_7,
+			ifnull(FORMAT(ats.day_8, 0), 0) as day_8,
+			ifnull(FORMAT(ats.day_9, 0), 0) as day_9,
+			ifnull(FORMAT(ats.day_10, 0), 0) as day_10,
+			ifnull(FORMAT(ats.day_11, 0), 0) as day_11,
+			ifnull(FORMAT(ats.day_12, 0), 0) as day_12,
+			ifnull(FORMAT(ats.day_13, 0), 0) as day_13,
+			ifnull(FORMAT(ats.day_14, 0), 0) as day_14,
+			ifnull(FORMAT(ats.day_15, 0), 0) as day_15,
+			ifnull(FORMAT(ats.day_16, 0), 0) as day_16,
+			ifnull(FORMAT(ats.day_17, 0), 0) as day_17,
+			ifnull(FORMAT(ats.day_18, 0), 0) as day_18,
+			ifnull(FORMAT(ats.day_19, 0), 0) as day_19,
+			ifnull(FORMAT(ats.day_20, 0), 0) as day_20,
+			ifnull(FORMAT(ats.day_21, 0), 0) as day_21,
+			ifnull(FORMAT(ats.day_22, 0), 0) as day_22,
+			ifnull(FORMAT(ats.day_23, 0), 0) as day_23,
+			ifnull(FORMAT(ats.day_24, 0), 0) as day_24,
+			ifnull(FORMAT(ats.day_25, 0), 0) as day_25,
+			ifnull(FORMAT(ats.day_26, 0), 0) as day_26,
+			ifnull(FORMAT(ats.day_27, 0), 0) as day_27,
+			ifnull(FORMAT(ats.day_28, 0), 0) as day_28,
+			ifnull(FORMAT(ats.day_29, 0), 0) as day_29,
+			ifnull(FORMAT(ats.day_30, 0), 0) as day_30,
+			ifnull(FORMAT(ats.day_31, 0), 0) as day_31
+		FROM tb_account_mapping_v2 amv  
+		LEFT OUTER JOIN tb_account_tally_sheet ats
+		ON ats.account_id = amv.account_id
+        AND ats.type = amv.type
+		AND ats.count_year = #{year}
+		AND ats.count_month = #{month}
+		WHERE amv.account_id = #{account_id}
+        AND amv.del_yn = 'N'
+		ORDER BY amv.type asc
+	</select>
+	
+	<insert id="TallyNowMonthSave" parameterType="map">
+		INSERT INTO tb_account_tally_sheet
+		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31)
+		VALUES
+		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31})
+		ON DUPLICATE KEY UPDATE
+		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
+		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
+		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
+		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31}
+	</insert>
+	
+	<insert id="TallyBeforeMonthSave" parameterType="map">
+		INSERT INTO tb_account_tally_sheet
+		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31)
+		VALUES
+		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31})
+		ON DUPLICATE KEY UPDATE
+		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
+		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
+		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
+		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31}
+	</insert>
+	
+	<select id="PropertiesList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+	        account_id,
+	        purchase_name,
+	        item,
+	        spec,
+	        qty,
+	        type,
+	        purchase_price,
+	        item_img,
+	        receipt_img,
+	        note,
+	        del_yn,
+	        DATE_FORMAT(purchase_dt, '%Y-%m-%d') as purchase_dt,
+	        DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt,
+	        DATE_FORMAT(del_dt, '%Y-%m-%d') as del_dt
+		FROM tb_account_property
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="PropertiesSave" parameterType="map">
+		INSERT INTO tb_account_property
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        account_id,
+	        purchase_name,
+	        item,
+	        spec,
+	        qty,
+	        type,
+	        purchase_price,
+	        item_img,
+	        receipt_img,
+	        note,
+	        del_yn,
+	        <if test="purchase_dt != null and purchase_dt != ''">purchase_dt,</if>
+	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+	        <if test="del_dt != null and del_dt != ''">del_dt,</if>
+	        depreciation
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{idx},
+	        #{account_id},
+	        #{purchase_name},
+	        #{item},
+	        #{spec},
+	        #{qty, jdbcType=INTEGER},
+	        #{type, jdbcType=INTEGER},
+	        #{purchase_price, jdbcType=INTEGER},
+	        #{item_img},
+	        #{receipt_img},
+	        #{note},
+	        #{del_yn},
+	        <if test="purchase_dt != null and purchase_dt != ''">DATE_FORMAT(#{purchase_dt}, '%Y-%m-%d'),</if>
+	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+	        <if test="del_dt != null and del_dt != ''">DATE_FORMAT(#{del_dt}, '%Y-%m-%d'),</if>
+	        #{depreciation}
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        <if test="idx != null">
+	            idx=#{idx},
+	        </if>
+	        <if test="account_id != null">
+	            account_id=#{account_id},
+	        </if>
+	        <if test="purchase_name != null">
+	            purchase_name=#{purchase_name},
+	        </if>
+	        <if test="item != null">
+	            item=#{item},
+	        </if>
+	        <if test="spec != null">
+	            spec=#{spec},
+	        </if>
+	        <if test="qty != null">
+	            qty=#{qty, jdbcType=INTEGER},
+	        </if>
+	        <if test="type != null">
+	            type=#{type, jdbcType=INTEGER},
+	        </if>
+	        <if test="purchase_price != null">
+	            purchase_price=#{purchase_price, jdbcType=INTEGER},
+	        </if>
+	        <if test="item_img != null">
+	            item_img=#{item_img},
+	        </if>
+	        <if test="receipt_img != null">
+	            receipt_img=#{receipt_img},
+	        </if>
+	        <if test="note != null">
+	            note=#{note},
+	        </if>
+	        <if test="del_yn != null">
+	            del_yn=#{del_yn},
+	        </if>
+	        <if test="purchase_dt != null and purchase_dt != ''">
+	            purchase_dt=#{purchase_dt},
+	        </if>
+	        <if test="reg_dt != null and reg_dt != ''">
+	            reg_dt=#{reg_dt},
+	        </if>
+	        <if test="del_dt != null and del_dt != ''">
+	            del_dt=#{del_dt},
+	        </if>
+	        <if test="depreciation != null and depreciation != ''">
+	            depreciation=#{depreciation},
+	        </if>
+	    </trim>
+	</insert>
+	
+	<select id="HygieneList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+	        account_id,
+	        problem_image,
+	        problem_note,
+	        clean_image,
+	        clean_note,
+	        note, 
+	        DATE_FORMAT(mod_dt, '%Y-%m-%d') as mod_dt,
+	        DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt
+		FROM tb_account_hygiene_management
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="HygieneSave" parameterType="map">
+		INSERT INTO tb_account_hygiene_management
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        account_id,
+	        problem_image,
+	        problem_note,
+	        clean_image,
+	        clean_note,
+	        note,
+	        <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
+	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{idx},
+	        #{account_id},
+	        #{problem_image},
+	        #{problem_note},
+	        #{clean_image},
+	        #{clean_note},
+	        #{note},
+	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
+	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        <if test="idx != null">
+	            idx=#{idx},
+	        </if>
+	        <if test="account_id != null">
+	            account_id=#{account_id},
+	        </if>
+	        <if test="problem_image != null">
+	            problem_image=#{problem_image},
+	        </if>
+	        <if test="problem_note != null">
+	            problem_note=#{problem_note},
+	        </if>
+	        <if test="clean_image != null">
+	            clean_image=#{clean_image},
+	        </if>
+	        <if test="clean_note != null">
+	            clean_note=#{clean_note},
+	        </if>
+	        <if test="note != null">
+	            note=#{note},
+	        </if>
+	        <if test="mod_dt != null and mod_dt != ''">
+	            mod_dt=#{mod_dt},
+	        </if>
+	        <if test="reg_dt != null and reg_dt != ''">
+	            reg_dt=#{reg_dt},
+	        </if>
+	    </trim>
+	</insert>
+	
+	<select id="HandOverSearch" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+	        handover_company,
+	        handover_name,
+	        DATE_FORMAT(handover_dt, '%Y-%m-%d') as handover_dt,
+	        acquisition_company,
+	        acquisition_name,
+	        DATE_FORMAT(acquisition_dt, '%Y-%m-%d') as acquisition_dt,
+	        check_team,
+	        check_name,
+	        handover_location,
+	        meal_number,
+	        catering_ration,
+	        normal_diet,
+	        kitchen_member,
+	        work_type,
+	        order_program_info,
+	        ingredients_order_type,
+	        inspection_store_type,
+	        stock_manage_type,
+	        diet_submit_cycle,
+	        hygiene_note,
+	        hot_issue,
+	        program_use_whether,
+	        rounding_satis_whether,
+	        complain_note,
+	        manager_phone,
+	        trash_treatment_type,
+	        regular_schedule,
+	        special_note,
+	        DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt,
+	        DATE_FORMAT(mod_dt, '%Y-%m-%d') as mod_dt,
+	        user_id
+		FROM tb_account_handover_management
+		WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="HandOverSave" parameterType="map">
+		INSERT INTO tb_account_handover_management
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        handover_company,
+	        handover_name,
+	        <if test="handover_dt != null and handover_dt != ''">handover_dt,</if>
+	        acquisition_company,
+	        acquisition_name,
+	        <if test="acquisition_dt != null and acquisition_dt != ''">acquisition_dt,</if>
+	        check_team,
+	        check_name,
+	        handover_location,
+	        meal_number,
+	        catering_ration,
+	        normal_diet,
+	        kitchen_member,
+	        work_type,
+	        order_program_info,
+	        ingredients_order_type,
+	        inspection_store_type,
+	        stock_manage_type,
+	        diet_submit_cycle,
+	        hygiene_note,
+	        hot_issue,
+	        program_use_whether,
+	        rounding_satis_whether,
+	        complain_note,
+	        manager_phone,
+	        trash_treatment_type,
+	        regular_schedule,
+	        special_note,
+	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+	        <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
+	        user_id
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{handover_company},
+	        #{handover_name},
+	        <if test="handover_dt != null and handover_dt != ''">DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),</if>
+	        #{acquisition_company},
+	        #{acquisition_name},
+	        <if test="acquisition_dt != null and acquisition_dt != ''">DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),</if>
+	        #{check_team},
+	        #{check_name},
+	        #{handover_location},
+	        #{meal_number},
+	        #{catering_ration},
+	        #{normal_diet},
+	        #{kitchen_member},
+	        #{work_type},
+	        #{order_program_info},
+	        #{ingredients_order_type},
+	        #{inspection_store_type},
+	        #{stock_manage_type},
+	        #{diet_submit_cycle},
+	        #{hygiene_note},
+	        #{hot_issue},
+	        #{program_use_whether},
+	        #{rounding_satis_whether},
+	        #{complain_note},
+	        #{manager_phone},
+	        #{trash_treatment_type},
+	        #{regular_schedule},
+	        #{special_note},
+	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
+	        #{user_id}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        <if test="handover_company != null">
+	        handover_company=#{handover_company},
+	        </if>
+	        <if test="handover_name != null">
+	        handover_name=#{handover_name},
+	        </if>
+	        <if test="handover_location != null">
+	        handover_location=#{handover_location},
+	        </if>
+	        <if test="meal_number != null">
+	        meal_number=#{meal_number},
+	        </if>
+	        <if test="catering_ration != null">
+	        catering_ration=#{catering_ration},
+	        </if>
+	        <if test="normal_diet != null">
+	        normal_diet=#{normal_diet},
+	        </if>
+	        <if test="kitchen_member != null">
+	        kitchen_member=#{kitchen_member},
+	        </if>
+	        <if test="work_type != null">
+	        work_type=#{work_type},
+	        </if>
+	        <if test="order_program_info != null">
+	        order_program_info=#{order_program_info},
+	        </if>
+	        <if test="ingredients_order_type != null">
+	        ingredients_order_type=#{ingredients_order_type},
+	        </if>
+	        <if test="inspection_store_type != null">
+	        inspection_store_type=#{inspection_store_type},
+	        </if>
+	        <if test="stock_manage_type != null">
+	        stock_manage_type=#{stock_manage_type},
+	        </if>
+	        <if test="diet_submit_cycle != null">
+	        diet_submit_cycle=#{diet_submit_cycle},
+	        </if>
+	        <if test="hygiene_note != null">
+	        hygiene_note=#{hygiene_note},
+	        </if>
+	        <if test="hot_issue != null">
+	        hot_issue=#{hot_issue},
+	        </if>
+	        <if test="program_use_whether != null">
+	        program_use_whether=#{program_use_whether},
+	        </if>
+	        <if test="rounding_satis_whether != null">
+	        rounding_satis_whether=#{rounding_satis_whether},
+	        </if>
+	        <if test="complain_note != null">
+	        complain_note=#{complain_note},
+	        </if>
+	        <if test="manager_phone != null">
+	        manager_phone=#{manager_phone},
+	        </if>
+	        <if test="trash_treatment_type != null">
+	        trash_treatment_type=#{trash_treatment_type},
+	        </if>
+	        <if test="regular_schedule != null">
+	        regular_schedule=#{regular_schedule},
+	        </if>
+	        <if test="special_note != null">
+	        special_note=#{special_note},
+	        </if>
+	        <if test="handover_dt != null and handover_dt != ''">
+	        handover_dt=DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),
+	        </if>
+	        <if test="acquisition_dt != null and acquisition_dt != ''">
+	        acquisition_dt=DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),
+	        </if>
+	        <if test="user_id != null">
+	        user_id=#{user_id},
+	        </if>
+	        <if test="reg_dt != null and reg_dt != ''">
+	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        </if>
+	        <if test="mod_dt != null and mod_dt != ''">
+	        mod_dt=DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),
+	        </if>
+	    </trim>
+	</insert>
+	
+	<select id="AccountMappingList" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM tb_account_mapping am
+	</select>
+	
+	<select id="AccountMappingV2List" parameterType="map" resultType="hashmap">
+		SELECT amv.account_id,
+		amv.type,
+		am.name,
+		amv.del_yn
+		FROM tb_account_mapping am
+		JOIN tb_account_mapping_v2 amv
+		ON amv.type = am.type
+		WHERE amv.account_id = #{account_id}
+	</select>
+	
+	<insert id="AccountMappingSave">
+	    INSERT INTO tb_account_mapping_v2
+	    (account_id, type, reg_dt, del_dt, del_yn)
+	    VALUES
+	    (
+	        #{account_id}
+	        , #{type}
+	        , <choose>
+	            <when test='del_yn == "N"'>DATE_FORMAT(now(), '%Y-%m-%d')</when>
+	            <otherwise>NULL</otherwise>
+	        </choose>
+	        
+	        , <choose>
+	            <when test='del_yn == "Y"'>DATE_FORMAT(now(), '%Y-%m-%d')</when>
+	            <otherwise>NULL</otherwise>
+	        </choose>
+	        
+	        , #{del_yn, jdbcType=CHAR}
+	        
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    account_id = #{account_id}, 
+	    type = #{type}, 
+	    <if test='del_yn == "N"'>
+	        reg_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	        del_dt = NULL,
+	    </if>
+	    <if test='del_yn == "Y"'>
+	        del_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	        reg_dt = reg_dt,
+	    </if>
+	    del_yn = #{del_yn, jdbcType=CHAR}
+	    
+	</insert>
+	
+	<insert id="AccountRetailBusinessSave">
+	    INSERT INTO tb_account_mapping
+	    (type, name, biz_no, ceo_name, tel, bank_name, bank_no, bank_image, biz_image, del_yn)
+	    VALUES
+	    (
+	        #{type},
+	        #{name},
+	        #{biz_no},
+	        #{ceo_name},
+	        #{tel},
+	        #{bank_name},
+	        #{bank_no},
+	        #{bank_image},
+	        #{biz_image},
+	        #{del_yn}
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    type = #{type}, 
+	    name = #{name},
+	    biz_no = #{biz_no},
+	    ceo_name = #{ceo_name},
+	    tel = #{tel},
+	    bank_name = #{bank_name},
+	    bank_no = #{bank_no},
+	    bank_image = #{bank_image},
+	    biz_image = #{biz_image},
+	    del_yn = #{del_yn}
+	</insert>
+	
+	<select id="AccountRetailBusinessList" parameterType="map" resultType="hashmap">
+		SELECT concat(ifnull(count(a.account_name),0), '개 거래처 연결') as account_name,
+			   am.type,
+			   am.name,
+			   am.biz_no,
+			   am.ceo_name,
+			   am.tel,
+			   am.bank_name,
+			   am.bank_no,
+			   am.bank_image,
+			   am.biz_image,
+			   am.del_yn
+		FROM tb_account_mapping am
+		LEFT OUTER JOIN tb_account_mapping_v2 amv
+		ON amv.type = am.type
+		LEFT OUTER JOIN tb_account a
+		ON a.account_id = amv.account_id
+		GROUP BY am.type,
+			   am.name,
+			   am.biz_no,
+			   am.ceo_name,
+			   am.tel,
+			   am.bank_name,
+			   am.bank_no,
+			   am.bank_image,
+			   am.biz_image,
+			   am.del_yn;
+	</select>
+	
+	<select id="AccountMembersFilesList" parameterType="map" resultType="hashmap">
+		SELECT am.member_id,
+			   am.name,
+		       am.position,
+               t.doc_id,
+               t.doc_type_id,
+               t.doc_type_name,
+               t.doc_sub_name,
+               t.issue_dt,
+               t.expiry_dt,
+               t.file_path,
+               t.note
+		FROM tb_account_members am
+		LEFT OUTER JOIN 
+        (
+        SELECT amf.member_id,
+			   amf.doc_id,
+		       amft.doc_type_id,
+		       amft.doc_type_name,
+		       amft.doc_sub_name,
+		       DATE_FORMAT(amf.issue_dt, '%Y-%m-%d') as issue_dt,
+		       DATE_FORMAT(amf.expiry_dt, '%Y-%m-%d') as expiry_dt,
+		       amf.file_path,
+		       amf.note
+        FROM tb_account_members_files amf
+		LEFT OUTER JOIN tb_account_members_files_type amft
+		ON amft.doc_type_id = amf.doc_type_id 
+        LIMIT 1 
+		) t
+        ON t.member_id = am.member_id
+        WHERE am.account_id = #{account_id}
+	</select>
+	
+	<select id="AccountTypeForFileList" parameterType="map" resultType="hashmap">
+		SELECT doc_id,
+			   file_path,
+			   issue_dt,
+			   expiry_dt,
+			   doc_type_id,
+			   note
+		FROM tb_account_members_files
+		WHERE member_id = #{member_id}
+		AND doc_type_id = #{doc_type_id}
+	</select>
+	
+	<insert id="AccountMembersFilesSave">
+	    INSERT INTO tb_account_members_files
+	    (member_id, doc_type_id, file_path, issue_dt, expiry_dt, update_dt, user_id, note)
+	    VALUES
+	    (
+	        #{member_id},
+	        #{doc_type_id},
+	        #{file_path},
+	        #{issue_dt},
+	        #{expiry_dt},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        #{user_id},
+	        #{note}
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    member_id = #{member_id},
+	    doc_type_id = #{doc_type_id},
+	    file_path = #{file_path},
+	    issue_dt = #{issue_dt},
+	    expiry_dt = #{expiry_dt},
+	    update_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	    user_id = #{user_id},
+	    note = #{note}
+	</insert>
+	
+	
+	<select id="AccountSubRestaurantList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id,
+			   a.account_name,
+			   a.account_address,
+			   move_lunch,
+			   move_lunch_tel,
+			   sub_restaurant1,
+			   sub_restaurant1_tel,
+			   sub_restaurant2,
+			   sub_restaurant2_tel,
+			   sub_restaurant3,
+			   sub_restaurant3_tel
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_sub_restaurant asr
+		ON asr.account_id = a.account_id
+		<if test='region != ""'>
+	        WHERE a.account_address LIKE #{region}
+	    </if>
+	</select>
+	
+	<insert id="AccountSubRestaurantSave">
+	    INSERT INTO tb_account_sub_restaurant
+	    (account_id, move_lunch, move_lunch_tel, sub_restaurant1, sub_restaurant1_tel, sub_restaurant2, sub_restaurant2_tel, sub_restaurant3, sub_restaurant3_tel, update_dt, user_id)
+	    VALUES
+	    (
+	        #{account_id},
+	        #{move_lunch},
+	        #{move_lunch_tel},
+	        #{sub_restaurant1},
+	        #{sub_restaurant1_tel},
+	        #{sub_restaurant2},
+	        #{sub_restaurant2_tel},
+	        #{sub_restaurant3},
+	        #{sub_restaurant3_tel},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        #{user_id}
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    account_id = #{account_id},
+        move_lunch = #{move_lunch},
+        move_lunch_tel = #{move_lunch_tel},
+        sub_restaurant1 = #{sub_restaurant1},
+        sub_restaurant1_tel = #{sub_restaurant1_tel},
+        sub_restaurant2 = #{sub_restaurant2},
+        sub_restaurant2_tel = #{sub_restaurant2_tel},
+        sub_restaurant3 = #{sub_restaurant3},
+        sub_restaurant3_tel = #{sub_restaurant3_tel},
+	    update_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	    user_id = #{user_id}
+	</insert>
+	
+	<select id="AccountMemberSheetList" parameterType="map" resultType="hashmap">
+		SELECT a.account_name
+	 		 , concat(a.account_address, '\n', a.account_address_detail) as account_address
+	     	 , am.*
+		FROM tb_account_members am
+		JOIN tb_account a
+		ON am.account_id = a.account_id
+		WHERE am.account_id = #{account_id}
+		AND am.del_yn = #{del_yn}
+	</select>
+	
+	<select id="AccountMemberAllList" parameterType="map" resultType="map">
+		SELECT T.member_id,
+		    T.account_id,
+			T2.account_name,
+		    T.name,
+		    T.join_dt,
+		    T.del_dt,
+		    T.del_yn,
+		    T.position_type,
+		    T.work_system,
+		    T.start_time,
+		    T.end_time,
+		    T.salary,
+		    T.relation,
+		    T.del_note,
+		    T.rct_notice,
+		    T.note,
+		    T.position_type,
+		    T.address,
+		    T.rrn,
+		    T.account_number,
+		    T.phone,
+		    T.contract_type,
+		    DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+		    DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS act_join_dt,
+		    DATE_FORMAT(T.national_pension, '%Y-%m-%d') AS national_pension,
+		    DATE_FORMAT(T.health_insurance, '%Y-%m-%d') AS health_insurance,
+		    DATE_FORMAT(T.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
+		    DATE_FORMAT(T.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+		    DATE_FORMAT(T.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
+		    T.employment_contract,
+		    T.subsidy,
+		    T.headoffice_note
+		FROM tb_account_members T
+		JOIN tb_account T2
+		ON T.account_id = T2.account_id
+		WHERE 1=1
+		<if test='del_yn != null'>
+			AND T.del_yn = #{del_yn}
+ 		</if>
+		<if test='account_id !=null'>
+			AND T.account_id = #{account_id}
+ 		</if>
+ 		ORDER BY T.account_id, T.position_type
+	</select>
+	
+	<insert id="AccountMembersSave" parameterType="map">
+	    INSERT INTO tb_account_members (
+	        member_id,
+	        account_id,
+	        name,
+	        join_dt,
+	        del_dt,
+	        del_yn,
+	        position,
+	        work_system,
+	        start_time,
+	        end_time,
+	        salary,
+	        relation,
+	        del_note,
+	        rct_notice,
+	        note,
+	        position_type,
+	        address,
+	        rrn,
+	        account_number,
+	        phone,
+	        contract_type,
+	        act_join_dt,
+	        ret_set_dt,
+	        national_pension,
+	        health_insurance,
+	        industrial_insurance,
+	        employment_insurance,
+	        employment_contract,
+	        subsidy,
+	        headoffice_note,
+	        loss_major_insurances,
+	        update_dt,
+	        user_id
+	    )
+	    VALUES (
+	        <choose>
+	            <when test="member_id == null or member_id == ''">
+	                DATE_FORMAT(NOW(), '%Y%m%d%H%i%s'),
+	            </when>
+	            <otherwise>#{member_id},</otherwise>
+	        </choose>
+	
+	        #{account_id},
+	        #{name},
+	
+	        <!-- join_dt -->
+	        <choose>
+	            <when test="join_dt != null and join_dt != ''">
+	                DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
+	            </when>
+	            <otherwise>null,</otherwise>
+	        </choose>
+	
+	        <!-- del_dt -->
+	        <choose>
+	            <when test="del_dt != null and del_dt != ''">
+	                DATE_FORMAT(#{del_dt}, '%Y-%m-%d'),
+	            </when>
+	            <otherwise>null,</otherwise>
+	        </choose>
+	
+	        #{del_yn},
+	        #{position},
+	        #{work_system},
+	        #{start_time},
+	        #{end_time},
+	        #{salary},
+	        #{relation},
+	        #{del_note},
+	        #{rct_notice},
+	        #{note},
+	        #{position_type},
+	        #{address},
+	        #{rrn},
+	        #{account_number},
+	        #{phone},
+	        #{contract_type},
+	
+	        <!-- act_join_dt -->
+	        <choose>
+	            <when test="act_join_dt != null and act_join_dt != ''">
+	                DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d'),
+	            </when>
+	            <otherwise>null,</otherwise>
+	        </choose>
+	
+	        <!-- ret_set_dt -->
+	        <choose>
+	            <when test="ret_set_dt != null and ret_set_dt != ''">
+	                DATE_FORMAT(#{ret_set_dt}, '%Y-%m-%d'),
+	            </when>
+	            <otherwise>null,</otherwise>
+	        </choose>
+	
+	        #{national_pension},
+	        #{health_insurance},
+	        #{industrial_insurance},
+	        #{employment_insurance},
+	        #{employment_contract},
+	        #{subsidy},
+	        #{headoffice_note},
+	        #{loss_major_insurances},
+	
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id}
+	    )
+	
+	    ON DUPLICATE KEY UPDATE
+	        member_id = #{member_id},
+	        account_id = #{account_id},
+	        name = #{name},
+	
+	        join_dt = <choose>
+	            <when test="join_dt != null and join_dt != ''">
+	                DATE_FORMAT(#{join_dt}, '%Y-%m-%d')
+	            </when>
+	            <otherwise>null</otherwise>
+	        </choose>,
+	
+	        del_dt = <choose>
+	            <when test="del_dt != null and del_dt != ''">
+	                DATE_FORMAT(#{del_dt}, '%Y-%m-%d')
+	            </when>
+	            <otherwise>null</otherwise>
+	        </choose>,
+	
+	        del_yn = #{del_yn},
+	        position = #{position},
+	        work_system = #{work_system},
+	        start_time = #{start_time},
+	        end_time = #{end_time},
+	        salary = #{salary},
+	        relation = #{relation},
+	        del_note = #{del_note},
+	        rct_notice = #{rct_notice},
+	        note = #{note},
+	        position_type = #{position_type},
+	        address = #{address},
+	        rrn = #{rrn},
+	        account_number = #{account_number},
+	        phone = #{phone},
+	        contract_type = #{contract_type},
+	
+	        act_join_dt = <choose>
+	            <when test="act_join_dt != null and act_join_dt != ''">
+	                DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d')
+	            </when>
+	            <otherwise>null</otherwise>
+	        </choose>,
+	
+	        ret_set_dt = <choose>
+	            <when test="ret_set_dt != null and ret_set_dt != ''">
+	                DATE_FORMAT(#{ret_set_dt}, '%Y-%m-%d')
+	            </when>
+	            <otherwise>null</otherwise>
+	        </choose>,
+	
+	        national_pension = #{national_pension},
+	        health_insurance = #{health_insurance},
+	        industrial_insurance = #{industrial_insurance},
+	        employment_insurance = #{employment_insurance},
+	        employment_contract = #{employment_contract},
+	        subsidy = #{subsidy},
+	        headoffice_note = #{headoffice_note},
+	        loss_major_insurances = #{loss_major_insurances},
+	
+	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id = #{user_id}
+	</insert>
+
+	
+	<select id="AccountDinnersNumberList" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM tb_account_diners_number
+		WHERE account_id = #{account_id}
+		AND diner_year = #{year}
+		AND diner_month = #{month}
+	</select>
+	
+	<insert id="AccountDinnersNumberSave" parameterType="map">
+		INSERT INTO tb_account_diners_number
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        diner_year,
+	        diner_month,
+	        diner_date,
+	        breakfast,
+	        lunch,
+	        dinner,
+	        daycare_lunch,
+	        daycare_diner,
+	        employ,
+	        note,
+	        total,
+	        breakcancel,
+	        lunchcancel,
+	        dinnercancel,
+	        ceremony
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{diner_year},
+	        #{diner_month},
+	        #{diner_date},
+	        #{breakfast},
+	        #{lunch},
+	        #{dinner},
+	        #{daycare_lunch},
+	        #{daycare_diner},
+	        #{employ},
+	        #{note},
+	        #{total},
+	        #{breakcancel},
+	        #{lunchcancel},
+	        #{dinnercancel},
+	        #{ceremony}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        account_id=#{account_id},
+	        diner_year=#{diner_year},
+	        diner_month=#{diner_month},
+	        diner_date=#{diner_date},
+	        breakfast=#{breakfast},
+	        lunch=#{lunch},
+	        dinner=#{dinner},
+	        daycare_lunch=#{daycare_lunch},
+	        daycare_diner=#{daycare_diner},
+	        employ=#{employ},
+	        note=#{note},
+	        total=#{total},
+	        breakcancel=#{breakcancel},
+	        lunchcancel=#{lunchcancel},
+	        dinnercancel=#{dinnercancel},
+	        ceremony=#{ceremony}
+	    </trim>
+	</insert>
+</mapper>
