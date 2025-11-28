@@ -8,14 +8,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.mapper.HeadOfficeMapper;
+import com.example.demo.mapper.OperateMapper;
 
 @Service
 public class HeadOfficeService {
 	
 	HeadOfficeMapper headOfficeMapper;
+	OperateMapper operateMapper;
 
-	public HeadOfficeService(HeadOfficeMapper userMapper) {
+	public HeadOfficeService(HeadOfficeMapper userMapper, OperateMapper operateMapper) {
         this.headOfficeMapper = userMapper;
+        this.operateMapper = operateMapper;
     }
 	// 본사 -> 캘린더 저장
 	public int WeekMenuSave(Map<String, Object> paramMap) {
@@ -69,7 +72,17 @@ public class HeadOfficeService {
         if (result != 1) {
             throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
         }
+        
+        // 예산 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(param);
 
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+        }
+        
         return 1; // ✅ 전체 성공
     }
 }

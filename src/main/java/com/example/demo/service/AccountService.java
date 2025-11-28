@@ -9,16 +9,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.mapper.AccountMapper;
 import com.example.demo.mapper.HeadOfficeMapper;
+import com.example.demo.mapper.OperateMapper;
 
 @Service
 public class AccountService {
 
 	AccountMapper accountMapper;
 	HeadOfficeMapper headOfficeMapper;
+	OperateMapper operateMapper;
 	
-	public AccountService(AccountMapper accountMapper, HeadOfficeMapper headOfficeMapper) {
+	public AccountService(AccountMapper accountMapper, HeadOfficeMapper headOfficeMapper, OperateMapper operateMapper) {
 		this.accountMapper = accountMapper;
 		this.headOfficeMapper = headOfficeMapper;
+		this.operateMapper = operateMapper;
 	}
 	
 	public List<Map<String, Object>> AccountMemberList(int accountType) {
@@ -233,11 +236,21 @@ public class AccountService {
         // ③ 손익표 합계 + 비율 저장 프로시저 호출
         param.put("result", 0); // OUT 값 초기화
         headOfficeMapper.ProfitLossTotalSave(param);
-
+        
         // OUT 값 확인
         result = (int) param.get("result");
         if (result != 1) {
             throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+        }
+        
+        // 예산 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(param);
+
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
         }
 
         return 1; // ✅ 전체 성공
@@ -258,6 +271,16 @@ public class AccountService {
         result = (int) param.get("result");
         if (result != 1) {
             throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+        }
+        
+        // 예산 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(param);
+
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
         }
 
         return 1; // ✅ 전체 성공

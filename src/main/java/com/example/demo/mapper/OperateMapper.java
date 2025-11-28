@@ -35,4 +35,9 @@ public interface OperateMapper {
 	int AccountMembersSave(Map<String, Object> paramMap);								// 급식사업부 -> 운영관리 -> 직원관리 저장
 	List<Map<String, Object>> AccountDinnersNumberList(Map<String, Object> paramMap); 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황
 	int AccountDinnersNumberSave(Map<String, Object> paramMap);							// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황 저장
+	void BudgetTotalSave(Map<String, Object> paramMap);									// 예산 계산 프로시저
+	List<Map<String, Object>> BudgetManageMentList(Map<String, Object> paramMap); 		// 급식사업부 -> 운영관리 -> 예산관리 조회
+	int BudgetTableSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 예산관리 저장
+	List<Map<String, Object>> BudgetStandardList(Map<String, Object> paramMap); 		// 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
+	List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 }

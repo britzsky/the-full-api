@@ -737,5 +737,67 @@ public class BusinessController {
 
 	    return obj.toString();
 	}
-
+	/*
+     * part		: 영업
+     * method 	: AccountEctDietList
+     * comment 	: 급식사업부 -> 영업관리 -> 고객사 상세 추가 식단가 조회
+     */
+    @GetMapping("Business/AccountEctDietList")
+    public String AccountEctDietList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = businessService.AccountEctDietList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 영업
+     * method 	: AccountEctDietSave
+     * comment 	: 고객사 상세 관리 -> 추가 식단가 저장
+     */
+    @SuppressWarnings("unchecked")
+	@PostMapping("Business/AccountEctDietSave")
+    public String AccountInfoSave(@RequestBody Map<String, Object> payload) {
+    	
+    	int iResult = 0;
+    	
+    	//List<Map<String, Object>> payloadList = new ArrayList<>();
+    	
+    	Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
+        Map<String, Object> payloadMap = new HashMap<String, Object>();
+        
+        payloadMap.putAll(formData);
+        
+        System.out.println("payloadMap ==================== :: " + payloadMap);
+        
+        iResult = businessService.AccountEctDietSave(payloadMap);
+        
+        JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+    		obj.addProperty("code", 200);
+    		obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+    		obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+//    
+//	@PostMapping("Business/AccountEctDietSave")
+//	private String AccountEctDietSave(@RequestParam Map<String, Object> paramMap) {
+//	    	
+//    	JsonObject obj =new JsonObject();
+//    	
+//    	if(businessService.AccountEctDietSave(paramMap) > 0) {
+//    		obj.addProperty("code", 200);
+//    		obj.addProperty("message", "성공");
+//    	} else {
+//    		obj.addProperty("code", 400);
+//    		obj.addProperty("message", "실패");
+//    	}
+//    	
+//    	return obj.toString();
+//    }
 }

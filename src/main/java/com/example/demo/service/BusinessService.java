@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.demo.mapper.BusinessMapper;
 
@@ -177,5 +178,24 @@ public class BusinessService {
 	// 고객사 관리 -> 고객사 행사관리 이미지 저장
 	public void SaveEventFile(Map<String, Object> param) {
 	    businessMapper.SaveEventFile(param);
+	}
+	// 고객사 상세 관리 -> 추가 식단가 조회
+	public List<Map<String, Object>> AccountEctDietList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = businessMapper.AccountEctDietList(paramMap);
+		return resultList;
+	}
+	// 고객사 상세 관리 -> 추가 식단가 저장
+	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
+	public int AccountEctDietSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = businessMapper.AccountEctDietSave(paramMap);
+		
+//		if(iResult > 0) {
+//			// 고객사 관리 -> 식수현황 -> 추가 식단가 수정
+//			iResult += businessMapper.DinerNumberUpdate(paramMap);
+//		}
+		
+		return iResult;
 	}
 }

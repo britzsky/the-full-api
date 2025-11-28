@@ -323,4 +323,46 @@
 	    )
 	</insert>
 	
+	<select id="AccountEctDietList" parameterType="map" resultType="map">
+	    SELECT extra_diet1_name,
+	    	   extra_diet1_price,
+	    	   extra_diet2_name,
+	    	   extra_diet2_price,
+	    	   extra_diet3_name,
+	    	   extra_diet3_price,
+	    	   extra_diet4_name,
+	    	   extra_diet4_price,
+	    	   extra_diet5_name,
+	    	   extra_diet5_price
+	    FROM tb_account_info
+	    WHERE account_id = #{account_id}
+	</select>
+	
+	<insert id="AccountEctDietSave" parameterType="map">
+		INSERT INTO tb_account_info(account_id,extra_diet1_name,extra_diet1_price,extra_diet2_name,extra_diet2_price,extra_diet3_name,extra_diet3_price,extra_diet4_name,extra_diet4_price,extra_diet5_name,extra_diet5_price)
+		VALUES
+		(#{account_id},#{extra_diet1_name},#{extra_diet1_price},#{extra_diet2_name},#{extra_diet2_price},#{extra_diet3_name},#{extra_diet3_price},#{extra_diet4_name},#{extra_diet4_price},#{extra_diet5_name},#{extra_diet5_price})
+		ON DUPLICATE KEY UPDATE
+		extra_diet1_name = VALUES(extra_diet1_name),
+		extra_diet1_price = VALUES(extra_diet1_price),
+		extra_diet2_name = VALUES(extra_diet2_name),
+		extra_diet2_price = VALUES(extra_diet2_price),
+		extra_diet3_name = VALUES(extra_diet3_name),
+		extra_diet3_price = VALUES(extra_diet3_price),
+		extra_diet4_name = VALUES(extra_diet4_name),
+		extra_diet4_price = VALUES(extra_diet4_price),
+		extra_diet5_name = VALUES(extra_diet5_name),
+		extra_diet5_price = VALUES(extra_diet5_price)
+	</insert>
+	
+	<update id="DinerNumberUpdate" parameterType="map">
+	    UPDATE tb_account_diners_number
+	    SET extra_diet1_name = #{extra_diet1_name},
+			extra_diet2_name = #{extra_diet2_name},
+			extra_diet3_name = #{extra_diet3_name},
+			extra_diet4_name = #{extra_diet4_name},
+			extra_diet5_name = #{extra_diet5_name}
+	    WHERE account_id = #{account_id}
+	</update>
+	
 </mapper>

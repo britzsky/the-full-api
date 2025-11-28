@@ -421,7 +421,8 @@
         		DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end,
         		T.account_type,
         		T.meal_type,
-        		T2.industry_note
+        		T2.industry_note,
+        		T2.working_day
 		FROM tb_account T
 		LEFT OUTER JOIN tb_account_info T2
 		ON T.account_id = T2.account_id
@@ -450,7 +451,17 @@
 		        T2.utility_bills,
 		        T.account_type,
 		        T2.industry_note,
-		        T2.expenses_note
+		        T2.expenses_note,
+		        T2.extra_diet1_name,
+		        T2.extra_diet2_name,
+		        T2.extra_diet3_name,
+		        T2.extra_diet4_name,
+		        T2.extra_diet5_name,
+		        T2.extra_diet1_price,
+		        T2.extra_diet2_price,
+		        T2.extra_diet3_price,
+		        T2.extra_diet4_price,
+		        T2.extra_diet5_price
 		FROM tb_account T
 		LEFT OUTER JOIN tb_account_info T2
 		ON T.account_id = T2.account_id
@@ -636,7 +647,13 @@
 	        business_regist,
 	        kitchen_drawing,
 	        expenses_note,
-	        update_dt
+	        update_dt,
+	        extra_diet1_price,
+	        extra_diet2_price,
+	        extra_diet3_price,
+	        extra_diet4_price,
+	        extra_diet5_price,
+	        working_day
 	    </trim>
 	    
 	    VALUES
@@ -694,7 +711,13 @@
 	        #{business_regist},
 	        #{kitchen_drawing},
 	        #{expenses_note},
-	        DATE_FORMAT(now(), '%Y-%m-%d')
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        #{extra_diet1_price},
+	        #{extra_diet2_price},
+	        #{extra_diet3_price},
+	        #{extra_diet4_price},
+	        #{extra_diet5_price},
+	        #{working_day}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -750,7 +773,13 @@
 	        business_regist=#{business_regist},
 	        kitchen_drawing=#{kitchen_drawing},
 	        expenses_note=#{expenses_note},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d')
+	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        extra_diet1_price=#{extra_diet1_price},
+	        extra_diet2_price=#{extra_diet2_price},
+	        extra_diet3_price=#{extra_diet3_price},
+	        extra_diet4_price=#{extra_diet4_price},
+	        extra_diet5_price=#{extra_diet5_price},
+	        working_day=#{working_day}
 	    </trim>
 	</insert>
 	

@@ -116,7 +116,7 @@ public class OperateService {
 		param.put("year", param.get("count_year"));
 		
         int result = 0;
-
+        
         // ③ 손익표 합계 + 비율 저장 프로시저 호출
         param.put("result", 0); // OUT 값 초기화
         headOfficeMapper.ProfitLossTotalSave(param);
@@ -125,6 +125,16 @@ public class OperateService {
         result = (int) param.get("result");
         if (result != 1) {
             throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+        }
+        
+        // 예산 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(param);
+
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
         }
 
         return 1; // ✅ 전체 성공
@@ -191,4 +201,43 @@ public class OperateService {
 		iResult = operateMapper.AccountDinnersNumberSave(paramMap);
 		return iResult;
 	}
+	// 급식사업부 -> 운영관리 -> 예산관리 조회
+	public List<Map<String, Object>> BudgetManageMentList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.BudgetManageMentList(paramMap);
+		return resultList;
+	}
+	// 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
+	public List<Map<String, Object>> BudgetStandardList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.BudgetStandardList(paramMap);
+		return resultList;
+	}
+	// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
+	public List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.MealsNumberList(paramMap);
+		return resultList;
+	}
+	// 급식사업부 -> 운영관리 -> 예산관리 저장
+	public int BudgetTableSave(Map<String, Object> paramMap) {
+		return operateMapper.BudgetTableSave(paramMap);
+	}
+	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
+    public int BudgetTotalSave(Map<String, Object> param) {
+
+        int result = 0;
+        
+        // 예산 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(param);
+
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+        }
+        
+        return 1; // ✅ 전체 성공
+    }
 }

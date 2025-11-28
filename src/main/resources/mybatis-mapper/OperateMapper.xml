@@ -959,7 +959,13 @@
 	        breakcancel,
 	        lunchcancel,
 	        dinnercancel,
-	        ceremony
+	        ceremony,
+	        extra_diet1_price,
+	        extra_diet2_price,
+	        extra_diet3_price,
+	        extra_diet4_price,
+	        extra_diet5_price,
+	        special_yn
 	    </trim>
 	    
 	    VALUES
@@ -980,7 +986,13 @@
 	        #{breakcancel},
 	        #{lunchcancel},
 	        #{dinnercancel},
-	        #{ceremony}
+	        #{ceremony},
+	        #{extra_diet1_price},
+	        #{extra_diet2_price},
+	        #{extra_diet3_price},
+	        #{extra_diet4_price},
+	        #{extra_diet5_price},
+	        #{special_yn}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -999,7 +1011,160 @@
 	        breakcancel=#{breakcancel},
 	        lunchcancel=#{lunchcancel},
 	        dinnercancel=#{dinnercancel},
-	        ceremony=#{ceremony}
+	        ceremony=#{ceremony},
+	        extra_diet1_price=#{extra_diet1_price},
+	        extra_diet2_price=#{extra_diet2_price},
+	        extra_diet3_price=#{extra_diet3_price},
+	        extra_diet4_price=#{extra_diet4_price},
+	        extra_diet5_price=#{extra_diet5_price},
+	        special_yn=#{special_yn}
+	    </trim>
+	</insert>
+	
+	<select id="BudgetStandardList" parameterType="map" resultType="map">
+		SELECT CASE WHEN meal_type = 1 THEN '요양주간'
+					WHEN meal_type = 2 THEN '요양직원'
+					WHEN meal_type = 3 THEN '요양'
+					WHEN meal_type = 4 THEN '주간보호' 
+					ELSE '산업체' END AS meal_type,
+			   standard
+		FROM tb_account_budget_standard
+	</select>
+	
+	<select id="MealsNumberList" parameterType="map" resultType="map">
+		SELECT CASE WHEN account_type = 1 THEN '위탁급식'
+					WHEN account_type = 4 THEN '산업체'
+					WHEN account_type = 5 THEN '학교' ELSE '' END AS account_type,
+			   meals_number
+		FROM tb_account_meals_number
+	</select>
+	
+	<select id="BudgetManageMentList" parameterType="map" resultType="map">
+		SELECT a.account_id,
+			   a.account_name,
+			   CASE WHEN a.account_type = 1 THEN '요양원'
+			   		WHEN a.account_type = 4 THEN '산업체'
+			   		WHEN a.account_type = 5 THEN '학교'
+			   		ELSE '' END as account_type_name,
+			   CASE WHEN a.meal_type = 1 THEN '요양주간'
+			   		WHEN a.meal_type = 2 THEN '요양지원'
+			   		WHEN a.meal_type = 3 THEN '요양'
+			   		WHEN a.meal_type = 4 THEN '주간보호'
+			   		ELSE '산업체' END as meal_type_name,
+			   abm.year,
+			   abm.month,
+			   abm.total,
+			   abm.diet_price,
+			   abm.utility_bills,
+			   abm.food_budget,
+			   abm.budget_total,
+			   abm.day_budget,
+			   abm.day_use_amount,
+			   abm.use_ratio,
+			   abm.note,
+			   abm.budget_grant,
+			   abm.day_use_ratio,
+			   abm.existing_budget,
+			   abm.diff_amount
+		FROM tb_account a
+		LEFT OUTER JOIN tb_account_budget_management abm
+		ON abm.account_id = a.account_id
+		AND abm.year = #{year}
+		AND abm.month = #{month}
+	</select>
+	
+	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
+	    { CALL BudgetTotalSave(
+	        #{year, mode=IN, jdbcType=INTEGER},
+	        #{month, mode=IN, jdbcType=INTEGER},
+	        #{account_id, mode=IN, jdbcType=VARCHAR},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
+	
+	
+	<insert id="BudgetTableSave" parameterType="map">
+	    INSERT INTO tb_account_budget_management (
+	        year,
+	        month,
+	        account_id,
+	        total,
+	        diet_price,
+	        utility_bills,
+	        food_budget,
+	        budget_total,
+	        day_budget,
+	        day_use_amount,
+	        use_ratio,
+	        note,
+	        budget_grant,
+	        day_use_ratio,
+	        existing_budget,
+	        diff_amount,
+	        update_dt
+	    )
+	    VALUES
+	    (
+	        #{year},
+	        #{month},
+	        #{account_id},
+	        #{total},
+	        #{diet_price},
+	        #{utility_bills},
+	        #{food_budget},
+	        #{budget_total},
+	        #{day_budget},
+	        #{day_use_amount},
+	        #{use_ratio},
+	        #{note},
+	        #{budget_grant},
+	        #{day_use_ratio},
+	        #{existing_budget},
+	        #{diff_amount},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d')
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        <if test="total != null">
+	            total = #{total},
+	        </if>
+	        <if test="diet_price != null">
+	            diet_price = #{diet_price},
+	        </if>
+	        <if test="utility_bills != null">
+	            utility_bills = #{utility_bills},
+	        </if>
+	        <if test="food_budget != null">
+	            food_budget = #{food_budget},
+	        </if>
+	        <if test="budget_total != null">
+	            budget_total = #{budget_total},
+	        </if>
+	        <if test="day_budget != null">
+	            day_budget = #{day_budget},
+	        </if>
+	        <if test="day_use_amount != null">
+	            day_use_amount = #{day_use_amount},
+	        </if>
+	        <if test="use_ratio != null">
+	            use_ratio = #{use_ratio},
+	        </if>
+	        <if test="note != null">
+	            note = #{note},
+	        </if>
+	        <if test="budget_grant != null">
+	            budget_grant = #{budget_grant},
+	        </if>
+	        <if test="day_use_ratio != null">
+	            day_use_ratio = #{day_use_ratio},
+	        </if>
+	        <if test="existing_budget != null">
+	            existing_budget = #{existing_budget},
+	        </if>
+	        <if test="diff_amount != null">
+	            diff_amount = #{diff_amount},
+	        </if>
+	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
 	    </trim>
 	</insert>
 </mapper>

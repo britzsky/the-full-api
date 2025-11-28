@@ -37,4 +37,7 @@ public interface BusinessMapper {
 	int EventUpdate(Map<String, Object> paramMap);									// 고객사 관리 -> 고객사 행사관리 수정
 	Integer GetMaxImageOrder(int eventId);											// 고객사 관리 -> 고객사 행사관리 이미지 순번 최대값 조회
 	void SaveEventFile(Map<String, Object> param);									// 고객사 관리 -> 고객사 행사관리 이미지 저장
+	List<Map<String, Object>> AccountEctDietList(Map<String, Object> paramMap);		// 고객사 관리 -> 고객사 상세관리 -> 추가 식단가 조회
+	int AccountEctDietSave(Map<String, Object> paramMap);							// 고객사 관리 -> 고객사 상세관리 -> 추가 식단가 저장
+	int DinerNumberUpdate(Map<String, Object> paramMap);							// 고객사 관리 -> 식수현황 -> 추가 식단가 수정
 }

@@ -582,4 +582,79 @@ public class OperateController {
     	
     	return obj.toString();
     }
+    
+    /*
+     * part		: 운영
+     * method 	: BudgetManageMentList
+     * comment 	: 급식사업부 -> 운영관리 -> 예산관리 조회
+     */
+    @GetMapping("Operate/BudgetManageMentList")
+    public String BudgetManageMentList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.BudgetManageMentList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: BudgetStandardList
+     * comment 	: 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
+     */
+    @GetMapping("Operate/BudgetStandardList")
+    public String BudgetStandardList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.BudgetStandardList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: MealsNumberList
+     * comment 	: 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
+     */
+    @GetMapping("Operate/MealsNumberList")
+    public String MealsNumberList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.MealsNumberList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 운영
+     * method 	: BudgetTableSave
+     * comment 	: 급식사업부 -> 운영관리 -> 예산관리 저장
+     */
+	@PostMapping("Operate/BudgetTableSave")
+	public String BudgetTableSave(@RequestBody Map<String, Object> payload) {
+		
+		// payload에서 rows만 꺼냄
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
+		
+		int iResult = 0;
+		
+		for (Map<String, Object> paramMap : rows) {
+			iResult += operateService.BudgetTableSave(paramMap);
+        }
+		
+		if (iResult > 0) {
+			for (Map<String, Object> paramMap : rows) {
+				iResult += operateService.BudgetTotalSave(paramMap);
+	        }
+		}
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
 }
