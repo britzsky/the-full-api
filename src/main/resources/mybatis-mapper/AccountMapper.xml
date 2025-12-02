@@ -18,7 +18,6 @@
  		<if test='accountType != 0'>
 			WHERE account_type = #{accountType}
  		</if>
-		ORDER BY account_type DESC
 	</select>
 	
 	<select id="AccountDirectList" resultType="hashmap">
@@ -475,24 +474,26 @@
 				subquery.cuisine_note,
 				subquery.name,
 		        subquery.budget_note,
-		        CONCAT(
-					CASE WHEN SUM(subquery2.kitchen_cnt1) != 0
-						 THEN CONCAT("조리팀장 : ", SUM(subquery2.kitchen_cnt1), "명\n")
-		                 ELSE ''
-		                 END,
-		            CASE WHEN SUM(subquery2.kitchen_cnt2) != 0
-						 THEN CONCAT("조리장 : ", SUM(subquery2.kitchen_cnt2), "명\n")
-		                 ELSE ''
-		                 END,
-					CASE WHEN SUM(subquery2.kitchen_cnt3) != 0
-						 THEN CONCAT("조리사 : ", SUM(subquery2.kitchen_cnt3), "명\n")
-		                 ELSE ''  
-		                 END,
-					CASE WHEN SUM(subquery2.kitchen_cnt4) != 0
-						 THEN CONCAT("조리원 : ", SUM(subquery2.kitchen_cnt4), "명")
-		                 ELSE ''
-		                 END
-		        ) As members,
+		        CAST(
+				  CONCAT(
+				    CASE WHEN SUM(subquery2.kitchen_cnt1) != 0
+				         THEN CONCAT('조리팀장 : ', SUM(subquery2.kitchen_cnt1), '명\n')
+				         ELSE ''
+				         END,
+				    CASE WHEN SUM(subquery2.kitchen_cnt2) != 0
+				         THEN CONCAT('조리장 : ', SUM(subquery2.kitchen_cnt2), '명\n')
+				         ELSE ''
+				         END,
+				    CASE WHEN SUM(subquery2.kitchen_cnt3) != 0
+				         THEN CONCAT('조리사 : ', SUM(subquery2.kitchen_cnt3), '명\n')
+				         ELSE ''  
+				         END,
+				    CASE WHEN SUM(subquery2.kitchen_cnt4) != 0
+				         THEN CONCAT('조리원 : ', SUM(subquery2.kitchen_cnt4), '명')
+				         ELSE ''
+				         END
+				  ) AS CHAR(255) CHARACTER SET utf8mb4
+				) AS members
 		        REPLACE(GROUP_CONCAT(DISTINCT subquery3.work_system, " : ", subquery3.work_cnt, "명 \n"), ',', '') as work_system
 				-- subquery3.note
 		        FROM (
