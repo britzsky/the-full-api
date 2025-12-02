@@ -33,14 +33,5 @@ public class WebConfig implements WebMvcConfigurer {
 		
 		//registry.addResourceHandler("/image/**")
 		//.addResourceLocations("file:///opt/apache-tomcat-10.1.49/webapps/api/WEB-INF/classes/static/image/");
-		
-
-		
-		
-		
-		 
-		 //.addResourceLocations("file:///C:/Users/손경원/eclipse-workspace/the-full-api/src/main/resources/static/image/");
-        // ✅ http://localhost:8080/uploads/** → C:/uploads/** 매핑
-       
     }
 }
