@@ -12,23 +12,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.example.demo.WebConfig;
 import com.example.demo.service.HeadOfficeService;
-import com.google.api.client.util.Value;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 @RestController
-@CrossOrigin(origins = {
-    "http://localhost:3000",       	// 로컬
-    "http://172.30.1.48:8080",      // 개발 React
-    "http://52.64.151.137:8080"     // 운영 React
-})
 public class HeadOfficeController {
 	
 	private final HeadOfficeService headOfficeService;
 	
     @Autowired
-    public HeadOfficeController(HeadOfficeService headOfficeService) {
+    public HeadOfficeController(HeadOfficeService headOfficeService, WebConfig webConfig) {
     	this.headOfficeService = headOfficeService;
     }
     

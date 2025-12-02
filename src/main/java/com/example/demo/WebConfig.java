@@ -10,8 +10,13 @@ public class WebConfig implements WebMvcConfigurer {
 	
 	@Override
     public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/api/**")
-                .allowedOrigins("<http://localhost:3000>")
+			registry.addMapping("/**")  // ★ context-path(/api)는 빼고!
+		        .allowedOrigins(
+		            "http://localhost:3000",
+		            "http://172.30.1.48:8080",
+		            "http://52.64.151.137",
+		            "http://52.64.151.137:8080"
+		        )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("Authorization", "x-refresh-token", "Content-Type")
                 .exposedHeaders("Authorization", "x-refresh-token")
