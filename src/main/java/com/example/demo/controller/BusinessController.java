@@ -206,16 +206,15 @@ public class BusinessController {
     			row.put("contract_type", Integer.parseInt(row.get("contract_type").toString()));
     		}
     		
-    		if(row.get("account_name").toString() != null 
-    				|| row.get("account_name").toString() != null
-    				|| row.get("sales_root").toString() != null
-    				|| row.get("manager").toString() != null
-    				|| row.get("region").toString() != null
-    				|| row.get("now_consignor").toString() != null
-    				|| row.get("end_dt").toString() != null
-    				|| row.get("contract_type") != null) {
-    			
-    			iResult += BusinessTeleInfoSave(row);
+    		if (row.get("account_name") != null
+    		        || row.get("sales_root") != null
+    		        || row.get("manager") != null
+    		        || row.get("region") != null
+    		        || row.get("now_consignor") != null
+    		        || row.get("end_dt") != null
+    		        || row.get("contract_type") != null) {
+
+    		    iResult += BusinessTeleInfoSave(row);
     		}
         }
     	
