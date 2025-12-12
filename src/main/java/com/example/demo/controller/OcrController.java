@@ -3,6 +3,9 @@ package com.example.demo.controller;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -12,8 +15,10 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,8 +29,11 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.parser.ReceiptParserFactory;
-import com.example.demo.service.OcrService;
+import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
+import com.example.demo.service.OcrService;
+import com.example.demo.utils.BizNoUtils;
+import com.example.demo.utils.DateUtils;
 import com.google.cloud.documentai.v1.Document;
 
 @RestController
@@ -33,17 +41,29 @@ import com.google.cloud.documentai.v1.Document;
     "http://localhost:3000",       	// 로컬
     "http://172.30.1.48:8080",      // 개발 React
     "http://52.64.151.137",    		// 운영 React
-    "http://52.64.151.137:8080"     // 운영 React
+    "http://52.64.151.137:8080",    // 운영 React
+    "http://thefull.kr",			// 운영 도메인
+    "http://thefull.kr:8080"		// 운영 도메인
 })
 public class OcrController {
 
     @Autowired
     private OcrService ocrService;
+    
+    @Autowired
+    private AccountService accountService;
 
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
     
- // ✅ 식재료 키워드
+    private final String uploadDir;
+    
+    @Autowired
+    public OcrController(@Value("${file.upload-dir}") String uploadDir) {
+    	this.uploadDir = uploadDir;
+    }
+    
+    // ✅ 식재료 키워드
     private static final List<String> FOOD_KEYWORDS = Arrays.asList(
         "쌀", "현미", "찹쌀", "보리",
         "감자", "고구마", "양파", "당근", "마늘", "생강", "무", "배추", "파", "버섯", "양배추",
@@ -82,11 +102,11 @@ public class OcrController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "account_id", required = false) String account_id) {
-
+    	
+    	// 1️⃣ 파일 저장
+        File tempFile = saveFile(file);
+    	
         try {
-            // 1️⃣ 파일 저장
-            File tempFile = saveFile(file);
-
             // 2️⃣ OCR 처리 (Google Document AI)
             //Document doc = ocrService.processReceiptFile(tempFile);
             
@@ -112,9 +132,17 @@ public class OcrController {
             purchase.put("account_id", account_id);		// account_id 세팅.
             
             // 1️⃣ 입력값을 LocalDate로 변환 (기본적으로 2000년대 기준으로 해석됨 → 2025년)
-            DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("yy-MM-dd");
-            LocalDate date = LocalDate.parse(result.meta.saleDate, inputFormat); // 2025-10-09
-
+            //DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("yy-MM-dd");
+            //LocalDate date = LocalDate.parse(result.meta.saleDate, inputFormat); // 2025-10-09
+            
+            if (result == null || result.meta == null || result.meta.saleDate == null) {
+                return ResponseEntity.badRequest()
+                    .body("❌ 영수증 날짜를 인식하지 못했습니다.");
+            }
+            
+            // 여러 타입의 날짜형식을 매핑.
+            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            
             // 2️⃣ 현재 시간 가져오기
             LocalTime nowTime = LocalTime.now(); // 시:분:초
 
@@ -124,46 +152,156 @@ public class OcrController {
             // 4️⃣ 원하는 형식으로 출력 (예: 20251009152744)
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             
-            purchase.put("saleId", saleId);								// saleId 세팅.
+            purchase.put("sale_id", saleId);							// saleId 세팅.
             purchase.put("saleDate", date);								// saleDate 세팅.
             purchase.put("total", result.totals.total);					// total 세팅.
             purchase.put("discount", result.totals.discount);			// discount 세팅.
             purchase.put("vat", result.totals.vat);						// vat 세팅.
             purchase.put("taxFree", result.totals.taxFree);				// taxFree 세팅.
             
-            if (result.payment.type.equals("cash")) {
-            	purchase.put("payType", 1);
-            	purchase.put("totalCash", result.payment.approvalAmt);	// totalCash 세팅.
-            } else {
-            	purchase.put("payType", 2);
-            	purchase.put("totalCard", result.payment.approvalAmt);	// totalCard 세팅.
+            String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
+
+            int iApprovalAmt = 0;
+            if (approvalAmt != null && !approvalAmt.isBlank()) {
+                String clean = approvalAmt.replaceAll("[^0-9]", ""); // 숫자만 남기기
+                if (!clean.isEmpty()) {
+                    iApprovalAmt = Integer.parseInt(clean);
+                }
             }
-            purchase.put("cardNo", result.payment.cardNo);				// cardNo 세팅.
-            purchase.put("cardBrand", result.payment.cardBrand);		// cardBrand 세팅.
-            purchase.put("bizNo", result.merchant.bizNo);				// bizNo 세팅.
-            purchase.put("type", purchase);								// tb_account_mapping 정보와 비교 후 type 값 세팅.(예정)
             
+            if ("cash".equals(result.payment != null ? result.payment.type : null)) {
+                purchase.put("payType", 1);
+                purchase.put("totalCash", iApprovalAmt);
+                purchase.put("totalCard", 0);
+            } else {
+                purchase.put("payType", 2);
+                purchase.put("totalCard", iApprovalAmt);
+                purchase.put("totalCash", 0);
+            }
             
-            
+            // payment 정보 세팅 (null-safe)
+            if (result.payment != null) {
+                purchase.put("cardNo", result.payment.cardNo);
+                purchase.put("cardBrand", result.payment.cardBrand);
+            } else {
+                purchase.put("cardNo", null);
+                purchase.put("cardBrand", null);
+            }
+
+            // merchant 사업자번호 원본/정규화
+            String merchantBizNoRaw = (result.merchant != null ? result.merchant.bizNo : null);
+            String normalizedBizNo = null;
+            if (merchantBizNoRaw != null && !merchantBizNoRaw.isBlank()) {
+                try {
+                    normalizedBizNo = BizNoUtils.normalizeBizNo(merchantBizNoRaw);
+                } catch (IllegalArgumentException ex) {
+                    // 형식이 이상하면 일단 원본으로라도 저장
+                    normalizedBizNo = merchantBizNoRaw;
+                }
+            }
+            purchase.put("bizNo", normalizedBizNo);
+
+            // 해당 거래처에 등록된 업체 유무를 확인.
+            // tb_account_mapping 정보와 비교 후 type 값 세팅.
+            List<Map<String, Object>> mappingList = accountService.AccountMappingList(account_id);
+
+            boolean hasMapping = false;
+
+            if (normalizedBizNo != null && mappingList != null) {
+                for (Map<String, Object> m : mappingList) {
+                    try {
+                        Object bizNoObj = m.get("biz_no");
+                        if (bizNoObj == null) continue;
+
+                        String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
+
+                        if (formattedBizNo2.equals(normalizedBizNo)) {
+                            purchase.put("type", m.get("type"));
+                            hasMapping = true;
+                            break; // 매칭되면 더 안 돌게
+                        }
+                    } catch (IllegalArgumentException ex) {
+                        // 형식 이상한 사업자번호는 그냥 무시
+                        continue;
+                    }
+                }
+            }
+
+            // 📌 사업자 매핑 실패 시: 아래 동작(파일 저장, DB 저장)은 의미 없으므로 여기서 종료
+            if (!hasMapping) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", 400);
+                error.put("message",
+                    "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
+                    "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
+                error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
+
+                return ResponseEntity.badRequest().body(error);
+            }
             
             // tb_account_purchase_tally_detail 저장 map
-            Map<String, Object> purchaseDetail = new HashMap<String, Object>();
+            List<Map<String, Object>> detailList = new ArrayList<>();
+            
             for (Item r : result.items) {
-            	purchaseDetail.put("account_id", account_id);
-            	purchaseDetail.put("name", r.name);
-            	purchaseDetail.put("taxFlag", taxify(r.taxFlag));
-            	purchaseDetail.put("unitPrice", r.unitPrice);
-            	purchaseDetail.put("qty", r.qty);
-            	purchaseDetail.put("amount", r.amount);
-            	purchaseDetail.put("itemType", classify(r.name));
+            	Map<String, Object> detailMap = new HashMap<String, Object>();
+                detailMap.put("sale_id", saleId);
+                detailMap.put("name", r.name);
+                detailMap.put("qty", r.qty);
+                detailMap.put("amount", r.amount);
+                detailMap.put("unitPrice", r.unitPrice);
+                detailMap.put("taxType", taxify(r.taxFlag));
+                detailMap.put("itemType", classify(r.name));
+                
+                detailList.add(detailMap);
             }
             
-            return ResponseEntity.ok(result);
+            System.out.println(purchase);
+            System.out.println(detailList);
+            
+            if (!purchase.isEmpty()) {
+            	
+            	String resultPath = "";
+            	
+                // 프로젝트 루트 대신 static 폴더 경로 사용
+                String staticPath = new File(uploadDir).getAbsolutePath();
+                String basePath = staticPath + "/" + "receipt/" + saleId + "/";
+                
+                Path dirPath = Paths.get(basePath);
+                Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+                String originalFileName = file.getOriginalFilename();
+                String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+                Path filePath = dirPath.resolve(uniqueFileName);
+
+                file.transferTo(filePath.toFile()); // 파일 저장
+                
+                // 브라우저 접근용 경로 반환
+                resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+                purchase.put("receipt_image", resultPath);
+            }
+            
+            int iResult = 0;
+            
+            iResult += accountService.AccountPurchaseSave(purchase);
+            
+            for (Map<String, Object> m : detailList) {
+            	iResult += accountService.AccountPurchaseDetailSave(m);
+            }
+            
+            return ResponseEntity.ok(purchase);
 
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.internalServerError()
                     .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+        } finally {
+            // 🔹 temp 파일 삭제
+            if (tempFile != null && tempFile.exists()) {
+                boolean deleted = tempFile.delete();
+                if (!deleted) {
+                    System.out.println("⚠ 임시 파일 삭제 실패: " + tempFile.getAbsolutePath());
+                }
+            }
         }
     }
     /**

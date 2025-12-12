@@ -13,7 +13,6 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -30,19 +29,16 @@ import com.google.gson.JsonObject;
 @RestController
 public class BusinessController {
 
-    private final OcrController ocrController;
 	private final BusinessService businessService;
 	private final String uploadDir;
 	
     @Autowired
     public BusinessController(
 	    		BusinessService businessService, 
-	    		WebConfig webConfig, 
-	    		OcrController ocrController, 
+	    		WebConfig webConfig,  
 	    		@Value("${file.upload-dir}") String uploadDir
     		) {
     	this.businessService = businessService;
-    	this.ocrController = ocrController;
     	this.uploadDir = uploadDir;
     }
     

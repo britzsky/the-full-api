@@ -19,7 +19,6 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -901,5 +900,46 @@ public class AccountController {
         
         // 3. 다시 double로 변환하여 반환
         return bd.doubleValue();
+    }
+    /*
+     * part		: 현장
+     * method 	: AccountMappingList
+     * comment 	: 현장 -> 집계표 -> 영수증 매장 확인 조회
+     */
+    public List<Map<String, Object>> AccountMappingList(String account_id) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountMappingList(account_id);
+    	
+    	return resultList;
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPurchaseTallyList
+     * comment 	: 회계 -> 매입 -> 매입마감 조회
+     */
+    @GetMapping("Account/AccountPurchaseTallyList")
+    public String AccountPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	System.out.println(paramMap);
+    	
+    	resultList = accountService.AccountPurchaseTallyList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPurchaseTallyList
+     * comment 	: 회계 -> 매입 -> 매입집계 조회
+     */
+    @GetMapping("Account/AccountPurchaseDetailList")
+    public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	System.out.println(paramMap);
+    	
+    	resultList = accountService.AccountPurchaseDetailList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
     }
 }

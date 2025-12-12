@@ -43,4 +43,9 @@ public interface AccountMapper {
 	List<Map<String, Object>> BatchForPayBack(Map<String, Object> paramMap); 						// 본사 -> 관리표 -> 손익표 (판장금)
 	int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap);									// 출근부 -> 연차관리 저장
 	int AccountOverTimeLedgerSave(Map<String, Object> paramMap);									// 출근부 -> 초과관리 저장
+	List<Map<String, Object>> AccountMappingList(String account_id); 								// 현장 -> 집계표 -> 영수증 매장 확인 조회
+	int AccountPurchaseSave(Map<String, Object> paramMap);											// 현장 -> 집계표 -> 매입집계 저장
+	int AccountPurchaseDetailSave(Map<String, Object> paramMap);									// 현장 -> 집계표 -> 매입집계 상세 저장
+	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입마감 조회
+	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입집계 조회
 }

@@ -1114,4 +1114,176 @@
 	        #{reason},
 	    </trim>
 	</insert>
+	
+	<select id="AccountMappingList" parameterType="string" resultType="hashmap">
+		SELECT am.type, am.name, am.biz_no 
+		FROM tb_account_mapping am
+		JOIN tb_account_mapping_v2 amv
+		ON am.type = amv.type
+		WHERE amv.account_id = #{account_id}
+		AND am.del_yn = 'N'
+		AND am.biz_no is not null
+		AND am.biz_no != ''
+	</select>
+	
+	<insert id="AccountPurchaseSave" parameterType="map">
+		INSERT INTO tb_account_purchase_tally
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        sale_id,
+	        type,
+	        saleDate,
+	        total,
+	        discount,
+	        vat,
+	        taxFree,
+	        payType,
+	        totalCash,
+	        totalCard,
+	        cardNo,
+	        cardBrand,
+	        bizNo,
+	        receipt_image,
+	        note
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{sale_id},
+	        #{type},
+	        DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
+	        #{total},
+	        #{discount},
+	        #{vat},
+	        #{taxFree},
+	        #{payType},
+	        #{totalCash},
+	        #{totalCard},
+	        #{cardNo},
+	        #{cardBrand},
+	        #{bizNo},
+	        #{receipt_image},
+	        #{note}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        type=#{type},
+	        saleDate=DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
+	        total=#{total},
+	        discount=#{discount},
+	        vat=#{vat},
+	        taxFree=#{taxFree},
+	        payType=#{payType},
+	        totalCash=#{totalCash},
+	        totalCard=#{totalCard},
+	        cardNo=#{cardNo},
+	        cardBrand=#{cardBrand},
+	        bizNo=#{bizNo},
+	        receipt_image=#{receipt_image},
+	        note=#{note}
+	    </trim>
+	</insert>
+	
+	<insert id="AccountPurchaseDetailSave" parameterType="map">
+		INSERT INTO tb_account_purchase_tally_detail
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        item_id,
+	        sale_id,
+	        name,
+	        qty,
+	        amount,
+	        unitPrice,
+	        taxType,
+	        itemType,
+	        note
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{item_id},
+	        #{sale_id},
+	        #{name},
+	        #{qty},
+	        #{amount},
+	        #{unitPrice},
+	        #{taxType},
+	        #{itemType},
+	        #{note}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        name=#{name},
+	        qty=#{qty},
+	        amount=#{amount},
+	        unitPrice=#{unitPrice},
+	        taxType=#{taxType},
+	        itemType=#{itemType},
+	        note=#{note}
+	    </trim>
+	</insert>
+	
+	<select id="AccountPurchaseTallyList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name, 
+		       amv.type, 
+		       am.name, 
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+		       ifnull(apt.total, 0) as total, 
+		       ifnull(apt.vat, 0) as vat,
+		       ifnull(apt.taxFree, 0) as taxFree,
+		       ifnull(apt.totalCash, 0) as totalCash,
+		       ifnull(apt.totalCard, 0) as totalCard,
+		       apt.payType,
+		       apt.cardNo,
+		       apt.cardBrand,
+		       apt.receipt_image,
+		       apt.note,
+		       apt.bizNo,
+		       am.ceo_name
+		FROM tb_account a
+		JOIN tb_account_mapping_v2 amv
+		ON amv.account_id = a.account_id
+		JOIN tb_account_mapping am
+		ON am.type = amv.type
+		LEFT OUTER JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		AND apt.type = amv.type
+		WHERE a.account_id = #{account_id}
+		AND a.account_type = #{type}
+		<if test="payType == 1">
+	        AND apt.totalCash != 0
+        </if>
+        <if test="payType == 2">
+	        AND apt.totalCard != 0
+        </if>
+        AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+	</select>
+	
+	<select id="AccountPurchaseDetailList" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id, 
+			   aptd.sale_id,
+			   a.account_name,
+			   DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+			   aptd.name, 
+			   aptd.qty, 
+			   aptd.unitPrice, 
+			   aptd.amount, 
+			   aptd.taxType, 
+			   aptd.itemType,
+			   apt.receipt_image
+		FROM tb_account a
+		JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		JOIN tb_account_purchase_tally_detail aptd
+		ON aptd.sale_id = apt.sale_id
+		WHERE a.account_id = #{account_id}
+		AND a.account_type = #{type}
+		<if test="payType == 1">
+	        AND apt.totalCash != 0
+        </if>
+        <if test="payType == 2">
+	        AND apt.totalCard != 0
+        </if>
+		AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+	</select>
+	
 </mapper>

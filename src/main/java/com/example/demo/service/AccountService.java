@@ -297,4 +297,35 @@ public class AccountService {
 
         return 1; // ✅ 전체 성공
     }
+	
+	// 현장 -> 집계표 -> 영수증 매장 확인 조회
+	public List<Map<String, Object>> AccountMappingList (String account_id) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountMappingList(account_id);
+		return resultList;
+	}
+	// 현장 -> 집계표 -> 매입집계 저장
+	public int AccountPurchaseSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountPurchaseSave(paramMap);
+		return iResult;
+	}
+	// 현장 -> 집계표 -> 매입집계 상세 저장
+	public int AccountPurchaseDetailSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountPurchaseDetailSave(paramMap);
+		return iResult;
+	}
+	// 회계 -> 매입 -> 매입마감 조회
+	public List<Map<String, Object>> AccountPurchaseTallyList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPurchaseTallyList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 매입 -> 매입집계 조회
+	public List<Map<String, Object>> AccountPurchaseDetailList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPurchaseDetailList(paramMap);
+		return resultList;
+	}
 }
