@@ -523,6 +523,8 @@ public class OperateController {
     	int iResult = 0;
     	
     	for (Map<String, Object> row : data) {
+    		String member_id = operateService.NowDateKey();
+    		row.put("member_id", member_id);
     		iResult += operateService.AccountMembersSave(row);
         }
     	

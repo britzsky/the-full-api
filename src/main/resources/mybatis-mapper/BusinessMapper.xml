@@ -5,7 +5,7 @@
 <mapper namespace="com.example.demo.mapper.BusinessMapper">
 	
 	<select id="NowDateKey" resultType="String">
-		SELECT DATE_FORMAT(now(), '%Y%m%d%H%i%s')
+		SELECT DATE_FORMAT(NOW(6), '%Y%m%d%H%i%s%f')
 	</select>
 	
 	<select id="BusinessTeleAccountList" parameterType="map" resultType="hashmap">
