@@ -8,6 +8,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 	
+	final static String REAL_HANDLE = "/image/**";
+	final static String REAL_PATH = "file:///opt/thefull/uploads/image/";
+	
+	final static String DEV_HANDLE = "/api/image/**";
+	final static String DEV_PATH = "file:///C:/Program Files/Apache Software Foundation/Tomcat 10.1/webapps/api/WEB-INF/classes/static/image/";
+	
+	final static String LOCAL_HANDLE = "/image/**";
+	final static String LOCAL_PATH = "file:///C:/Users/손경원/git/the-full-api/src/main/resources/static/image/";
+	
 	@Override
     public void addCorsMappings(CorsRegistry registry) {
 			registry.addMapping("/**")  // ★ context-path(/api)는 빼고!
@@ -28,11 +37,7 @@ public class WebConfig implements WebMvcConfigurer {
 	
 	@Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-		registry.addResourceHandler("/api/image/**")
-		.addResourceLocations("file:///C:/Program Files/Apache Software Foundation/Tomcat 10.1/webapps/api/WEB-INF/classes/static/image/");
-		//registry.addResourceHandler("/image/**")
-		//.addResourceLocations("file:///C:/Users/손경원/git/the-full-api/src/main/resources/static/image/");
-		//registry.addResourceHandler("/image/**")
-		//.addResourceLocations("file:///opt/apache-tomcat-10.1.49/webapps/api/WEB-INF/classes/static/image/");
+		registry.addResourceHandler(REAL_HANDLE)
+		.addResourceLocations(REAL_PATH);
     }
 }
