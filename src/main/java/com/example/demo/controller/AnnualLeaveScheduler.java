@@ -27,7 +27,7 @@ public class AnnualLeaveScheduler {
      * cron 형식: 초 분 시 일 월 요일
      * 0 0 8 * * *  → 매일 08:00:00
      */
-    @Scheduled(cron = "0 0 8 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 3 12 * * *", zone = "Asia/Seoul")
     public void runAnnualLeaveJob() {
         try {
             log.info("[AnnualLeaveScheduler] 연차 자동 처리 프로시저 시작");
