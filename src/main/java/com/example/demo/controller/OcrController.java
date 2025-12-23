@@ -101,7 +101,8 @@ public class OcrController {
     public ResponseEntity<?> scanReceipt(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", required = false) String type,
-            @RequestParam(value = "account_id", required = false) String account_id) {
+            @RequestParam(value = "account_id", required = false) String account_id,
+            @RequestParam(value = "cell_date", required = false) String cell_date) {
     	
     	// 1️⃣ 파일 저장
         File tempFile = saveFile(file);
@@ -143,6 +144,7 @@ public class OcrController {
             // 여러 타입의 날짜형식을 매핑.
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
             
+            
             // 2️⃣ 현재 시간 가져오기
             LocalTime nowTime = LocalTime.now(); // 시:분:초
 
@@ -151,6 +153,7 @@ public class OcrController {
 
             // 4️⃣ 원하는 형식으로 출력 (예: 20251009152744)
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+            String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             
             purchase.put("sale_id", saleId);							// saleId 세팅.
             purchase.put("saleDate", date);								// saleDate 세팅.
@@ -158,6 +161,18 @@ public class OcrController {
             purchase.put("discount", result.totals.discount);			// discount 세팅.
             purchase.put("vat", result.totals.vat);						// vat 세팅.
             purchase.put("taxFree", result.totals.taxFree);				// taxFree 세팅.
+            
+            // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
+            if (!receiptDate.equals(cell_date)) {
+            	Map<String, Object> error = new HashMap<>();
+                error.put("code", 400);
+                error.put("message",
+                    "선택된 집계표 일자와 영수증 거래일자가 일치하지 않습니다.\n");
+                error.put("[집계표]", cell_date);
+                error.put("[거래일자]", date);
+
+                return ResponseEntity.badRequest().body(error);
+            }
             
             String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
 
@@ -254,9 +269,6 @@ public class OcrController {
                 
                 detailList.add(detailMap);
             }
-            
-            System.out.println(purchase);
-            System.out.println(detailList);
             
             if (!purchase.isEmpty()) {
             	
