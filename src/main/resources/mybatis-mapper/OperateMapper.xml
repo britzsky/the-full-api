@@ -9,7 +9,7 @@
 	</select>
 	
 	<select id="TallySheetList" parameterType="map" resultType="hashmap">
-		SELECT (SELECT name FROM tb_account_mapping WHERE type = amv.type) as name, 
+		SELECT (SELECT case when add_yn = 'Y' then add_name else name end as name FROM tb_account_mapping WHERE type = amv.type) as name, 
 			amv.type,
 			amv.account_id,
 			#{year} as count_year,
@@ -524,7 +524,7 @@
 	
 	<insert id="AccountRetailBusinessSave">
 	    INSERT INTO tb_account_mapping
-	    (type, name, biz_no, ceo_name, tel, bank_name, bank_no, bank_image, biz_image, del_yn)
+	    (type, name, biz_no, ceo_name, tel, bank_name, bank_no, bank_image, biz_image, del_yn, add_yn, add_name)
 	    VALUES
 	    (
 	        #{type},
@@ -536,7 +536,9 @@
 	        #{bank_no},
 	        #{bank_image},
 	        #{biz_image},
-	        #{del_yn}
+	        #{del_yn},
+	        #{add_yn}, 
+	        #{add_name}
 	    )
 	    ON DUPLICATE KEY UPDATE
 	    type = #{type}, 
@@ -548,7 +550,9 @@
 	    bank_no = #{bank_no},
 	    bank_image = #{bank_image},
 	    biz_image = #{biz_image},
-	    del_yn = #{del_yn}
+	    del_yn = #{del_yn},
+	    add_yn = #{add_yn},
+	    add_name = #{add_name}
 	</insert>
 	
 	<select id="AccountRetailBusinessList" parameterType="map" resultType="hashmap">
@@ -562,7 +566,9 @@
 			   am.bank_no,
 			   am.bank_image,
 			   am.biz_image,
-			   am.del_yn
+			   am.del_yn,
+			   am.add_yn,
+			   am.add_name
 		FROM tb_account_mapping am
 		LEFT OUTER JOIN tb_account_mapping_v2 amv
 		ON amv.type = am.type
@@ -577,7 +583,9 @@
 			   am.bank_no,
 			   am.bank_image,
 			   am.biz_image,
-			   am.del_yn;
+			   am.del_yn,
+			   am.add_yn,
+			   am.add_name
 	</select>
 	
 	<select id="AccountMembersFilesList" parameterType="map" resultType="hashmap">

@@ -1306,4 +1306,288 @@
 		AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
 	</select>
 	
+	<select id="HeadOfficeCorporateCardList" parameterType="string" resultType="hashmap">
+		SELECT idx, department, card_brand, card_no, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, del_yn 
+		FROM tb_headoffice_corporate_card
+	</select>
+	
+	<select id="HeadOfficeCorporateCardPaymentList" parameterType="string" resultType="hashmap">
+		SELECT sale_id, department, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id
+		FROM tb_headoffice_corporate_card_payment_list
+		WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
+		AND DATE_FORMAT(payment_dt, '%m') = #{month}
+	</select>
+	
+	<select id="HeadOfficeCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">
+		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType
+		FROM tb_headoffice_corporate_card_payment_detail_list
+		WHERE sale_id = #{sale_id}
+	</select>
+	
+	<insert id="HeadOfficeCorporateCardSave" parameterType="map">
+		INSERT INTO tb_headoffice_corporate_card
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        department,
+	        card_brand,
+	        card_no,
+	        reg_dt,
+	        user_id,
+	        del_yn
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{idx},
+	        #{department},
+	        #{card_brand},
+	        #{card_no},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id},
+	        #{del_yn},
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        idx=#{idx},
+	        department=#{department},
+	        card_brand=#{card_brand},
+	        card_no=#{card_no},
+	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id=#{user_id},
+	        del_yn=#{del_yn},
+	    </trim>
+	</insert>
+	
+	<insert id="HeadOfficeCorporateCardPaymentSave" parameterType="map">
+		INSERT INTO tb_headoffice_corporate_card_payment_list
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        sale_id,
+	        department,
+	        payment_dt,
+	        use_name,
+	        bizNo,
+	        total,
+	        vat,
+	        taxFree,
+	        totalCard,
+	        cardNo,
+	        cardBrand,
+	        receipt_image,
+	        note,
+	        reg_dt,
+	        user_id
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{sale_id},
+	        #{department},
+	        DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        #{use_name},
+	        #{bizNo},
+	        #{total},
+	        #{vat},
+	        #{taxFree},
+	        #{totalCard},
+	        #{cardNo},
+	        #{cardBrand},
+	        #{receipt_image},
+	        #{note},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id},
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        sale_id=#{sale_id},
+	        department=#{department},
+	        payment_dt=DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        use_name=#{use_name},
+	        bizNo=#{bizNo},
+	        total=#{total},
+	        vat=#{vat},
+	        taxFree=#{taxFree},
+	        totalCard=#{totalCard},
+	        cardNo=#{cardNo},
+	        cardBrand=#{cardBrand},
+	        receipt_image=#{receipt_image},
+	        note=#{note},
+	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id=#{user_id},
+	    </trim>
+	</insert>
+	
+	<insert id="HeadOfficeCorporateCardPaymentDetailLSave" parameterType="map">
+		INSERT INTO tb_headoffice_corporate_card_payment_detail_list
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	idx,
+	        sale_id,
+	        name,
+	        qty,
+	        amount,
+	        unitPrice,
+	        taxType
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	        #{sale_id},
+	        #{name},
+	        #{qty},
+	        #{amount},
+	        #{unitPrice},
+	        #{taxType}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	idx=#{idx},
+	        sale_id=#{sale_id},
+	        name=#{name},
+	        qty=#{qty},
+	        amount=#{amount},
+	        unitPrice=#{unitPrice},
+	        taxType=#{taxType}
+	    </trim>
+	</insert>
+	
+	<select id="AccountCorporateCardList" parameterType="string" resultType="hashmap">
+		SELECT idx, account_id, card_brand, card_no, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, del_yn 
+		FROM tb_account_corporate_card
+	</select>
+	
+	<select id="AccountCorporateCardPaymentList" parameterType="string" resultType="hashmap">
+		SELECT sale_id, account_id, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id
+		FROM tb_account_corporate_card_payment_list
+		WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
+		AND DATE_FORMAT(payment_dt, '%m') = #{month}
+	</select>
+	
+	<select id="AccountCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">
+		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType, itemType
+		FROM tb_account_corporate_card_payment_detail_list
+		WHERE sale_id = #{sale_id}
+	</select>
+	
+	<insert id="AccountCorporateCardSave" parameterType="map">
+		INSERT INTO tb_account_corporate_card
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        account_id,
+	        card_brand,
+	        card_no,
+	        reg_dt,
+	        user_id,
+	        del_yn
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{idx},
+	        #{account_id},
+	        #{card_brand},
+	        #{card_no},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id},
+	        #{del_yn},
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        idx=#{idx},
+	        account_id=#{account_id},
+	        card_brand=#{card_brand},
+	        card_no=#{card_no},
+	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id=#{user_id},
+	        del_yn=#{del_yn},
+	    </trim>
+	</insert>
+	
+	<insert id="AccountCorporateCardPaymentSave" parameterType="map">
+		INSERT INTO tb_account_corporate_card_payment_list
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        sale_id,
+	        account_id,
+	        payment_dt,
+	        use_name,
+	        bizNo,
+	        total,
+	        vat,
+	        taxFree,
+	        totalCard,
+	        cardNo,
+	        cardBrand,
+	        receipt_image,
+	        note,
+	        reg_dt,
+	        user_id
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{sale_id},
+	        #{account_id},
+	        DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        #{use_name},
+	        #{bizNo},
+	        #{total},
+	        #{vat},
+	        #{taxFree},
+	        #{totalCard},
+	        #{cardNo},
+	        #{cardBrand},
+	        #{receipt_image},
+	        #{note},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id},
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        sale_id=#{sale_id},
+	        account_id=#{account_id},
+	        payment_dt=DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        use_name=#{use_name},
+	        bizNo=#{bizNo},
+	        total=#{total},
+	        vat=#{vat},
+	        taxFree=#{taxFree},
+	        totalCard=#{totalCard},
+	        cardNo=#{cardNo},
+	        cardBrand=#{cardBrand},
+	        receipt_image=#{receipt_image},
+	        note=#{note},
+	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id=#{user_id},
+	    </trim>
+	</insert>
+	
+	<insert id="AccountCorporateCardPaymentDetailLSave" parameterType="map">
+		INSERT INTO tb_account_corporate_card_payment_detail_list
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	idx,
+	        sale_id,
+	        name,
+	        qty,
+	        amount,
+	        unitPrice,
+	        taxType,
+	        itemType
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	        #{sale_id},
+	        #{name},
+	        #{qty},
+	        #{amount},
+	        #{unitPrice},
+	        #{taxType},
+	        #{itemType}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	idx=#{idx},
+	        sale_id=#{sale_id},
+	        name=#{name},
+	        qty=#{qty},
+	        amount=#{amount},
+	        unitPrice=#{unitPrice},
+	        taxType=#{taxType},
+	        itemType=#{itemType}
+	    </trim>
+	</insert>
 </mapper>

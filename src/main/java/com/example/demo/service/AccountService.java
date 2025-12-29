@@ -333,4 +333,83 @@ public class AccountService {
 		resultList = accountMapper.AccountPurchaseDetailList(paramMap);
 		return resultList;
 	}
+	// 회계 -> 본사 법인카드 목록 조회
+	public List<Map<String, Object>> HeadOfficeCorporateCardList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.HeadOfficeCorporateCardList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 본사 법인카드 결제내역 조회
+	public List<Map<String, Object>> HeadOfficeCorporateCardPaymentList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.HeadOfficeCorporateCardPaymentList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 본사 법인카드 결제 상세내역 조회
+	public List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.HeadOfficeCorporateCardPaymentDetailList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 본사 법인카드 저장
+	public int HeadOfficeCorporateCardSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.HeadOfficeCorporateCardSave(paramMap);
+		return iResult;
+	}
+	// 회계 -> 본사 법인카드 결제내역 저장
+	public int HeadOfficeCorporateCardPaymentSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.HeadOfficeCorporateCardPaymentSave(paramMap);
+		return iResult;
+	}
+	// 회계 -> 본사 법인카드 상세내역 저장
+	public int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.HeadOfficeCorporateCardPaymentDetailLSave(paramMap);
+		return iResult;
+	}
+	
+	
+	
+	
+	
+	
+	
+	// 회계 -> 현장 법인카드 목록 조회
+	public List<Map<String, Object>> AccountCorporateCardList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCorporateCardList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 현장 법인카드 결제내역 조회
+	public List<Map<String, Object>> AccountCorporateCardPaymentList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCorporateCardPaymentList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 현장 법인카드 결제 상세내역 조회
+	public List<Map<String, Object>> AccountCorporateCardPaymentDetailList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCorporateCardPaymentDetailList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 현장 법인카드 저장
+	public int AccountCorporateCardSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCorporateCardSave(paramMap);
+		return iResult;
+	}
+	// 회계 -> 본사 법인카드 결제내역 저장
+	public int AccountCorporateCardPaymentSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCorporateCardPaymentSave(paramMap);
+		return iResult;
+	}
+	// 회계 -> 본사 법인카드 상세내역 저장
+	public int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCorporateCardPaymentDetailLSave(paramMap);
+		return iResult;
+	}
 }

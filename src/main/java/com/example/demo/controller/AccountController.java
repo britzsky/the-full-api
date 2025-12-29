@@ -364,10 +364,6 @@ public class AccountController {
     	
     	int iResult = 0;
     	
-    	System.out.println("paramMap :: " + paramMap);
-    	System.out.println("account_id :: " + paramMap.get("account_id"));
-    	System.out.println("member_id :: " + paramMap.get("member_id"));
-    	
     	// ✅ member_id가 없을 때만 생성
         Object memberIdObj = paramMap.get("member_id");
         String memberId = memberIdObj == null ? "" : String.valueOf(memberIdObj).trim();
@@ -809,7 +805,6 @@ public class AccountController {
         
         // 브라우저 접근용 경로 반환
         resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
-        System.out.println("resultPath :: " + resultPath);
         
         return resultPath;
     }
@@ -934,8 +929,6 @@ public class AccountController {
     public String AccountPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
     	
-    	System.out.println(paramMap);
-    	
     	resultList = accountService.AccountPurchaseTallyList(paramMap);
     	
     	return new Gson().toJson(resultList);
@@ -949,10 +942,217 @@ public class AccountController {
     public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
     	
-    	System.out.println(paramMap);
-    	
     	resultList = accountService.AccountPurchaseDetailList(paramMap);
     	
     	return new Gson().toJson(resultList);
     }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardList
+     * comment 	: 회계 -> 본사 법인카드 목록 조회
+     */
+    @GetMapping("Account/HeadOfficeCorporateCardList")
+    public String HeadOfficeCorporateCardList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.HeadOfficeCorporateCardList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardPaymentList
+     * comment 	: 회계 -> 본사 법인카드 결제내역 조회
+     */
+    @GetMapping("Account/HeadOfficeCorporateCardPaymentList")
+    public String HeadOfficeCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.HeadOfficeCorporateCardPaymentList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardPaymentDetailList
+     * comment 	: 회계 -> 본사 법인카드 결제 상세내역 조회
+     */
+    @GetMapping("Account/HeadOfficeCorporateCardPaymentDetailList")
+    public String HeadOfficeCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.HeadOfficeCorporateCardPaymentDetailList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardSave
+     * comment 	: 회계 -> 본사 법인카드 저장
+     */
+    @PostMapping("Account/HeadOfficeCorporateCardSave")
+    private String HeadOfficeCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+    		iResult += accountService.HeadOfficeCorporateCardSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardPaymentAllSave
+     * comment 	: 회계 -> 본사 법인카드 결제내역 전체 저장
+     */
+    @PostMapping("Account/HeadOfficeCorporateCardPaymentAllSave")
+    private String HeadOfficeCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	// 1. 'main' 리스트 추출
+        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+        
+        // 2. 'item' 리스트 추출
+        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+    	
+        int iResult = 0;
+        
+    	if (mainList != null) {
+    		for (Map<String, Object> mainMap : mainList) {
+        		iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
+            }
+    	}
+    	if (itemList != null) {
+    		for (Map<String, Object> itemMap : itemList) {
+        		iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
+            }
+    	}
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 회계
+     * method 	: HeadOfficeCorporateCardList
+     * comment 	: 회계 -> 현장 법인카드 목록 조회
+     */
+    @GetMapping("Account/AccountCorporateCardList")
+    public String AccountCorporateCardList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountCorporateCardList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountCorporateCardPaymentList
+     * comment 	: 회계 -> 현장 법인카드 결제내역 조회
+     */
+    @GetMapping("Account/AccountCorporateCardPaymentList")
+    public String AccountCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountCorporateCardPaymentList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountCorporateCardPaymentDetailList
+     * comment 	: 회계 -> 현장 법인카드 결제 상세내역 조회
+     */
+    @GetMapping("Account/AccountCorporateCardPaymentDetailList")
+    public String AccountCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountCorporateCardPaymentDetailList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountCorporateCardSave
+     * comment 	: 현장 -> 본사 법인카드 저장
+     */
+    @PostMapping("Account/AccountCorporateCardSave")
+    private String AccountCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+    		iResult += accountService.AccountCorporateCardSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountCorporateCardPaymentAllSave
+     * comment 	: 회계 -> 현장 법인카드 결제내역 전체 저장
+     */
+    @PostMapping("Account/AccountCorporateCardPaymentAllSave")
+    private String AccountCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	// 1. 'main' 리스트 추출
+        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+        
+        // 2. 'item' 리스트 추출
+        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+    	
+        int iResult = 0;
+        
+    	if (mainList != null) {
+    		for (Map<String, Object> mainMap : mainList) {
+        		iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
+            }
+    	}
+    	if (itemList != null) {
+    		for (Map<String, Object> itemMap : itemList) {
+        		iResult += accountService.AccountCorporateCardPaymentDetailLSave(itemMap);
+            }
+    	}
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    
 }
