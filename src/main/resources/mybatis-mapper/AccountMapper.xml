@@ -548,11 +548,11 @@
 		    SELECT
 		        T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note
 		    FROM tb_account T
-		    JOIN tb_account_info AS T1 ON T1.account_id = T.account_id
-		    JOIN tb_account_members AS T2 ON T2.account_id = T1.account_id 
-		    WHERE T.account_id = #{account_id}
+		    LEFT JOIN tb_account_info AS T1 ON T1.account_id = T.account_id
+		    LEFT JOIN tb_account_members AS T2 ON T2.account_id = T1.account_id 
 		    AND T2.del_yn = 'N'
 		    AND T2.position_type = 1
+		    WHERE T.account_id = #{account_id}
 		    GROUP BY T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note
 		) AS subquery
 		JOIN (
@@ -570,11 +570,13 @@
 		) AS subquery2 ON subquery.account_id = subquery2.account_id
 		JOIN (
 		    SELECT
-		        T2.account_id, T2.work_system, count(1) as work_cnt
+		        T2.account_id, T2.idx, T3.work_system, count(1) as work_cnt
 		    FROM tb_account_members T2
+		    JOIN tb_account_member_work_system T3
+		    ON T3.idx = T2.idx
 		    WHERE T2.account_id = #{account_id} 
 		    AND T2.del_yn = 'N'
-		    GROUP BY T2.account_id, T2.work_system
+		    GROUP BY T2.account_id, T2.idx, T3.work_system
 		) AS subquery3 ON subquery.account_id = subquery3.account_id
 		GROUP BY subquery.account_id, subquery.setting_item, subquery.cuisine, subquery.cuisine_note, 
 		         subquery.name, subquery.budget_note, subquery2.total_cnt1, subquery2.total_cnt2, 

@@ -169,6 +169,18 @@ public class OperateService {
 		iResult = operateMapper.AccountSubRestaurantSave(paramMap);
 		return iResult;
 	}
+	// 운영/인사 근무형태 조회 
+	public List<Map<String, Object>> AccountMemberWorkSystemList() {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.AccountMemberWorkSystemList();
+		return resultList;
+	}
+	// 운영/인사 근무형태 저장
+	public int AccountMemberWorkSystemSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.AccountMemberWorkSystemSave(paramMap);
+		return iResult;
+	}
 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 인사기록카드 조회
 	public List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -181,21 +193,30 @@ public class OperateService {
 		resultList = operateMapper.AccountMemberAllList(paramMap);
 		return resultList;
 	}
-	
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
 	public int AccountMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountMembersSave(paramMap);
 		return iResult;
 	}
-	
+	// 급식사업부 -> 운영 -> 채용관리 -> 현장 채용현황 조회
+	public List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.AccountRecMemberList(paramMap);
+		return resultList;
+	}
+	// 급식사업부 -> 운영 -> 채용관리 -> 현장 채용현황 저장
+	public int AccountRecMembersSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.AccountRecMembersSave(paramMap);
+		return iResult;
+	}
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 조회
 	public List<Map<String, Object>> AccountDispatchMemberAllList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountDispatchMemberAllList(paramMap);
 		return resultList;
 	}
-	
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 저장
 	public int AccountDispatchMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;

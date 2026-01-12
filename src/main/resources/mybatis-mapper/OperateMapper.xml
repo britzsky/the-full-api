@@ -679,7 +679,7 @@
 	    </if>
 	</select>
 	
-	<insert id="AccountSubRestaurantSave">
+	<insert id="AccountSubRestaurantSave" parameterType="map">
 	    INSERT INTO tb_account_sub_restaurant
 	    (account_id, move_lunch, move_lunch_tel, sub_restaurant1, sub_restaurant1_tel, sub_restaurant2, sub_restaurant2_tel, sub_restaurant3, sub_restaurant3_tel, update_dt, user_id)
 	    VALUES
@@ -710,6 +710,36 @@
 	    user_id = #{user_id}
 	</insert>
 	
+	<select id="AccountMemberWorkSystemList" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM tb_account_member_work_system
+		WHERE del_yn = 'N'
+	</select>
+	
+	<insert id="AccountMemberWorkSystemSave" parameterType="map">
+	    INSERT INTO tb_account_member_work_system
+	    (idx, work_system, start_time, end_time, del_yn, reg_dt, mod_dt, user_id)
+	    VALUES
+	    (
+	        #{idx},
+	        #{work_system},
+	        #{start_time},
+	        #{end_time},
+	        'N',
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        null,
+	        #{user_id}
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    idx = #{idx},
+        work_system = #{work_system},
+        start_time = #{start_time},
+        end_time = #{end_time},
+        del_yn = #{del_yn},
+        mod_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+        user_id = #{user_id}
+	</insert>
+	
 	<select id="AccountMemberSheetList" parameterType="map" resultType="hashmap">
 		SELECT a.account_name
 	 		 , concat(a.account_address, '\n', a.account_address_detail) as account_address
@@ -730,7 +760,7 @@
 		    T.del_dt,
 		    T.del_yn,
 		    T.position_type,
-		    T.work_system,
+		    T.idx,
 		    T.start_time,
 		    T.end_time,
 		    T.salary,
@@ -745,7 +775,7 @@
 		    T.phone,
 		    T.contract_type,
 		    DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
-		    DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS act_join_dt,
+		    DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
 		    DATE_FORMAT(T.national_pension, '%Y-%m-%d') AS national_pension,
 		    DATE_FORMAT(T.health_insurance, '%Y-%m-%d') AS health_insurance,
 		    DATE_FORMAT(T.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
@@ -776,7 +806,7 @@
 	        del_dt,
 	        del_yn,
 	        position,
-	        work_system,
+	        idx,
 	        start_time,
 	        end_time,
 	        salary,
@@ -832,7 +862,7 @@
 	
 	        #{del_yn},
 	        #{position},
-	        #{work_system},
+	        #{idx},
 	        #{start_time},
 	        #{end_time},
 	        #{salary},
@@ -897,7 +927,7 @@
 	
 	        del_yn = #{del_yn},
 	        position = #{position},
-	        work_system = #{work_system},
+	        idx = #{idx},
 	        start_time = #{start_time},
 	        end_time = #{end_time},
 	        salary = #{salary},
@@ -939,6 +969,135 @@
 	        user_id = #{user_id}
 	</insert>
 	
+	<select id="AccountRecMemberList" parameterType="map" resultType="map">
+		SELECT T.member_id,
+		    T.account_id,
+			T2.account_name,
+		    T.name,
+		    T.position_type,
+		    T.idx,
+		    T.start_time,
+		    T.end_time,
+		    T.salary,
+		    T.note,
+		    T.position_type,
+		    T.address,
+		    T.rrn,
+		    T.account_number,
+		    T.phone,
+		    T.contract_type,
+		    DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+		    T.employment_contract,
+		    T.id,
+		    T.bankbook,
+		    T.use_yn
+		FROM tb_account_rec_management T
+		JOIN tb_account T2
+		ON T.account_id = T2.account_id
+		WHERE 1=1
+		<if test='use_yn !=null'>
+			AND T.use_yn = #{use_yn}
+ 		</if>
+		<if test='account_id !=null'>
+			AND T.account_id = #{account_id}
+ 		</if>
+ 		ORDER BY T.account_id, T.position_type
+	</select>
+	
+	<insert id="AccountRecMembersSave" parameterType="map">
+	    INSERT INTO tb_account_rec_management (
+	        member_id,
+	        account_id,
+	        name,
+	        position,
+	        idx,
+	        start_time,
+	        end_time,
+	        salary,
+	        note,
+	        position_type,
+	        address,
+	        rrn,
+	        account_number,
+	        phone,
+	        contract_type,
+	        act_join_dt,
+	        employment_contract,
+	        id,
+	        bankbook,
+	        use_yn,
+	        update_dt,
+	        user_id
+	    )
+	    VALUES (
+	        <choose>
+	            <when test="member_id == null or member_id == ''">
+	                DATE_FORMAT(NOW(6), '%Y%m%d%H%i%s%f'),
+	            </when>
+	            <otherwise>#{member_id},</otherwise>
+	        </choose>
+	        #{account_id},
+	        #{name},
+	        #{position},
+	        #{idx},
+	        #{start_time},
+	        #{end_time},
+	        #{salary},
+	        #{note},
+	        #{position_type},
+	        #{address},
+	        #{rrn},
+	        #{account_number},
+	        #{phone},
+	        #{contract_type},
+	
+	        <!-- act_join_dt -->
+	        <choose>
+	            <when test="act_join_dt != null and act_join_dt != ''">
+	                DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d'),
+	            </when>
+	            <otherwise>null,</otherwise>
+	        </choose>
+	
+	        #{employment_contract},
+	        #{id},
+	        #{bankbook},
+	        #{use_yn},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id}
+	    )
+	
+	    ON DUPLICATE KEY UPDATE
+	        member_id = #{member_id},
+	        account_id = #{account_id},
+	        name = #{name},
+	        position = #{position},
+	        idx = #{idx},
+	        start_time = #{start_time},
+	        end_time = #{end_time},
+	        salary = #{salary},
+	        note = #{note},
+	        position_type = #{position_type},
+	        address = #{address},
+	        rrn = #{rrn},
+	        account_number = #{account_number},
+	        phone = #{phone},
+	        contract_type = #{contract_type},
+	
+	        act_join_dt = <choose>
+	            <when test="act_join_dt != null and act_join_dt != ''">
+	                DATE_FORMAT(#{act_join_dt}, '%Y-%m-%d')
+	            </when>
+	            <otherwise>null</otherwise>
+	        </choose>,
+			use_yn = #{use_yn},
+	        employment_contract = #{employment_contract},
+	        id = #{id},
+	        bankbook = #{bankbook},
+	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id = #{user_id}
+	</insert>
+	
 	<select id="AccountDispatchMemberAllList" parameterType="map" resultType="map">
 		SELECT T.account_id,
 			   T.member_id,
@@ -973,15 +1132,12 @@
 		) AS T2
 		ON T2.account_id = T.account_id
 		AND T2.member_id = T.member_id
-		WHERE 1=1
-		<if test='del_yn != null'>
-			AND T.del_yn = #{del_yn}
- 		</if>
+		AND T2.record_year = #{year}
+ 		AND T2.record_month = #{month}
+		WHERE T.del_yn = #{del_yn}
 		<if test='account_id !=null'>
 			AND T.account_id = #{account_id}
  		</if>
- 		AND T2.record_year = #{year}
- 		AND T2.record_month = #{month}
 		GROUP BY T.account_id,
 			     T.member_id,
 		         T2.record_year,

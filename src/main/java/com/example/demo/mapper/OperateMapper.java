@@ -30,9 +30,13 @@ public interface OperateMapper {
 	int AccountMembersFilesSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 저장
 	List<Map<String, Object>> AccountSubRestaurantList(Map<String, Object> paramMap);			// 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 조회
 	int AccountSubRestaurantSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 저장
+	List<Map<String, Object>> AccountMemberWorkSystemList(); 									// 운영/인사 근무형태 조회
+	int AccountMemberWorkSystemSave(Map<String, Object> paramMap);								// 운영/인사 근무형태 저장
 	List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 고객사관리 -> 인사기록카드 조회
 	List<Map<String, Object>> AccountMemberAllList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 조회
 	int AccountMembersSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
+	List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 조회
+	int AccountRecMembersSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 저장
 	List<Map<String, Object>> AccountDispatchMemberAllList(Map<String, Object> paramMap); 		// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 조회
 	int AccountDispatchMembersSave(Map<String, Object> paramMap);								// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 저장
 	List<Map<String, Object>> AccountDinnersNumberList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황
