@@ -183,4 +183,16 @@ public class HeadOfficeController {
     	
     	return new Gson().toJson(resultList);
     }
+    
+    /* 
+	 * part		: 본사
+     * method 	: AccountMappingPurchaseList
+     * comment 	: 본사 -> 관리표 -> 거래처 통계
+     */
+	@GetMapping("HeadOffice/AccountMappingPurchaseList")
+	public String AccountMappingPurchaseList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.AccountMappingPurchaseList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
 }

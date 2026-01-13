@@ -89,4 +89,10 @@ public class HeadOfficeService {
         
         return 1; // ✅ 전체 성공
     }
+	// 본사 -> 관리표 -> 거래처 통계
+	public List<Map<String, Object>> AccountMappingPurchaseList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.AccountMappingPurchaseList(paramMap);
+		return resultList;
+	}
 }

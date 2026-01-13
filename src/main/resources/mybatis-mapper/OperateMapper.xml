@@ -783,7 +783,9 @@
 		    DATE_FORMAT(T.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
 		    T.employment_contract,
 		    T.subsidy,
-		    T.headoffice_note
+		    T.headoffice_note,
+		    T.id,
+		    T.bankbook
 		FROM tb_account_members T
 		JOIN tb_account T2
 		ON T.account_id = T2.account_id
@@ -831,7 +833,9 @@
 	        headoffice_note,
 	        loss_major_insurances,
 	        update_dt,
-	        user_id
+	        user_id,
+	        id,
+	        bankbook
 	    )
 	    VALUES (
 	        <choose>
@@ -903,7 +907,9 @@
 	        #{loss_major_insurances},
 	
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        #{user_id}
+	        #{user_id},
+	        #{id},
+	        #{bankbook}
 	    )
 	
 	    ON DUPLICATE KEY UPDATE
@@ -966,7 +972,9 @@
 	        loss_major_insurances = #{loss_major_insurances},
 	
 	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        user_id = #{user_id}
+	        user_id = #{user_id},
+	        id = #{id},
+	        bankbook = #{bankbook}
 	</insert>
 	
 	<select id="AccountRecMemberList" parameterType="map" resultType="map">
@@ -1392,7 +1400,6 @@
 	        #{result, mode=OUT, jdbcType=INTEGER}
 	    ) }
 	</select>
-	
 	
 	<insert id="BudgetTableSave" parameterType="map">
 	    INSERT INTO tb_account_budget_management (

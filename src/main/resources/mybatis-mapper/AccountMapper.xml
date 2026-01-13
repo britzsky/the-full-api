@@ -825,6 +825,23 @@
 	    </trim>
 	</insert>
 	
+	<insert id="AccountDietPriceHistorySave" parameterType="map">
+		INSERT INTO tb_account_dietprice_history
+		(account_id,diet_price,before_diet_price,mod_dt,user_id)
+		VALUES
+		(#{account_id},#{diet_price},#{before_diet_price},DATE_FORMAT(now(), '%Y-%m-%d'),#{user_id})
+	</insert>
+	
+	<select id="AccountDietPriceHistoryList" parameterType="map" resultType="hashmap">
+		SELECT T.account_id,
+			   ifnull(T2.diet_price,0) as diet_price,
+			   ifnull(T2.before_diet_price,0) as before_diet_price
+		FROM tb_account T
+        LEFT JOIN tb_account_dietprice_history T2
+        ON T.account_id = T2.account_id
+		WHERE T.account_id = #{account_id}
+	</select>
+	
 	<select id="AccountBusinessImgList" parameterType="map" resultType="hashmap">
 		SELECT business_report,
 		       business_regist,

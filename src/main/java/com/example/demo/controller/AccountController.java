@@ -505,11 +505,45 @@ public class AccountController {
 
         if (priceData != null) {
             for (Map<String, Object> row : priceData) {
-                if (row != null) payloadMap.putAll(row);
+                if (row != null) {
+                	payloadMap.putAll(row);
+                	
+                	Object priceObj = row.get("diet_price");
+                	int dietPrice = 0;
+
+                	if (priceObj != null && !priceObj.toString().isEmpty()) {
+                	    dietPrice = Integer.parseInt(priceObj.toString());
+                	}
+                	
+                	Object beforePriceObj = row.get("before_diet_price");
+                	int beforeDietPrice = 0;
+
+                	if (beforePriceObj != null && !beforePriceObj.toString().isEmpty()) {
+                		beforeDietPrice = Integer.parseInt(beforePriceObj.toString());
+                	}
+                	
+                	List<Map<String, Object>> resultList = new ArrayList<>();
+                	resultList = accountService.AccountDietPriceHistoryList(payloadMap);
+                	
+                	for (Map<String, Object> dietRow : resultList) {
+                		
+                		Object dietPriceObj = dietRow.get("diet_price");
+                    	int dietPrice2 = 0;
+
+                    	if (dietPriceObj != null && !dietPriceObj.toString().isEmpty()) {
+                    		dietPrice2 = Integer.parseInt(dietPriceObj.toString());
+                    	}
+                		
+                		// 식단가와 내역의 식단가가 다르면 저장.
+                    	if (dietPrice != dietPrice2) {
+                    		iResult += accountService.AccountDietPriceHistorySave(payloadMap);
+                    	}
+                	}
+                } 
             }
         }
 
-        iResult = accountService.AccountInfoSave(payloadMap);
+        iResult += accountService.AccountInfoSave(payloadMap);
 
         if (iResult > 0) {
             obj.addProperty("code", 200);

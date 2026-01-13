@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 import com.example.demo.WebConfig;
 import com.example.demo.service.OperateService;
@@ -623,6 +625,33 @@ public class OperateController {
             }
 
             iResult += operateService.AccountRecMembersSave(row);
+            
+            // 현장채용 관리에서 채용확정이면 직원정보를 저장.
+            Object useynObj = row.get("use_yn");
+        	String useyn = "";
+
+        	if (useynObj != null && !useynObj.toString().isEmpty()) {
+        		
+        		useyn = useynObj.toString();
+        		
+        		if (useyn.toString().equals("Y")) {
+        			row.put("del_yn", "N");
+        			iResult += operateService.AccountMembersSave(row);
+        		}
+        		
+        		// 현장채용 관리에서 채용취소면 현재 현장직원 테이블에 데이터 존재유무를 체크.
+        		// del_yn 을 Y로 업데이트.
+        		if (useyn.toString().equals("N")) {
+        			List<Map<String, Object>> resultList = new ArrayList<>();
+        			resultList = operateService.AccountMemberAllList(row);
+        			if (!resultList.isEmpty()) {
+        				String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+        				row.put("del_yn", "Y");
+        				row.put("del_dt", today);
+            			iResult += operateService.AccountMembersSave(row);
+        			}
+        		}
+        	}
         }
 
         JsonObject obj = new JsonObject();
@@ -716,6 +745,14 @@ public class OperateController {
     	for (Map<String, Object> paramMap : paramList) {
             iResult += operateService.AccountDinnersNumberSave(paramMap);
         }
+    	
+    	if (iResult > 0) {
+			for (Map<String, Object> paramMap : paramList) {
+				paramMap.put("year", paramMap.get("diner_year"));
+				paramMap.put("month", paramMap.get("diner_month"));
+				iResult += operateService.BudgetTotalSave(paramMap);
+	        }
+		}
     	
     	JsonObject obj = new JsonObject();
     	

@@ -27,7 +27,9 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountInfoList_3(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
 	List<Map<String, Object>> AccountInfoList_4(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
 	List<Map<String, Object>> AccountInfoList_5(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	int AccountInfoSave(Map<String, Object> paramMap);													// 거래처 -> 거래처 저장
+	int AccountInfoSave(Map<String, Object> paramMap);													// 거래처 -> 거래처 상세 저장
+	int AccountDietPriceHistorySave(Map<String, Object> paramMap);										// 거래처 -> 거래처 상세 -> 식단가 변경내역 저장
+	List<Map<String, Object>>AccountDietPriceHistoryList(Map<String, Object> paramMap);					// 거래처 -> 거래처 상세 -> 식단가 변경내역 조회
 	List<Map<String, Object>> AccountBusinessImgList(Map<String, Object> paramMap); 					// 거래처 -> 거래처 상세 이미지 조회
 	int insertOrUpdateFile(Map<String, Object> paramMap); 												// 거래처 -> 거래처 상세 이미지 업로드
 	List<Map<String, Object>> AccountDeadlineBalanceList(Map<String, Object> paramMap); 				// 회계 -> 매출마감/미수잔액 조회

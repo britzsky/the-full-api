@@ -149,6 +149,17 @@ public class AccountService {
 		iResult = accountMapper.AccountInfoSave(paramMap);
 		return iResult;
 	}
+	public List<Map<String, Object>> AccountDietPriceHistoryList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountDietPriceHistoryList(paramMap);
+		return resultList;
+	}
+	// 거래처 -> 거래처상세 -> 식단가 변경내역 저장 
+	public int AccountDietPriceHistorySave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDietPriceHistorySave(paramMap);
+		return iResult;
+	}
 	// 거래처 -> 거래처상세 이미지 업로드
 	public int insertOrUpdateFile (Map<String, Object> paramMap) {
 		int iResult = 0;
