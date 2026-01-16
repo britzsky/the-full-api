@@ -40,4 +40,5 @@ public class WebConfig implements WebMvcConfigurer {
 		registry.addResourceHandler(DEV_HANDLE)
 		.addResourceLocations(DEV_PATH);
     }
+	
 }
