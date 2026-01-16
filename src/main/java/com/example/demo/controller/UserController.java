@@ -27,15 +27,14 @@ public class UserController {
 	}
 
 	/*
-	 * method : Login comment : 로그인
+	 * method : Login
+	 * comment : 로그인
 	 */
 	@PostMapping("/User/Login")
 	public String Login(@RequestBody HashMap<String, Object> map) {
 
 		Map<String, Object> resultMap = userService.Login(map);
 		JsonObject obj = new JsonObject();
-
-		System.out.println(resultMap.get("status_code").toString());
 
 		// null 안전 처리
 		String statusCode = "400";
@@ -80,18 +79,51 @@ public class UserController {
 		obj.addProperty("code", statusCode);
 
 		return obj.toString();
-
 	}
 
 	/*
-	 * method : UserRgt comment : 사용자 등록
+	 * method : ApprovalPendingList
+	 * comment : 승인대기 목록 조회
+	 */
+	@GetMapping("/User/ApprovalPendingList")
+	public Map<String, Object> ApprovalPendingList() {
+		Map<String, Object> out = new HashMap<>();
+		out.put("code", "200");
+		out.put("list", userService.SelectApprovalPendingUsers(new HashMap<>()));
+		return out;
+	}
+
+	/*
+	 * method : ApprovalSave
+	 * comment : 저장(ApprovalSave) 엔드포인트 추가: 프론트의 /User/ApprovalSave 대응
+	 */
+	@PostMapping("/User/ApprovalSave")
+	@SuppressWarnings("unchecked")
+	public Map<String, Object> ApprovalSave(@RequestBody Map<String, Object> body) {
+		Map<String, Object> out = new HashMap<>();
+		try {
+			Object listObj = body.get("list");
+			List<Map<String, Object>> list = (List<Map<String, Object>>) listObj;
+
+			int updated = userService.ApprovalSave(list);
+			out.put("code", "200");
+			out.put("updated", updated);
+		} catch (Exception e) {
+			out.put("code", "400");
+			out.put("msg", "승인 저장 처리 중 오류가 발생했습니다.");
+		}
+		return out;
+	}
+
+	/*
+	 * method : UserRgt
+	 * comment : 사용자 등록
 	 */
 	@PostMapping("/User/UserRgt")
 	public String UserRgt(@RequestBody Map<String, Object> paramMap) {
 
 		int iResult = 0;
 
-		// info, detail 꺼내기
 		Map<String, Object> info = (Map<String, Object>) paramMap.get("info");
 		Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
 
@@ -112,42 +144,42 @@ public class UserController {
 	}
 
 	/*
-	 * method : SelectUserInfo comment : 직원 정보 조회
+	 * method : SelectUserInfo
+	 * comment : 직원 정보 조회
 	 */
 	@GetMapping("/User/SelectUserInfo")
 	public String SelectUserInfo(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.SelectUserInfo(paramMap);
-
 		return new Gson().toJson(resultList);
 	}
 
 	/*
-	 * method : UserRecordSheetList comment : 신사업(일단,...)근태관리 조회
+	 * method : UserRecordSheetList
+	 * comment : 신사업(일단,...)근태관리 조회
 	 */
 	@GetMapping("User/UserRecordSheetList")
 	public String UserRecordSheetList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserRecordSheetList(paramMap);
-
 		return new Gson().toJson(resultList);
 	}
 
 	/*
-	 * method : UserMemberList comment : 신사업(일단,...)근태관리 직원정보 조회
+	 * method : UserMemberList
+	 * comment : 신사업(일단,...)근태관리 직원정보 조회
 	 */
 	@GetMapping("User/UserMemberList")
 	public String UserMemberList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserMemberList(paramMap);
-
 		return new Gson().toJson(resultList);
 	}
 
 	/*
-	 * method : ContractEndAccountList comment : 3개월 이내 종료업장 조회
+	 * method : ContractEndAccountList
+	 * comment : 3개월 이내 종료업장 조회
 	 */
 	@GetMapping("/User/ContractEndAccountList")
 	public String ContractEndAccountList() {
 		List<Map<String, Object>> resultList = userService.ContractEndAccountList();
-
 		return new Gson().toJson(resultList);
 	}
 }
