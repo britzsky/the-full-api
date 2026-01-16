@@ -18,129 +18,136 @@ import com.google.gson.JsonObject;
 
 @RestController
 public class UserController {
-	
+
 	private final UserService userService;
-	
-    @Autowired
-    public UserController(UserService userService, WebConfig webConfig) {
-    	this.userService = userService;
-    }
-	
-    /*
-     * method 	: Login
-     * comment 	: 로그인
-     */
-    @PostMapping("/User/Login")
-    public String Login(@RequestBody HashMap<String, Object> map) {
-    	
-    	Map<String, Object> resultMap =  userService.Login(map);
-    	JsonObject obj = new JsonObject();
-    	
-    	System.out.println(resultMap.get("status_code").toString());
-    	
-    	if(resultMap.get("status_code").toString().equals("400")) {
-    		obj.addProperty("code", resultMap.get("status_code").toString());
-    		obj.addProperty("msg", "아이디 혹은 비밀번호를 확인하세요.");
-        	
-    	} else {
-    		obj.addProperty("user_id", resultMap.get("user_id").toString());
-        	obj.addProperty("user_type", resultMap.get("user_type").toString());
-        	
-        	if (resultMap.get("user_id").toString().equals("ceo")) {
-        		obj.addProperty("position_name", "CEO");
-        	} else if (resultMap.get("user_id").toString().equals("britzsky")
-        			|| resultMap.get("user_id").toString().equals("hh2")
-        			|| resultMap.get("user_id").toString().equals("mh2")
-        			|| resultMap.get("user_id").toString().equals("bh4")
-        			|| resultMap.get("user_id").toString().equals("yh2")) {
-        		obj.addProperty("position_name", "Team Leader");
-        	} else if (resultMap.get("user_id").toString().equals("sy7")
-        			|| resultMap.get("user_id").toString().equals("jr1")) {
-        		obj.addProperty("position_name", "Part Leader");
-        	} else {
-        		obj.addProperty("position_name", "Manager");
-        	}
-        	
-        	obj.addProperty("position", resultMap.get("position").toString());
-        	obj.addProperty("department", resultMap.get("department").toString());
-        	obj.addProperty("account_id", resultMap.get("account_id").toString());
-        	obj.addProperty("user_name", resultMap.get("user_name").toString());
-        	obj.addProperty("code", "status_code");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * method 	: UserRgt
-     * comment 	: 사용자 등록
-     */
+
+	@Autowired
+	public UserController(UserService userService, WebConfig webConfig) {
+		this.userService = userService;
+	}
+
+	/*
+	 * method : Login comment : 로그인
+	 */
+	@PostMapping("/User/Login")
+	public String Login(@RequestBody HashMap<String, Object> map) {
+
+		Map<String, Object> resultMap = userService.Login(map);
+		JsonObject obj = new JsonObject();
+
+		System.out.println(resultMap.get("status_code").toString());
+
+		// null 안전 처리
+		String statusCode = "400";
+		if (resultMap != null && resultMap.get("status_code") != null) {
+			statusCode = String.valueOf(resultMap.get("status_code"));
+		}
+
+		// ✅ 1) 아이디/비번 실패 OR ✅ 2) 미승인(use_yn='N') 차단
+		if (!"200".equals(statusCode)) {
+			obj.addProperty("code", statusCode);
+
+			if ("400".equals(statusCode)) {
+				obj.addProperty("msg", "아이디 혹은 비밀번호를 확인하세요.");
+			} else {
+				obj.addProperty("msg", "승인되지 않은 계정입니다. 관리자에게 문의해주세요.");
+			}
+			return obj.toString();
+		}
+
+		// ===== 성공 응답 =====
+		obj.addProperty("user_id", String.valueOf(resultMap.get("user_id")));
+		obj.addProperty("user_type", String.valueOf(resultMap.get("user_type")));
+
+		String userId = String.valueOf(resultMap.get("user_id"));
+
+		if ("ceo".equals(userId)) {
+			obj.addProperty("position_name", "CEO");
+		} else if ("britzsky".equals(userId) || "hh2".equals(userId) || "mh2".equals(userId) || "bh4".equals(userId)
+				|| "yh2".equals(userId)) {
+			obj.addProperty("position_name", "Team Leader");
+		} else if ("sy7".equals(userId) || "jr1".equals(userId)) {
+			obj.addProperty("position_name", "Part Leader");
+		} else {
+			obj.addProperty("position_name", "Manager");
+		}
+
+		obj.addProperty("position", String.valueOf(resultMap.get("position")));
+		obj.addProperty("department", String.valueOf(resultMap.get("department")));
+		obj.addProperty("account_id", String.valueOf(resultMap.get("account_id")));
+		obj.addProperty("user_name", String.valueOf(resultMap.get("user_name")));
+
+		obj.addProperty("code", statusCode);
+
+		return obj.toString();
+
+	}
+
+	/*
+	 * method : UserRgt comment : 사용자 등록
+	 */
 	@PostMapping("/User/UserRgt")
-	public String UserRgt(@RequestBody Map<String,Object> paramMap) {
-		
-		int iResult = 0 ;
-		
+	public String UserRgt(@RequestBody Map<String, Object> paramMap) {
+
+		int iResult = 0;
+
 		// info, detail 꺼내기
-	    Map<String, Object> info   = (Map<String, Object>) paramMap.get("info");
-	    Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
-	    
-	    iResult += userService.UserRgt(info);
-	    iResult += userService.UserRgtDetail(detail);
-	    
-	    JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+		Map<String, Object> info = (Map<String, Object>) paramMap.get("info");
+		Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
+
+		iResult += userService.UserRgt(info);
+		iResult += userService.UserRgtDetail(detail);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
+		}
+
+		return obj.toString();
 	}
-	
+
 	/*
-     * method 	: SelectUserInfo
-     * comment 	: 직원 정보 조회
-     */
+	 * method : SelectUserInfo comment : 직원 정보 조회
+	 */
 	@GetMapping("/User/SelectUserInfo")
 	public String SelectUserInfo(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.SelectUserInfo(paramMap);
-		
+
 		return new Gson().toJson(resultList);
 	}
-	
-	 /*
-     * method 	: UserRecordSheetList
-     * comment 	: 신사업(일단,...)근태관리 조회
-     */
+
+	/*
+	 * method : UserRecordSheetList comment : 신사업(일단,...)근태관리 조회
+	 */
 	@GetMapping("User/UserRecordSheetList")
 	public String UserRecordSheetList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserRecordSheetList(paramMap);
-		
+
 		return new Gson().toJson(resultList);
 	}
-	
+
 	/*
-     * method 	: UserMemberList
-     * comment 	: 신사업(일단,...)근태관리 직원정보 조회
-     */
+	 * method : UserMemberList comment : 신사업(일단,...)근태관리 직원정보 조회
+	 */
 	@GetMapping("User/UserMemberList")
 	public String UserMemberList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserMemberList(paramMap);
-		
+
 		return new Gson().toJson(resultList);
 	}
-	
+
 	/*
-     * method 	: ContractEndAccountList
-     * comment 	: 3개월 이내 종료업장 조회
-     */
+	 * method : ContractEndAccountList comment : 3개월 이내 종료업장 조회
+	 */
 	@GetMapping("/User/ContractEndAccountList")
 	public String ContractEndAccountList() {
 		List<Map<String, Object>> resultList = userService.ContractEndAccountList();
-		
+
 		return new Gson().toJson(resultList);
 	}
 }
