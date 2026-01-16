@@ -391,6 +391,7 @@
 			ON u.user_id = bc.user_id 
 			WHERE DATE_FORMAT(start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
 			AND DATE_FORMAT(end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			AND bc.del_yn = 'N'
     </select>
     
     <select id="BusinessScheduleTodayList" parameterType="map" resultType="hashmap">

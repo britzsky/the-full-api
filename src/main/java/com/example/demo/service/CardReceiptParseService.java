@@ -53,14 +53,10 @@ public class CardReceiptParseService {
 
         return switch (t) {
             case "CONVENIENCE", "CVS", "편의점" -> CardReceiptType.CONVENIENCE;
-
             case "COUPANG_APP", "쿠팡앱", "쿠페이" -> CardReceiptType.COUPANG_APP;
             case "COUPANG_CARD", "COUPANG", "쿠팡", "쿠팡카드" -> CardReceiptType.COUPANG_CARD;
-
             case "MART", "MART_ITEMIZED", "마트" -> CardReceiptType.MART_ITEMIZED;
-
             case "DELIVERY", "배달", "BAEMIN", "YOGIYO", "COUPANG_EATS" -> CardReceiptType.DELIVERY;
-
             case "SLIP", "CARD_SLIP_GENERIC", "전표", "GENERIC" -> CardReceiptType.CARD_SLIP_GENERIC;
             case "UNKNOWN" -> CardReceiptType.UNKNOWN;
             default -> null;

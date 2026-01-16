@@ -51,6 +51,7 @@ public interface AccountMapper {
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
 	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회
 	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입집계 조회
+	List<Map<String, Object>> AccountPurchaseDetailList_tmp(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입집계(임시) 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); 				// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제내역 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제 상세내역 조회
@@ -64,4 +65,5 @@ public interface AccountMapper {
 	int AccountCorporateCardPaymentSave(Map<String, Object> paramMap);									// 회계 -> 본사 법인카드 결제내역 저장
 	int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 상세내역 저장
 	void TallySheetCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 집계표 적용
+	void TallySheetCorporateCardPaymentSaveV2(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 집계표 적용
 }

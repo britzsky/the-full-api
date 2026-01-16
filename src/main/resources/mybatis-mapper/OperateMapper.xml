@@ -1595,6 +1595,7 @@
 			ON u.user_id = oc.user_id 
 			WHERE DATE_FORMAT(oc.start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
 			AND DATE_FORMAT(oc.end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			AND oc.del_yn = 'N'
     </select>
     
     <select id="OperateScheduleTodayList" parameterType="map" resultType="hashmap">
