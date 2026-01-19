@@ -108,9 +108,9 @@ public class CardReceiptController {
                 corporateCard.put("year", year);
                 corporateCard.put("month", month);
             } else {
-                // 본사/부서 저장
-                int iDepartment = (objectValue == null || objectValue.isBlank()) ? 0 : Integer.parseInt(objectValue);
-                corporateCard.put("department", iDepartment);
+            	corporateCard.put("account_id", objectValue);
+                corporateCard.put("year", year);
+                corporateCard.put("month", month);
             }
 
             corporateCard.put("cardNo", cardNo);
@@ -150,6 +150,7 @@ public class CardReceiptController {
                 }
             } else {
                 iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
+                iResult += accountService.TallySheetCorporateCardPaymentSaveV2(corporateCard);
                 for (Map<String, Object> m : detailList) {
                     iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
                 }

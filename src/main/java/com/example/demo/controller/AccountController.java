@@ -1048,6 +1048,19 @@ public class AccountController {
     }
     /*
      * part		: 회계
+     * method 	: AccountPurchaseTallyList_tmp
+     * comment 	: 회계 -> 매입 -> 매입집계(임시) 조회
+     */
+    @GetMapping("Account/AccountPurchaseDetailList_tmp")
+    public String AccountPurchaseTallyList_tmp(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountPurchaseDetailList_tmp(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
      * method 	: HeadOfficeCorporateCardList
      * comment 	: 회계 -> 본사 법인카드 목록 조회
      */
@@ -1067,7 +1080,7 @@ public class AccountController {
     @GetMapping("Account/HeadOfficeCorporateCardPaymentList")
     public String HeadOfficeCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
+    	System.out.println(paramMap);
     	resultList = accountService.HeadOfficeCorporateCardPaymentList(paramMap);
     	
     	return new Gson().toJson(resultList);
@@ -1152,7 +1165,7 @@ public class AccountController {
     }
     /*
      * part		: 회계
-     * method 	: HeadOfficeCorporateCardList
+     * method 	: AccountCorporateCardList
      * comment 	: 회계 -> 현장 법인카드 목록 조회
      */
     @GetMapping("Account/AccountCorporateCardList")

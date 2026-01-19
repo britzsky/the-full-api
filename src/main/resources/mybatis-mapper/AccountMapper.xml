@@ -278,6 +278,7 @@
 		    subquery.member_id,
 		    subquery.account_id,
 		    subquery.name,
+		    subquery.phone,
 		    subquery.max_salary,
 		    subquery.count_max,
 		    subquery.min_salary,
@@ -317,6 +318,7 @@
 		        T.member_id,
 		        T.account_id,
 		        T.name,
+		        T.phone,
 		        T.rrn,
 		        T.account_number,
 		        MAX(T2.salary) AS max_salary,
@@ -338,7 +340,7 @@
 		    <if test="del_yn != null">
 				AND T.del_yn = #{del_yn}
 			</if>
-		    GROUP BY T.member_id, T.account_id, T.name, T.rrn, T.account_number
+		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number
 		) AS subquery
 		ORDER BY subquery.member_id
 	</select>
@@ -443,11 +445,12 @@
 	
 	<insert id="AccountDispatchMemberSave" parameterType="map">
 		INSERT INTO tb_account_members_dispatch
-		(account_id, member_id, name, rrn, account_number, note, del_yn)
+		(account_id, member_id, name, phone, rrn, account_number, note, del_yn)
 		VALUES
-		(#{account_id}, #{member_id}, #{name}, #{rrn}, #{account_number}, #{note}, #{del_yn})
+		(#{account_id}, #{member_id}, #{name}, #{phone}, #{rrn}, #{account_number}, #{note}, #{del_yn})
 		ON DUPLICATE KEY UPDATE
 		name = #{name},
+		phone = #{phone},
 		rrn = #{rrn},
 		account_number = #{account_number},
 		note = #{note},
@@ -1363,20 +1366,56 @@
 		AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
 	</select>
 	
+	<select id="AccountPurchaseDetailList_tmp" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id, 
+			   aptd.sale_id,
+			   aptd.item_id,
+			   a.account_name,
+			   DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+			   aptd.name, 
+			   aptd.qty, 
+			   aptd.unitPrice, 
+			   aptd.amount, 
+			   aptd.taxType, 
+			   aptd.itemType,
+			   apt.receipt_image
+		FROM tb_account a
+		JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		JOIN tb_account_purchase_tally_detail aptd
+		ON aptd.sale_id = apt.sale_id
+		WHERE aptd.sale_id = #{sale_id}
+	</select>
+	
 	<select id="HeadOfficeCorporateCardList" parameterType="string" resultType="hashmap">
-		SELECT idx, department, card_brand, card_no, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, del_yn 
+		SELECT idx, card_brand, card_no, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, del_yn 
 		FROM tb_headoffice_corporate_card
 	</select>
 	
-	<select id="HeadOfficeCorporateCardPaymentList" parameterType="string" resultType="hashmap">
-		SELECT sale_id, department, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id
+	<select id="HeadOfficeCorporateCardPaymentList" parameterType="map" resultType="hashmap">
+		SELECT sale_id, 
+			   account_id, 
+			   DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, 
+			   use_name, 
+			   bizNo, 
+			   total, 
+			   vat, 
+			   taxFree, 
+			   totalCard, 
+			   cardNo,
+			   cardBrand, 
+			   receipt_image, 
+			   note, 
+			   DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, 
+			   user_id
 		FROM tb_headoffice_corporate_card_payment_list
-		WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
-		AND DATE_FORMAT(payment_dt, '%m') = #{month}
+		WHERE DATE_FORMAT(payment_dt, '%Y') = ${year}
+		AND DATE_FORMAT(payment_dt, '%m') = ${month}
+		AND account_id = #{account_id}
 	</select>
 	
-	<select id="HeadOfficeCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">
-		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType
+	<select id="HeadOfficeCorporateCardPaymentDetailList" parameterType="map" resultType="hashmap">
+		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType, itemType
 		FROM tb_headoffice_corporate_card_payment_detail_list
 		WHERE sale_id = #{sale_id}
 	</select>
@@ -1385,7 +1424,6 @@
 		INSERT INTO tb_headoffice_corporate_card
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        idx,
-	        department,
 	        card_brand,
 	        card_no,
 	        reg_dt,
@@ -1395,7 +1433,6 @@
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        #{idx},
-	        #{department},
 	        #{card_brand},
 	        #{card_no},
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
@@ -1405,7 +1442,6 @@
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        idx=#{idx},
-	        department=#{department},
 	        card_brand=#{card_brand},
 	        card_no=#{card_no},
 	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
@@ -1418,7 +1454,7 @@
 		INSERT INTO tb_headoffice_corporate_card_payment_list
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        sale_id,
-	        department,
+	        account_id,
 	        payment_dt,
 	        use_name,
 	        bizNo,
@@ -1436,7 +1472,7 @@
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        #{sale_id},
-	        #{department},
+	        #{account_id},
 	        DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
 	        #{use_name},
 	        #{bizNo},
@@ -1454,7 +1490,7 @@
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        sale_id=#{sale_id},
-	        department=#{department},
+	        account_id=#{account_id},
 	        payment_dt=DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
 	        use_name=#{use_name},
 	        bizNo=#{bizNo},
@@ -1480,7 +1516,8 @@
 	        qty,
 	        amount,
 	        unitPrice,
-	        taxType
+	        taxType,
+	        itemType
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1490,7 +1527,8 @@
 	        #{qty},
 	        #{amount},
 	        #{unitPrice},
-	        #{taxType}
+	        #{taxType},
+	        #{itemType}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1500,7 +1538,8 @@
 	        qty=#{qty},
 	        amount=#{amount},
 	        unitPrice=#{unitPrice},
-	        taxType=#{taxType}
+	        taxType=#{taxType},
+	        itemType=#{itemType}
 	    </trim>
 	</insert>
 	
@@ -1652,6 +1691,14 @@
 	
 	<select id="TallySheetCorporateCardPaymentSave" statementType="CALLABLE" parameterType="map">
 	    { CALL sp_sync_corp_card_to_tally_sheet_one_day(
+	        #{account_id, mode=IN, jdbcType=VARCHAR},
+	        #{payment_dt, mode=IN, jdbcType=VARCHAR},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
+	
+	<select id="TallySheetCorporateCardPaymentSaveV2" statementType="CALLABLE" parameterType="map">
+	    { CALL sp_sync_corp_card_to_tally_sheet_one_day_v2(
 	        #{account_id, mode=IN, jdbcType=VARCHAR},
 	        #{payment_dt, mode=IN, jdbcType=VARCHAR},
 	        #{result, mode=OUT, jdbcType=INTEGER}

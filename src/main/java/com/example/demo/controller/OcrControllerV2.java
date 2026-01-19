@@ -104,20 +104,17 @@ public class OcrControllerV2 {
             @RequestParam(value = "objectValue", required = false) String objectValue,
             @RequestParam(value = "folderValue", required = false) String folderValue,
             @RequestParam(value = "cardNo", required = false) String cardNo,
-            @RequestParam(value = "cardBrand", required = false) String cardBrand) {
+            @RequestParam(value = "cardBrand", required = false) String cardBrand,
+            @RequestParam(value = "saveType", required = false) String saveType
+    ) {
     	
-    	// 1️⃣ 파일 저장
+    	// 파일 저장
         File tempFile = saveFile(file);
         
         try {
-            // 2️⃣ OCR 처리 (Google Document AI)
-            //Document doc = ocrService.processReceiptFile(tempFile);
-            
-            // 2️⃣ OCR 처리 (Google Document AI)
-            // [수정된 부분]: processReceiptFile -> processDocumentFile 로 변경
             Document doc = ocrService.processDocumentFile(tempFile);
 
-            // 3️⃣ (선택) AI로 타입 자동 분석
+            // AI로 타입 자동 분석
             if (type == null || type.isEmpty()) {
                 if (aiAnalyzer != null) {
                     type = aiAnalyzer.detectType(doc);
@@ -126,18 +123,9 @@ public class OcrControllerV2 {
                     type = "mart"; // 기본값
                 }
             }
-            
-            System.out.println("type ======= :: " + type);
 
-            // 4️⃣ 유형별 파서로 파싱
+            // 유형별 파서로 파싱
             BaseReceiptParser.ReceiptResult result = ReceiptParserFactory.parse(doc, type);
-            
-            Map<String, Object> corporateCard = new HashMap<String, Object>();
-            int iDepartment = Integer.parseInt(objectValue);
-            
-            corporateCard.put("department", iDepartment);
-            corporateCard.put("cardNo", cardNo);
-            corporateCard.put("cardBrand", cardBrand);
             
             // 1️⃣ 입력값을 LocalDate로 변환 (기본적으로 2000년대 기준으로 해석됨 → 2025년)
             //DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("yy-MM-dd");
@@ -147,19 +135,27 @@ public class OcrControllerV2 {
                 return ResponseEntity.badRequest()
                     .body("❌ 영수증 날짜를 인식하지 못했습니다.");
             }
-            
-            // 여러 타입의 날짜형식을 매핑.
+
+            // ✅ 2) saleId 생성(영수증 날짜 기반)
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
-            
-            // 2️⃣ 현재 시간 가져오기
-            LocalTime nowTime = LocalTime.now(); // 시:분:초
-
-            // 3️⃣ 날짜 + 시간 합치기
-            LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
-
-            // 4️⃣ 원하는 형식으로 출력 (예: 20251009152744)
+            LocalDateTime dateTime = LocalDateTime.of(date, LocalTime.now());
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             
+            // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+            int year = date.getYear();        // 2026
+            int month = date.getMonthValue(); // 1~12
+            
+            // ✅ 3) DB 저장 payload 만들기
+            Map<String, Object> corporateCard = new HashMap<>();
+
+            boolean isAccount = "account".equalsIgnoreCase(saveType); // ✅ NPE 방지
+            
+            corporateCard.put("account_id", objectValue);
+            corporateCard.put("year", year);
+            corporateCard.put("month", month);
+            
+            corporateCard.put("cardNo", cardNo);
+            corporateCard.put("cardBrand", cardBrand);
             corporateCard.put("sale_id", saleId);								// saleId 세팅.
             corporateCard.put("use_name", result.merchant.name);				// use_name 세팅.
             corporateCard.put("payment_dt", date);								// payment_dt 세팅.
@@ -212,6 +208,7 @@ public class OcrControllerV2 {
                 detailMap.put("amount", r.amount);
                 detailMap.put("unitPrice", r.unitPrice);
                 detailMap.put("taxType", taxify(r.taxFlag));
+                detailMap.put("itemType", classify(r.name));
                 
                 detailList.add(detailMap);
             }
@@ -238,12 +235,20 @@ public class OcrControllerV2 {
                 corporateCard.put("receipt_image", resultPath);
             }
             
+            // DB 저장
             int iResult = 0;
-            
-            iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
-            
-            for (Map<String, Object> m : detailList) {
-            	iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
+            if (isAccount) {
+                iResult += accountService.AccountCorporateCardPaymentSave(corporateCard);
+                iResult += accountService.TallySheetCorporateCardPaymentSave(corporateCard);
+                for (Map<String, Object> m : detailList) {
+                    iResult += accountService.AccountCorporateCardPaymentDetailLSave(m);
+                }
+            } else {
+                iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
+                iResult += accountService.TallySheetCorporateCardPaymentSaveV2(corporateCard);
+                for (Map<String, Object> m : detailList) {
+                    iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
+                }
             }
             
             return ResponseEntity.ok(corporateCard);
