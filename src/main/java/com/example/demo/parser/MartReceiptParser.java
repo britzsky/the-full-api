@@ -37,15 +37,22 @@ public class MartReceiptParser extends BaseReceiptParser {
                 extract(merchantText, "([가-힣A-Za-z\\s]*?식자재마트|[가-힣A-Za-z\\s]*?마트|베이커리|뚜레쥬르|파리바게뜨)", 1),
                 extract(merchantText, "가맹점명[:：]\\s*([^\\n]*)")
         );
-        r.merchant.bizNo   = extract(merchantText, "([0-9]{3}-[0-9]{2}-[0-9]{5})");
+     // ✅ 사업자번호: 라벨 우선 -> 포맷 fallback
+        r.merchant.bizNo = firstNonNull(
+                extract(merchantText, "(?:사업자\\s*(?:등록)?\\s*번호|등록번호)\\s*[:：]?\\s*([0-9]{3}-[0-9]{2}-[0-9]{5})", 1),
+                extract(t,           "(?:사업자\\s*(?:등록)?\\s*번호|등록번호)\\s*[:：]?\\s*([0-9]{3}-[0-9]{2}-[0-9]{5})", 1),
+                extract(merchantText, "\\b([0-9]{3}-[0-9]{2}-[0-9]{5})\\b", 1),
+                extract(t,           "\\b([0-9]{3}-[0-9]{2}-[0-9]{5})\\b", 1)
+        );
         r.merchant.tel     = extract(merchantText, "(0\\d{1,2}-\\d{3,4}-\\d{4})");
         r.merchant.address = extract(merchantText, "(서울|인천|부산|대구|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[^\\n]*\\d[^\\n]*");
 
         // 5️⃣ 메타정보
         r.meta.saleDate = firstNonNull(
-                extract(t, "(?:일시|판매일)[:：]?\\s*((?:20)?\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1),
-                extract(t, "(?:20)?\\d{2}[./-]\\d{1,2}[./-]\\d{1,2}")
-        );
+    	    extract(t, "(?:판매일|매출일|거래일|결제일|일시|재인쇄|재발행|재매일)\\s*[:：]?\\s*((?:20)?\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1),
+    	    pickValidDate(t)  // ✅ 유효한 날짜만
+    	);
+
         r.meta.saleTime  = extract(t, "(?:일시|판매일)[^\\n]*?([01]?\\d|2[0-3]):([0-5]\\d)");
         r.meta.receiptNo = firstNonNull(
                 extract(t, "거래\\s?NO[:：]?\\s*([0-9]{8,20})", 1),
@@ -70,6 +77,22 @@ public class MartReceiptParser extends BaseReceiptParser {
     }
 
     // -------------------- 섹션 분리 --------------------
+    private String pickValidDate(String text) {
+        Pattern p = Pattern.compile("\\b((?:20)?\\d{2})[./-](\\d{1,2})[./-](\\d{1,2})\\b");
+        Matcher m = p.matcher(text);
+
+        String best = null;
+        while (m.find()) {
+            int mm = Integer.parseInt(m.group(2));
+            int dd = Integer.parseInt(m.group(3));
+            if (mm < 1 || mm > 12) continue;
+            if (dd < 1 || dd > 31) continue;
+
+            best = m.group(0); // 마지막 유효값(대부분 판매일이 뒤쪽에 나옴)
+        }
+        return best;
+    }
+    
     private List<List<String>> splitByLogicalSections(List<String> lines) {
         List<List<String>> sections = new ArrayList<>();
         List<String> current = new ArrayList<>();

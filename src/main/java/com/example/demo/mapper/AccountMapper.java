@@ -19,6 +19,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountRecordSheetList(Map<String, Object> paramMap); 					// 출근부 -> 출근현황
 	List<Map<String, Object>> AccountMemberRecordTime(Map<String, Object> paramMap);					// 출근부 -> 출근현황 출퇴근 시간 조회
 	int AccountMemberRecordSave(Map<String, Object> paramMap);											// 출근부 -> 상용출근 정보 저장
+	int AccountMemberRecRecordSave(Map<String, Object> paramMap);										// 출근부 -> 채용현황 출근 정보 저장
 	int AccountDispatchRecordSave(Map<String, Object> paramMap);										// 출근부 -> 파출출근 정보 저장
 	int AccountDispatchMemberSave(Map<String, Object> paramMap);										// 출근부 -> 파출직원 정보 저장
 	List<Map<String, Object>> AccountPropertiesList(Map<String, Object> paramMap); 						// 거래처 -> 기물리스트

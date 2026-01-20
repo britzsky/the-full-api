@@ -83,6 +83,12 @@ public class AccountService {
 		iResult = accountMapper.AccountMemberRecordSave(paramMap);
 		return iResult;
 	}
+	// 거래처 -> 출근부 -> 채용현황 출근 정보 저장
+	public int AccountMemberRecRecordSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountMemberRecRecordSave(paramMap);
+		return iResult;
+	}
 	// 거래처 -> 출근부 -> 파출출근 정보 저장
 	public int AccountDispatchRecordSave(Map<String, Object> paramMap) {
 		int iResult = 0;

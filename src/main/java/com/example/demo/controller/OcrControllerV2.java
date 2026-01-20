@@ -28,7 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
-import com.example.demo.parser.ReceiptParserFactory;
+import com.example.demo.parser.HeadOfficeReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.OcrService;
@@ -105,7 +105,8 @@ public class OcrControllerV2 {
             @RequestParam(value = "folderValue", required = false) String folderValue,
             @RequestParam(value = "cardNo", required = false) String cardNo,
             @RequestParam(value = "cardBrand", required = false) String cardBrand,
-            @RequestParam(value = "saveType", required = false) String saveType
+            @RequestParam(value = "saveType", required = false) String saveType,
+            @RequestParam(value = "receiptType", required = false) String receiptType
     ) {
     	
     	// 파일 저장
@@ -125,7 +126,7 @@ public class OcrControllerV2 {
             }
 
             // 유형별 파서로 파싱
-            BaseReceiptParser.ReceiptResult result = ReceiptParserFactory.parse(doc, type);
+            BaseReceiptParser.ReceiptResult result = HeadOfficeReceiptParserFactory.parse(doc, type);
             
             // 1️⃣ 입력값을 LocalDate로 변환 (기본적으로 2000년대 기준으로 해석됨 → 2025년)
             //DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("yy-MM-dd");
@@ -153,35 +154,52 @@ public class OcrControllerV2 {
             corporateCard.put("account_id", objectValue);
             corporateCard.put("year", year);
             corporateCard.put("month", month);
+            corporateCard.put("receipt_type", receiptType);
             
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
             corporateCard.put("sale_id", saleId);								// saleId 세팅.
             corporateCard.put("use_name", result.merchant.name);				// use_name 세팅.
             corporateCard.put("payment_dt", date);								// payment_dt 세팅.
-            corporateCard.put("total", result.totals.total);					// total 세팅.
             corporateCard.put("discount", result.totals.discount);				// discount 세팅.
             corporateCard.put("vat", result.totals.vat);						// vat 세팅.
             corporateCard.put("taxFree", result.totals.taxFree);				// taxFree 세팅.
             
             String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
-
-            int iApprovalAmt = 0;
-            if (approvalAmt != null && !approvalAmt.isBlank()) {
-                String clean = approvalAmt.replaceAll("[^0-9]", ""); // 숫자만 남기기
-                if (!clean.isEmpty()) {
-                    iApprovalAmt = Integer.parseInt(clean);
-                }
-            }
             
-            if ("cash".equals(result.payment != null ? result.payment.type : null)) {
-            	corporateCard.put("payType", 1);
-                corporateCard.put("totalCash", iApprovalAmt);
-                corporateCard.put("totalCard", 0);
+            if (approvalAmt == null) {
+            	corporateCard.put("total", result.totals.total);	
+            	
+            	if (result.payment.cardBrand == null) {
+                	corporateCard.put("payType", 1);
+                    corporateCard.put("totalCash", result.totals.total);
+                    corporateCard.put("totalCard", 0);
+                } else {
+                	corporateCard.put("payType", 2);
+                	corporateCard.put("totalCard", result.totals.total);
+                	corporateCard.put("totalCash", 0);
+                }
+            	
             } else {
-            	corporateCard.put("payType", 2);
-            	corporateCard.put("totalCard", iApprovalAmt);
-            	corporateCard.put("totalCash", 0);
+            	int iApprovalAmt = 0;
+                if (approvalAmt != null && !approvalAmt.isBlank()) {
+                    String clean = approvalAmt.replaceAll("[^0-9]", ""); // 숫자만 남기기
+                    if (!clean.isEmpty()) {
+                        iApprovalAmt = Integer.parseInt(clean);
+                    }
+                }
+                
+                corporateCard.put("total", approvalAmt);					// total 세팅.
+                
+                if (result.payment.cardBrand == null) {
+                	corporateCard.put("payType", 1);
+                    corporateCard.put("totalCash", iApprovalAmt);
+                    corporateCard.put("totalCard", 0);
+                } else {
+                	corporateCard.put("payType", 2);
+                	corporateCard.put("totalCard", iApprovalAmt);
+                	corporateCard.put("totalCash", 0);
+                }
             }
             
             // merchant 사업자번호 원본/정규화
@@ -202,6 +220,7 @@ public class OcrControllerV2 {
             
             for (Item r : result.items) {	
             	Map<String, Object> detailMap = new HashMap<String, Object>();
+            	detailMap.put("account_id", objectValue);
                 detailMap.put("sale_id", saleId);
                 detailMap.put("name", r.name);
                 detailMap.put("qty", r.qty);
@@ -209,6 +228,23 @@ public class OcrControllerV2 {
                 detailMap.put("unitPrice", r.unitPrice);
                 detailMap.put("taxType", taxify(r.taxFlag));
                 detailMap.put("itemType", classify(r.name));
+                
+                // 본사법인카드 특성상, 디테일에 있는 itemType(소모품, 식재료)에 따라
+                // 집계표의 거래처(기타:type 1002, 기타비용:1003) 따로 저장이 되어야 함.
+                // 따라서 payment_dt 가 집계표의 날짜와 매핑하기 때문에 detail 에도 적용해야 함.
+                detailMap.put("payment_dt", date);
+                
+                // 상품구분 3:알수없음 은 우선 소모품 type:1002 로 저장
+                if (classify(r.name) == 3) {
+                	detailMap.put("type", 1002);
+                } else if (classify(r.name) == 1) {	// 식재료면 type:1003
+                	detailMap.put("type", 1003);
+                } else {									// 소모품은 type:1002
+                	detailMap.put("type", 1002);
+                }
+                // 상단에서 파싱한 year,month 세팅(손익표 적용을 위해 필요)
+                detailMap.put("year", year);
+                detailMap.put("month", month);
                 
                 detailList.add(detailMap);
             }
@@ -245,9 +281,12 @@ public class OcrControllerV2 {
                 }
             } else {
                 iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
-                iResult += accountService.TallySheetCorporateCardPaymentSaveV2(corporateCard);
                 for (Map<String, Object> m : detailList) {
                     iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
+                    System.out.println("account_id ======= " + m.get("account_id").toString());
+                    System.out.println("account_id ======= " + m.get("year"));
+                    System.out.println("account_id ======= " + m.get("month"));
+                    iResult += accountService.TallySheetCorporateCardPaymentSaveV2(m);
                 }
             }
             

@@ -1622,7 +1622,7 @@
 			WHERE DATE_FORMAT(oc.start_date, '%Y-%m-%d') = #{today}
     </select>
 	
-	<insert id="OperateScheduleSave">
+	<insert id="OperateScheduleSave" parameterType="map">
         INSERT INTO tb_operate_calendar
     
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1666,5 +1666,30 @@
 	        user_id=#{user_id},
 	        reg_user_id=#{reg_user_id}
 	    </trim>
+    </insert>
+    
+    <insert id="AccountRecordSetRecRecordDataSave" parameterType="map">
+        INSERT INTO tb_account_record
+		  (account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)
+		SELECT
+		  r.account_id,
+		  r.member_id,
+		  r.record_date,
+		  r.type,
+		  r.record_year,
+		  r.record_month,
+		  r.start_time,
+		  r.end_time,
+		  r.note,
+		  r.salary
+		FROM tb_account_rec_record r
+		WHERE r.account_id   = #{account_id}
+		  AND r.member_id = #{member_id}
+		ON DUPLICATE KEY UPDATE
+		  type       = VALUES(type),
+	      start_time = VALUES(start_time),
+	      end_time   = VALUES(end_time),
+	      note       = VALUES(note),
+	      salary     = VALUES(salary)
     </insert>
 </mapper>

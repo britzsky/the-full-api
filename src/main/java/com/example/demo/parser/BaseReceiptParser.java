@@ -3,6 +3,10 @@ package com.example.demo.parser;
 import java.util.regex.*;
 import java.util.*;
 import com.google.cloud.documentai.v1.Document;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.IdentityHashMap;
+import java.util.Map;
 
 public abstract class BaseReceiptParser {
 
@@ -101,6 +105,71 @@ public abstract class BaseReceiptParser {
             // 실패 시 null
         }
         return null;
+    }
+    
+    protected String reflectFields(Object obj) {
+        if (obj == null) return "null";
+
+        StringBuilder sb = new StringBuilder();
+        Map<Object, Boolean> visited = new IdentityHashMap<>();
+        reflectFieldsInternal(obj, sb, visited, 0, 2); // depth=2 (원하면 늘려도 됨)
+        return sb.toString();
+    }
+
+    private void reflectFieldsInternal(Object obj, StringBuilder sb, Map<Object, Boolean> visited, int depth, int maxDepth) {
+        if (obj == null) {
+            sb.append("null");
+            return;
+        }
+        if (visited.containsKey(obj)) {
+            sb.append("(circular-ref)");
+            return;
+        }
+        visited.put(obj, true);
+
+        Class<?> c = obj.getClass();
+        sb.append(c.getSimpleName()).append("{");
+
+        Field[] fields = c.getDeclaredFields();
+        boolean first = true;
+
+        for (Field f : fields) {
+            // static 제외 (원하면 transient도 제외 가능)
+            if (Modifier.isStatic(f.getModifiers())) continue;
+
+            if (!first) sb.append(", ");
+            first = false;
+
+            f.setAccessible(true);
+            sb.append(f.getName()).append("=");
+
+            try {
+                Object v = f.get(obj);
+
+                if (v == null) {
+                    sb.append("null");
+                } else if (isPrimitiveLike(v)) {
+                    sb.append(String.valueOf(v));
+                } else if (depth >= maxDepth) {
+                    sb.append(v.getClass().getSimpleName());
+                } else {
+                    reflectFieldsInternal(v, sb, visited, depth + 1, maxDepth);
+                }
+            } catch (Exception e) {
+                sb.append("(error:").append(e.getClass().getSimpleName()).append(")");
+            }
+        }
+
+        sb.append("}");
+    }
+
+    private boolean isPrimitiveLike(Object v) {
+        return v instanceof String
+                || v instanceof Number
+                || v instanceof Boolean
+                || v instanceof Character
+                || v.getClass().isPrimitive()
+                || v.getClass().isEnum();
     }
 
     // -------------------- 공용 헬퍼 --------------------

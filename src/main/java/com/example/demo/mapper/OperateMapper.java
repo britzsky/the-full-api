@@ -37,6 +37,7 @@ public interface OperateMapper {
 	int AccountMembersSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
 	List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 조회
 	int AccountRecMembersSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 저장
+	int AccountRecordSetRecRecordDataSave(Map<String, Object> paramMap);						// 급식사업부 -> 운영->현장관리 채용확정 시, 출근부 적용
 	List<Map<String, Object>> AccountDispatchMemberAllList(Map<String, Object> paramMap); 		// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 조회
 	int AccountDispatchMembersSave(Map<String, Object> paramMap);								// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 저장
 	List<Map<String, Object>> AccountDinnersNumberList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황

@@ -7,567 +7,329 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * CoupangReceiptParser v14.x
- * - 쿠팡 카드영수증(화면형) 포맷 고정: 패턴 기반 추출로 라벨/섹션 섞임에 강함
- * - 결제정보: 블록에서 정규식으로 카드번호/승인번호/거래일시/카드종류/거래종류/할부 추출
- * - 구매정보: 승인번호 이후에서 주문번호(12~20자리) + 금액 4개(과세/비과세/부가세/합계) 추출
- * - 상품명: 주문번호 다음부터 첫 금액 전까지, 라벨/섹션 단어 제거 + 수량 추출/정리
- * - 상점정보: 판매자상호/사업자번호/주소 추출 (사업자번호는 포맷 맞는 것 우선)
- * - 카드금액 필드도 함께 채우도록 훅 제공(applyCardTotals)
+ * CoupangReceiptParser v10.x
+ * - 카드영수증(결제정보/구매정보/이용상점정보) 라벨 기반 파싱 강화
+ * - 판매자상호 우선 추출(쿠팡 고정 제거)
+ * - 상품명 라벨 기반(줄바꿈 포함) 추출 → 아이템 안정화
+ * - 카드종류(BC카드/IBK비씨카드 등) 더 정확히 추출
  */
 public class CoupangReceiptParser extends BaseReceiptParser {
 
-    // 날짜/시간
-    private static final Pattern DATE_TIME = Pattern.compile(
-            "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})\\s*([0-2]?\\d:[0-5]\\d:[0-5]\\d)"
-    );
-
-    // 카드번호 마스킹
-    private static final Pattern MASKED_CARD = Pattern.compile("\\b\\d{4}\\*{2,}\\d{2,}\\*?\\d{0,4}\\b");
-
-    // 승인번호(6~12자리)
-    private static final Pattern APPROVAL_NO = Pattern.compile("\\b\\d{6,12}\\b");
-
-    // 주문번호(쿠팡은 보통 12~20자리)
-    private static final Pattern ORDER_NO = Pattern.compile("\\b\\d{12,20}\\b");
-
-    // 금액: 19,400 / 19,400원 / 0원
-    private static final Pattern MONEY = Pattern.compile("\\b([0-9]{1,9}(?:,[0-9]{3})*)(?:\\s*원)?\\b");
-
-    // 사업자번호
-    private static final Pattern BIZNO_DASH = Pattern.compile("\\b(\\d{3}-\\d{2}-\\d{5})\\b");
-    private static final Pattern BIZNO_10 = Pattern.compile("\\b(\\d{10})\\b");
-
-    // 수량 (용량단위는 제외)
-    private static final Pattern QTY_UNIT = Pattern.compile("(?i)\\b([0-9]{1,3})\\s*(개|ea|입|팩|봉|병|캔|세트|box|박스)\\b");
-    private static final Pattern QTY_X = Pattern.compile("(?i)\\b(?:x\\s*([0-9]{1,3})|([0-9]{1,3})\\s*x)\\b");
-    private static final Pattern SIZE_UNIT = Pattern.compile("(?i)\\b\\d+(?:\\.\\d+)?\\s*(kg|g|l|ml|oz|lb|cm|mm|m)\\b");
-
-    // 라벨/섹션 제거용(상품명에서 제거)
-    private static final Pattern JUNK_LABELS = Pattern.compile(
-            "(카드영수증|결제정보|구매정보|이용상점정보|판매자상호|판매자\\s*사업자등록번호|판매자주소|"
-          + "카드종류|거래종류|할부개월|카드번호|거래일시|승인번호|주문번호|"
-          + "상품명|과세금액|비과세금액|부가세|합계금액)"
-    );
-
     @Override
     public ReceiptResult parse(Document doc) {
-
-        String rawKeepNl = text(doc)
+        String rawText = text(doc)
                 .replaceAll("[\\t\\x0B\\f\\r]+", " ")
-                .replaceAll("\\u00A0", " ")
+                .replaceAll(" +", " ")
                 .trim();
 
-        String oneLine = rawKeepNl.replace("\n", " ").replaceAll(" +", " ").trim();
+        System.out.println("=== 🧾 RAW TEXT (Coupang) ===");
+        System.out.println(rawText);
+        System.out.println("=================================");
 
-        System.out.println("=== 🧾 RAW TEXT (KEEP NL) ===");
-        System.out.println(rawKeepNl);
-        System.out.println("=============================");
-
-        boolean isApp = isCoupangAppReceipt(oneLine, rawKeepNl);
+        boolean isApp = isCoupangAppReceipt(rawText);
         System.out.println("🧭 인식된 유형: " + (isApp ? "쿠팡앱 결제내역" : "카드영수증"));
 
-        return isApp ? parseAppVersion(oneLine) : parseCardVersion(rawKeepNl);
+        ReceiptResult r = isApp ? parseAppVersion(rawText) : parseCardVersion(rawText);
+
+        // ✅ 로그 출력
+        System.out.println("------ ✅ 최종 파싱 결과 요약 ------");
+        System.out.println("상호: " + safe(r.merchant.name));
+        System.out.println("주문번호: " + safe(r.meta.receiptNo));
+        System.out.println("거래일시: " + safe(r.meta.saleDate) + " " + safe(r.meta.saleTime));
+        System.out.println("결제수단: " + safe(r.payment.type) + " / " + safe(r.payment.cardBrand));
+        System.out.println("카드번호: " + safe(r.payment.cardMasked));
+        System.out.println("승인번호: " + safe(r.approval.approvalNo));
+        System.out.println("합계금액: " + safeInt(r.totals.total));
+        System.out.println("과세금액: " + safeInt(r.totals.taxable) +
+                " / 부가세: " + safeInt(r.totals.vat) +
+                " / 비과세금액: " + safeInt(r.totals.taxFree));
+        System.out.println("품목 수: " + (r.items != null ? r.items.size() : 0));
+        if (r.items != null) {
+            for (Item it : r.items) {
+                System.out.println("  · " + safe(it.name)
+                        + " | 수량:" + safe(it.qty)
+                        + " | 금액:" + safeInt(it.amount));
+            }
+        }
+        System.out.println("---------------------------------");
+        return r;
     }
 
     /* ========================= 1) 쿠팡 앱 결제내역 ========================= */
-
-    private ReceiptResult parseAppVersion(String oneLine) {
+    private ReceiptResult parseAppVersion(String text) {
         ReceiptResult r = new ReceiptResult();
         r.merchant.name = "쿠팡";
 
-        String totalStr = extract(oneLine, "쿠팡\\(쿠페이\\)\\s*[-]?\\s*([0-9,]+)원", 1);
-        if (totalStr == null) totalStr = extract(oneLine, "([0-9,]+)원", 1);
+        String totalStr = extract(text, "쿠팡\\(쿠페이\\)\\s*[-]?([0-9,]+)원");
+        if (totalStr == null) totalStr = extract(text, "(-?[0-9,]+)원");
         r.totals.total = toInt(totalStr);
 
-        r.payment.cardBrand = firstNonNull(extract(oneLine, "(쿠페이)", 1), extract(oneLine, "(쿠팡페이)", 1));
+        r.payment.cardBrand = firstNonNull(extract(text, "(쿠페이)"), extract(text, "(쿠팡페이)"));
         r.payment.type = "간편결제";
+        r.meta.saleDate = extract(text, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})");
+        r.meta.saleTime = extract(text, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)");
+        r.meta.receiptNo = extract(text, "(주문\\s*번호)\\s*[:：]?\\s*([0-9]{8,})", 2);
 
-        r.meta.saleDate = extract(oneLine, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1);
-        r.meta.saleTime = extract(oneLine, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 1);
-        r.meta.receiptNo = extract(oneLine, "(주문번호)\\s*[:：]?\\s*([0-9]{8,})", 2);
+        String memoItem = firstNonNull(
+                extract(text, "거래메모\\s*([가-힣A-Za-z0-9\\s:/,\\.]{2,30})"),
+                extract(text, "([가-힣A-Za-z0-9]+\\s?(절단미역|쌀강정|세제|쿠키|강정|미역))")
+        );
 
         Item it = new Item();
-        it.name = "쿠팡 구매상품";
+        it.name = (memoItem != null ? memoItem : "쿠팡 구매상품").trim();
         it.qty = 1;
         it.amount = r.totals.total;
         it.unitPrice = r.totals.total;
         r.items = List.of(it);
 
-        // 카드 금액 훅(필요 시)
-        applyCardTotals(r);
-
         return r;
     }
 
-    /* ========================= 2) 카드영수증(화면형) ========================= */
-
-    private ReceiptResult parseCardVersion(String rawKeepNl) {
+    /* ========================= 2) 카드영수증 ========================= */
+    private ReceiptResult parseCardVersion(String text) {
         ReceiptResult r = new ReceiptResult();
 
-        List<String> lines = splitLines(rawKeepNl);
+        // ✅ (핵심) 판매자상호 우선 추출 (이용상점정보 영역)
+        String sellerName = extractDot(text,
+                "(?s)판매자상호\\s*([\\s\\S]*?)\\s*(판매자\\s*사업자등록번호|판매자주소|$)", 1);
+        sellerName = cleanField(sellerName);
 
-        // ---- 결제정보: 정규식으로 값 추출(라벨/순서에 영향 없음) ----
-        String joined = String.join("\n", lines);
+        // fallback: 쿠팡류/일반
+        r.merchant.name = firstNonNull(
+                notEmpty(sellerName) ? sellerName : null,
+                extract(text, "(쿠팡\\(주\\)|쿠팡주식회사|쿠팡)"),
+                "쿠팡"
+        );
 
-        r.payment.cardMasked = findFirst(MASKED_CARD, joined);
+        // ✅ 카드사(카드종류) 라벨 기반 우선
+        String cardType = extractDot(text,
+                "(?s)카드종류\\s*([가-힣A-Za-z0-9\\s]*?카드)\\s*(거래종류|할부개월|카드번호|거래일시|승인번호|$)", 1);
+        cardType = cleanField(cardType);
 
-        // 거래일시
-        Matcher dtm = DATE_TIME.matcher(joined);
-        if (dtm.find()) {
-            r.meta.saleDate = dtm.group(1);
-            r.meta.saleTime = dtm.group(2);
+        r.payment.cardBrand = firstNonNull(
+                notEmpty(cardType) ? cardType : null,
+                extract(text, "(IBK비씨카드|IBK\\s*비씨카드|BC카드|비씨카드|BC)"),
+                extract(text, "(농협|하나|국민|신한|롯데|현대|NH|KB)"),
+                extract(text, "(농협카드|하나카드|국민카드|신한카드|롯데카드|현대카드)")
+        );
+        r.payment.cardBrand = normalizeCardBrand(r.payment.cardBrand);
+
+        // 카드번호(마스킹)
+        r.payment.cardMasked = firstNonNull(
+                extract(text, "(\\d{4}\\*+\\d{2,6}\\*?\\d{0,6})"),
+                extract(text, "(\\d{4}\\*{4,}\\d{3,4}\\*?)")
+        );
+
+        // 거래종류 라벨 기반 우선
+        String tradeType = extractDot(text,
+                "(?s)거래종류\\s*([가-힣A-Za-z0-9\\s]{2,20})\\s*(할부개월|카드번호|거래일시|승인번호|$)", 1);
+        tradeType = cleanField(tradeType);
+
+        r.payment.type = firstNonNull(
+                notEmpty(tradeType) ? tradeType : null,
+                extract(text, "(신용거래|현금거래|일시불|할부)"),
+                "신용거래"
+        );
+
+        // 주문번호/승인번호/거래일시
+        r.meta.receiptNo = extract(text, "(주문\\s*번호)\\s*[:：]?\\s*([0-9]{8,})", 2);
+        r.approval.approvalNo = extract(text, "(승인\\s*번호)\\s*[:：]?\\s*([0-9]{6,12})", 2);
+
+        r.meta.saleDate = extract(text, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})");
+        r.meta.saleTime = extract(text, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)");
+
+        // 세부 금액
+        r.totals.taxable  = firstInt(text, "과세금액[^0-9]*([0-9,]+)");
+        r.totals.vat      = firstInt(text, "부가세[^0-9]*([0-9,]+)");
+        r.totals.taxFree  = firstInt(text, "비과세금액[^0-9]*([0-9,]+)");
+
+        if (r.totals.taxable != null && !text.contains("부가세")) {
+            r.totals.taxable = null;
         }
 
-        // 승인번호: 거래일시 뒤쪽에서 첫 6~12자리
-        r.approval.approvalNo = findApprovalAfterDateTime(lines);
-
-        // 카드종류/거래종류/할부개월은 "대표 텍스트"로 추출
-        String cardBrand = pickFirstAmong(lines, List.of("BC카드", "IBK", "국민", "KB", "NH", "농협", "삼성", "신한", "현대", "롯데", "하나"));
-        r.payment.cardBrand = normalizeCardBrand(cardBrand);
-
-        String tradeType = pickFirstAmong(lines, List.of("신용거래", "승인거래", "체크", "현금"));
-        String installment = pickFirstAmong(lines, List.of("일시불", "할부", "개월"));
-        r.payment.type = firstNonNull(tradeType, "신용거래");
-        if (installment != null && !installment.isEmpty() && !installment.equals(r.payment.type)) {
-            String inst = normalizeInstallment(installment, lines);
-            if (inst != null) r.payment.type = r.payment.type + "(" + inst + ")";
+        // ✅ 합계금액(=총 결제액) 라벨 우선
+        Integer totalFromLabel = firstInt(text, "합계금액[^0-9]*([0-9]{1,3}(?:,[0-9]{3})+)");
+        if (totalFromLabel == null) {
+            totalFromLabel = firstInt(text, "(총액|결제금액)[^0-9]*([0-9]{1,3}(?:,[0-9]{3})+)");
         }
 
-        // ---- 구매정보: 승인번호 이후 구간에서 주문번호/상품명/금액 4개 추출 ----
-        PurchaseParsed p = parsePurchaseFromApprovalOnward(lines, r.approval.approvalNo);
-        r.meta.receiptNo = p.orderNo;
-
-        r.totals.taxable = p.taxable;
-        r.totals.taxFree = p.taxFree;
-        r.totals.vat     = p.vat;
-        r.totals.total   = p.total;
-
-        // total fallback
-        if (r.totals.total == null) {
-            if (r.totals.taxable != null && r.totals.vat != null) r.totals.total = r.totals.taxable + r.totals.vat;
-            else if (r.totals.taxFree != null) r.totals.total = r.totals.taxFree;
+        // 기존 쿠페이 우선 로직(있을 때만)
+        Integer grandTotalFromCoupay = null;
+        {
+            Matcher mPay = Pattern.compile("쿠팡\\(쿠페이\\)\\s*-?\\s*([0-9]{1,3}(?:,[0-9]{3})*)")
+                    .matcher(text);
+            if (mPay.find()) grandTotalFromCoupay = toInt(mPay.group(1));
         }
 
-        // 상품명 정리 + 수량
-        ProductName pn = refineProductName(p.productNameRaw);
-        Integer qty = firstPositive(pn.qty, 1);
+        Integer fallbackTotal = totalFromLabel;
+        if (fallbackTotal == null) {
+            if (r.totals.taxFree != null && r.totals.taxFree > 0) {
+                fallbackTotal = r.totals.taxFree;
+            } else if (r.totals.taxable != null && r.totals.vat != null) {
+                fallbackTotal = r.totals.taxable + r.totals.vat;
+            }
+        }
 
-        Item it = new Item();
-        it.name = pn.name;
-        it.qty = qty;
-        it.amount = r.totals.total;
-        it.unitPrice = (r.totals.total != null && qty > 0) ? (r.totals.total / qty) : r.totals.total;
-        r.items = List.of(it);
+        r.totals.total = firstNonNullInt(grandTotalFromCoupay, fallbackTotal);
 
-        // ---- 상점정보: 판매자상호/사업자번호/주소 ----
-        ShopParsed sp = parseShop(lines);
-        r.merchant.name = firstNonNull(sp.sellerName, "카드영수증");
-        // ⚠️ ReceiptResult에 bizNo 필드가 없으면 이 줄은 네 DTO에 맞게 수정
-        trySetMerchantBizNo(r, sp.bizNo);
-
-        // 카드 영수증인데 카드금액 필드가 비는 문제 대응
-        applyCardTotals(r);
+        // ✅ 품목: "상품명 라벨 기반"을 최우선으로
+        r.items = parseCardItemsV2_LabelFirst(text, r.totals.total);
 
         return r;
-    }
-
-    /* ========================= 구매정보 파싱(승인번호 이후) ========================= */
-
-    private static class PurchaseParsed {
-        String orderNo;
-        String productNameRaw;
-        Integer taxable;
-        Integer taxFree;
-        Integer vat;
-        Integer total;
-    }
-
-    private PurchaseParsed parsePurchaseFromApprovalOnward(List<String> lines, String approvalNo) {
-        PurchaseParsed p = new PurchaseParsed();
-
-        int start = 0;
-        if (approvalNo != null) {
-            int idx = indexOfExact(lines, approvalNo);
-            if (idx >= 0) start = idx + 1;
-        }
-
-        List<String> tail = lines.subList(Math.min(start, lines.size()), lines.size());
-
-        // 1) 주문번호: tail에서 첫 12~20자리 숫자
-        p.orderNo = findFirst(ORDER_NO, String.join("\n", tail));
-
-        // 2) 금액 4개: tail에서 money 후보만 모아서 "마지막 4개"를 (과세/비과세/부가세/합계)로 본다
-        List<Integer> monies = new ArrayList<>();
-        for (String s : tail) {
-            Integer mv = parseMoneyStrict(s);
-            if (mv != null) monies.add(mv);
-        }
-        if (monies.size() >= 4) {
-            int n = monies.size();
-            p.taxable = monies.get(n - 4);
-            p.taxFree = monies.get(n - 3);
-            p.vat     = monies.get(n - 2);
-            p.total   = monies.get(n - 1);
-        }
-
-        // 3) 상품명 raw: 주문번호 다음 라인부터 "첫 금액" 전까지 텍스트 합치기
-        if (p.orderNo != null) {
-            int orderIdxInTail = indexOfExact(tail, p.orderNo);
-            int firstMoneyLineIdx = firstMoneyLineIndex(tail);
-            if (orderIdxInTail >= 0) {
-                int a = orderIdxInTail + 1;
-                int b = (firstMoneyLineIdx > 0 ? firstMoneyLineIdx : tail.size());
-                if (b > a) {
-                    StringBuilder sb = new StringBuilder();
-                    for (int i = a; i < b; i++) {
-                        String t = tail.get(i).trim();
-                        if (t.isEmpty()) continue;
-                        sb.append(t).append(" ");
-                    }
-                    p.productNameRaw = sb.toString().replaceAll("\\s{2,}", " ").trim();
-                }
-            }
-        }
-
-        // fallback
-        if (p.productNameRaw == null || p.productNameRaw.isEmpty()) {
-            StringBuilder sb = new StringBuilder();
-            for (String s : tail) {
-                String t = s.trim();
-                if (t.isEmpty()) continue;
-                if (ORDER_NO.matcher(t).matches()) continue;
-                if (parseMoneyStrict(t) != null) break;
-                sb.append(t).append(" ");
-            }
-            p.productNameRaw = sb.toString().replaceAll("\\s{2,}", " ").trim();
-        }
-
-        return p;
-    }
-
-    private int firstMoneyLineIndex(List<String> tail) {
-        for (int i = 0; i < tail.size(); i++) {
-            if (parseMoneyStrict(tail.get(i)) != null) return i;
-        }
-        return -1;
     }
 
     /**
-     * 돈으로 인정하는 조건(승인번호/주문번호 같은 숫자 배제)
-     * - 콤마 또는 '원'이 있어야 돈으로 인정
+     * 카드영수증 품목 파싱 (라벨 기반 우선)
+     * - 상품명은 줄바꿈 포함해서 '과세금액/비과세금액/부가세/합계금액' 전까지 먹는다
+     * - 금액은 totalAmount(합계금액) 사용 (스샷 포맷은 1품목 1합계)
      */
-    private Integer parseMoneyStrict(String s) {
-        if (s == null) return null;
-        String x = s.trim();
-        if (x.isEmpty()) return null;
+    private List<Item> parseCardItemsV2_LabelFirst(String text, Integer totalAmount) {
+        // 1) 상품명 라벨 기반(가장 안정적)
+        String product = extractDot(text,
+                "(?s)상품명\\s*([\\s\\S]*?)\\s*(과세금액|비과세금액|부가세|합계금액|이용상점정보|$)", 1);
+        product = cleanProductName(product);
 
-        Matcher m = MONEY.matcher(x);
-        if (!m.find()) return null;
+        if (notEmpty(product)) {
+            Item it = new Item();
+            it.name = product;
 
-        boolean hasWon = x.contains("원");
-        boolean hasComma = x.contains(",");
-        String digits = m.group(1).replaceAll("[^0-9]", "");
+            Integer qty = null;
+            Matcher q1 = Pattern.compile("총\\s*([0-9]+)\\s*건").matcher(product);
+            if (q1.find()) qty = toInt(q1.group(1));
+            if (qty == null) {
+                Matcher q2 = Pattern.compile("([0-9]+)\\s*개(?!\\s*포함)").matcher(product);
+                if (q2.find()) qty = toInt(q2.group(1));
+            }
+            if (qty == null) qty = 1;
 
-        if (!hasWon && !hasComma) return null;
+            it.qty = qty;
+            it.amount = totalAmount;
+            it.unitPrice = (qty != null && qty > 0 && totalAmount != null) ? (totalAmount / qty) : totalAmount;
 
-        // 너무 길면(주문번호급) 배제
-        if (digits.length() >= 7) return null;
-
-        return toInt(m.group(1));
-    }
-
-    /* ========================= 상품명 정리/수량 ========================= */
-
-    private static class ProductName {
-        String name;
-        Integer qty;
-    }
-
-    private ProductName refineProductName(String raw) {
-        ProductName pn = new ProductName();
-
-        String x = (raw == null ? "" : raw).replaceAll("\\s{2,}", " ").trim();
-        x = JUNK_LABELS.matcher(x).replaceAll(" ");
-        x = x.replaceAll("\\s{2,}", " ").trim();
-
-        pn.qty = extractQty(x);
-        x = removeQtyTokens(x);
-
-        // 끝에 붙는 단독 "669" 같은 잡숫자 제거
-        x = x.replaceAll("\\b\\d{1,4}\\b$", "").trim();
-
-        pn.name = x.isEmpty() ? "구매상품" : x;
-        return pn;
-    }
-
-    private Integer extractQty(String text) {
-        if (text == null) return null;
-
-        Matcher m = QTY_UNIT.matcher(text);
-        Integer best = null;
-        while (m.find()) {
-            Integer v = toInt(m.group(1));
-            if (v != null && v > 0) best = (best == null) ? v : Math.max(best, v);
+            return List.of(it);
         }
 
-        if (best == null) {
-            Matcher mx = QTY_X.matcher(text);
-            if (mx.find()) {
-                Integer v = toInt(firstNonNull(mx.group(1), mx.group(2)));
-                if (v != null && v > 0) best = v;
+        // 2) (fallback) 기존 블록 파서
+        return parseCardItemsLegacy(text, totalAmount);
+    }
+
+    /* 기존 parseCardItems를 "레거시"로 남겨두는 fallback */
+    private List<Item> parseCardItemsLegacy(String text, Integer totalAmount) {
+        List<Item> list = new ArrayList<>();
+
+        String[] lines = text.split("\\n|\\r|\\s{3,}");
+        List<String> cleanLines = new ArrayList<>();
+        for (String l : lines) {
+            l = l.replaceAll("[^가-힣A-Za-z0-9,./()\\-원 ]", "").trim();
+            if (!l.isEmpty()) cleanLines.add(l);
+        }
+
+        List<List<String>> blocks = new ArrayList<>();
+        List<String> cur = null;
+
+        for (String l : cleanLines) {
+            if (l.contains("상품명")) {
+                if (cur != null && !cur.isEmpty()) blocks.add(cur);
+                cur = new ArrayList<>();
+            } else if (l.matches(".*(합계금액|과세금액|비과세금액|부가세|총액|결제금액).*")) {
+                if (cur != null && !cur.isEmpty()) {
+                    blocks.add(cur);
+                    cur = null;
+                }
+            } else if (cur != null) {
+                cur.add(l);
             }
         }
+        if (cur != null && !cur.isEmpty()) blocks.add(cur);
 
-        // 용량만 있는 경우는 qty로 보지 않음
-        if (best != null && SIZE_UNIT.matcher(text).matches()) return null;
+        for (List<String> block : blocks) {
+            String joined = String.join(" ", block)
+                    .replaceAll("\\s{2,}", " ")
+                    .replaceAll("(쿠팡\\(쿠페이\\)|저장|확인|구매정보|이용상점정보).*", "")
+                    .trim();
+            if (joined.isEmpty()) continue;
 
-        return best;
-    }
+            String name = joined;
+            name = name.replaceAll(
+                    "(과세금액|비과세금액|합계금액|부가세|총액|결제금액|" +
+                            "거래정보|거래일시|거래내용|이용상점정보|구매정보|" +
+                            "쿠팡\\(쿠페이\\)|저장|확인|검색|카드영수증).*", ""
+            );
+            name = name.replaceAll("주문\\s*번호\\s*[0-9]{6,}", "")
+                    .replaceAll("\\b[0-9]{9,}\\b", "")
+                    .replaceAll("\\s{2,}", " ")
+                    .trim();
+            name = name.replaceAll("[,.:]+$", "").trim();
+            name = name.replaceAll("[^가-힣A-Za-z0-9,()\\-\\s]", "").trim();
 
-    private String removeQtyTokens(String text) {
-        if (text == null) return null;
-        String x = text;
-        x = x.replaceAll("(?i)\\b([0-9]{1,3})\\s*(개|ea|입|팩|봉|병|캔|세트|box|박스)\\b", " ");
-        x = x.replaceAll("(?i)\\b(x\\s*[0-9]{1,3}|[0-9]{1,3}\\s*x)\\b", " ");
-        x = x.replaceAll("\\s{2,}", " ").trim();
-        return x;
-    }
-
-    /* ========================= 상점정보 ========================= */
-
-    private static class ShopParsed {
-        String sellerName;
-        String bizNo;
-        String address;
-    }
-
-    private ShopParsed parseShop(List<String> lines) {
-        ShopParsed sp = new ShopParsed();
-
-        sp.sellerName = valueAfterLabel(lines, "판매자상호");
-
-        sp.bizNo = firstNonNull(
-                normalizeBizNo(valueAfterLabel(lines, "판매자 사업자등록번호")),
-                findBizNo(lines)
-        );
-
-        sp.address = collectAfterLabelUntilNextLabel(lines, "판매자주소",
-                Set.of("판매자 사업자등록번호", "판매자상호", "카드영수증", "결제정보", "구매정보"));
-
-        if (sp.sellerName == null || sp.sellerName.isEmpty()) {
-            sp.sellerName = guessSellerName(lines);
-        }
-
-        return sp;
-    }
-
-    private String guessSellerName(List<String> lines) {
-        int bizLabel = indexOfContains(lines, "판매자 사업자등록번호");
-        if (bizLabel > 0) {
-            for (int i = bizLabel - 1; i >= 0; i--) {
-                String t = lines.get(i).trim();
-                if (t.isEmpty()) continue;
-                if (JUNK_LABELS.matcher(t).find()) continue;
-                if (BIZNO_DASH.matcher(t).find()) continue;
-                if (ORDER_NO.matcher(t).matches()) continue;
-                if (APPROVAL_NO.matcher(t).matches()) continue;
-                if (parseMoneyStrict(t) != null) continue;
-                return t;
+            Integer qty = null;
+            Matcher q1 = Pattern.compile("총\\s*([0-9]+)\\s*건").matcher(joined);
+            if (q1.find()) qty = toInt(q1.group(1));
+            else {
+                Matcher q2 = Pattern.compile("([0-9]+)\\s*개(?!\\s*포함)").matcher(joined);
+                if (q2.find()) qty = toInt(q2.group(1));
             }
+            if (qty == null) qty = 1;
+
+            Item it = new Item();
+            it.name = name;
+            it.qty = qty;
+            it.amount = totalAmount;
+            it.unitPrice = (qty > 0 && totalAmount != null) ? totalAmount / qty : totalAmount;
+            list.add(it);
         }
-        return null;
+
+        if (list.isEmpty()) {
+            Item it = new Item();
+            it.name = "쿠팡 상품";
+            it.qty = 1;
+            it.amount = totalAmount;
+            it.unitPrice = totalAmount;
+            list.add(it);
+        }
+
+        return list;
     }
 
-    private String findBizNo(List<String> lines) {
-        String joined = String.join("\n", lines);
-        Matcher m1 = BIZNO_DASH.matcher(joined);
-        if (m1.find()) return m1.group(1);
-
-        Matcher m2 = BIZNO_10.matcher(joined.replaceAll("[^0-9]", " "));
-        if (m2.find()) {
-            String d = m2.group(1);
-            return d.substring(0, 3) + "-" + d.substring(3, 5) + "-" + d.substring(5);
-        }
-        return null;
-    }
-
-    private String normalizeBizNo(String s) {
-        if (s == null) return null;
-        String x = s.trim();
-        if (x.isEmpty()) return null;
-
-        Matcher m1 = BIZNO_DASH.matcher(x);
-        if (m1.find()) return m1.group(1);
-
-        String digits = x.replaceAll("[^0-9]", "");
-        if (digits.length() == 10) {
-            return digits.substring(0, 3) + "-" + digits.substring(3, 5) + "-" + digits.substring(5);
-        }
-        return null;
-    }
-
-    /* ========================= 카드금액 세팅 훅 ========================= */
-
-    private void applyCardTotals(ReceiptResult r) {
-        if (r == null || r.totals == null) return;
-        if (r.totals.total == null) return;
-
-        // ✅ 여기만 네 DTO에 맞게 바꿔서 "카드금액"에도 합계가 들어가게 해줘
-        try {
-            // 예시:
-            // r.totals.card = r.totals.total;
-            // r.totals.cash = 0;
-            // r.payment.method = "CARD";
-        } catch (Exception ignore) {}
-    }
-
-    /* ========================= 결제정보 보조 ========================= */
-
-    private String findApprovalAfterDateTime(List<String> lines) {
-        int dtIdx = -1;
-        for (int i = 0; i < lines.size(); i++) {
-            if (DATE_TIME.matcher(lines.get(i)).find()) {
-                dtIdx = i;
-                break;
-            }
-        }
-        if (dtIdx >= 0) {
-            for (int j = dtIdx + 1; j < Math.min(lines.size(), dtIdx + 8); j++) {
-                String t = lines.get(j).trim();
-                if (APPROVAL_NO.matcher(t).matches()) return t;
-            }
-        }
-        return findFirst(APPROVAL_NO, String.join("\n", lines));
-    }
-
-    private String normalizeInstallment(String picked, List<String> lines) {
-        if (picked == null) return null;
-        String x = picked.trim();
-        if (x.equals("할부")) {
-            for (String s : lines) {
-                if (s.contains("개월")) return s.trim();
-            }
-            return null;
-        }
-        return x;
+    /* ========================= 유형 감지 ========================= */
+    private boolean isCoupangAppReceipt(String text) {
+        boolean hasCoupay = text.contains("쿠팡(쿠페이)");
+        boolean hasMemo = text.contains("거래메모");
+        boolean hasCardReceipt = text.contains("카드영수증") || text.contains("구매정보");
+        return hasCoupay && hasMemo && !hasCardReceipt;
     }
 
     /* ========================= 공통 유틸 ========================= */
-
-    private boolean isCoupangAppReceipt(String oneLine, String rawKeepNl) {
-        boolean hasCoupay = oneLine.contains("쿠팡(쿠페이)");
-        boolean hasMemo = oneLine.contains("거래메모");
-        boolean hasCardUI = rawKeepNl.contains("카드영수증") || rawKeepNl.contains("결제정보") || rawKeepNl.contains("상품명");
-        return hasCoupay && hasMemo && !hasCardUI;
-    }
-
-    private List<String> splitLines(String rawKeepNl) {
-        String[] arr = rawKeepNl.split("\\R+");
-        List<String> out = new ArrayList<>();
-        for (String s : arr) {
-            String t = s.replaceAll("\\s{2,}", " ").trim();
-            if (!t.isEmpty()) out.add(t);
-        }
-        return out;
-    }
-
-    private int indexOfExact(List<String> lines, String exact) {
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).equals(exact)) return i;
-        }
-        return -1;
-    }
-
-    private int indexOfContains(List<String> lines, String needle) {
-        for (int i = 0; i < lines.size(); i++) {
-            if (lines.get(i).contains(needle)) return i;
-        }
-        return -1;
-    }
-
-    private String valueAfterLabel(List<String> lines, String label) {
-        for (int i = 0; i < lines.size() - 1; i++) {
-            if (lines.get(i).equals(label) || lines.get(i).contains(label)) {
-                String next = lines.get(i + 1).trim();
-                if (next.isEmpty()) return null;
-                if (JUNK_LABELS.matcher(next).find()) return null;
-                return next;
-            }
-        }
-        return null;
-    }
-
-    private String collectAfterLabelUntilNextLabel(List<String> lines, String label, Set<String> stopLabels) {
-        int idx = indexOfContains(lines, label);
-        if (idx < 0) return null;
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = idx + 1; i < lines.size(); i++) {
-            String t = lines.get(i).trim();
-            if (t.isEmpty()) continue;
-
-            boolean stop = false;
-            for (String s : stopLabels) {
-                if (t.contains(s)) { stop = true; break; }
-            }
-            if (stop) break;
-
-            if (JUNK_LABELS.matcher(t).find()) continue;
-            sb.append(t).append(" ");
-        }
-        String out = sb.toString().replaceAll("\\s{2,}", " ").trim();
-        return out.isEmpty() ? null : out;
-    }
-
-    private String findFirst(Pattern p, String text) {
-        if (text == null) return null;
-        Matcher m = p.matcher(text);
-        return m.find() ? m.group(0).trim() : null;
-    }
-
-    private String pickFirstAmong(List<String> lines, List<String> keywords) {
-        for (String line : lines) {
-            for (String k : keywords) {
-                if (line.contains(k)) return line.trim();
-            }
-        }
-        return null;
-    }
-
-    private Integer firstPositive(Integer... arr) {
-        for (Integer v : arr) if (v != null && v > 0) return v;
-        return 1;
-    }
-
-    private String normalizeCardBrand(String s) {
-        if (s == null) return null;
-        String x = s.replaceAll("\\s+", "").trim();
-        if (x.contains("BC")) return "BC카드";
-        if (x.contains("IBK") && x.contains("비씨")) return "IBK비씨카드";
-        if (x.contains("KB") || x.contains("국민")) return "KB국민카드";
-        if (x.contains("NH") || x.contains("농협")) return "NH농협카드";
-        return s.trim();
-    }
-
-    protected Integer toInt(String s) {
-        try {
-            return (s == null) ? null : Integer.parseInt(s.replaceAll("[^0-9-]", ""));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
+    protected String extract(String text, String regex) { return extract(text, regex, 1); }
     protected String extract(String text, String regex, int group) {
         try {
             Matcher m = Pattern.compile(regex).matcher(text);
-            if (!m.find()) return null;
-            int g = Math.min(group, m.groupCount());
-            String v = (g <= 0) ? m.group(0) : m.group(g);
-            return v == null ? null : v.trim();
-        } catch (Exception e) {
-            return null;
-        }
+            return m.find() ? m.group(Math.min(group, m.groupCount())).trim() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    // ✅ DOTALL 인라인 regex를 더 자주 쓰기 위해 별도 함수
+    protected String extractDot(String text, String regex, int group) {
+        try {
+            Matcher m = Pattern.compile(regex).matcher(text);
+            return m.find() ? m.group(Math.min(group, m.groupCount())).trim() : null;
+        } catch (Exception e) { return null; }
+    }
+
+    private String safe(Object o) { return (o == null ? "" : String.valueOf(o)); }
+    private String safeInt(Integer n) { return (n == null ? "null" : n.toString()); }
+
+    protected Integer toInt(String s) {
+        try { return (s == null) ? null : Integer.parseInt(s.replaceAll("[^0-9-]", "")); }
+        catch (Exception e) { return null; }
+    }
+
+    protected Integer firstInt(String text, String regex) {
+        try {
+            Matcher m = Pattern.compile(regex).matcher(text);
+            if (m.find()) return toInt(m.group(m.groupCount()));
+        } catch (Exception ignore) {}
+        return null;
     }
 
     protected String firstNonNull(String... arr) {
@@ -575,11 +337,46 @@ public class CoupangReceiptParser extends BaseReceiptParser {
         return null;
     }
 
-    private void trySetMerchantBizNo(ReceiptResult r, String bizNo) {
-        if (bizNo == null || bizNo.isEmpty()) return;
-        try {
-            // 예: r.merchant.bizNo = bizNo;
-            // 네 ReceiptResult에 해당 필드가 있으면 위처럼 직대입으로 바꿔.
-        } catch (Exception ignore) {}
+    private Integer firstNonNullInt(Integer... nums) {
+        for (Integer n : nums) {
+            if (n != null && n > 0) return n;
+        }
+        return null;
+    }
+
+    private boolean notEmpty(String s) {
+        return s != null && !s.trim().isEmpty();
+    }
+
+    private String cleanField(String s) {
+        if (s == null) return null;
+        return s.replaceAll("[\\u00A0]+", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String cleanProductName(String s) {
+        if (s == null) return null;
+        s = s.replaceAll("[\\u00A0]+", " ");
+        s = s.replaceAll("\\s+", " ").trim();
+
+        // 흔한 꼬리 제거
+        s = s.replaceAll("(과세금액|비과세금액|부가세|합계금액).*", "").trim();
+        s = s.replaceAll("(주문\\s*번호\\s*[:：]?\\s*[0-9]{8,}).*", "").trim();
+
+        // 끝 특수문자 정리
+        s = s.replaceAll("[,.:/\\-]+$", "").trim();
+        return s;
+    }
+
+    private String normalizeCardBrand(String s) {
+        if (s == null) return null;
+        s = s.replaceAll("\\s+", "");
+        // 표시 통일(원하면 더 추가)
+        if (s.equalsIgnoreCase("BC")) return "BC카드";
+        if (s.contains("비씨") && !s.endsWith("카드")) return s + "카드";
+        if (s.equals("BC카드")) return "BC카드";
+        if (s.equals("IBK비씨카드") || s.equals("IBK비씨카드카드")) return "IBK비씨카드";
+        return s;
     }
 }

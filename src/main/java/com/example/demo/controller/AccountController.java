@@ -182,11 +182,29 @@ public class AccountController {
     	int iResult = 0;
     	
     	List<Map<String, Object>> normalRecords = payload.get("normalRecords");
-        List<Map<String, Object>> type5Records = payload.get("type5Records");
+        List<Map<String, Object>> disRecords = payload.get("disRecords");
+        List<Map<String, Object>> recRecords = payload.get("recRecords");
         
-        for (Map<String, Object> row : normalRecords) {	
-        	iResult += accountService.AccountMemberRecordSave(row);
-        	iResult += accountService.processProfitLossV2(row);
+        boolean bType = true;
+        
+        // normalRecords, recRecords 를 조건에 따라 담을 List
+        List<Map<String, Object>> objRecords = new ArrayList<Map<String, Object>>();
+        if (!normalRecords.isEmpty()) {
+        	bType = true;
+        	objRecords = normalRecords;
+        } else if (!recRecords.isEmpty()) {
+        	bType = false;
+        	objRecords = recRecords;
+        }
+        
+        for (Map<String, Object> row : objRecords) {
+        	if (bType) {
+        		iResult += accountService.AccountMemberRecordSave(row);
+            	iResult += accountService.processProfitLossV2(row);
+        	} else {
+        		iResult += accountService.AccountMemberRecRecordSave(row);
+            	iResult += accountService.processProfitLossV2(row);
+        	}
         	
         	if (row.get("type") != null) {
         		
@@ -194,6 +212,7 @@ public class AccountController {
         		Map<String, Object> overMap = new HashMap<String, Object>();
         		
         		int iType = (int) row.get("type");
+        		int iPositionType = Integer.parseInt(row.get("position_type").toString());
         		
         		// 1. 연, 월, 일로 LocalDate 객체 생성
                 LocalDate date = LocalDate.of((int)row.get("record_year"), (int)row.get("record_month"), (int)row.get("record_date"));
@@ -209,7 +228,7 @@ public class AccountController {
                 
                 // 초과근무 시간 사용이 있는 지 체크.
                 if (iType == 1) {
-                	if (position.equals("영양사")) {
+                	if (position.equals("영양사") || iPositionType == 1) {
                 		// 시각 파싱
                 		DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
                 		
@@ -246,7 +265,7 @@ public class AccountController {
                 
                 // 초과
                 if (iType == 3) {
-                	if (position.equals("영양사")) {
+                	if (position.equals("영양사") || iPositionType == 1) {
                 		
                         // 초과근무시간 추출.
                 		double dOver = Double.parseDouble(row.get("note").toString());
@@ -330,7 +349,7 @@ public class AccountController {
         		}
         	}
         }
-        for (Map<String, Object> row : type5Records) {	
+        for (Map<String, Object> row : disRecords) {	
         	iResult += accountService.AccountDispatchRecordSave(row);
         	iResult += accountService.processProfitLossV2(row);
         }
@@ -1148,6 +1167,29 @@ public class AccountController {
     	if (itemList != null) {
     		for (Map<String, Object> itemMap : itemList) {
         		iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
+        		
+        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
+        		String paymentDate = String.valueOf(itemMap.get("payment_dt")); // "2026-01-01"
+
+        		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
+        		int year = payDate.getYear();        // 2026
+        		int month = payDate.getMonthValue(); // 1~12
+        		
+        		itemMap.put("year", year);
+        		itemMap.put("month", month);
+        		
+        		String strItem = itemMap.get("itemType").toString();
+        		int itemType = Integer.parseInt(strItem);
+        		// 상품구분 3:알수없음 은 우선 소모품 type:1002 로 저장
+                if (itemType == 3) {
+                	itemMap.put("type", 1002);
+                } else if (itemType == 1) {	// 식재료면 type:1003
+                	itemMap.put("type", 1003);
+                } else {									// 소모품은 type:1002
+                	itemMap.put("type", 1002);
+                }
+        		// 집계표도 다시 적용.
+        		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
             }
     	}
     	
