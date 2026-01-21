@@ -1,112 +1,226 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
-        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace="com.example.demo.mapper.UserMapper">
 
-	<select id="Login" parameterType="map" resultType="map">
-		call tb_user_login(#{userId}, #{password})
-	</select>
+    <select id="Login" parameterType="map" resultType="map">
+        CALL tb_user_login(#{userId}, #{password})
+    </select>
 
-	<insert id="UserRgt" parameterType="map">
-        INSERT INTO tb_user
-        (user_id, user_name, password, user_type, reg_dt, join_dt, account_id, position, department)
-        VALUES
-        (#{user_id}, #{user_name}, #{password}, #{user_type}, DATE_FORMAT(NOW(), '%Y-%m-%d'), DATE_FORMAT(#{join_dt}, '%Y-%m-%d'), #{account_id}, #{position}, #{department})
-    	ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	        user_id=#{user_id},
-	        user_name=#{user_name},
-	        password=#{password},
-	        user_type=#{user_type},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        join_dt=DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
-	        account_id=#{account_id},
-	        position=#{position},
-	        department=#{department}
-	    </trim>
+    <select id="SelectApprovalPendingUsers" parameterType="map" resultType="map">
+        <![CDATA[
+            SELECT
+                u.user_id,
+                u.user_name,
+                u.user_type,
+                u.department,
+                u.account_id,
+                u.position,
+                u.use_yn,
+
+                -- 구분 라벨
+                CASE
+                    WHEN u.user_type = 1 THEN 'ceo'
+                    WHEN u.user_type = 2 THEN '본사'
+                    WHEN u.user_type = 3 THEN '현장'
+                    ELSE CAST(u.user_type AS CHAR)
+                END AS user_type_name,
+
+                -- 부서/고객사 라벨
+                CASE
+                    WHEN u.account_id IS NOT NULL AND u.account_id <> '' THEN a.account_name
+                    ELSE CASE
+                        WHEN u.department = 0 THEN '대표'
+                        WHEN u.department = 1 THEN '신사업팀'
+                        WHEN u.department = 2 THEN '회계팀'
+                        WHEN u.department = 3 THEN '인사팀'
+                        WHEN u.department = 4 THEN '영업팀'
+                        WHEN u.department = 5 THEN '운영팀'
+                        WHEN u.department = 6 THEN '개발팀'
+                        ELSE CAST(u.department AS CHAR)
+                    END
+                END AS dept_or_account_name,
+
+                -- 직책 라벨
+                CASE
+                    WHEN u.position = 0 THEN '대표'
+                    WHEN u.position = 1 THEN '팀장'
+                    WHEN u.position = 2 THEN '파트장'
+                    WHEN u.position BETWEEN 3 AND 7 THEN '매니저'
+                    WHEN u.position = 8 THEN '영양사'
+                    ELSE CAST(u.position AS CHAR)
+                END AS position_name
+            FROM tb_user u
+            LEFT JOIN tb_account a
+                ON u.account_id = a.account_id
+            WHERE u.del_yn = 'N'
+                AND u.use_yn = 'N'
+            ORDER BY u.reg_dt DESC
+        ]]>
+    </select>
+
+    <update id="UpdateUserUseYn" parameterType="map">
+        UPDATE tb_user
+        SET use_yn = #{use_yn}
+        WHERE user_id = #{user_id}
+    </update>
+
+    <insert id="UserRgt" parameterType="map">
+        INSERT INTO tb_user (
+            user_id,
+            user_name,
+            password,
+            user_type,
+            reg_dt,
+            join_dt,
+            account_id,
+            position,
+            department
+        )
+        VALUES (
+            #{user_id},
+            #{user_name},
+            #{password},
+            #{user_type},
+            DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
+            #{account_id},
+            #{position},
+            #{department}
+        )
+        ON DUPLICATE KEY UPDATE
+        <trim suffixOverrides=",">
+            user_id = #{user_id},
+            user_name = #{user_name},
+            password = #{password},
+            user_type = #{user_type},
+            reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            join_dt = DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
+            account_id = #{account_id},
+            position = #{position},
+            department = #{department}
+        </trim>
     </insert>
-    
+
     <insert id="UserRgtDetail" parameterType="map">
-        INSERT INTO tb_userdetail
-        (user_id, address, address_detail, zipcode, birth_date, phone)
-        VALUES
-        (#{user_id}, #{address}, #{address_detail}, #{zipcode}, DATE_FORMAT(#{birth_date}, '%Y-%m-%d'), #{phone})
-    	ON DUPLICATE KEY UPDATE
-    	<trim suffixOverrides=",">
-	        user_id=#{user_id},
-	        address=#{address},
-	        address_detail=#{address_detail},
-	        zipcode=#{zipcode},
-	        birth_date=DATE_FORMAT(#{birth_date}, '%Y-%m-%d'),
-	       	phone=#{phone}
-	    </trim>
+        INSERT INTO tb_userdetail (
+            user_id,
+            address,
+            address_detail,
+            zipcode,
+            birth_date,
+            phone
+        )
+        VALUES (
+            #{user_id},
+            #{address},
+            #{address_detail},
+            #{zipcode},
+            DATE_FORMAT(#{birth_date}, '%Y-%m-%d'),
+            #{phone}
+        )
+        ON DUPLICATE KEY UPDATE
+        <trim suffixOverrides=",">
+            user_id = #{user_id},
+            address = #{address},
+            address_detail = #{address_detail},
+            zipcode = #{zipcode},
+            birth_date = DATE_FORMAT(#{birth_date}, '%Y-%m-%d'),
+            phone = #{phone}
+        </trim>
     </insert>
-    
+
     <select id="SelectUserInfo" parameterType="map" resultType="hashmap">
-    	SELECT T.user_id, T.user_name, T.password, T.user_type, 
-    		   DATE_FORMAT(T.reg_dt, '%Y-%m-%d') AS reg_dt, 
-    		   DATE_FORMAT(T.join_dt, '%Y-%m-%d') AS join_dt, 
-    		   DATE_FORMAT(T.del_dt, '%Y-%m-%d') AS del_dt, 
-    		   T.del_yn, T.account_id, T.position, T.department, 
-    		   T2.address, T2.address_detail, T2.zipcode, T2.phone, 
-    		   DATE_FORMAT(T2.birth_date, '%Y-%m-%d') AS birth_date,
-    		   T.user_name
-			FROM tb_user T
-			JOIN tb_userdetail T2
-			ON T.user_id = T2.user_id
-			WHERE T.user_id = #{user_id}
-			AND T.del_yn = 'N'
+        SELECT
+            T.user_id,
+            T.user_name,
+            T.password,
+            T.user_type,
+            DATE_FORMAT(T.reg_dt, '%Y-%m-%d') AS reg_dt,
+            DATE_FORMAT(T.join_dt, '%Y-%m-%d') AS join_dt,
+            DATE_FORMAT(T.del_dt, '%Y-%m-%d') AS del_dt,
+            T.del_yn,
+            T.account_id,
+            T.position,
+            T.department,
+            T2.address,
+            T2.address_detail,
+            T2.zipcode,
+            T2.phone,
+            DATE_FORMAT(T2.birth_date, '%Y-%m-%d') AS birth_date,
+            T.user_name
+        FROM tb_user T
+        JOIN tb_userdetail T2
+            ON T.user_id = T2.user_id
+        WHERE T.user_id = #{user_id}
+            AND T.del_yn = 'N'
     </select>
-    
+
     <select id="UserRecordSheetList" parameterType="map" resultType="hashmap">
-    	SELECT T.user_id, T.user_name, T2.year, T2.month, T2.record_date, T2.start_time, T2.end_time, ifnull(T2.leave_use,"") as leave_use, ifnull(T2.leave_type,"") as leave_type
-			FROM tb_user T
-			JOIN tb_user_record T2
-			ON T.user_id = T2.user_id
-			JOIN tb_user_attendance_management T3
-			ON T.user_id = T3.user_id
-			WHERE T.department = 1
-			AND T.del_yn = 'N'
-			ORDER BY T.user_id, record_date
+        SELECT
+            T.user_id,
+            T.user_name,
+            T2.year,
+            T2.month,
+            T2.record_date,
+            T2.start_time,
+            T2.end_time,
+            IFNULL(T2.leave_use, "") AS leave_use,
+            IFNULL(T2.leave_type, "") AS leave_type
+        FROM tb_user T
+        JOIN tb_user_record T2
+            ON T.user_id = T2.user_id
+        JOIN tb_user_attendance_management T3
+            ON T.user_id = T3.user_id
+        WHERE T.department = 1
+            AND T.del_yn = 'N'
+        ORDER BY T.user_id, record_date
     </select>
-    
+
     <select id="UserMemberList" parameterType="map" resultType="hashmap">
-    	SELECT T.user_id, 
-    		   T.user_name,
-    		   DATE_FORMAT(T.join_dt, '%Y-%m-%d') as join_dt,
-    		   T.position, 
-    		   T2.total_leave, 
-    		   T2.leave_remain, 
-    		   T2.leave_use
-			FROM tb_user T
-			JOIN tb_user_attendance_management T2
-			ON T.user_id = T2.user_id
-			WHERE T.del_yn = 'N'
-			ORDER BY position
+        SELECT
+            T.user_id,
+            T.user_name,
+            DATE_FORMAT(T.join_dt, '%Y-%m-%d') AS join_dt,
+            T.position,
+            T2.total_leave,
+            T2.leave_remain,
+            T2.leave_use
+        FROM tb_user T
+        JOIN tb_user_attendance_management T2
+            ON T.user_id = T2.user_id
+        WHERE T.del_yn = 'N'
+        ORDER BY position
     </select>
-    
+
     <select id="ContractEndAccountList" resultType="hashmap">
-    	SELECT a.account_id, 
-    		   a.account_name, 
-    		   account_address, 
-    		   DATE_FORMAT(ai.contract_start, '%Y-%m-%d') as contract_start, 
-    		   DATE_FORMAT(ai.contract_end, '%Y-%m-%d') as contract_end,
-    		   CASE WHEN a.account_type = 1 THEN '요양원'
-    		   		WHEN a.account_type = 2 THEN '도소매'
-    		   		WHEN a.account_type = 3 THEN '프랜차이즈'
-    		   		WHEN a.account_type = 4 THEN '산업체'
-    		   		ELSE '학교' END AS account_type,
-    		   CASE WHEN ai.manager_name = '' || ai.manager_name is null  THEN ai.manager_name2
-    		   		WHEN ai.manager_name2 = '' || ai.manager_name2 is null THEN ai.closing_name
-    		   		ELSE '' END AS manager_name
-		FROM tb_account_info ai
-		JOIN tb_account a
-		ON a.account_id = ai.account_id
-		<![CDATA[ 
-		WHERE ai.contract_end > NOW()
-		AND ai.contract_end < DATE_ADD(NOW(), INTERVAL 3 MONTH)
-		]]>
-		AND a.del_yn = 'N'
+        SELECT
+            a.account_id,
+            a.account_name,
+            account_address,
+            DATE_FORMAT(ai.contract_start, '%Y-%m-%d') AS contract_start,
+            DATE_FORMAT(ai.contract_end, '%Y-%m-%d') AS contract_end,
+            CASE
+                WHEN a.account_type = 1 THEN '요양원'
+                WHEN a.account_type = 2 THEN '도소매'
+                WHEN a.account_type = 3 THEN '프랜차이즈'
+                WHEN a.account_type = 4 THEN '산업체'
+                ELSE '학교'
+            END AS account_type,
+            CASE
+                WHEN ai.manager_name = '' OR ai.manager_name IS NULL THEN ai.manager_name2
+                WHEN ai.manager_name2 = '' OR ai.manager_name2 IS NULL THEN ai.closing_name
+                ELSE ''
+            END AS manager_name
+        FROM tb_account_info ai
+        JOIN tb_account a
+            ON a.account_id = ai.account_id
+        <![CDATA[
+            WHERE ai.contract_end > NOW()
+                AND ai.contract_end < DATE_ADD(NOW(), INTERVAL 3 MONTH)
+        ]]>
+            AND a.del_yn = 'N'
     </select>
+
 </mapper>

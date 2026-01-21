@@ -13,6 +13,7 @@ build/
 .settings
 .springBeans
 .sts4-cache
+.metadata
 logs/*
 bin/
 !**/src/main/**/bin/
@@ -42,3 +43,9 @@ src/main/resources/application-secret-real.properties
 src/main/resources/application.properties_real
 src/main/resources/keys/
 src/main/resources/static/image/**
+src/main/resources/mybatis-mapper/TempMapper.xml
+src/main/resources/application-secret-local.properties
+src/main/resources/application-secret-dev.properties
+src/main/java/com/example/demo/service/TempService.java
+src/main/java/com/example/demo/mapper/TempMapper.java
+src/main/java/com/example/demo/controller/TempController.java
