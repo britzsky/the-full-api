@@ -1453,6 +1453,16 @@
 		ON abm.account_id = a.account_id
 		AND abm.year = #{year}
 		AND abm.month = #{month}
+		AND a.account_id not in 
+ 		(
+ 			20260122065002,
+			20260122071337,
+			20260122071857,
+			20260122072114,
+			20260122072245,
+			20260122072529,
+			20260122072732
+ 		)
 	</select>
 	
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">

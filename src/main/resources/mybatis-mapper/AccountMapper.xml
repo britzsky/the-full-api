@@ -627,26 +627,29 @@
 		JOIN (
 		    -- 이 부분에서 position_type별 카운트를 한 행으로 합칩니다 (Pivot)
 		    SELECT
-		        T2.account_id,
+		        T.account_id,
 		        SUM(CASE WHEN T2.position_type = 2 THEN 1 ELSE 0 END) AS total_cnt1,
 		        SUM(CASE WHEN T2.position_type = 3 THEN 1 ELSE 0 END) AS total_cnt2,
 		        SUM(CASE WHEN T2.position_type = 4 THEN 1 ELSE 0 END) AS total_cnt3,
 		        SUM(CASE WHEN T2.position_type = 5 THEN 1 ELSE 0 END) AS total_cnt4
-		    FROM tb_account_members T2
-		    WHERE T2.account_id = #{account_id} 
+		    FROM tb_account T
+			LEFT JOIN tb_account_members T2
+            ON T2.account_id = T.account_id
+		    AND T.account_id = #{account_id}
 		    AND T2.del_yn = 'N'
-		    GROUP BY T2.account_id
+		    GROUP BY T.account_id
 		) AS subquery2 ON subquery.account_id = subquery2.account_id
 		JOIN (
-		    SELECT
-		        T2.account_id, T2.idx, T3.work_system, count(1) as work_cnt
-		    FROM tb_account_members T2
-		    LEFT JOIN tb_account_member_work_system T3
-		    ON T3.idx = T2.idx
-		    WHERE T2.account_id = #{account_id} 
-		    AND T2.del_yn = 'N'
-		    GROUP BY T2.account_id, T2.idx, T3.work_system
-		) AS subquery3 ON subquery.account_id = subquery3.account_id
+		    SELECT T.account_id, T2.idx, T3.work_system, count(1) as work_cnt
+            FROM tb_account T
+            LEFT JOIN tb_account_members T2
+            ON T2.account_id = T.account_id
+            LEFT JOIN tb_account_member_work_system T3
+            ON T3.idx = T2.idx
+            AND T.account_id = #{account_id}
+		    GROUP BY T.account_id, T2.idx, T3.work_system
+		) AS subquery3 
+        ON subquery.account_id = subquery3.account_id
 		GROUP BY subquery.account_id, subquery.setting_item, subquery.cuisine, subquery.cuisine_note, 
 		         subquery.name, subquery.budget_note, subquery2.total_cnt1, subquery2.total_cnt2, 
 		         subquery2.total_cnt3, subquery2.total_cnt4;
