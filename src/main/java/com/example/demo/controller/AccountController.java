@@ -497,6 +497,8 @@ public class AccountController {
 
         if (formData != null) {
             payloadMap.putAll(formData);
+            // 거래처 기본정보 저장
+            iResult += accountService.AccountSave(formData);
         }
 
         List<Map<String, Object>> priceData   = (List<Map<String, Object>>) payload.get("priceData");
@@ -561,7 +563,7 @@ public class AccountController {
                 } 
             }
         }
-
+        
         iResult += accountService.AccountInfoSave(payloadMap);
 
         if (iResult > 0) {
@@ -588,7 +590,7 @@ public class AccountController {
     }
     
     @PostMapping("Account/AccountBusinessImgUpload")
-    public void uploadFiles(
+    public String uploadFiles(
             @RequestParam("account_id") String accountId,
             @RequestParam(value = "business_report", required = false) MultipartFile businessReport,
             @RequestParam(value = "business_regist", required = false) MultipartFile businessRegist,
@@ -596,7 +598,7 @@ public class AccountController {
             @RequestParam(value = "nutritionist_room_img", required = false) MultipartFile nutritionistRoomImg,
             @RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg
     ) throws IOException {
-        Map<String, String> filePathMap = new HashMap<>();
+        Map<String, Object> filePathMap = new HashMap<>();
 
         if (businessReport != null && !businessReport.isEmpty()) {
             String path = saveFile(accountId, "business_report", businessReport);
@@ -622,13 +624,12 @@ public class AccountController {
             String path = saveFile(accountId, "chef_lounge_img", chefLoungeImg);
             filePathMap.put("chef_lounge_img", path);
         }
+        
+        filePathMap.put("account_id", accountId);
 
-        // Map을 MyBatis로 저장
-        Map<String, Object> paramMap = new HashMap<>();
-        paramMap.put("account_id", accountId);
-        paramMap.putAll(filePathMap);
-
-        accountService.insertOrUpdateFile(paramMap);
+        accountService.insertOrUpdateFile(filePathMap);
+    	
+    	return filePathMap.toString();
     }
 
     private String saveFile(String accountId, String type, MultipartFile file) throws IOException {

@@ -117,11 +117,13 @@ public class CardReceiptController {
             corporateCard.put("cardBrand", cardBrand);
             corporateCard.put("sale_id", saleId);
             corporateCard.put("use_name", result.merchant != null ? result.merchant.name : null);
+            corporateCard.put("bizNo", result.merchant != null ? result.merchant.bizNo : null);
             corporateCard.put("payment_dt", date);
             corporateCard.put("total", result.totals != null ? result.totals.total : null);
             corporateCard.put("discount", result.totals != null ? result.totals.discount : null);
             corporateCard.put("vat", result.totals != null ? result.totals.vat : null);
             corporateCard.put("taxFree", result.totals != null ? result.totals.taxFree : null);
+            corporateCard.put("tax", result.totals != null ? result.totals.taxable : null);
             corporateCard.put("receipt_image", resultPath);
 
             // detailList

@@ -208,10 +208,9 @@
 	<select id="CookWearNewList" parameterType="map" resultType="map">
 		SELECT acwnh.type,
 			   acwi.type_name,
-			  acwnh.account_id,
+			  acwnh.note,
 			  DATE_FORMAT(acwnh.new_dt, '%Y-%m-%d') as new_dt,
-		      ifnull(acwnh.new_qty, 0) as new_qty,
-		      note
+		      ifnull(acwnh.new_qty, 0) as new_qty
 		FROM tb_account_cook_wear_new_history acwnh
 		JOIN tb_account_cook_wear_inventory acwi
 		ON acwi.type = acwnh.type
@@ -249,12 +248,12 @@
 	</insert>
 	
 	<insert id="CookWearNewSave" parameterType="map">
-		INSERT INTO tb_account_cook_wear_new_history(type,account_id,new_dt,new_qty)
+		INSERT INTO tb_account_cook_wear_new_history(type,note,new_dt,new_qty)
 		VALUES
-		(#{type},#{account_id},DATE_FORMAT(#{new_dt}, '%Y-%m-%d'),#{new_qty})
+		(#{type},#{note},DATE_FORMAT(#{new_dt}, '%Y-%m-%d'),#{new_qty})
 		ON DUPLICATE KEY UPDATE
 		type = VALUES(type),
-		account_id = VALUES(account_id),
+		note = VALUES(note),
 		new_dt = VALUES(new_dt),
 		new_qty = VALUES(new_qty)
 	</insert>

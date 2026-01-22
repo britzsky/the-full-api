@@ -24,6 +24,16 @@
  		<if test='accountType != 0'>
 			AND account_type = #{accountType}
  		</if>
+ 		AND account_id not in 
+ 		(
+ 			20260122065002,
+			20260122071337,
+			20260122071857,
+			20260122072114,
+			20260122072245,
+			20260122072529,
+			20260122072732
+ 		)
 	</select>
 	
 	<select id="AccountDirectList" resultType="hashmap">
@@ -172,40 +182,40 @@
 	</insert>
 	
 	<insert id="AccountSave" parameterType="map">
-		INSERT INTO tb_account (
-		    account_id, 
-		    account_name, 
-		    account_address, 
-		    account_address_detail, 
-		    account_rqd_member, 
-		    account_headcount, 
-		    phone, 
-		    account_type, 
-		    reg_dt, 
-		    meal_type
-		)
-		VALUES (
-		    COALESCE(#{account_id}, DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')), 
-		    #{account_name}, 
-		    #{account_address}, 
-		    #{account_address_detail}, 
-		    #{account_rqd_member}, 
-		    #{account_headcount}, 
-		    #{phone}, 
-		    #{account_type}, 
-		    DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'), 
-		    #{meal_type}
-		)
-		ON DUPLICATE KEY UPDATE
-		    account_type           = COALESCE(#{account_type}, account_type),
-		    meal_type              = COALESCE(#{meal_type}, meal_type),
-		    reg_dt       		   = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),
-		    account_name           = COALESCE(#{account_name}, account_name),
-		    account_address        = COALESCE(#{account_address}, account_address),
-		    account_address_detail = COALESCE(#{account_address_detail}, account_address_detail),
-		    account_rqd_member     = COALESCE(#{account_rqd_member}, account_rqd_member),
-		    account_headcount      = COALESCE(#{account_headcount}, account_headcount),
-		    phone                  = COALESCE(#{phone}, phone)
+	    INSERT INTO tb_account (
+	        account_id,
+	        <if test="account_name != null and account_name != ''">account_name,</if>
+	        <if test="account_address != null and account_address != ''">account_address,</if>
+	        <if test="account_address_detail != null and account_address_detail != ''">account_address_detail,</if>
+	        <if test="account_rqd_member != null">account_rqd_member,</if>
+	        <if test="account_headcount != null">account_headcount,</if>
+	        <if test="phone != null and phone != ''">phone,</if>
+	        <if test="account_type != null and account_type != ''">account_type,</if>
+	        <if test="meal_type != null and meal_type != ''">meal_type,</if>
+	        reg_dt
+	    )
+	    VALUES (
+	        COALESCE(#{account_id}, DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')),
+	        <if test="account_name != null and account_name != ''">#{account_name},</if>
+	        <if test="account_address != null and account_address != ''">#{account_address},</if>
+	        <if test="account_address_detail != null and account_address_detail != ''">#{account_address_detail},</if>
+	        <if test="account_rqd_member != null">#{account_rqd_member},</if>
+	        <if test="account_headcount != null">#{account_headcount},</if>
+	        <if test="phone != null and phone != ''">#{phone},</if>
+	        <if test="account_type != null and account_type != ''">#{account_type},</if>
+	        <if test="meal_type != null and meal_type != ''">#{meal_type},</if>
+	        DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+	    )
+	    ON DUPLICATE KEY UPDATE
+	        reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+	        <if test="account_name != null and account_name != ''">, account_name = #{account_name}</if>
+	        <if test="account_address != null and account_address != ''">, account_address = #{account_address}</if>
+	        <if test="account_address_detail != null and account_address_detail != ''">, account_address_detail = #{account_address_detail}</if>
+	        <if test="account_rqd_member != null">, account_rqd_member = #{account_rqd_member}</if>
+	        <if test="account_headcount != null">, account_headcount = #{account_headcount}</if>
+	        <if test="phone != null and phone != ''">, phone = #{phone}</if>
+	        <if test="account_type != null and account_type != ''">, account_type = #{account_type}</if>
+	        <if test="meal_type != null and meal_type != ''">, meal_type = #{meal_type}</if>
 	</insert>
 	
 	<select id="AccountRecordSheetList" parameterType="map" resultType="hashmap">
@@ -600,10 +610,12 @@
 		            IF(subquery2.total_cnt4 > 0, CONCAT('조리원 : ', subquery2.total_cnt4, '명'), '')
 		          ) AS CHAR(255) CHARACTER SET utf8mb4
 		        ) AS members,
-		        REPLACE(GROUP_CONCAT(DISTINCT subquery3.work_system, " : ", subquery3.work_cnt, "명 \n"), ',', '') as work_system
+		        REPLACE(GROUP_CONCAT(DISTINCT subquery3.work_system, " : ", subquery3.work_cnt, "명 \n"), ',', '') as work_system,
+		        subquery.breakfast_time, subquery.lunch_time, subquery.dinner_time, subquery.snack_time
 		FROM (
 		    SELECT
-		        T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note
+		        T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note,
+		        T1.breakfast_time, T1.lunch_time, T1.dinner_time, T1.snack_time
 		    FROM tb_account T
 		    LEFT JOIN tb_account_info AS T1 ON T1.account_id = T.account_id
 		    LEFT JOIN tb_account_members AS T2 ON T2.account_id = T1.account_id 
@@ -629,7 +641,7 @@
 		    SELECT
 		        T2.account_id, T2.idx, T3.work_system, count(1) as work_cnt
 		    FROM tb_account_members T2
-		    JOIN tb_account_member_work_system T3
+		    LEFT JOIN tb_account_member_work_system T3
 		    ON T3.idx = T2.idx
 		    WHERE T2.account_id = #{account_id} 
 		    AND T2.del_yn = 'N'
@@ -736,7 +748,11 @@
 	        nutritionist_room_yn,
 	        chef_lounge_yn,
 	        nutritionist_room_img,
-	        chef_lounge_img
+	        chef_lounge_img,
+	        breakfast_time,
+	        lunch_time,
+	        dinner_time,
+	        snack_time
 	    </trim>
 	    
 	    VALUES
@@ -808,7 +824,11 @@
 	        #{nutritionist_room_yn},
 	        #{chef_lounge_yn},
 	        #{nutritionist_room_img},
-	        #{chef_lounge_img}
+	        #{chef_lounge_img},
+	        #{breakfast_time},
+	        #{lunch_time},
+	        #{dinner_time},
+	        #{snack_time}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -878,7 +898,11 @@
 	        nutritionist_room_yn=#{nutritionist_room_yn},
 	        chef_lounge_yn=#{chef_lounge_yn},
 	        nutritionist_room_img=#{nutritionist_room_img},
-	        chef_lounge_img=#{chef_lounge_img}
+	        chef_lounge_img=#{chef_lounge_img},
+	        breakfast_time=#{breakfast_time},
+	        lunch_time=#{lunch_time},
+	        dinner_time=#{dinner_time},
+	        snack_time=#{snack_time}
 	    </trim>
 	</insert>
 	
@@ -943,6 +967,7 @@
 		AND adb.month = #{month}
 		LEFT OUTER JOIN tb_account_balance_price abp
 		ON abp.account_id = a.account_id
+		WHERE a.del_yn = 'N'
 	</select>
 	
 	<select id="AccountDepositHistoryList" parameterType="map" resultType="hashmap">
@@ -1462,7 +1487,8 @@
 			   note, 
 			   DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, 
 			   user_id,
-			   receipt_type
+			   receipt_type,
+			   idx
 		FROM tb_headoffice_corporate_card_payment_list
 		WHERE DATE_FORMAT(payment_dt, '%Y') = ${year}
 		AND DATE_FORMAT(payment_dt, '%m') = ${month}
@@ -1516,6 +1542,7 @@
 	        total,
 	        vat,
 	        taxFree,
+	        tax,
 	        totalCard,
 	        cardNo,
 	        cardBrand,
@@ -1523,7 +1550,8 @@
 	        note,
 	        reg_dt,
 	        user_id,
-	        receipt_type
+	        receipt_type,
+	        idx
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1535,6 +1563,7 @@
 	        #{total},
 	        #{vat},
 	        #{taxFree},
+	        #{tax},
 	        #{totalCard},
 	        #{cardNo},
 	        #{cardBrand},
@@ -1542,7 +1571,8 @@
 	        #{note},
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        #{user_id},
-	        #{receipt_type}
+	        #{receipt_type},
+	        #{idx}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1554,6 +1584,7 @@
 	        total=#{total},
 	        vat=#{vat},
 	        taxFree=#{taxFree},
+	        tax=#{tax},
 	        totalCard=#{totalCard},
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
@@ -1561,7 +1592,8 @@
 	        note=#{note},
 	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        user_id=#{user_id},
-	        receipt_type=#{receipt_type}
+	        receipt_type=#{receipt_type},
+	        idx=#{idx}
 	    </trim>
 	</insert>
 	
@@ -1607,11 +1639,16 @@
 		WHERE account_id = #{account_id}
 	</select>
 	
-	<select id="AccountCorporateCardPaymentList" parameterType="string" resultType="hashmap">
-		SELECT sale_id, account_id, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id
+	<select id="AccountCorporateCardPaymentList" parameterType="map" resultType="hashmap">
+		SELECT sale_id, account_id, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, receipt_type, idx
 		FROM tb_account_corporate_card_payment_list
-		WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
-		AND DATE_FORMAT(payment_dt, '%m') = #{month}
+        <choose>
+            <when test="year != null and year != ''">
+                WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
+				AND DATE_FORMAT(payment_dt, '%m') = #{month}
+            </when>
+            <otherwise>WHERE DATE_FORMAT(payment_dt, '%Y-%m-%d') = #{payment_dt}</otherwise>
+        </choose>
 		AND account_id = #{account_id}
 	</select>
 	
@@ -1665,13 +1702,16 @@
 	        total,
 	        vat,
 	        taxFree,
+	        tax,
 	        totalCard,
 	        cardNo,
 	        cardBrand,
 	        receipt_image,
 	        note,
 	        reg_dt,
-	        user_id
+	        user_id,
+	        receipt_type,
+	        idx
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1683,6 +1723,7 @@
 	        #{total},
 	        #{vat},
 	        #{taxFree},
+	        #{tax},
 	        #{totalCard},
 	        #{cardNo},
 	        #{cardBrand},
@@ -1690,6 +1731,8 @@
 	        #{note},
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        #{user_id},
+	        #{receipt_type},
+	        #{idx}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1701,6 +1744,7 @@
 	        total=#{total},
 	        vat=#{vat},
 	        taxFree=#{taxFree},
+	        tax=#{tax},
 	        totalCard=#{totalCard},
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
@@ -1708,6 +1752,8 @@
 	        note=#{note},
 	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        user_id=#{user_id},
+	        receipt_type=#{receipt_type},
+	        idx=#{idx}
 	    </trim>
 	</insert>
 	

@@ -26,11 +26,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.demo.model.CardReceiptResponse;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.parser.ReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
+import com.example.demo.service.CardReceiptParseService;
 import com.example.demo.service.OcrService;
 import com.example.demo.service.OperateService;
 import com.example.demo.utils.BizNoUtils;
@@ -46,7 +48,7 @@ import com.google.cloud.documentai.v1.Document;
     "http://thefull.kr",			// 운영 도메인
     "http://thefull.kr:8080"		// 운영 도메인
 })
-public class OcrController {
+public class OcrControllerV3 {
 
     @Autowired
     private OcrService ocrService;
@@ -57,13 +59,16 @@ public class OcrController {
     @Autowired
     private OperateService operateService;
     
+    @Autowired
+    private CardReceiptParseService cardReceiptParseService;
+    
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
     
     private final String uploadDir;
     
     @Autowired
-    public OcrController(@Value("${file.upload-dir}") String uploadDir) {
+    public OcrControllerV3(@Value("${file.upload-dir}") String uploadDir) {
     	this.uploadDir = uploadDir;
     }
     
@@ -101,42 +106,31 @@ public class OcrController {
     /**
      * OCR 영수증 스캔 + 파싱
      */
-    @PostMapping("/receipt-scan")
+    @PostMapping("/receipt-scanV3")
     public ResponseEntity<?> scanReceipt(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "type", required = false) String type,
+            @RequestParam(value = "total", required = false) int total,
+            @RequestParam(value = "type", required = false) int type,
+            @RequestParam(value = "card_idx", required = false) int idx,
             @RequestParam(value = "account_id", required = false) String account_id,
-            @RequestParam(value = "cell_day", required = false) String cell_day,
+            @RequestParam(value = "sale_id", required = false) String sale_id,
+            @RequestParam(value = "receipt_type", required = false) String receipt_type,
+            @RequestParam(value = "use_name", required = false) String use_name,
             @RequestParam(value = "cell_date", required = false) String cell_date,
-            @RequestParam(value = "saveType", required = false) String saveType) {
+            @RequestParam(value = "saveType", required = false) String saveType,
+            @RequestParam(value = "card_brand", required = false) String card_brand,
+            @RequestParam(value = "card_no", required = false) String card_no) {
     	
     	// 1️⃣ 파일 저장
         File tempFile = saveFile(file);
     	
         try {
-            // 2️⃣ OCR 처리 (Google Document AI)
-            //Document doc = ocrService.processReceiptFile(tempFile);
-            
-            // 2️⃣ OCR 처리 (Google Document AI)
-            // [수정된 부분]: processReceiptFile -> processDocumentFile 로 변경
-            Document doc = ocrService.processDocumentFile(tempFile);
-
-            // 3️⃣ (선택) AI로 타입 자동 분석
-            if (type == null || type.isEmpty()) {
-                if (aiAnalyzer != null) {
-                    type = aiAnalyzer.detectType(doc);
-                    System.out.println("🤖 AI가 감지한 영수증 타입: " + type);
-                } else {
-                    type = "mart"; // 기본값
-                }
-            }
-
-            // 4️⃣ 유형별 파서로 파싱
-            BaseReceiptParser.ReceiptResult result = ReceiptParserFactory.parse(doc, type);
+            CardReceiptResponse res = cardReceiptParseService.parseFile(tempFile, receipt_type);
+            BaseReceiptParser.ReceiptResult result = res.result;
             
             // tb_account_purchase_tally 저장 map
-            Map<String, Object> purchase = new HashMap<String, Object>();
-            purchase.put("account_id", account_id);		// account_id 세팅.
+            Map<String, Object> accountMap = new HashMap<String, Object>();
+            accountMap.put("account_id", account_id);		// account_id 세팅.
             
             // 1️⃣ 입력값을 LocalDate로 변환 (기본적으로 2000년대 기준으로 해석됨 → 2025년)
             //DateTimeFormatter inputFormat = DateTimeFormatter.ofPattern("yy-MM-dd");
@@ -164,13 +158,39 @@ public class OcrController {
             // tally sheet 테이블 저장을 위한 연,월 세팅.
             String yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
             String monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
+            String dayStr = date.format(DateTimeFormatter.ofPattern("D"));
             
-            purchase.put("sale_id", saleId);							// saleId 세팅.
-            purchase.put("saleDate", date);								// saleDate 세팅.
-            purchase.put("total", result.totals.total);					// total 세팅.
-            purchase.put("discount", result.totals.discount);			// discount 세팅.
-            purchase.put("vat", result.totals.vat);						// vat 세팅.
-            purchase.put("taxFree", result.totals.taxFree);				// taxFree 세팅.
+            if (result.merchant.name == null) {
+            	accountMap.put("use_name", use_name);
+            } else {
+            	accountMap.put("use_name", result.merchant.name);
+            }
+            
+            if (sale_id == null) {
+            	accountMap.put("sale_id", saleId);							// sale_id 가 없을 때, 생성된 saleId 세팅.
+            } else {
+            	accountMap.put("sale_id", sale_id);							// sale_id 가 있으면 전달받은 sale_id 세팅.
+            }
+            
+            accountMap.put("saleDate", date);							// saleDate 세팅.
+            accountMap.put("payment_dt", date);							// payment_dt 세팅.
+            accountMap.put("type", type);								// mapping 테이블의 type 값 세팅
+            accountMap.put("idx", idx);									// 카드 idx 세팅
+            accountMap.put("receipt_type", receipt_type);				// 영수증 타입 세팅
+            accountMap.put("cardBrand", card_brand);					// 카드사 세팅
+            accountMap.put("cardNo", card_no);							// 카드번호 세팅
+            
+            // 영수증 파싱에서 합계금액을 못구하면 화면에서 입력된 금액으로 세팅.
+            if (result.totals.total == 0 || result.totals.total == null) {
+            	accountMap.put("total", total);								// total 세팅.
+            } else {
+            	accountMap.put("total", result.totals.total);				// total 세팅.
+            }
+           
+            accountMap.put("discount", result.totals.discount);				// discount 세팅.
+            accountMap.put("vat", result.totals.vat);						// vat 세팅.
+            accountMap.put("taxFree", result.totals.taxFree);				// taxFree 세팅.
+            accountMap.put("tax", result.totals.taxable);					// tax 세팅.
             
             // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
             if (!receiptDate.equals(cell_date)) {
@@ -195,22 +215,13 @@ public class OcrController {
             }
             
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {
-                purchase.put("payType", 1);
-                purchase.put("totalCash", iApprovalAmt);
-                purchase.put("totalCard", 0);
+            	accountMap.put("payType", 1);
+            	accountMap.put("totalCash", iApprovalAmt);
+            	accountMap.put("totalCard", 0);
             } else {
-                purchase.put("payType", 2);
-                purchase.put("totalCard", iApprovalAmt);
-                purchase.put("totalCash", 0);
-            }
-            
-            // payment 정보 세팅 (null-safe)
-            if (result.payment != null) {
-                purchase.put("cardNo", result.payment.cardNo);
-                purchase.put("cardBrand", result.payment.cardBrand);
-            } else {
-                purchase.put("cardNo", null);
-                purchase.put("cardBrand", null);
+            	accountMap.put("payType", 2);
+                accountMap.put("totalCard", iApprovalAmt);
+                accountMap.put("totalCash", 0);
             }
 
             // merchant 사업자번호 원본/정규화
@@ -224,7 +235,7 @@ public class OcrController {
                     normalizedBizNo = merchantBizNoRaw;
                 }
             }
-            purchase.put("bizNo", normalizedBizNo);
+            accountMap.put("bizNo", normalizedBizNo);
 
             // 해당 거래처에 등록된 업체 유무를 확인.
             // tb_account_mapping 정보와 비교 후 type 값 세팅.
@@ -241,7 +252,7 @@ public class OcrController {
                         String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
 
                         if (formattedBizNo2.equals(normalizedBizNo)) {
-                            purchase.put("type", m.get("type"));
+                        	accountMap.put("type", m.get("type"));
                             hasMapping = true;
                             break; // 매칭되면 더 안 돌게
                         }
@@ -253,6 +264,7 @@ public class OcrController {
             }
 
             // 📌 사업자 매핑 실패 시: 아래 동작(파일 저장, DB 저장)은 의미 없으므로 여기서 종료
+            /*
             if (!hasMapping) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);
@@ -263,7 +275,7 @@ public class OcrController {
 
                 return ResponseEntity.badRequest().body(error);
             }
-            
+            */
             // tb_account_purchase_tally_detail 저장 map
             List<Map<String, Object>> detailList = new ArrayList<>();
             
@@ -280,7 +292,7 @@ public class OcrController {
                 detailList.add(detailMap);
             }
             
-            if (!purchase.isEmpty()) {
+            if (!accountMap.isEmpty()) {
             	
             	String resultPath = "";
             	
@@ -299,29 +311,30 @@ public class OcrController {
                 
                 // 브라우저 접근용 경로 반환
                 resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
-                purchase.put("receipt_image", resultPath);
+                accountMap.put("receipt_image", resultPath);
             }
             
             int iResult = 0;
             
             // tall sheet 테이블 저장을 위한 값 세팅.
-            String day = "day_" + cell_day;
-            int total = 0;
-            Object totalObj = purchase.get("total");
+            String day = "day_" + dayStr;
+            Object totalObj = accountMap.get("total");
             total = Integer.parseInt(totalObj.toString());
             
-            purchase.put(day, total);
-            purchase.put("count_year", yearStr);
-            purchase.put("count_month", monthStr);
+            accountMap.put(day, total);
+            accountMap.put("count_year", yearStr);
+            accountMap.put("count_month", monthStr);
+            accountMap.put("year", yearStr);
+            accountMap.put("month", monthStr);
             
-            iResult += accountService.AccountPurchaseSave(purchase);
-            iResult += operateService.TallyNowMonthSave(purchase);
+            iResult += accountService.AccountCorporateCardPaymentSave(accountMap);
+            iResult += accountService.TallySheetCorporateCardPaymentSave(accountMap);
             
             for (Map<String, Object> m : detailList) {
-            	iResult += accountService.AccountPurchaseDetailSave(m);
+            	iResult += accountService.AccountCorporateCardPaymentDetailLSave(m);
             }
             
-            return ResponseEntity.ok(purchase);
+            return ResponseEntity.ok(accountMap);
 
         } catch (Exception e) {
             e.printStackTrace();

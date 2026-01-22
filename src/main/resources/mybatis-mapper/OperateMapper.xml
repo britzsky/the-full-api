@@ -100,6 +100,8 @@
 	        DATE_FORMAT(del_dt, '%Y-%m-%d') as del_dt
 		FROM tb_account_property
 		WHERE account_id = #{account_id}
+		AND del_yn = 'N'
+		ORDER BY purchase_dt ASC
 	</select>
 	
 	<insert id="PropertiesSave" parameterType="map">
@@ -754,6 +756,7 @@
 	<select id="AccountMemberAllList" parameterType="map" resultType="map">
 		SELECT T.member_id,
 		    T.account_id,
+		    T.cor_type,
 			T2.account_name,
 		    T.name,
 		    T.join_dt,
@@ -835,7 +838,8 @@
 	        update_dt,
 	        user_id,
 	        id,
-	        bankbook
+	        bankbook,
+	        cor_type
 	    )
 	    VALUES (
 	        <choose>
@@ -909,7 +913,8 @@
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        #{user_id},
 	        #{id},
-	        #{bankbook}
+	        #{bankbook},
+	        #{cor_type}
 	    )
 	
 	    ON DUPLICATE KEY UPDATE
@@ -974,7 +979,8 @@
 	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        user_id = #{user_id},
 	        id = #{id},
-	        bankbook = #{bankbook}
+	        bankbook = #{bankbook},
+	        cor_type = #{cor_type}
 	</insert>
 	
 	<select id="AccountRecMemberList" parameterType="map" resultType="map">
@@ -998,7 +1004,8 @@
 		    T.employment_contract,
 		    T.id,
 		    T.bankbook,
-		    T.use_yn
+		    T.use_yn,
+		    T.cor_type
 		FROM tb_account_rec_management T
 		JOIN tb_account T2
 		ON T.account_id = T2.account_id
@@ -1035,7 +1042,8 @@
 	        bankbook,
 	        use_yn,
 	        update_dt,
-	        user_id
+	        user_id,
+	        cor_type
 	    )
 	    VALUES (
 	        <choose>
@@ -1072,7 +1080,8 @@
 	        #{bankbook},
 	        #{use_yn},
 	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        #{user_id}
+	        #{user_id},
+	        #{cor_type}
 	    )
 	
 	    ON DUPLICATE KEY UPDATE
@@ -1103,7 +1112,8 @@
 	        id = #{id},
 	        bankbook = #{bankbook},
 	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        user_id = #{user_id}
+	        user_id = #{user_id},
+	        cor_type = #{cor_type}
 	</insert>
 	
 	<select id="AccountDispatchMemberAllList" parameterType="map" resultType="map">
