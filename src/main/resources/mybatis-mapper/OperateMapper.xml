@@ -1453,7 +1453,7 @@
 		ON abm.account_id = a.account_id
 		AND abm.year = #{year}
 		AND abm.month = #{month}
-		AND a.account_id not in 
+		WHERE a.account_id not in 
  		(
  			20260122065002,
 			20260122071337,
