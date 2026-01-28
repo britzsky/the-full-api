@@ -6,18 +6,18 @@ public class ReceiptParserFactory {
 
     public static BaseReceiptParser.ReceiptResult parse(Document doc, String type) {
         BaseReceiptParser parser;
-
-        switch (type.toLowerCase()) {
-            case "mart":
+        //System.out.println("type.toLowerCase() == " + type.toLowerCase());
+        switch (type) {
+            case "MART_ITEMIZED":
                 parser = new MartReceiptParser();
                 break;
-            case "convenience":
+            case "CONVENIENCE":
                 parser = new ConvenienceReceiptParser();
                 break;
-            case "coupang":
+            case "COUPANG_CARD":
                 parser = new CoupangReceiptParser();
                 break;
-            case "delivery":
+            case "COUPANG_APP":
                 parser = new DeliveryReceiptParser();
                 break;
             default:

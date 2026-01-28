@@ -80,6 +80,7 @@
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        idx,
 	        menu_date,
+	        end_date,
 	        content,
 	        type,
 	        update_dt,
@@ -93,6 +94,7 @@
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	    	#{idx},
 	    	DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	    	DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
 	        #{content},
 	        #{type},
 	        DATE_FORMAT(now(), '%Y-%m-%d'),
@@ -105,6 +107,7 @@
 	    <trim suffixOverrides=",">
 	    	idx=#{idx},
 	        menu_date=DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
+	        end_date=DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
 	        content=#{content},
 	        type=#{type},
 	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
@@ -117,6 +120,7 @@
     <select id="EventList" parameterType="map" resultType="hashmap">
     	SELECT idx,
     		   DATE_FORMAT(menu_date, '%Y-%m-%d') as menu_date,
+    		   DATE_FORMAT(end_date, '%Y-%m-%d') as end_date,
     		   content,
     		   type,
     		   del_yn,
@@ -196,7 +200,9 @@
 		    indirect_total_ratio,
 		    business_profit,
 		    business_profit_ratio,
-		    update_dt
+		    update_dt,
+		    event_cost,
+		    event_ratio
 		)
 		VALUES
 		(
@@ -251,7 +257,9 @@
 		    #{indirect_total_ratio},
 		    #{business_profit},
 		    #{business_profit_ratio},
-		    NOW() 
+		    NOW(),
+		    #{event_cost},
+		    #{event_ratio}
 		)
 		ON DUPLICATE KEY UPDATE
 		<trim suffixOverrides=",">
@@ -399,7 +407,13 @@
 		    <if test="business_profit_ratio != null">
 		        business_profit_ratio = #{business_profit_ratio},
 		    </if>
-		    update_dt = NOW()
+		    update_dt = NOW(),
+		    <if test="event_cost != null">
+		        event_cost = #{event_cost},
+		    </if>
+		    <if test="event_ratio != null">
+		        event_ratio = #{event_ratio},
+		    </if>
 		</trim>
     </insert>
     
@@ -455,6 +469,8 @@
 			    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 			    ifnull(business_profit,0) as business_profit,
 			    ifnull(business_profit_ratio,0) as business_profit_ratio,
+			    ifnull(event_cost,0) as event_cost,
+			    ifnull(event_ratio,0) as event_ratio,
 			    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt
 			FROM the_full.tb_account_managerment_table
 			WHERE year = #{year}

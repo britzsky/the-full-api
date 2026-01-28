@@ -67,31 +67,34 @@ public class OcrService {
     }
 
     public Document processDocumentFile(File file) throws IOException {
+    	
         // 1️⃣ 이미지 크기/용량 최적화 (유지)
         // OCR 처리량을 늘리고 전송 시간을 줄이는 데 도움이 됩니다.
-        File optimized = autoOptimizeImage(file);
-
+    	File optimized = autoOptimizeImage(file);
+    	
         // 2️⃣ Google Document AI 요청 생성
         // 이 요청은 이제 구조화된 데이터 추출(Expense Parser)이 아닌
         // 문서 내 모든 텍스트를 인식하는 (일반 OCR) 기능을 수행합니다.
         String name = String.format("projects/%s/locations/%s/processors/%s",
                 projectId, location, processorId);
-
+        
         ByteString content = ByteString.readFrom(new FileInputStream(optimized));
+    	
         RawDocument rawDocument = RawDocument.newBuilder()
                 .setContent(content)
                 // 이미지 파일을 보내므로 image/jpeg MimeType을 사용합니다.
                 .setMimeType("image/jpeg") 
                 .build();
-
+        
         ProcessRequest request = ProcessRequest.newBuilder()
                 .setName(name)
                 .setRawDocument(rawDocument)
                 .build();
-
+        
         // 3️⃣ Document AI 호출
         // 반환되는 Document 객체는 텍스트(document.getText())와 레이아웃 정보만 포함합니다.
         ProcessResponse response = docAiClient.processDocument(request);
+        
         return response.getDocument();
         
         // Expense Parser를 사용했다면 여기서 

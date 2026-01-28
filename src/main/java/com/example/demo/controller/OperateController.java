@@ -229,6 +229,11 @@ public class OperateController {
     	int iResult = 0;
     	
     	for (Map<String, Object> paramMap : paramList) {
+    		
+    		System.out.println("idx ==== " + paramMap.get("idx"));
+    		System.out.println("account_id ==== " + paramMap.get("account_id").toString());
+    		System.out.println("del_yn ==== " + paramMap.get("del_yn").toString());
+    		
             iResult += operateService.HygieneSave(paramMap);
         }
     	

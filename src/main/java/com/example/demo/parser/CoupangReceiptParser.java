@@ -275,7 +275,11 @@ public class CoupangReceiptParser extends BaseReceiptParser {
             it.name = name;
             it.qty = qty;
             it.amount = totalAmount;
-            it.unitPrice = (qty > 0 && totalAmount != null) ? totalAmount / qty : totalAmount;
+            Integer unitPrice = null;
+            if (totalAmount != null && qty != null && qty > 0) {
+                unitPrice = totalAmount / qty; // totalAmount != null 이면 오토언박싱 안전
+            }
+            it.unitPrice = unitPrice;
             list.add(it);
         }
 

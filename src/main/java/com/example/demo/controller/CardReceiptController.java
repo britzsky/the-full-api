@@ -112,6 +112,8 @@ public class CardReceiptController {
                 corporateCard.put("year", year);
                 corporateCard.put("month", month);
             }
+            
+            System.out.println(result);
 
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);

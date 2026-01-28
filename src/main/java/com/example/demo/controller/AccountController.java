@@ -19,17 +19,20 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.HeadOfficeService;
+import com.example.demo.utils.DateUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -626,6 +629,13 @@ public class AccountController {
         }
         
         filePathMap.put("account_id", accountId);
+        
+        System.out.println("account_id == " + filePathMap.get("account_id"));
+        System.out.println("business_report == " + filePathMap.get("business_report"));
+        System.out.println("business_regist == " + filePathMap.get("business_regist"));
+        System.out.println("kitchen_drawing == " + filePathMap.get("kitchen_drawing"));
+        System.out.println("nutritionist_room_img == " + filePathMap.get("nutritionist_room_img"));
+        System.out.println("chef_lounge_img == " + filePathMap.get("chef_lounge_img"));
 
         accountService.insertOrUpdateFile(filePathMap);
     	
@@ -647,6 +657,25 @@ public class AccountController {
 
         // 브라우저 접근용 경로 반환
         return "/image/" + accountId + "/" + type + "/" + uniqueFileName;
+    }
+    
+    private String saveReceiptFile(String saleId, MultipartFile file) throws IOException {
+    	
+    	// 프로젝트 루트 대신 static 폴더 경로 사용
+        String staticPath = new File(uploadDir).getAbsolutePath();
+        String basePath = staticPath + "/" + "receipt/" + saleId + "/";
+        
+        Path dirPath = Paths.get(basePath);
+        Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+        String originalFileName = file.getOriginalFilename();
+        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+        Path filePath = dirPath.resolve(uniqueFileName);
+
+        file.transferTo(filePath.toFile()); // 파일 저장
+        
+        // 브라우저 접근용 경로 반환
+        return "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
     }
     
     /*
@@ -935,6 +964,14 @@ public class AccountController {
     	
     	for (Map<String, Object> paramMap : paramList) {
             iResult += accountService.AccountPurchaseSave(paramMap);
+            // 여러 타입의 날짜형식을 매핑.
+            LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
+            // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+            int year = date.getYear();        // 2026
+            int month = date.getMonthValue(); // 1~12
+            paramMap.put("year", year);
+            paramMap.put("month", month);
+            iResult += accountService.TallySheetPaymentSave(paramMap);
         }
     	
     	JsonObject obj = new JsonObject();
@@ -949,6 +986,54 @@ public class AccountController {
     	
     	return obj.toString();
     }
+    
+    /*
+     * part		: 현장
+     * method 	: AccountTallyToPurchaseSave
+     * comment 	: 집계표 -> 집계표 수정 시, 매입마감도 반영
+     */
+    @PostMapping(
+      value = "/Account/AccountTallyToPurchaseSave",
+      consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+      produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public String AccountTallyToPurchaseSave(
+        @RequestParam Map<String, String> params,
+        @RequestPart(value = "file", required = false) MultipartFile file
+    ) {
+        int iResult = 0;
+
+        // ✅ String -> Object 맵으로 변환 (서비스에서 Object 기대하면)
+        Map<String, Object> paramMap = new HashMap<>(params);
+
+        // ✅ 프론트에서 보내는 필드명에 맞춰 날짜 파싱 (saleDate가 아니라 cell_date)
+        LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
+
+        int year = date.getYear();
+        int month = date.getMonthValue();
+        paramMap.put("year", year);
+        paramMap.put("month", month);
+
+        // ✅ file 처리 필요하면 paramMap에 담거나 별도 저장 후 경로 넣기
+        if (file != null && !file.isEmpty()) {
+        	try {
+				String resultPath = saveReceiptFile(paramMap.get("sale_id").toString(), file);
+				paramMap.put("receipt_image", resultPath);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+        }
+
+        iResult += accountService.AccountPurchaseSave(paramMap);
+        iResult += accountService.TallySheetPaymentSave(paramMap);
+
+        JsonObject obj = new JsonObject();
+        obj.addProperty("code", iResult > 0 ? 200 : 400);
+        obj.addProperty("message", iResult > 0 ? "성공" : "실패");
+        return obj.toString();
+    }
+
     
     /*
      * part		: 회계
@@ -1080,6 +1165,19 @@ public class AccountController {
     	return new Gson().toJson(resultList);
     }
     /*
+     * part		: 현장
+     * method 	: AccountPurchaseTallyPaymentList
+     * comment 	: 집계표 -> 결제 리스트 조회
+     */
+    @GetMapping("Account/AccountPurchaseTallyPaymentList")
+    public String AccountPurchaseTallyPaymentList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountPurchaseTallyPaymentList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
      * part		: 회계
      * method 	: HeadOfficeCorporateCardList
      * comment 	: 회계 -> 본사 법인카드 목록 조회
@@ -1163,6 +1261,19 @@ public class AccountController {
     	if (mainList != null) {
     		for (Map<String, Object> mainMap : mainList) {
         		iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
+        		
+        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
+        		String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+
+        		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
+        		int year = payDate.getYear();        // 2026
+        		int month = payDate.getMonthValue(); // 1~12
+        		
+        		mainMap.put("year", year);
+        		mainMap.put("month", month);
+        		
+        		// 집계표도 다시 적용.
+        		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(mainMap);
             }
     	}
     	if (itemList != null) {
@@ -1179,16 +1290,6 @@ public class AccountController {
         		itemMap.put("year", year);
         		itemMap.put("month", month);
         		
-        		String strItem = itemMap.get("itemType").toString();
-        		int itemType = Integer.parseInt(strItem);
-        		// 상품구분 3:알수없음 은 우선 소모품 type:1002 로 저장
-                if (itemType == 3) {
-                	itemMap.put("type", 1002);
-                } else if (itemType == 1) {	// 식재료면 type:1003
-                	itemMap.put("type", 1003);
-                } else {									// 소모품은 type:1002
-                	itemMap.put("type", 1002);
-                }
         		// 집계표도 다시 적용.
         		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
             }
@@ -1248,7 +1349,7 @@ public class AccountController {
     /*
      * part		: 회계
      * method 	: AccountCorporateCardSave
-     * comment 	: 현장 -> 본사 법인카드 저장
+     * comment 	: 현장 -> 현장 법인카드 저장
      */
     @PostMapping("Account/AccountCorporateCardSave")
     private String AccountCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
@@ -1257,6 +1358,7 @@ public class AccountController {
     	
     	for (Map<String, Object> paramMap : paramList) {
     		iResult += accountService.AccountCorporateCardSave(paramMap);
+    		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
         }
     	
     	JsonObject obj = new JsonObject();

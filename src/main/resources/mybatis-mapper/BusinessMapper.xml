@@ -206,11 +206,12 @@
 	</select>
 	
 	<select id="CookWearNewList" parameterType="map" resultType="map">
-		SELECT acwnh.type,
+		SELECT acwnh.idx,
+			   acwnh.type,
 			   acwi.type_name,
-			  acwnh.note,
-			  DATE_FORMAT(acwnh.new_dt, '%Y-%m-%d') as new_dt,
-		      ifnull(acwnh.new_qty, 0) as new_qty
+			   acwnh.note,
+			   DATE_FORMAT(acwnh.new_dt, '%Y-%m-%d') as new_dt,
+		       ifnull(acwnh.new_qty, 0) as new_qty
 		FROM tb_account_cook_wear_new_history acwnh
 		JOIN tb_account_cook_wear_inventory acwi
 		ON acwi.type = acwnh.type
@@ -248,9 +249,9 @@
 	</insert>
 	
 	<insert id="CookWearNewSave" parameterType="map">
-		INSERT INTO tb_account_cook_wear_new_history(type,note,new_dt,new_qty)
+		INSERT INTO tb_account_cook_wear_new_history(idx,type,note,new_dt,new_qty)
 		VALUES
-		(#{type},#{note},DATE_FORMAT(#{new_dt}, '%Y-%m-%d'),#{new_qty})
+		(#{idx},#{type},#{note},DATE_FORMAT(#{new_dt}, '%Y-%m-%d'),#{new_qty})
 		ON DUPLICATE KEY UPDATE
 		type = VALUES(type),
 		note = VALUES(note),
@@ -264,7 +265,9 @@
 		       event_name,
 		       DATE_FORMAT(event_dt, '%Y-%m-%d') as event_dt
 		FROM tb_account_event_management
-		WHERE account_id = #{account_id}
+		<if test='account_id != null'>
+			WHERE account_id = #{account_id}
+ 		</if>
 	</select>
 	
 	<select id="EventFileList" parameterType="int" resultType="map">

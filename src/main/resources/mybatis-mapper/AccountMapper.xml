@@ -32,7 +32,13 @@
 			20260122072114,
 			20260122072245,
 			20260122072529,
-			20260122072732
+			20260122072732,
+			20260126093618,
+			20260126093730,
+			20260126093808,
+			20260127025350,
+			20260127025437,
+			20260127025657
  		)
 	</select>
 	
@@ -733,9 +739,15 @@
 	        hygiene_note,
 	        event_note,
 	        industry_note,
-	        business_report,
-	        business_regist,
-	        kitchen_drawing,
+	        <if test="business_report != null and business_report != ''">
+	        	business_report,
+	        </if>
+	        <if test="business_regist != null and business_regist != ''">
+	        	business_regist,
+	        </if>
+	        <if test="kitchen_drawing != null and kitchen_drawing != ''">
+	        	kitchen_drawing,
+	        </if>
 	        expenses_note,
 	        update_dt,
 	        extra_diet1_price,
@@ -750,8 +762,12 @@
 	        group_feed_yn,
 	        nutritionist_room_yn,
 	        chef_lounge_yn,
-	        nutritionist_room_img,
-	        chef_lounge_img,
+	        <if test="nutritionist_room_img != null and nutritionist_room_img != ''">
+	        	nutritionist_room_img,
+	        </if>
+	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
+	        	chef_lounge_img,
+	        </if>
 	        breakfast_time,
 	        lunch_time,
 	        dinner_time,
@@ -809,9 +825,15 @@
 	        #{hygiene_note},
 	        #{event_note},
 	        #{industry_note},
-	        #{business_report},
-	        #{business_regist},
-	        #{kitchen_drawing},
+	        <if test="business_report != null and business_report != ''">
+	        	#{business_report},
+	        </if>
+	        <if test="business_regist != null and business_regist != ''">
+	        	#{business_regist},
+	        </if>
+	        <if test="kitchen_drawing != null and kitchen_drawing != ''">
+	        	#{kitchen_drawing},
+	        </if>
 	        #{expenses_note},
 	        DATE_FORMAT(now(), '%Y-%m-%d'),
 	        #{extra_diet1_price},
@@ -826,8 +848,12 @@
 	        #{group_feed_yn},
 	        #{nutritionist_room_yn},
 	        #{chef_lounge_yn},
-	        #{nutritionist_room_img},
-	        #{chef_lounge_img},
+	        <if test="nutritionist_room_img != null and nutritionist_room_img != ''">
+	        	#{nutritionist_room_img},
+	        </if>
+	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
+	        	#{chef_lounge_img},
+	        </if>
 	        #{breakfast_time},
 	        #{lunch_time},
 	        #{dinner_time},
@@ -883,9 +909,15 @@
 	        hygiene_note=#{hygiene_note},
 	        event_note=#{event_note},
 	        industry_note=#{industry_note},
-	        business_report=#{business_report},
-	        business_regist=#{business_regist},
-	        kitchen_drawing=#{kitchen_drawing},
+	        <if test="business_report != null and business_report != ''">
+	        	business_report=#{business_report},
+	        </if>
+	        <if test="business_regist != null and business_regist != ''">
+	        	business_regist=#{business_regist},
+	        </if>
+	        <if test="kitchen_drawing != null and kitchen_drawing != ''">
+	        	kitchen_drawing=#{kitchen_drawing},
+	        </if>
 	        expenses_note=#{expenses_note},
 	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
 	        extra_diet1_price=#{extra_diet1_price},
@@ -900,8 +932,12 @@
 	        group_feed_yn=#{group_feed_yn},
 	        nutritionist_room_yn=#{nutritionist_room_yn},
 	        chef_lounge_yn=#{chef_lounge_yn},
-	        nutritionist_room_img=#{nutritionist_room_img},
-	        chef_lounge_img=#{chef_lounge_img},
+	        <if test="nutritionist_room_img != null and nutritionist_room_img != ''">
+	        	nutritionist_room_img=#{nutritionist_room_img},
+	        </if>
+	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
+	        	chef_lounge_img=#{chef_lounge_img},
+	        </if>
 	        breakfast_time=#{breakfast_time},
 	        lunch_time=#{lunch_time},
 	        dinner_time=#{dinner_time},
@@ -937,16 +973,28 @@
 	</select>
 	
 	<insert id="insertOrUpdateFile" parameterType="map">
-		INSERT INTO tb_account_info
-			( account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img)
-			VALUES
-			( #{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img} )
-			ON DUPLICATE KEY UPDATE
-			business_report = #{business_report},
-			business_regist = #{business_regist},
-			kitchen_drawing = #{kitchen_drawing},
-			chef_lounge_img = #{chef_lounge_img},
-			nutritionist_room_img = #{nutritionist_room_img}
+	    INSERT INTO tb_account_info
+	        (account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img)
+	    VALUES
+	        (#{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img})
+	    ON DUPLICATE KEY UPDATE
+	    <trim prefix="" suffix="" suffixOverrides=",">
+	        <if test='business_report != null'>
+	            business_report = #{business_report},
+	        </if>
+	        <if test='business_regist != null'>
+	            business_regist = #{business_regist},
+	        </if>
+	        <if test='kitchen_drawing != null'>
+	            kitchen_drawing = #{kitchen_drawing},
+	        </if>
+	        <if test='chef_lounge_img != null'>
+	            chef_lounge_img = #{chef_lounge_img},
+	        </if>
+	        <if test='nutritionist_room_img != null'>
+	            nutritionist_room_img = #{nutritionist_room_img}
+	        </if>
+	    </trim>
 	</insert>
 	
 	<select id="AccountDeadlineBalanceList" parameterType="map" resultType="hashmap">
@@ -1301,7 +1349,12 @@
 	        cardBrand,
 	        bizNo,
 	        receipt_image,
-	        note
+	        note,
+	        use_name,
+	        cashReceiptType,
+	        user_id,
+	        reg_dt,
+	        receipt_type
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1321,7 +1374,12 @@
 	        #{cardBrand},
 	        #{bizNo},
 	        #{receipt_image},
-	        #{note}
+	        #{note},
+	        #{use_name},
+	        #{cashReceiptType},
+	        #{user_id},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{receipt_type}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1339,7 +1397,12 @@
 	        cardBrand=#{cardBrand},
 	        bizNo=#{bizNo},
 	        receipt_image=#{receipt_image},
-	        note=#{note}
+	        note=#{note},
+	        use_name = #{use_name},
+	        cashReceiptType = #{cashReceiptType},
+	        mod_id = #{user_id},
+	        mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        receipt_type = #{receipt_type}
 	    </trim>
 	</insert>
 	
@@ -1354,7 +1417,9 @@
 	        unitPrice,
 	        taxType,
 	        itemType,
-	        note
+	        note,
+	        user_id,
+	        reg_dt
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1366,7 +1431,9 @@
 	        #{unitPrice},
 	        #{taxType},
 	        #{itemType},
-	        #{note}
+	        #{note},
+	        #{user_id},
+	        DATE_FORMAT(NOW(), '%Y-%m-%d')
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1376,7 +1443,9 @@
 	        unitPrice=#{unitPrice},
 	        taxType=#{taxType},
 	        itemType=#{itemType},
-	        note=#{note}
+	        note=#{note},
+	        mod_id=#{user_id},
+	        mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d')
 	    </trim>
 	</insert>
 	
@@ -1384,7 +1453,7 @@
 		SELECT a.account_id, 
 			   a.account_name, 
 		       amv.type, 
-		       am.name, 
+		       apt.use_name, 
 		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
 		       ifnull(apt.total, 0) as total, 
 		       ifnull(apt.vat, 0) as vat,
@@ -1467,6 +1536,31 @@
 		JOIN tb_account_purchase_tally_detail aptd
 		ON aptd.sale_id = apt.sale_id
 		WHERE aptd.sale_id = #{sale_id}
+	</select>
+	
+	<select id="AccountPurchaseTallyPaymentList" parameterType="map" resultType="hashmap">
+		SELECT account_id, 
+			   sale_id,
+			   use_name, 
+		       type, 
+		       DATE_FORMAT(saleDate, '%Y-%m-%d') as saleDate, 
+		       ifnull(total, 0) as total, 
+		       ifnull(vat, 0) as vat,
+		       ifnull(taxFree, 0) as taxFree,
+		       ifnull(tax, 0) as tax,
+		       ifnull(totalCash, 0) as totalCash,
+		       ifnull(totalCard, 0) as totalCard,
+		       payType,
+		       cardNo,
+		       cardBrand,
+		       receipt_image,
+		       note,
+		       bizNo,
+		       receipt_type
+		FROM tb_account_purchase_tally
+		WHERE account_id = #{account_id}
+		AND type = #{type}
+        AND saleDate = DATE_FORMAT(#{saleDate}, '%Y-%m-%d')
 	</select>
 	
 	<select id="HeadOfficeCorporateCardList" parameterType="string" resultType="hashmap">
@@ -1808,6 +1902,16 @@
 	    { CALL sp_sync_corp_card_to_tally_sheet_one_day_v2(
 	        #{account_id, mode=IN, jdbcType=VARCHAR},
 	        #{payment_dt, mode=IN, jdbcType=VARCHAR},
+	        #{sale_id, mode=IN, jdbcType=VARCHAR},
+	        #{type, mode=IN, jdbcType=INTEGER},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
+	
+	<select id="TallySheetPaymentSave" statementType="CALLABLE" parameterType="map">
+	    { CALL sp_sync_tally_sheet_one_day(
+	        #{account_id, mode=IN, jdbcType=VARCHAR},
+	        #{saleDate, mode=IN, jdbcType=VARCHAR},
 	        #{sale_id, mode=IN, jdbcType=VARCHAR},
 	        #{type, mode=IN, jdbcType=INTEGER},
 	        #{result, mode=OUT, jdbcType=INTEGER}

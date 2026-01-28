@@ -209,9 +209,11 @@
 	        clean_note,
 	        note, 
 	        DATE_FORMAT(mod_dt, '%Y-%m-%d') as mod_dt,
-	        DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt
+	        DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt,
+	        del_yn
 		FROM tb_account_hygiene_management
 		WHERE account_id = #{account_id}
+		AND del_yn = 'N'
 	</select>
 	
 	<insert id="HygieneSave" parameterType="map">
@@ -227,6 +229,8 @@
 	        note,
 	        <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
 	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+	        del_yn,
+	        <if test='del_yn == "Y"'>del_dt</if>
 	    </trim>
 	    
 	    VALUES
@@ -241,6 +245,8 @@
 	        #{note},
 	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
 	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+	    	#{del_yn},
+	    	<if test='del_yn == "Y"'>DATE_FORMAT(NOW(), '%Y-%m-%d')</if>
 	    </trim>
 	    
 	    ON DUPLICATE KEY UPDATE
@@ -271,6 +277,12 @@
 	        </if>
 	        <if test="reg_dt != null and reg_dt != ''">
 	            reg_dt=#{reg_dt},
+	        </if>
+	        <if test="del_yn != null and del_yn != ''">
+	            del_yn=#{del_yn},
+	        </if>
+	        <if test='del_yn == "Y"'>
+	        	del_dt=DATE_FORMAT(NOW(), '%Y-%m-%d')
 	        </if>
 	    </trim>
 	</insert>
@@ -868,7 +880,7 @@
 	            <otherwise>null,</otherwise>
 	        </choose>
 	
-	        #{del_yn},
+	        'N',
 	        #{position},
 	        #{idx},
 	        #{start_time},
@@ -1461,7 +1473,12 @@
 			20260122072114,
 			20260122072245,
 			20260122072529,
-			20260122072732
+			20260122072732,
+			20260126093618,
+			20260126093730,
+			20260126093808,
+			20260127025437,
+			20260127025657
  		)
 	</select>
 	

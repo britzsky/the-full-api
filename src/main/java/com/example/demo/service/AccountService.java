@@ -350,6 +350,12 @@ public class AccountService {
 		resultList = accountMapper.AccountPurchaseDetailList_tmp(paramMap);
 		return resultList;
 	}
+	// 집계표 -> 결제 리스트 조회
+	public List<Map<String, Object>> AccountPurchaseTallyPaymentList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPurchaseTallyPaymentList(paramMap);
+		return resultList;
+	}
 	// 회계 -> 매입 -> 매입집계 조회
 	public List<Map<String, Object>> AccountPurchaseDetailList (Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -476,6 +482,42 @@ public class AccountService {
         result = (int) paramMap.get("result");
         if (result != 1) {
             throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day_v2 프로시저 실패");
+        }
+		
+        // ③ 손익표 합계 + 비율 저장 프로시저 호출
+        paramMap.put("result", 0); // OUT 값 초기화
+        headOfficeMapper.ProfitLossTotalSave(paramMap);
+        
+        // OUT 값 확인
+        result = (int) paramMap.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+        }
+        
+        // 예산 저장 프로시저 호출
+        paramMap.put("result", 0); // OUT 값 초기화
+        operateMapper.BudgetTotalSave(paramMap);
+
+        // OUT 값 확인
+        result = (int) paramMap.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+        }
+        
+		return result;
+	}
+	// 집계표 -> 집계표 적용, 손익표, 예산도 함께 적용해야 함.
+	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
+	public int TallySheetPaymentSave(Map<String, Object> paramMap) {
+		
+		int result = 0;
+		
+		paramMap.put("result", 0); // OUT 값 초기화
+		accountMapper.TallySheetPaymentSave(paramMap);
+		// OUT 값 확인
+        result = (int) paramMap.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day 프로시저 실패");
         }
 		
         // ③ 손익표 합계 + 비율 저장 프로시저 호출
