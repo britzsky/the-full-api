@@ -55,7 +55,9 @@ dependencies {
 	implementation 'com.google.cloud:google-cloud-vision:3.47.0' // 최신 버전을 확인하여 사용하세요
 	implementation 'com.google.protobuf:protobuf-java:3.25.3'
 	implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1' // @PostConstruct (Java 17/Spring Boot 3.x 호환)
-	implementation 'com.google.cloud:google-cloud-document-ai:2.81.0'
+	implementation platform("com.google.cloud:libraries-bom:26.56.0")
+    implementation "com.google.cloud:google-cloud-document-ai"
+    implementation "com.google.api.grpc:proto-google-common-protos"
 	implementation 'org.openpnp:opencv:4.9.0-0'
 	// ✅ WebClient (Spring WebFlux)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'

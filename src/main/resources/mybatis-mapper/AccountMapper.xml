@@ -51,12 +51,40 @@
 		ORDER BY account_type DESC
 	</select>
 	
-	<select id="AccountMemberList" parameterType="map" resultType="map">
+	<select id="AccountMemberList" resultType="map">
 		SELECT user_name, user_type
 		FROM tb_user
 		WHERE user_id = #{userId}
 		AND password = #{password}
 	</select>
+	
+	<select id="AccountUtilMemberList" parameterType="map" resultType="map">
+		SELECT member_id, name, position_type
+		FROM tb_account_members T
+		WHERE position_type = 6
+		AND del_yn = 'N'
+	</select>
+	
+	<select id="AccountUtilMappingList" parameterType="map" resultType="map">
+		SELECT T2.idx, T2.account_id, T.member_id, T.name, T.position_type
+		FROM tb_account_members T
+		LEFT OUTER JOIN tb_account_util_member_mapping T2
+		ON T2.member_id = T.member_id
+		AND T.position_type = 6 
+		AND T.del_yn = 'N'
+		WHERE T2.member_id = #{member_id}
+	</select>
+	
+	<insert id="AccountUtilMemberMappingSave" parameterType="map">
+		INSERT INTO tb_account_util_member_mapping
+		(idx, member_id, account_id, del_yn, reg_dt, user_id)
+		VALUES
+		(#{idx}, #{member_id}, #{account_id}, 'N', DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+		ON DUPLICATE KEY UPDATE
+		member_id = #{member_id},
+		account_id = #{account_id},
+		del_yn = #{del_yn}
+	</insert>
 	
 	<insert id="AccountMemberSave" parameterType="map">
 		INSERT INTO tb_account_members
@@ -265,6 +293,34 @@
 		WHERE T2.account_id = #{account_id}
 		AND T2.del_yn = 'N' 
 		UNION ALL
+		-- 아래는 유틸 직원
+		SELECT
+            'nor' as gubun,
+		    T2.account_id,
+		    T2.member_id,
+		    T.position,
+            T.position_type,
+		    T.name,
+		    T3.record_year,
+		    T3.record_month,
+		    T3.record_date,
+		    T3.type,
+		    T.start_time,
+		    T.end_time,
+		    CASE WHEN T3.type = 6 THEN T3.salary ELSE 0 END AS salary,
+		    T.note
+		FROM tb_account_util_member_mapping T2 
+		LEFT JOIN tb_account_members T
+		    ON T.member_id = T2.member_id
+		LEFT JOIN tb_account_record T3
+            ON T3.member_id = T2.member_id
+            AND T3.account_id = T2.account_id
+		    AND T3.record_year = #{year}
+		    AND T3.record_month = #{month}
+		WHERE T2.account_id = #{account_id}
+           AND T.del_yn = 'N'
+        UNION ALL
+		
 		SELECT
 			'rec' as gubun,
 		    T2.account_id,

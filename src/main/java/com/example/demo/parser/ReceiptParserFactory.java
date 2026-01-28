@@ -20,6 +20,9 @@ public class ReceiptParserFactory {
             case "COUPANG_APP":
                 parser = new DeliveryReceiptParser();
                 break;
+            case "TRANSACTION":
+                parser = new TransactionStatementParser();
+                break;
             default:
                 throw new IllegalArgumentException("지원하지 않는 영수증 타입: " + type);
         }

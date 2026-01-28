@@ -81,6 +81,54 @@ public class AccountController {
     }
     
     /*
+     * method 	: AccountUtilMemberList
+     * comment 	: 유틸 직원 조회
+     */
+    @GetMapping("/Account/AccountUtilMemberList")
+    public String AccountUtilMemberList(@RequestParam(required = false) Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountUtilMemberList();
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * method 	: AccountUtilMappingList
+     * comment 	: 유틸 직원 매핑 정보 조회
+     */
+    @GetMapping("/Account/AccountUtilMappingList")
+    public String AccountUtilMappingList(@RequestParam(required = false) Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = accountService.AccountUtilMappingList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * method 	: AccountUtilMemberMappingSave
+     * comment 	: 유틸 직원 매핑 정보 저장
+     */
+    @PostMapping("/Account/AccountUtilMemberMappingSave")
+    private String AccountUtilMemberMappingSave(@RequestBody List<Map<String, Object>> paramList) { 
+    	
+        int iResult = 0;
+        
+        for (Map<String, Object> paramMap : paramList) {
+        	iResult += accountService.AccountUtilMemberMappingSave(paramMap);
+        }
+        
+        JsonObject obj = new JsonObject();
+        
+        if(iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "실패");
+        }
+        
+        return obj.toString();
+    }
+    
+    /*
      * part		: 현장
      * method 	: AccountTallySheetList
      * comment 	: 거래처 -> 집계표 조회

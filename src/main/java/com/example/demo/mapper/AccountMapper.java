@@ -12,6 +12,9 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountList(int accountType);												// 거래처 목록
 	List<Map<String, Object>> AccountDirectList();														// 신사업 -> 직영점 목록
 	List<Map<String, Object>> AccountMemberList();
+	List<Map<String, Object>> AccountUtilMemberList();													// 직원관리 -> 유틸직원 조회
+	List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap);						// 직원관리 -> 유틸 직원 매핑정보 조회
+	int AccountUtilMemberMappingSave(Map<String, Object> paramMap);										// 직원관리 -> 유틸 직원 매핑정보 저장
 	List<Map<String, Object>> AccountTallySheetList(Map<String, Object> paramMap);						// 거래처 -> 집계표
 	int AccountSave(Map<String, Object> paramMap);														// 거래처 -> 집계표 저장(예정)
 	List<Map<String, Object>> AccountRecordDispatchList(Map<String, Object> paramMap); 					// 출근부 -> 파출정보

@@ -766,6 +766,8 @@
 	</select>
 	
 	<select id="AccountMemberAllList" parameterType="map" resultType="map">
+	
+	<!--  
 		SELECT T.member_id,
 		    T.account_id,
 		    T.cor_type,
@@ -812,6 +814,106 @@
 			AND T.account_id = #{account_id}
  		</if>
  		ORDER BY T.account_id, T.position_type
+ 	-->	
+ 	
+ 		(
+		  SELECT
+		    T.member_id,
+		    T.account_id,
+		    T2.account_name,
+		    T.name,
+		    T.cor_type,
+			T.join_dt,
+			T.del_dt,
+			T.del_yn,
+			T.position_type,
+			T.idx,
+			T.start_time,
+			T.end_time,
+			T.salary,
+			T.relation,
+			T.del_note,
+			T.rct_notice,
+			T.note,
+			T.position_type,
+			T.address,
+			T.rrn,
+			T.account_number,
+			T.phone,
+			T.contract_type,
+			DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+			DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
+			DATE_FORMAT(T.national_pension, '%Y-%m-%d') AS national_pension,
+			DATE_FORMAT(T.health_insurance, '%Y-%m-%d') AS health_insurance,
+			DATE_FORMAT(T.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
+			DATE_FORMAT(T.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+			DATE_FORMAT(T.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
+			T.employment_contract,
+			T.subsidy,
+			T.headoffice_note,
+			T.id,
+			T.bankbook
+		  FROM tb_account_members T
+		  JOIN tb_account T2 ON T.account_id = T2.account_id
+		  WHERE 1=1
+			<if test='del_yn != null'>
+				AND T.del_yn = #{del_yn}
+	 		</if>
+			<if test='account_id !=null'>
+				AND T.account_id = #{account_id}
+	 		</if>
+		)
+		UNION ALL
+		(
+		  SELECT
+		    M.member_id,
+		    M.account_id,
+		    B.account_name,
+		    A.name,
+			A.cor_type,
+			A.join_dt,
+			A.del_dt,
+			A.del_yn,
+			A.position_type,
+			A.idx,
+			A.start_time,
+			A.end_time,
+			A.salary,
+			A.relation,
+			A.del_note,
+			A.rct_notice,
+			A.note,
+			A.position_type,
+			A.address,
+			A.rrn,
+			A.account_number,
+			A.phone,
+			A.contract_type,
+			DATE_FORMAT(A.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+			DATE_FORMAT(A.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
+			DATE_FORMAT(A.national_pension, '%Y-%m-%d') AS national_pension,
+			DATE_FORMAT(A.health_insurance, '%Y-%m-%d') AS health_insurance,
+			DATE_FORMAT(A.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
+			DATE_FORMAT(A.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+			DATE_FORMAT(A.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
+			A.employment_contract,
+			A.subsidy,
+			A.headoffice_note,
+			A.id,
+			A.bankbook
+		  FROM tb_account_util_member_mapping M
+		  JOIN tb_account_members A ON M.member_id = A.member_id
+		  JOIN tb_account B ON M.account_id = B.account_id
+		  WHERE 1=1
+		  <if test='del_yn != null'>
+				AND A.del_yn = #{del_yn}
+				AND M.del_yn = #{del_yn}
+	 		</if>
+			<if test='account_id !=null'>
+				AND M.account_id = #{account_id}
+	 		</if>
+		)
+		ORDER BY account_id;
 	</select>
 	
 	<insert id="AccountMembersSave" parameterType="map">

@@ -35,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.parser.ReceiptParserFactory;
+import com.example.demo.parser.TransactionStatementParser;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.OcrService;
@@ -133,6 +134,7 @@ public class OcrController {
         purchase.put("cell_date", cell_date);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
+        
 
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
@@ -171,6 +173,7 @@ public class OcrController {
                     executor.submit(() -> ReceiptParserFactory.parse(doc, receiptType));
 
             BaseReceiptParser.ReceiptResult result;
+            
             try {
                 result = parseFuture.get(10, TimeUnit.SECONDS);
             } catch (TimeoutException te) {
@@ -186,7 +189,7 @@ public class OcrController {
             if (result == null || result.meta == null || result.meta.saleDate == null) {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             }
-
+            
             // =========================
             // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
             // =========================
@@ -194,10 +197,17 @@ public class OcrController {
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
             LocalTime nowTime = LocalTime.now();
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
-
+            
+            // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+            int year = date.getYear();        // 2026
+            int month = date.getMonthValue(); // 1~12
+            
+            purchase.put("year", year);
+            purchase.put("month", month);
+            
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
+            
             // 집계표 날짜 불일치면 기존 로직 유지(원하면 이 케이스도 fallback으로 바꿀 수 있음)
             if (cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
@@ -244,7 +254,7 @@ public class OcrController {
                 purchase.put("cardNo", null);
                 purchase.put("cardBrand", null);
             }
-
+            
             // 사업자번호
             String merchantBizNoRaw = (result.merchant != null ? result.merchant.bizNo : null);
             String normalizedBizNo = null;
@@ -314,7 +324,7 @@ public class OcrController {
 
             int iResult = 0;
             iResult += accountService.AccountPurchaseSave(purchase);
-            iResult += operateService.TallyNowMonthSave(purchase);
+            iResult += accountService.TallySheetPaymentSave(purchase);
             for (Map<String, Object> m : detailList) {
                 iResult += accountService.AccountPurchaseDetailSave(m);
             }
@@ -355,6 +365,13 @@ public class OcrController {
         purchase.putIfAbsent("discount", 0);
         purchase.putIfAbsent("vat", 0);
         purchase.putIfAbsent("taxFree", 0);
+        
+        // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+        int year = baseDate.getYear();        // 2026
+        int month = baseDate.getMonthValue(); // 1~12
+        
+        purchase.put("year", year);
+        purchase.put("month", month);
 
         // 이미지 저장(원하면 이 케이스에서는 저장 안해도 됨)
         attachReceiptImage(purchase, file, saleId);
@@ -368,7 +385,7 @@ public class OcrController {
 
         int iResult = 0;
         iResult += accountService.AccountPurchaseSave(purchase);
-        iResult += operateService.TallyNowMonthSave(purchase);
+        iResult += accountService.TallySheetPaymentSave(purchase);
         // ✅ detail은 저장하지 않음(파싱값 없으니까)
 
         return purchase;

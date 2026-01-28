@@ -35,6 +35,27 @@ public class AccountService {
 		return resultList;
 	}
 	
+	// 유틸 직원 조회
+	public List<Map<String, Object>> AccountUtilMemberList() {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountUtilMemberList();
+		return resultList;
+	}
+	
+	// 유틸 직원 매핑 정보 조회
+	public List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountUtilMappingList(paramMap);
+		return resultList;
+	}
+	
+	// 유틸 직원 매핑 정보 저장
+	public int AccountUtilMemberMappingSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountUtilMemberMappingSave(paramMap);
+		return iResult;
+	}
+	
 	public List<Map<String, Object>> AccountDirectList() {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.AccountDirectList();
