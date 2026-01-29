@@ -11,8 +11,13 @@ public class DateUtils {
     private static final List<DateTimeFormatter> DATE_FORMATTERS = List.of(
             DateTimeFormatter.ofPattern("uuuu-MM-dd"), // 2025-10-16
             DateTimeFormatter.ofPattern("uuuu/MM/dd"), // 2025/10/16
-            DateTimeFormatter.ofPattern("uu-MM-dd"),   // 25-10-16
-            DateTimeFormatter.ofPattern("uu/MM/dd")    // 25/10/16 (혹시 모를 케이스)
+            DateTimeFormatter.ofPattern("uuuu.MM.dd"), // 2025.10.16
+            DateTimeFormatter.ofPattern("uuuu.MM.dd."), // 2025.10.16.
+            DateTimeFormatter.ofPattern("uu-MM-dd"), // 25-10-16
+            DateTimeFormatter.ofPattern("uu/MM/dd"), // 25/10/16 (혹시 모를 케이스)
+            DateTimeFormatter.ofPattern("uu.MM.dd"), // 25.10.16
+            DateTimeFormatter.ofPattern("uu.MM.dd.") // 25.10.16.
+
     );
 
     public static LocalDate parseFlexibleDate(String text) {
@@ -34,4 +39,3 @@ public class DateUtils {
         throw new DateTimeParseException("지원하지 않는 날짜 형식입니다: " + value, value, 0);
     }
 }
-

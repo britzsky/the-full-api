@@ -46,65 +46,63 @@ import com.google.cloud.documentai.v1.Document;
 
 @RestController
 @CrossOrigin(origins = {
-    "http://localhost:3000",       	// 로컬
-    "http://172.30.1.48:8080",      // 개발 React
-    "http://52.64.151.137",    		// 운영 React
-    "http://52.64.151.137:8080",    // 운영 React
-    "http://thefull.kr",			// 운영 도메인
-    "http://thefull.kr:8080"		// 운영 도메인
+        "http://localhost:3000", // 로컬
+        "http://172.30.1.48:8080", // 개발 React
+        "http://52.64.151.137", // 운영 React
+        "http://52.64.151.137:8080", // 운영 React
+        "http://thefull.kr", // 운영 도메인
+        "http://thefull.kr:8080" // 운영 도메인
 })
 public class OcrController {
 
     @Autowired
     private OcrService ocrService;
-    
+
     @Autowired
     private AccountService accountService;
-    
+
     @Autowired
     private OperateService operateService;
-    
+
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
-    
+
     private final String uploadDir;
-    
+
     @Autowired
     public OcrController(@Value("${file.upload-dir}") String uploadDir) {
-    	this.uploadDir = uploadDir;
+        this.uploadDir = uploadDir;
     }
-    
+
     // ✅ 식재료 키워드
     private static final List<String> FOOD_KEYWORDS = Arrays.asList(
-        "쌀", "현미", "찹쌀", "보리",
-        "감자", "고구마", "양파", "당근", "마늘", "생강", "무", "배추", "파", "버섯", "양배추",
-        "고기", "쇠고기", "소고기", "돼지고기", "돈육", "닭", "계육", "정육", "삼겹살",
-        "계란", "달걀", "두부", "콩", "콩나물", "숙주",
-        "생선", "연어", "참치", "고등어", "오징어", "새우", "조개", "해물",
-        "김치", "고춧가루", "된장", "간장", "맛술", "참기름", "식초", "소금", "설탕",
-        "밀가루", "전분", "치즈", "버터", "우유", "생크림", "요거트",
-        "사과", "바나나", "딸기", "배", "포도", "과일"
-    );
+            "쌀", "현미", "찹쌀", "보리",
+            "감자", "고구마", "양파", "당근", "마늘", "생강", "무", "배추", "파", "버섯", "양배추",
+            "고기", "쇠고기", "소고기", "돼지고기", "돈육", "닭", "계육", "정육", "삼겹살",
+            "계란", "달걀", "두부", "콩", "콩나물", "숙주",
+            "생선", "연어", "참치", "고등어", "오징어", "새우", "조개", "해물",
+            "김치", "고춧가루", "된장", "간장", "맛술", "참기름", "식초", "소금", "설탕",
+            "밀가루", "전분", "치즈", "버터", "우유", "생크림", "요거트",
+            "사과", "바나나", "딸기", "배", "포도", "과일");
 
     // ✅ 소모품 키워드
     private static final List<String> SUPPLY_KEYWORDS = Arrays.asList(
-        "칼", "식칼", "도마", "가위", "국자", "집게",
-        "행주", "수건", "걸레", "키친타올", "종이타월", "휴지", "물티슈",
-        "위생장갑", "고무장갑", "앞치마", "마스크",
-        "종이컵", "비닐", "봉투", "랩", "호일", "포장",
-        "세제", "주방세제", "락스", "세척제", "소독제",
-        "수세미", "스펀지", "필터", "호스"
-    );
+            "칼", "식칼", "도마", "가위", "국자", "집게",
+            "행주", "수건", "걸레", "키친타올", "종이타월", "휴지", "물티슈",
+            "위생장갑", "고무장갑", "앞치마", "마스크",
+            "종이컵", "비닐", "봉투", "랩", "호일", "포장",
+            "세제", "주방세제", "락스", "세척제", "소독제",
+            "수세미", "스펀지", "필터", "호스");
 
     // ✅ 예외 케이스 (예: "칼국수" → 음식)
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList(
-        "칼국수", "가위살" // '칼','가위' 포함하지만 실제 식재료인 경우
+            "칼국수", "가위살" // '칼','가위' 포함하지만 실제 식재료인 경우
     );
-    
+
     // ✅ 과면세 케이스
     private static final String VAT = "과세";
     private static final String TAX_FREE = "면세";
-    
+
     /**
      * OCR 영수증 스캔 + 파싱
      * 집계표 type : 1000, 1002, 1003, 1008 외 모두
@@ -120,8 +118,9 @@ public class OcrController {
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "total", required = false) int total
-    ) {
+            @RequestParam(value = "total", required = false) int total) {
+
+        // 파일 저장
         File tempFile = saveFile(file);
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
@@ -134,8 +133,8 @@ public class OcrController {
         purchase.put("cell_date", cell_date);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
-        
 
+        // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
@@ -156,24 +155,24 @@ public class OcrController {
 
             // 2) receiptType 자동 감지 (OCR 성공했을 때만 의미 있음)
             String resolvedReceiptType = receiptType;
-            
+
             if (receiptType == null || receiptType.isEmpty()) {
                 if (aiAnalyzer != null) {
-                	resolvedReceiptType = aiAnalyzer.detectType(doc);
+                    resolvedReceiptType = aiAnalyzer.detectType(doc);
                 } else {
-                	resolvedReceiptType = "MART_ITEMIZED";
+                    resolvedReceiptType = "MART_ITEMIZED";
                 }
                 purchase.put("receipt_type", resolvedReceiptType);
             } else {
-            	purchase.put("receipt_type", resolvedReceiptType);
+                purchase.put("receipt_type", resolvedReceiptType);
             }
 
             // 3) 파싱 + 10초 타임아웃 (원하면 3~5초로 줄여도 됨)
-            Future<BaseReceiptParser.ReceiptResult> parseFuture =
-                    executor.submit(() -> ReceiptParserFactory.parse(doc, receiptType));
+            Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
+                    .submit(() -> ReceiptParserFactory.parse(doc, receiptType));
 
             BaseReceiptParser.ReceiptResult result;
-            
+
             try {
                 result = parseFuture.get(10, TimeUnit.SECONDS);
             } catch (TimeoutException te) {
@@ -189,25 +188,26 @@ public class OcrController {
             if (result == null || result.meta == null || result.meta.saleDate == null) {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             }
-            
+
             // =========================
             // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
             // =========================
 
+            // saleId 생성(영수증 날짜 기반)
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
             LocalTime nowTime = LocalTime.now();
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
-            
+
             // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-            int year = date.getYear();        // 2026
+            int year = date.getYear(); // 2026
             int month = date.getMonthValue(); // 1~12
-            
+
             purchase.put("year", year);
             purchase.put("month", month);
-            
+
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            
+
             // 집계표 날짜 불일치면 기존 로직 유지(원하면 이 케이스도 fallback으로 바꿀 수 있음)
             if (cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
@@ -232,9 +232,11 @@ public class OcrController {
             // 결제금액
             String approvalAmt = (result.payment != null ? result.payment.approvalAmt : null);
             int iApprovalAmt = 0;
+            
             if (approvalAmt != null && !approvalAmt.isBlank()) {
                 String clean = approvalAmt.replaceAll("[^0-9]", "");
-                if (!clean.isEmpty()) iApprovalAmt = Integer.parseInt(clean);
+                if (!clean.isEmpty())
+                    iApprovalAmt = Integer.parseInt(clean);
             }
 
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {
@@ -254,7 +256,7 @@ public class OcrController {
                 purchase.put("cardNo", null);
                 purchase.put("cardBrand", null);
             }
-            
+
             // 사업자번호
             String merchantBizNoRaw = (result.merchant != null ? result.merchant.bizNo : null);
             String normalizedBizNo = null;
@@ -275,14 +277,16 @@ public class OcrController {
                 for (Map<String, Object> m : mappingList) {
                     try {
                         Object bizNoObj = m.get("biz_no");
-                        if (bizNoObj == null) continue;
+                        if (bizNoObj == null)
+                            continue;
                         String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
                         if (formattedBizNo2.equals(normalizedBizNo)) {
                             purchase.put("type", m.get("type"));
                             hasMapping = true;
                             break;
                         }
-                    } catch (IllegalArgumentException ignore) {}
+                    } catch (IllegalArgumentException ignore) {
+                    }
                 }
             }
 
@@ -291,7 +295,7 @@ public class OcrController {
                 error.put("code", 400);
                 error.put("message",
                         "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
-                        "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
+                                "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
                 error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
                 return ResponseEntity.badRequest().body(error);
             }
@@ -337,14 +341,16 @@ public class OcrController {
                     .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
         } finally {
             executor.shutdownNow();
-            if (tempFile != null && tempFile.exists()) tempFile.delete();
+            if (tempFile != null && tempFile.exists())
+                tempFile.delete();
         }
     }
 
     // =========================
-    // ✅ fallback: requestparam만으로 저장
+    // ✅ fallback: OCR/파싱 실패 시 requestParam만으로 저장
     // =========================
-    private Map<String, Object> saveWithRequestParamsOnly(Map<String, Object> purchase, MultipartFile file) throws Exception {
+    private Map<String, Object> saveWithRequestParamsOnly(Map<String, Object> purchase, MultipartFile file)
+            throws Exception {
         // sale_id는 이 케이스에서도 필요할 가능성이 높아서 생성
         LocalDateTime now = LocalDateTime.now();
         String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
@@ -365,11 +371,11 @@ public class OcrController {
         purchase.putIfAbsent("discount", 0);
         purchase.putIfAbsent("vat", 0);
         purchase.putIfAbsent("taxFree", 0);
-        
+
         // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-        int year = baseDate.getYear();        // 2026
+        int year = baseDate.getYear(); // 2026
         int month = baseDate.getMonthValue(); // 1~12
-        
+
         purchase.put("year", year);
         purchase.put("month", month);
 
@@ -384,13 +390,14 @@ public class OcrController {
         }
 
         int iResult = 0;
-        iResult += accountService.AccountPurchaseSave(purchase);
+        iResult += accountService.AccountPurchaseSave(purchase);        
         iResult += accountService.TallySheetPaymentSave(purchase);
         // ✅ detail은 저장하지 않음(파싱값 없으니까)
 
         return purchase;
     }
-
+    
+    // ✅ fallback용 이미지 저장 로직 분리
     private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
         String staticPath = new File(uploadDir).getAbsolutePath();
         String basePath = staticPath + "/" + "receipt/" + saleId + "/";
@@ -407,7 +414,8 @@ public class OcrController {
     }
 
     private int safeInt(Object v) {
-        if (v == null) return 0;
+        if (v == null)
+            return 0;
         try {
             return Integer.parseInt(String.valueOf(v).replaceAll("[^0-9-]", ""));
         } catch (Exception e) {
@@ -417,7 +425,8 @@ public class OcrController {
 
     /**
      * ✅ TaxType 으로 결과 반환
-     * @return 
+     * 
+     * @return
      */
     public static int taxify(String taxFlag) {
         if (taxFlag == null || taxFlag.isEmpty()) {
@@ -434,10 +443,11 @@ public class OcrController {
 
         return 3;
     }
-    
+
     /**
      * ✅ 품목명으로부터 분류 결과 반환
-     * @return 
+     * 
+     * @return
      */
     public static int classify(String itemName) {
         if (itemName == null || itemName.isEmpty()) {
