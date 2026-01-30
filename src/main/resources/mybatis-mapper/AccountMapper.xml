@@ -1631,6 +1631,7 @@
 			   total, 
 			   vat, 
 			   taxFree, 
+			   tax, 
 			   totalCard, 
 			   cardNo,
 			   cardBrand, 
