@@ -95,4 +95,42 @@ public class HeadOfficeService {
 		resultList = headOfficeMapper.AccountMappingPurchaseList(paramMap);
 		return resultList;
 	}
+	
+	// 본사 -> 전자결재 관리 -> 전자결재 타입 리스트 조회
+	public List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.HeadOfficeElectronicPaymentTypeList(paramMap);
+		return resultList;
+	}
+	
+	// 본사 -> 전자결재 관리 -> 전자결재 문서 조회
+	public List<Map<String, Object>> HeadOfficeElectronicPaymentList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.HeadOfficeElectronicPaymentList(paramMap);
+		return resultList;
+	}
+	
+	// 본사 -> 전자결재 관리 -> 소모품 구매 품의서 메인 저장(전자결제 main table)
+	public int HeadOfficeElectronicPaymentSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficeElectronicPaymentSave(paramMap);
+	};
+	
+	// 본사 -> 전자결재 관리 -> 소모품 구매 품의서 품목 저장(구매요청 item table)
+	public int HeadOfficePurchaseRequestSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficePurchaseRequestSave(paramMap);
+	};
+	
+	// 본사 -> 전자결재 관리 -> 부서목록 조회
+	public List<Map<String, Object>> HeadOfficeDepartmentList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.HeadOfficeDepartmentList(paramMap);
+		return resultList;
+	}
+	
+	// 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
+	public List<Map<String, Object>> HeadOfficeUserListByDepartment (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.HeadOfficeUserListByDepartment(paramMap);
+		return resultList;
+	}
 }

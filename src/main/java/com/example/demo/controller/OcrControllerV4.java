@@ -186,39 +186,71 @@ public class OcrControllerV4 {
                 // ✅ 파싱 예외 -> requestParam 기반 fallback 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             }
-
+            
+            String saleId = "";
+            String receiptDate = "";
+            String yearStr = "";
+            String monthStr = "";
+            LocalDate date;
+            
             if (result == null || result.meta == null || result.meta.saleDate == null) {
-                return ResponseEntity.badRequest()
-                        .body("❌ 영수증 날짜를 인식하지 못했습니다.");
+//                return ResponseEntity.badRequest()
+//                        .body("❌ 영수증 날짜를 인식하지 못했습니다.");
+            	
+            	date = DateUtils.parseFlexibleDate(cell_date);
+            	LocalTime nowTime = LocalTime.now(); // 시:분:초
+                LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+
+                // 원하는 형식으로 출력 (예: 20251009152744)
+                saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+                // tally sheet 테이블 저장을 위한 연,월 세팅.
+                yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
+                monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
+                
+                // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+                int year = date.getYear();							 	// 2026
+                int month = date.getMonthValue(); 						// 1~12
+                
+                purchase.put("year", year);
+                purchase.put("month", month);
+            	purchase.put("saleDate", date); 
+            	
+            } else {
+            	// =========================
+                // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
+                // =========================
+            	date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+                LocalTime nowTime = LocalTime.now(); // 시:분:초
+                LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+
+                // 원하는 형식으로 출력 (예: 20251009152744)
+                saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+
+                // tally sheet 테이블 저장을 위한 연,월 세팅.
+                yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
+                monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
+
+                // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+                int year = date.getYear();							 	// 2026
+                int month = date.getMonthValue(); 						// 1~12
+                
+                purchase.put("year", year);
+                purchase.put("month", month);
+                purchase.put("saleDate", date); 						// saleDate 세팅.
             }
 
-            // =========================
-            // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
-            // =========================
-
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
-            LocalTime nowTime = LocalTime.now(); // 시:분:초
-            LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
-
-            // 원하는 형식으로 출력 (예: 20251009152744)
-            String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-            String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-
-            // tally sheet 테이블 저장을 위한 연,월 세팅.
-            String yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
-            String monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
-
-            // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-            int year = date.getYear();							 	// 2026
-            int month = date.getMonthValue(); 						// 1~12
-
             purchase.put("account_id", account_id); 				// account_id 세팅.
-            purchase.put("year", year);
-            purchase.put("month", month);
-
             purchase.put("sale_id", saleId); 						// saleId 세팅.
-            purchase.put("saleDate", date); 						// saleDate 세팅.
-            purchase.put("total", result.totals.total); 			// total 세팅.
+            
+            if (result.totals.total != null) {
+            	purchase.put("total", result.totals.total); 			// total 세팅.
+            } else {
+            	purchase.put("total", total); 			// total 세팅.
+            }
+            
             purchase.put("discount", result.totals.discount); 		// discount 세팅.
             purchase.put("vat", result.totals.vat); 				// vat 세팅.
             purchase.put("taxFree", result.totals.taxFree); 		// taxFree 세팅.
@@ -282,45 +314,6 @@ public class OcrControllerV4 {
             }
             purchase.put("bizNo", normalizedBizNo);
 
-            // 해당 거래처에 등록된 업체 유무를 확인.
-            // tb_account_mapping 정보와 비교 후 type 값 세팅.
-            List<Map<String, Object>> mappingList = accountService.AccountMappingList(account_id);
-
-            boolean hasMapping = false;
-
-            // if (normalizedBizNo != null && mappingList != null) {
-            // for (Map<String, Object> m : mappingList) {
-            // try {
-            // Object bizNoObj = m.get("biz_no");
-            // if (bizNoObj == null) continue;
-            //
-            // String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
-            //
-            // if (formattedBizNo2.equals(normalizedBizNo)) {
-            // purchase.put("type", m.get("type"));
-            // hasMapping = true;
-            // break; // 매칭되면 더 안 돌게
-            // }
-            // } catch (IllegalArgumentException ex) {
-            // // 형식 이상한 사업자번호는 그냥 무시
-            // continue;
-            // }
-            // }
-            // }
-
-            // 📌 사업자 매핑 실패 시: 아래 동작(파일 저장, DB 저장)은 의미 없으므로 여기서 종료
-            // if (!hasMapping) {
-            // Map<String, Object> error = new HashMap<>();
-            // error.put("code", 400);
-            // error.put("message",
-            // "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
-            // "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
-            // error.put("bizNo", normalizedBizNo != null ? normalizedBizNo :
-            // merchantBizNoRaw);
-            //
-            // return ResponseEntity.badRequest().body(error);
-            // }
-
             // tb_account_purchase_tally_detail 저장 map
             List<Map<String, Object>> detailList = new ArrayList<>();
 
@@ -381,9 +374,12 @@ public class OcrControllerV4 {
             return ResponseEntity.ok(purchase);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+        	try {
+				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+			} catch (Exception e1) {
+				return ResponseEntity.internalServerError()
+			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+			}
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
             // 🔹 temp 파일 삭제

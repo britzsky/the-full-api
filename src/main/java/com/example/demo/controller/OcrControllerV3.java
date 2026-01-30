@@ -379,9 +379,12 @@ public class OcrControllerV3 {
             return ResponseEntity.ok(accountMap);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+        	try {
+				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+			} catch (Exception e1) {
+				return ResponseEntity.internalServerError()
+			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+			}
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
             // 🔹 temp 파일 삭제

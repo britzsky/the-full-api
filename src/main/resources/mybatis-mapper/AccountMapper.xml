@@ -1793,14 +1793,18 @@
 	<select id="AccountCorporateCardPaymentList" parameterType="map" resultType="hashmap">
 		SELECT sale_id, account_id, DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, use_name, bizNo, total, vat, tax, taxFree, totalCard, cardNo,cardBrand, receipt_image, note, DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, user_id, receipt_type, idx
 		FROM tb_account_corporate_card_payment_list
-        <choose>
-            <when test="year != null and year != ''">
-                WHERE DATE_FORMAT(payment_dt, '%Y') = #{year}
-				AND DATE_FORMAT(payment_dt, '%m') = #{month}
-            </when>
-            <otherwise>WHERE DATE_FORMAT(payment_dt, '%Y-%m-%d') = #{payment_dt}</otherwise>
-        </choose>
-		AND account_id = #{account_id}
+		<where>
+		    <choose>
+		        <when test="year != null and year != ''">
+		            DATE_FORMAT(payment_dt, '%Y') = ${year}
+		            AND DATE_FORMAT(payment_dt, '%m') = ${month}
+		        </when>
+		        <otherwise>
+		            DATE_FORMAT(payment_dt, '%Y-%m-%d') = #{payment_dt}
+		        </otherwise>
+		    </choose>
+		    AND account_id = #{account_id}
+		</where>
 	</select>
 	
 	<select id="AccountCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">

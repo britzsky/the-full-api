@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -35,7 +34,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.parser.ReceiptParserFactory;
-import com.example.demo.parser.TransactionStatementParser;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.OcrService;
@@ -130,7 +128,8 @@ public class OcrController {
         purchase.put("user_id", user_id);
         purchase.put("saveType", saveType);
         purchase.put("cell_day", cell_day);
-        purchase.put("cell_date", cell_date);
+        purchase.put("saleDate", cell_date);
+        purchase.put("payment_dt", cell_date);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
 
@@ -223,6 +222,7 @@ public class OcrController {
 
             purchase.put("sale_id", saleId);
             purchase.put("saleDate", date);
+            purchase.put("payment_dt", date);
             purchase.put("total", result.totals.total);
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
@@ -336,16 +336,19 @@ public class OcrController {
             return ResponseEntity.ok(purchase);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+        	try {
+				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+			} catch (Exception e1) {
+				return ResponseEntity.internalServerError()
+			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+			}
         } finally {
             executor.shutdownNow();
             if (tempFile != null && tempFile.exists())
                 tempFile.delete();
         }
     }
-
+    
     // =========================
     // ✅ fallback: OCR/파싱 실패 시 requestParam만으로 저장
     // =========================

@@ -566,4 +566,157 @@
 		GROUP BY T2.type, T2.name, T.count_month
 		ORDER BY T2.type
     </select>
+    
+    <select id="HeadOfficeElectronicPaymentTypeList" parameterType="map" resultType="hashmap">
+    	SELECT doc_type, doc_name, position
+		FROM tb_electronic_payment_type
+		WHERE del_yn = 'N'
+    </select>
+    
+    <select id="HeadOfficeElectronicPaymentList" parameterType="map" resultType="hashmap">
+    	SELECT payment_id, 
+    		   DATE_FORMAT(draft_dt, '%Y-%m-%d') AS draft_dt,
+    		   doc_type,
+    		   user_id,
+    		   charge_sign,
+    		   tm_sign,
+    		   payer_sign,
+    		   ceo_sign,
+    		   status,
+    		   tm_user,
+    		   payer_user,
+    		   ceo_user,
+    		   department,
+    		   DATE_FORMAT(reg_dt, '%Y-%m-%d') AS reg_dt
+		FROM tb_headoffice_electronic_payment
+		WHERE del_yn = 'N'
+    </select>
+
+	<insert id="HeadOfficeElectronicPaymentSave">
+        INSERT INTO tb_headoffice_electronic_payment
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        payment_id,
+	        draft_dt,
+	        doc_type,
+	        department,
+	        status,
+	        user_id,
+	        charge_sign,
+	        tm_user,
+	        tm_sign,
+	        payer_user,
+	        payer_sign,
+	        ceo_user,
+	        ceo_sign,
+	        reg_dt,
+	        reg_user_id
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{payment_id},
+	    	DATE_FORMAT(#{draft_dt}, '%Y-%m-%d'),
+	        #{doc_type},
+	        #{department},
+	        #{status},
+	        #{user_id},
+	        #{charge_sign},
+	        #{tm_user},
+	        #{tm_sign},
+	        #{payer_user},
+	        #{payer_sign},
+	        #{ceo_user},
+	        #{ceo_sign},
+	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        #{user_id}
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	draft_dt = DATE_FORMAT(#{draft_dt}, '%Y-%m-%d'),
+	        doc_type = #{doc_type},
+	        department = #{department},
+	        status = #{status},
+	        user_id= #{user_id},
+	        charge_sign = #{charge_sign},
+	        tm_user = #{tm_user},
+	        tm_sign = #{tm_sign},
+	        payer_user = #{payer_user},
+	        payer_sign = #{payer_sign},
+	        ceo_user = #{ceo_user},
+	        ceo_sign = #{ceo_sign}
+	    </trim>
+    </insert>
+    
+    <insert id="HeadOfficePurchaseRequestSave">
+        INSERT INTO tb_headoffice_purchase_request
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx,
+	        payment_id,
+	        item_name,
+	        qty,
+	        price,
+	        use_note,
+	        link,
+	        note,
+	        payment_note
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	        #{payment_id},
+	        #{item_name},
+	        #{qty},
+	        #{price},
+	        #{use_note},
+	        #{link},
+	        #{note},
+	        #{payment_note}
+	    </trim>
+	    
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	payment_id = #{payment_id},
+	        item_name = #{item_name},
+	        qty = #{qty},
+	        price = #{price},
+	        use_note = #{use_note},
+	        link = #{link},
+	        note = #{note},
+	        payment_note = #{payment_note}
+	    </trim>
+    </insert>
+    
+    <select id="HeadOfficeDepartmentList" resultType="hashmap">
+		SELECT department, 
+			   CASE WHEN department = 0
+			   		THEN '대표실'
+			   		WHEN department = 2
+			   		THEN '회계팀'
+			   		WHEN department = 3
+			   		THEN '인사팀'
+			   		WHEN department = 4
+			   		THEN '영업팀'
+			   		WHEN department = 5
+			   		THEN '운영팀'
+			   		ELSE '개발팀' END AS dept_name
+	 	FROM tb_user
+		WHERE del_yn = 'N'
+		AND department not in (1,7)
+		GROUP BY department
+        ORDER BY department ASC;
+	</select>
+	
+	<select id="HeadOfficeUserListByDepartment" resultType="hashmap">
+		SELECT user_id, user_name, department, position, join_dt, user_type
+	 	FROM tb_user
+		WHERE del_yn = 'N'
+		AND department = #{department}
+		ORDER BY position ASC
+	</select>
 </mapper>

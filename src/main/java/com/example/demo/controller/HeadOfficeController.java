@@ -1,11 +1,11 @@
 package com.example.demo.controller;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -192,6 +192,120 @@ public class HeadOfficeController {
 	@GetMapping("HeadOffice/AccountMappingPurchaseList")
 	public String AccountMappingPurchaseList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.AccountMappingPurchaseList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: HeadOfficeElectronicPaymentTypeList
+     * comment 	: 본사 -> 전자결재 관리 -> 전자결재 타입 리스트 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeElectronicPaymentTypeList")
+	public String HeadOfficeElectronicPaymentTypeList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeElectronicPaymentTypeList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: HeadOfficeElectronicPaymentList
+     * comment 	: 본사 -> 전자결재 관리 -> 소모품 구매 품의서 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeElectronicPaymentList")
+	public String HeadOfficePurchaseRequestList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeElectronicPaymentList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: ProfitLossTableSave
+     * comment 	: 본사 -> 전자결재 관리 -> 소모품 구매 품의서 저장
+     */
+	@PostMapping("HeadOffice/HeadOfficePurchaseRequestSave")
+	public String HeadOfficePurchaseRequestSave(@RequestBody Map<String, Object> payload) {
+		
+	    List<Map<String, Object>> mainList = (List<Map<String, Object>>) payload.get("main");
+	    List<Map<String, Object>> itemList = (List<Map<String, Object>>) payload.get("item");
+	    
+		int iResult = 0;
+		
+		if (mainList != null) {
+			for (Map<String, Object> paramMap : mainList) {
+				iResult += headOfficeService.HeadOfficeElectronicPaymentSave(paramMap);
+	        }
+		}
+		
+		if (itemList != null) {
+			for (Map<String, Object> paramMap : itemList) {
+				iResult += headOfficeService.HeadOfficePurchaseRequestSave(paramMap);
+	        }
+		}
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: HeadOfficeDepartmentList
+     * comment 	: 본사 -> 전자결재 관리 -> 부서목록 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeDepartmentList")
+	public String HeadOfficeDepartmentList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeDepartmentList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: HeadOfficeDepartmentList
+     * comment 	: 본사 -> 전자결재 관리 -> 부서목록 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeCompanyUserTree")
+	public String HeadOfficeCompanyUserTree(@RequestParam Map<String, Object> paramMap) {
+
+	    // 1) 부서 목록
+	    List<Map<String, Object>> deptList = headOfficeService.HeadOfficeDepartmentList(paramMap);
+
+	    // 2) 부서마다 users 조회해서 붙이기
+	    for (Map<String, Object> dept : deptList) {
+	        // dept에서 부서키 꺼내기 (컬럼명은 실제 DB 컬럼명에 맞추세요)
+	        Object department = dept.get("department"); // 또는 "dept_code", "department_id" 등
+
+	        Map<String, Object> userParam = new HashMap<>(paramMap);
+	        userParam.put("department", department);
+
+	        List<Map<String, Object>> users = headOfficeService.HeadOfficeUserListByDepartment(userParam);
+
+	        dept.put("users", users);
+	    }
+
+	    return new Gson().toJson(deptList);
+	}
+
+	
+	/* 
+	 * part		: 본사
+     * method 	: HeadOfficeDepartmentList
+     * comment 	: 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeUserListByDepartment")
+	public String HeadOfficeUserListByDepartment(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeUserListByDepartment(paramMap);
 		
 		return new Gson().toJson(resultList);
 	}
