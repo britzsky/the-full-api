@@ -223,7 +223,13 @@ public class OcrController {
             purchase.put("sale_id", saleId);
             purchase.put("saleDate", date);
             purchase.put("payment_dt", date);
-            purchase.put("total", result.totals.total);
+            
+            if (result.totals.total != null) {
+            	purchase.put("total", result.totals.total); 			// total 세팅.
+            } else {
+            	purchase.put("total", total); 							// total 세팅.
+            }
+            
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
             purchase.put("taxFree", result.totals.taxFree);

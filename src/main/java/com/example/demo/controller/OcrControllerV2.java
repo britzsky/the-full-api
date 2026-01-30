@@ -337,9 +337,6 @@ public class OcrControllerV2 {
                 iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
                 for (Map<String, Object> m : detailList) {
                     iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
-                    System.out.println("account_id ======= " + m.get("account_id").toString());
-                    System.out.println("account_id ======= " + m.get("year"));
-                    System.out.println("account_id ======= " + m.get("month"));
                     iResult += accountService.TallySheetCorporateCardPaymentSaveV2(m);
                 }
             }

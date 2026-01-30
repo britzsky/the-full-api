@@ -445,6 +445,8 @@
 		    <if test="del_yn != null">
 				AND T.del_yn = #{del_yn}
 			</if>
+			AND T2.record_year = #{year} 
+			AND T2.record_month = #{month}
 		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number
 		) AS subquery
 		ORDER BY subquery.member_id
