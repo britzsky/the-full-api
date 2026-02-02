@@ -355,7 +355,7 @@
 		    T.record_year,
 		    T.record_month,
 		    T.record_date,
-		    T2.type,
+		    T.type,
 		    T.start_time,
 		    T.end_time,
 		    T.salary,
@@ -364,10 +364,10 @@
 		LEFT JOIN tb_account_record_dispatch T
 		    ON T.account_id = T2.account_id
 		    AND T.member_id = T2.member_id
-		    AND T.record_year = #{year}  
-		    AND T.record_month = #{month}
 		WHERE T2.account_id = #{account_id}
-		AND T2.del_yn = 'N'
+			AND T.record_year = #{year}  
+		    AND T.record_month = #{month}
+			AND T2.del_yn = 'N'
 		) as X
 		ORDER BY CASE X.gubun WHEN 'nor' THEN 1
 							  WHEN 'rec' THEN 2
@@ -384,37 +384,7 @@
 		    subquery.account_id,
 		    subquery.name,
 		    subquery.phone,
-		    subquery.max_salary,
-		    subquery.count_max,
-		    subquery.min_salary,
-		    subquery.count_min,
-		    CASE 
-				WHEN IFNULL(subquery.count_max, 0) = 0 AND IFNULL(subquery.count_min, 0) = 0 THEN ''
-				ELSE 
-					CONCAT(
-						-- Max Salary 파트: count가 0보다 클 때만 표시
-						IF(IFNULL(subquery.count_max, 0) > 0, 
-						   CONCAT(FORMAT(subquery.max_salary, 0), "원 ", FORMAT(subquery.count_max, 0), "회"), 
-						   ""),
-						
-						-- 연결자: 둘 다 존재할 경우에만 ' + ' 추가
-						IF(IFNULL(subquery.count_max, 0) > 0 AND IFNULL(subquery.count_min, 0) > 0, " + ", ""),
-						
-						-- Min Salary 파트: count가 0보다 클 때만 표시
-						IF(IFNULL(subquery.count_min, 0) > 0, 
-						   CONCAT(FORMAT(subquery.min_salary, 0), "원 ", FORMAT(subquery.count_min, 0), "회"), 
-						   ""),
-						
-						-- 총액 파트
-						", 총 ", 
-						FORMAT(
-							(IFNULL(subquery.max_salary, 0) * IFNULL(subquery.count_max, 0)) + 
-							(IFNULL(subquery.min_salary, 0) * IFNULL(subquery.count_min, 0)), 
-						0), 
-						"원"
-					)
-			END AS total,
-		    --FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0) AS total,
+		    CONCAT(subquery.count , "회, ", subquery.salary, "원") as total,
 		    subquery.rrn,
 		    subquery.account_number,
 		    subquery.del_yn
@@ -426,16 +396,8 @@
 		        T.phone,
 		        T.rrn,
 		        T.account_number,
-		        MAX(T2.salary) AS max_salary,
-		        SUM(CASE WHEN T2.salary = (SELECT MAX(salary) FROM tb_account_record_dispatch WHERE account_id = T.account_id AND member_id = T.member_id  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END) AS count_max,
-		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
-		             THEN MIN(T2.salary)
-		             ELSE NULL
-		        END AS min_salary,
-		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
-		             THEN SUM(CASE WHEN T2.salary = (SELECT MIN(salary) FROM tb_account_record_dispatch WHERE account_id = T.account_id AND member_id = T.member_id AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END)
-		             ELSE NULL
-		        END AS count_min,
+		        IFNULL(COUNT(1),0) as count,
+                IFNULL(SUM(salary),0) as salary,
 		        T.del_yn
 		    FROM tb_account_members_dispatch AS T
 		    LEFT JOIN tb_account_record_dispatch AS T2
@@ -463,6 +425,7 @@
                  WHEN subquery.position_type = 4 THEN '조리사'
                  WHEN subquery.position_type = 5 THEN '조리원'
                  ELSE '유틸' END AS position,
+            CONCAT('근로일수 : ', ifnull(subquery.working_day,0), '회') as working_day,
 		    CONCAT('총 ',ifnull(subquery.count_max,0) + ifnull(subquery.count_min,0), '회,', ' 합계금액 : ', FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0)) AS employ_dispatch,
 		    CONCAT('초과 : ', ifnull(subquery.over_work,0), '회') as over_work,
 		    subquery.over_work AS over_count,
@@ -500,6 +463,13 @@
 					AND member_id = T.member_id
 					AND type = 4
 				) AS non_work,
+				(SELECT count(1)
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type in (1,2,3)
+                    AND record_year = #{year} AND record_month = #{month}
+				) AS working_day,
 		        T.note
 		    FROM tb_account_members AS T
 		    LEFT JOIN tb_account_record AS T2
