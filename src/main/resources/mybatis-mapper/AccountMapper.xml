@@ -367,8 +367,8 @@
 		    AND T.record_year = T2.record_year
             AND T.record_month = T2.record_month
 		WHERE T2.account_id = #{account_id}
-			AND T.record_year = #{year}  
-		    AND T.record_month = #{month}
+			AND T2.record_year = #{year}  
+		    AND T2.record_month = #{month}
 			AND T2.del_yn = 'N'
 		) as X
 		ORDER BY CASE X.gubun WHEN 'nor' THEN 1
@@ -409,7 +409,7 @@
 		    AND T.record_year = T2.record_year
             AND T.record_month = T2.record_month
 		    WHERE T.account_id = #{account_id} 
-		    <if test="del_yn == null">
+		    <if test="del_yn != null">
 				AND T.del_yn = #{del_yn}
 			</if>
 			AND T.record_year = #{year} 
@@ -424,6 +424,7 @@
 		    subquery.member_id,
 		    subquery.account_id,
 		    subquery.name,
+            ifnull(subquery.salary,0) AS salary,
 		    case WHEN subquery.position_type = 1 THEN '영양사'
              WHEN subquery.position_type = 2 THEN '조리팀장'
                  WHEN subquery.position_type = 3 THEN '조리장'
@@ -431,42 +432,48 @@
                  WHEN subquery.position_type = 5 THEN '조리원'
                  ELSE '유틸' END AS position,
             CONCAT('근로일수 : ', ifnull(subquery.working_day,0), '회') as working_day,
-		    CONCAT('총 ',ifnull(subquery.count_max,0) + ifnull(subquery.count_min,0), '회,', ' 합계금액 : ', FORMAT((ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)), 0),0)) AS employ_dispatch,
+		    CONCAT('총 ',ifnull(subquery.employ_dispatch_cnt,0), '회,', ' 합계금액 : ', ifnull(subquery.employ_dispatch_salary,0)) AS employ_dispatch,
+            ifnull(subquery.employ_dispatch_cnt,0) as employ_dispatch_cnt,
+            ifnull(subquery.employ_dispatch_salary,0) as employ_dispatch_salary,
 		    CONCAT('초과 : ', ifnull(subquery.over_work,0), '회') as over_work,
-		    subquery.over_work AS over_count,
+		    ifnull(subquery.over_work,0) AS over_count,
 		    CONCAT('결근 : ', ifnull(subquery.non_work,0), '회') as non_work,
-		    subquery.non_work AS non_count,
-		    subquery.note,
-		    (ifnull(subquery.max_salary,0) * ifnull(subquery.count_max,0)) + COALESCE((ifnull(subquery.min_salary,0) * ifnull(subquery.count_min,0)),0) AS total
+		    ifnull(subquery.non_work,0) AS non_count,
+		    subquery.note
 		FROM (
 		    SELECT
 		        T.member_id,
 		        T.account_id,
 		        T.name,
 		        T.position_type,
-		        MAX(T2.salary) AS max_salary,
-		        CASE WHEN MAX(T2.salary) IS NOT NULL THEN SUM(CASE WHEN T2.salary = (SELECT MAX(T3.salary) FROM tb_account_record AS T3 WHERE T3.account_id = T.account_id AND T3.member_id = T.member_id AND T3.type = 6  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END) 
-					 ELSE NULL 
-				END AS count_max,
-		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
-		             THEN MIN(T2.salary)
-		             ELSE NULL
-		        END AS min_salary,
-		        CASE WHEN MAX(T2.salary) != MIN(T2.salary)
-		             THEN SUM(CASE WHEN T2.salary = (SELECT MIN(T4.salary) FROM tb_account_record AS T4 WHERE T4.account_id = T.account_id AND T4.member_id = T.member_id AND T4.type = 6  AND T2.record_year = #{year} AND T2.record_month = #{month}) THEN 1 ELSE 0 END)
-		             ELSE NULL
-		        END AS count_min,
+		        T.salary,
+		        (SELECT sum(salary)
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type = 6
+					AND record_year = #{year} AND record_month = #{month}
+				) AS employ_dispatch_salary,
+		        (SELECT count(1)
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type = 6
+					AND record_year = #{year} AND record_month = #{month}
+				) AS employ_dispatch_cnt,
 		        (SELECT count(1)
 					FROM tb_account_record
 					WHERE account_id = T.account_id
 					AND member_id = T.member_id
 					AND type = 3
+					AND record_year = #{year} AND record_month = #{month}
 				) AS over_work,
 		        (SELECT count(1)
 					FROM tb_account_record
 					WHERE account_id = T.account_id
 					AND member_id = T.member_id
 					AND type = 4
+					AND record_year = #{year} AND record_month = #{month}
 				) AS non_work,
 				(SELECT count(1)
 					FROM tb_account_record
