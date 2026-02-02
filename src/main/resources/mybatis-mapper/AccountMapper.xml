@@ -368,10 +368,6 @@
 			AND T.record_year = #{year}  
 		    AND T.record_month = #{month}
 			AND T2.del_yn = 'N'
-			OR (
-				SUBSTR(T2.member_id, 1,4) = ${year}  
-				AND SUBSTR(T2.member_id, 5,2) = ${month}
-            )
 		) as X
 		ORDER BY CASE X.gubun WHEN 'nor' THEN 1
 							  WHEN 'rec' THEN 2
@@ -414,10 +410,6 @@
 			</if>
 			AND T2.record_year = #{year} 
 			AND T2.record_month = #{month}
-			OR (
-				SUBSTR(T.member_id, 1,4) = ${year} 
-				AND SUBSTR(T.member_id, 5,2) = ${month}
-            )
 		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number
 		) AS subquery
 		ORDER BY subquery.member_id
