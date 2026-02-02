@@ -180,6 +180,7 @@
 		    water_ratio,
 		    utility_bills,
 		    utility_ratio,
+		    utility_bills_note,
 		    food_cost,
 		    food_ratio,
 		    etc_cost,
@@ -237,6 +238,7 @@
 		    #{water_ratio},
 		    #{utility_bills},
 		    #{utility_ratio},
+		    #{utility_bills_note},
 		    #{food_cost},
 		    #{food_ratio},
 		    #{etc_cost},
@@ -347,6 +349,9 @@
 		    <if test="utility_ratio != null">
 		        utility_ratio = #{utility_ratio},
 		    </if>
+		    <if test="utility_bills_note != null">
+		        utility_bills_note = #{utility_bills_note},
+		    </if>
 		    <if test="food_cost != null">
 		        food_cost = #{food_cost},
 		    </if>
@@ -449,6 +454,7 @@
 			    ifnull(water_ratio,0) as water_ratio,
 			    ifnull(utility_bills,0) as utility_bills,
 			    ifnull(utility_ratio,0) as utility_ratio,
+			    utility_bills_note,
 			    ifnull(food_cost,0) as food_cost,
 			    ifnull(food_ratio,0) as food_ratio,
 			    ifnull(etc_cost,0) as etc_cost,

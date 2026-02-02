@@ -292,7 +292,7 @@ public class OcrControllerV3 {
                         String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
 
                         if (formattedBizNo2.equals(normalizedBizNo)) {
-                            accountMap.put("type", m.get("type"));
+//                            accountMap.put("type", m.get("type"));
                             hasMapping = true;
                             break; // 매칭되면 더 안 돌게
                         }
