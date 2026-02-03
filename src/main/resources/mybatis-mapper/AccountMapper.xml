@@ -15,7 +15,8 @@
 			   case account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
 			   account_rqd_member,
 			   account_headcount,
-			   meal_type
+			   meal_type,
+			   del_yn
 		FROM tb_account
 		WHERE del_yn = 'N'
 		<if test='accountType == 0'>
@@ -226,6 +227,7 @@
 	        <if test="phone != null and phone != ''">phone,</if>
 	        <if test="account_type != null and account_type != ''">account_type,</if>
 	        <if test="meal_type != null and meal_type != ''">meal_type,</if>
+	        <if test="del_yn != null and del_yn != ''">del_yn,</if>
 	        reg_dt
 	    )
 	    VALUES (
@@ -238,6 +240,7 @@
 	        <if test="phone != null and phone != ''">#{phone},</if>
 	        <if test="account_type != null and account_type != ''">#{account_type},</if>
 	        <if test="meal_type != null and meal_type != ''">#{meal_type},</if>
+	        <if test="del_yn != null and del_yn != ''">#{del_yn},</if>
 	        DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
 	    )
 	    ON DUPLICATE KEY UPDATE
@@ -250,6 +253,8 @@
 	        <if test="phone != null and phone != ''">, phone = #{phone}</if>
 	        <if test="account_type != null and account_type != ''">, account_type = #{account_type}</if>
 	        <if test="meal_type != null and meal_type != ''">, meal_type = #{meal_type}</if>
+	        <if test="del_yn != null and del_yn != ''">, del_yn = #{del_yn}</if>
+	        <if test='del_yn == "Y"'>, del_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')</if>
 	</insert>
 	
 	<select id="AccountRecordSheetList" parameterType="map" resultType="hashmap">

@@ -103,6 +103,7 @@ public class OcrControllerV2 {
     @PostMapping("/Corporate/receipt-scan")
     public ResponseEntity<?> scanReceipt(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "sale_id", required = false) String sale_id,
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "objectValue", required = false) String objectValue,
             @RequestParam(value = "folderValue", required = false) String folderValue,
@@ -116,6 +117,11 @@ public class OcrControllerV2 {
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
+        
+        if (!sale_id.isEmpty()) {
+        	purchase.put("sale_id", sale_id); // saleId 세팅.
+        }
+        
         purchase.put("account_id", objectValue);
         purchase.put("type", type);
         purchase.put("saveType", saveType);
@@ -211,7 +217,13 @@ public class OcrControllerV2 {
 
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
-            corporateCard.put("sale_id", saleId); // saleId 세팅.
+            
+            if (!sale_id.isEmpty()) {
+            	corporateCard.put("sale_id", sale_id); // saleId 세팅.
+            } else {
+            	corporateCard.put("sale_id", saleId); // saleId 세팅.
+            }
+            
             corporateCard.put("use_name", result.merchant.name); // use_name 세팅.
             corporateCard.put("payment_dt", date); // payment_dt 세팅.
             corporateCard.put("discount", result.totals.discount); // discount 세팅.
@@ -344,9 +356,12 @@ public class OcrControllerV2 {
             return ResponseEntity.ok(corporateCard);
 
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.internalServerError()
-                    .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+        	try {
+				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+			} catch (Exception e1) {
+				return ResponseEntity.internalServerError()
+			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+			}
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
             // 🔹 temp 파일 삭제
@@ -372,11 +387,15 @@ public class OcrControllerV2 {
         if (folderValue == null || folderValue.isBlank()) {
             folderValue = "card";
         }
-
+        
         // sale_id 생성
         LocalDateTime now = LocalDateTime.now();
         String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-
+        
+        if (purchase.get("sale_id").toString().isEmpty()) {
+        	corporateCard.put("sale_id", saleId);
+        }
+        
         corporateCard.put("account_id", purchase.get("account_id"));
         corporateCard.put("year", now.getYear());
         corporateCard.put("month", now.getMonthValue());
@@ -386,7 +405,7 @@ public class OcrControllerV2 {
         String cardBrand = (String) purchase.get("cardBrand");
         corporateCard.put("cardNo", cardNo);
         corporateCard.put("cardBrand", cardBrand);
-        corporateCard.put("sale_id", saleId);
+        
         corporateCard.put("use_name", null);
         corporateCard.put("payment_dt", now.toLocalDate());
 

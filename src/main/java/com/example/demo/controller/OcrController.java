@@ -274,36 +274,39 @@ public class OcrController {
                 }
             }
             purchase.put("bizNo", normalizedBizNo);
+            
+            // 씨엔푸드, 대성상회 제외 사업자번호 체크.
+            if (type != 25 || type != 45 || type != 1011) {
+            	// ✅ 매핑 체크 (기존 로직 유지)
+                List<Map<String, Object>> mappingList = accountService.AccountMappingList(account_id);
+                boolean hasMapping = false;
 
-            // ✅ 매핑 체크 (기존 로직 유지)
-            List<Map<String, Object>> mappingList = accountService.AccountMappingList(account_id);
-            boolean hasMapping = false;
-
-            if (normalizedBizNo != null && mappingList != null) {
-                for (Map<String, Object> m : mappingList) {
-                    try {
-                        Object bizNoObj = m.get("biz_no");
-                        if (bizNoObj == null)
-                            continue;
-                        String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
-                        if (formattedBizNo2.equals(normalizedBizNo)) {
-                            purchase.put("type", m.get("type"));
-                            hasMapping = true;
-                            break;
+                if (normalizedBizNo != null && mappingList != null) {
+                    for (Map<String, Object> m : mappingList) {
+                        try {
+                            Object bizNoObj = m.get("biz_no");
+                            if (bizNoObj == null)
+                                continue;
+                            String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
+                            if (formattedBizNo2.equals(normalizedBizNo)) {
+                                purchase.put("type", m.get("type"));
+                                hasMapping = true;
+                                break;
+                            }
+                        } catch (IllegalArgumentException ignore) {
                         }
-                    } catch (IllegalArgumentException ignore) {
                     }
                 }
-            }
 
-            if (!hasMapping) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("code", 400);
-                error.put("message",
-                        "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
-                                "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
-                error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
-                return ResponseEntity.badRequest().body(error);
+                if (!hasMapping) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("code", 400);
+                    error.put("message",
+                            "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
+                                    "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
+                    error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
+                    return ResponseEntity.badRequest().body(error);
+                }
             }
 
             // 상세 저장 리스트
