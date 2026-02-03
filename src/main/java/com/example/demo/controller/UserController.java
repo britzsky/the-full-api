@@ -116,6 +116,43 @@ public class UserController {
 	}
 
 	/*
+	 * method : UserDelYnSave
+	 * comment : 사용자 재직/퇴사 저장
+	 */
+	@PostMapping("/User/UserDelYnSave")
+	public Map<String, Object> UserDelYnSave(@RequestBody Map<String, Object> body) {
+		Map<String, Object> out = new HashMap<>();
+		try {
+			String userId = String.valueOf(body.get("user_id"));
+			String delYn = String.valueOf(body.get("del_yn")).toUpperCase();
+
+			if (userId == null || userId.trim().isEmpty()) {
+				out.put("code", "400");
+				out.put("msg", "user_id가 비어 있습니다.");
+				return out;
+			}
+
+			if (!"Y".equals(delYn) && !"N".equals(delYn)) {
+				out.put("code", "400");
+				out.put("msg", "del_yn 값이 올바르지 않습니다. (Y 또는 N)");
+				return out;
+			}
+
+			Map<String, Object> param = new HashMap<>();
+			param.put("user_id", userId);
+			param.put("del_yn", delYn);
+
+			int updated = userService.UpdateUserDelYn(param);
+			out.put("code", "200");
+			out.put("updated", updated);
+		} catch (Exception e) {
+			out.put("code", "400");
+			out.put("msg", "처리 중 오류가 발생했습니다.");
+		}
+		return out;
+	}
+
+	/*
 	 * method : UserRgt
 	 * comment : 사용자 등록
 	 */
@@ -170,6 +207,16 @@ public class UserController {
 	@GetMapping("User/UserMemberList")
 	public String UserMemberList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserMemberList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : UserManageList
+	 * comment : 사용자 목록 조회
+	 */
+	@GetMapping("/User/UserManageList")
+	public String UserManageList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = userService.UserManageList(paramMap);
 		return new Gson().toJson(resultList);
 	}
 

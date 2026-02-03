@@ -1543,7 +1543,7 @@
 			   		WHEN a.account_type = 5 THEN '학교'
 			   		ELSE '' END as account_type_name,
 			   CASE WHEN a.meal_type = 1 THEN '요양주간'
-			   		WHEN a.meal_type = 2 THEN '요양지원'
+			   		WHEN a.meal_type = 2 THEN '요양직원'
 			   		WHEN a.meal_type = 3 THEN '요양'
 			   		WHEN a.meal_type = 4 THEN '주간보호'
 			   		ELSE '산업체' END as meal_type_name,

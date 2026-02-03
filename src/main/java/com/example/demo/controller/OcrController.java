@@ -223,13 +223,13 @@ public class OcrController {
             purchase.put("sale_id", saleId);
             purchase.put("saleDate", date);
             purchase.put("payment_dt", date);
-            
-            if (result.totals.total != null) {
-            	purchase.put("total", result.totals.total); 			// total 세팅.
+
+            if (result.totals.total == 0 || result.totals.total == null) {
+                purchase.put("total", total); // total 세팅.
             } else {
-            	purchase.put("total", total); 							// total 세팅.
+                purchase.put("total", result.totals.total); // total 세팅.
             }
-            
+
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
             purchase.put("taxFree", result.totals.taxFree);
@@ -238,7 +238,7 @@ public class OcrController {
             // 결제금액
             String approvalAmt = (result.payment != null ? result.payment.approvalAmt : null);
             int iApprovalAmt = 0;
-            
+
             if (approvalAmt != null && !approvalAmt.isBlank()) {
                 String clean = approvalAmt.replaceAll("[^0-9]", "");
                 if (!clean.isEmpty())
@@ -342,19 +342,19 @@ public class OcrController {
             return ResponseEntity.ok(purchase);
 
         } catch (Exception e) {
-        	try {
-				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-			} catch (Exception e1) {
-				return ResponseEntity.internalServerError()
-			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
-			}
+            try {
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+            } catch (Exception e1) {
+                return ResponseEntity.internalServerError()
+                        .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+            }
         } finally {
             executor.shutdownNow();
             if (tempFile != null && tempFile.exists())
                 tempFile.delete();
         }
     }
-    
+
     // =========================
     // ✅ fallback: OCR/파싱 실패 시 requestParam만으로 저장
     // =========================
@@ -399,13 +399,13 @@ public class OcrController {
         }
 
         int iResult = 0;
-        iResult += accountService.AccountPurchaseSave(purchase);        
+        iResult += accountService.AccountPurchaseSave(purchase);
         iResult += accountService.TallySheetPaymentSave(purchase);
         // ✅ detail은 저장하지 않음(파싱값 없으니까)
 
         return purchase;
     }
-    
+
     // ✅ fallback용 이미지 저장 로직 분리
     private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
         String staticPath = new File(uploadDir).getAbsolutePath();
