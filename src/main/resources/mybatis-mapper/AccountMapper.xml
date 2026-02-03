@@ -391,7 +391,7 @@
 		    subquery.account_id,
 		    subquery.name,
 		    subquery.phone,
-		    CONCAT(subquery.count , "회, ", subquery.salary, "원") as total,
+		    CONCAT(subquery.work_cnt , "회, ", subquery.salary, "원") as total,
 		    IFNULL(subquery.salary, 0) as salary,
 		    subquery.rrn,
 		    subquery.account_number,
@@ -404,7 +404,7 @@
 		        T.phone,
 		        T.rrn,
 		        T.account_number,
-		        IFNULL(COUNT(1),0) as count,
+		        COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
                 IFNULL(SUM(salary),0) as salary,
 		        T.del_yn
 		    FROM tb_account_members_dispatch AS T
@@ -413,13 +413,14 @@
 		    AND T.member_id = T2.member_id
 		    AND T.record_year = T2.record_year
             AND T.record_month = T2.record_month
-		    WHERE T.account_id = #{account_id} 
-		    <if test="del_yn != null">
+		    WHERE T.record_year = #{year}
+			AND T.record_month = #{month}
+			AND T.account_id = #{account_id}
+			<if test="del_yn != null">
 				AND T.del_yn = #{del_yn}
 			</if>
-			AND T.record_year = #{year} 
-			AND T.record_month = #{month}
-		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number
+            AND T2.is_present = 'Y'
+		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T2.is_present
 		) AS subquery
 		ORDER BY subquery.member_id
 	</select>
