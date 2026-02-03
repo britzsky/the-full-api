@@ -906,8 +906,8 @@
 		  JOIN tb_account B ON M.account_id = B.account_id
 		  WHERE 1=1
 		  <if test='del_yn != null'>
-				AND A.del_yn = #{del_yn}
-				AND M.del_yn = #{del_yn}
+				AND (A.del_yn = #{del_yn}
+            	OR M.del_yn = #{del_yn})
 	 		</if>
 			<if test='account_id !=null'>
 				AND M.account_id = #{account_id}
@@ -1232,102 +1232,97 @@
 	
 	<select id="AccountDispatchMemberAllList" parameterType="map" resultType="map">
 		SELECT
-			  T.account_id,
-			  T.member_id,
-			  T.name,
-			  DATE_FORMAT(T.del_dt, '%Y-%m-%d') AS del_dt,
-			  T.del_yn,
-			  T.rrn,
-			  TRIM(REGEXP_REPLACE(T.account_number, '[가-힣]+', '')) AS account_number,
-			  REGEXP_SUBSTR(T.account_number, '[가-힣]+') AS bank_name,
-			  T.note,
-			  T.type,
-			  COUNT(R.record_date) AS work_cnt,
-			  COALESCE(SUM(R.salary), 0) AS salary_sum,
-			  MAX(CASE WHEN R.record_date = 1  THEN '✅' END) AS `1`,
-			  MAX(CASE WHEN R.record_date = 1  THEN R.salary END) AS `1Salary`,
-			  MAX(CASE WHEN R.record_date = 2  THEN '✅' END) AS `2`,
-			  MAX(CASE WHEN R.record_date = 2  THEN R.salary END) AS `2Salary`,
-			  MAX(CASE WHEN R.record_date = 3  THEN '✅' END) AS `3`,
-			  MAX(CASE WHEN R.record_date = 3  THEN R.salary END) AS `3Salary`,
-			  MAX(CASE WHEN R.record_date = 4  THEN '✅' END) AS `4`,
-			  MAX(CASE WHEN R.record_date = 4  THEN R.salary END) AS `4Salary`,
-			  MAX(CASE WHEN R.record_date = 5  THEN '✅' END) AS `5`,
-			  MAX(CASE WHEN R.record_date = 5  THEN R.salary END) AS `5Salary`,
-			  MAX(CASE WHEN R.record_date = 6  THEN '✅' END) AS `6`,
-			  MAX(CASE WHEN R.record_date = 6  THEN R.salary END) AS `6Salary`,
-			  MAX(CASE WHEN R.record_date = 7  THEN '✅' END) AS `7`,
-			  MAX(CASE WHEN R.record_date = 7  THEN R.salary END) AS `7Salary`,
-			  MAX(CASE WHEN R.record_date = 8  THEN '✅' END) AS `8`,
-			  MAX(CASE WHEN R.record_date = 8  THEN R.salary END) AS `8Salary`,
-			  MAX(CASE WHEN R.record_date = 9  THEN '✅' END) AS `9`,
-			  MAX(CASE WHEN R.record_date = 9  THEN R.salary END) AS `9Salary`,
-			  MAX(CASE WHEN R.record_date = 10 THEN '✅' END) AS `10`,
-			  MAX(CASE WHEN R.record_date = 10 THEN R.salary END) AS `10Salary`,
-			  MAX(CASE WHEN R.record_date = 11 THEN '✅' END) AS `11`,
-			  MAX(CASE WHEN R.record_date = 11 THEN R.salary END) AS `11Salary`,
-			  MAX(CASE WHEN R.record_date = 12 THEN '✅' END) AS `12`,
-			  MAX(CASE WHEN R.record_date = 12 THEN R.salary END) AS `12Salary`,
-			  MAX(CASE WHEN R.record_date = 13 THEN '✅' END) AS `13`,
-			  MAX(CASE WHEN R.record_date = 13 THEN R.salary END) AS `13Salary`,
-			  MAX(CASE WHEN R.record_date = 14 THEN '✅' END) AS `14`,
-			  MAX(CASE WHEN R.record_date = 14 THEN R.salary END) AS `14Salary`,
-			  MAX(CASE WHEN R.record_date = 15 THEN '✅' END) AS `15`,
-			  MAX(CASE WHEN R.record_date = 15 THEN R.salary END) AS `15Salary`,
-			  MAX(CASE WHEN R.record_date = 16 THEN '✅' END) AS `16`,
-			  MAX(CASE WHEN R.record_date = 16 THEN R.salary END) AS `16Salary`,
-			  MAX(CASE WHEN R.record_date = 17 THEN '✅' END) AS `17`,
-			  MAX(CASE WHEN R.record_date = 17 THEN R.salary END) AS `17Salary`,
-			  MAX(CASE WHEN R.record_date = 18 THEN '✅' END) AS `18`,
-			  MAX(CASE WHEN R.record_date = 18 THEN R.salary END) AS `18Salary`,
-			  MAX(CASE WHEN R.record_date = 19 THEN '✅' END) AS `19`,
-			  MAX(CASE WHEN R.record_date = 19 THEN R.salary END) AS `19Salary`,
-			  MAX(CASE WHEN R.record_date = 20 THEN '✅' END) AS `20`,
-			  MAX(CASE WHEN R.record_date = 20 THEN R.salary END) AS `20Salary`,
-			  MAX(CASE WHEN R.record_date = 21 THEN '✅' END) AS `21`,
-			  MAX(CASE WHEN R.record_date = 21 THEN R.salary END) AS `21Salary`,
-			  MAX(CASE WHEN R.record_date = 22 THEN '✅' END) AS `22`,
-			  MAX(CASE WHEN R.record_date = 22 THEN R.salary END) AS `22Salary`,
-			  MAX(CASE WHEN R.record_date = 23 THEN '✅' END) AS `23`,
-			  MAX(CASE WHEN R.record_date = 23 THEN R.salary END) AS `23Salary`,
-			  MAX(CASE WHEN R.record_date = 24 THEN '✅' END) AS `24`,
-			  MAX(CASE WHEN R.record_date = 24 THEN R.salary END) AS `24Salary`,
-			  MAX(CASE WHEN R.record_date = 25 THEN '✅' END) AS `25`,
-			  MAX(CASE WHEN R.record_date = 25 THEN R.salary END) AS `25Salary`,
-			  MAX(CASE WHEN R.record_date = 26 THEN '✅' END) AS `26`,
-			  MAX(CASE WHEN R.record_date = 26 THEN R.salary END) AS `26Salary`,
-			  MAX(CASE WHEN R.record_date = 27 THEN '✅' END) AS `27`,
-			  MAX(CASE WHEN R.record_date = 27 THEN R.salary END) AS `27Salary`,
-			  MAX(CASE WHEN R.record_date = 28 THEN '✅' END) AS `28`,
-			  MAX(CASE WHEN R.record_date = 28 THEN R.salary END) AS `28Salary`,
-			  MAX(CASE WHEN R.record_date = 29 THEN '✅' END) AS `29`,
-			  MAX(CASE WHEN R.record_date = 29 THEN R.salary END) AS `29Salary`,
-			  MAX(CASE WHEN R.record_date = 30 THEN '✅' END) AS `30`,
-			  MAX(CASE WHEN R.record_date = 30 THEN R.salary END) AS `30Salary`,
-			  MAX(CASE WHEN R.record_date = 31 THEN '✅' END) AS `31`,
-			  MAX(CASE WHEN R.record_date = 31 THEN R.salary END) AS `31Salary`
+			    T.account_id,
+			    T.member_id,
+			    T.name,
+			    T.record_year,
+			    T.record_month,
+			    COUNT(CASE WHEN R.is_present = 'Y' THEN R.record_date END) AS work_cnt,
+			    COALESCE(SUM(R.salary), 0) AS salary_sum,
+			    MAX(CASE WHEN R.record_date = 1 AND is_present = 'Y' THEN '✅' END) AS `1`,
+			  MAX(CASE WHEN R.record_date = 1 AND is_present = 'Y' THEN R.salary END) AS `1Salary`,
+			  MAX(CASE WHEN R.record_date = 2 AND is_present = 'Y' THEN '✅' END) AS `2`,
+			  MAX(CASE WHEN R.record_date = 2 AND is_present = 'Y' THEN R.salary END) AS `2Salary`,
+			  MAX(CASE WHEN R.record_date = 3 AND is_present = 'Y' THEN '✅' END) AS `3`,
+			  MAX(CASE WHEN R.record_date = 3 AND is_present = 'Y' THEN R.salary END) AS `3Salary`,
+			  MAX(CASE WHEN R.record_date = 4 AND is_present = 'Y' THEN '✅' END) AS `4`,
+			  MAX(CASE WHEN R.record_date = 4 AND is_present = 'Y' THEN R.salary END) AS `4Salary`,
+			  MAX(CASE WHEN R.record_date = 5 AND is_present = 'Y' THEN '✅' END) AS `5`,
+			  MAX(CASE WHEN R.record_date = 5 AND is_present = 'Y' THEN R.salary END) AS `5Salary`,
+			  MAX(CASE WHEN R.record_date = 6 AND is_present = 'Y' THEN '✅' END) AS `6`,
+			  MAX(CASE WHEN R.record_date = 6 AND is_present = 'Y' THEN R.salary END) AS `6Salary`,
+			  MAX(CASE WHEN R.record_date = 7 AND is_present = 'Y' THEN '✅' END) AS `7`,
+			  MAX(CASE WHEN R.record_date = 7 AND is_present = 'Y' THEN R.salary END) AS `7Salary`,
+			  MAX(CASE WHEN R.record_date = 8 AND is_present = 'Y' THEN '✅' END) AS `8`,
+			  MAX(CASE WHEN R.record_date = 8 AND is_present = 'Y' THEN R.salary END) AS `8Salary`,
+			  MAX(CASE WHEN R.record_date = 9 AND is_present = 'Y' THEN '✅' END) AS `9`,
+			  MAX(CASE WHEN R.record_date = 9 AND is_present = 'Y' THEN R.salary END) AS `9Salary`,
+			  MAX(CASE WHEN R.record_date = 10 AND is_present = 'Y' THEN '✅' END) AS `10`,
+			  MAX(CASE WHEN R.record_date = 10 AND is_present = 'Y' THEN R.salary END) AS `10Salary`,
+			  MAX(CASE WHEN R.record_date = 11 AND is_present = 'Y' THEN '✅' END) AS `11`,
+			  MAX(CASE WHEN R.record_date = 11 AND is_present = 'Y' THEN R.salary END) AS `11Salary`,
+			  MAX(CASE WHEN R.record_date = 12 AND is_present = 'Y' THEN '✅' END) AS `12`,
+			  MAX(CASE WHEN R.record_date = 12 AND is_present = 'Y' THEN R.salary END) AS `12Salary`,
+			  MAX(CASE WHEN R.record_date = 13 AND is_present = 'Y' THEN '✅' END) AS `13`,
+			  MAX(CASE WHEN R.record_date = 13 AND is_present = 'Y' THEN R.salary END) AS `13Salary`,
+			  MAX(CASE WHEN R.record_date = 14 AND is_present = 'Y' THEN '✅' END) AS `14`,
+			  MAX(CASE WHEN R.record_date = 14 AND is_present = 'Y' THEN R.salary END) AS `14Salary`,
+			  MAX(CASE WHEN R.record_date = 15 AND is_present = 'Y' THEN '✅' END) AS `15`,
+			  MAX(CASE WHEN R.record_date = 15 AND is_present = 'Y' THEN R.salary END) AS `15Salary`,
+			  MAX(CASE WHEN R.record_date = 16 AND is_present = 'Y' THEN '✅' END) AS `16`,
+			  MAX(CASE WHEN R.record_date = 16 AND is_present = 'Y' THEN R.salary END) AS `16Salary`,
+			  MAX(CASE WHEN R.record_date = 17 AND is_present = 'Y' THEN '✅' END) AS `17`,
+			  MAX(CASE WHEN R.record_date = 17 AND is_present = 'Y' THEN R.salary END) AS `17Salary`,
+			  MAX(CASE WHEN R.record_date = 18 AND is_present = 'Y' THEN '✅' END) AS `18`,
+			  MAX(CASE WHEN R.record_date = 18 AND is_present = 'Y' THEN R.salary END) AS `18Salary`,
+			  MAX(CASE WHEN R.record_date = 19 AND is_present = 'Y' THEN '✅' END) AS `19`,
+			  MAX(CASE WHEN R.record_date = 19 AND is_present = 'Y' THEN R.salary END) AS `19Salary`,
+			  MAX(CASE WHEN R.record_date = 20 AND is_present = 'Y' THEN '✅' END) AS `20`,
+			  MAX(CASE WHEN R.record_date = 20 AND is_present = 'Y' THEN R.salary END) AS `20Salary`,
+			  MAX(CASE WHEN R.record_date = 21 AND is_present = 'Y' THEN '✅' END) AS `21`,
+			  MAX(CASE WHEN R.record_date = 21 AND is_present = 'Y' THEN R.salary END) AS `21Salary`,
+			  MAX(CASE WHEN R.record_date = 22 AND is_present = 'Y' THEN '✅' END) AS `22`,
+			  MAX(CASE WHEN R.record_date = 22 AND is_present = 'Y' THEN R.salary END) AS `22Salary`,
+			  MAX(CASE WHEN R.record_date = 23 AND is_present = 'Y' THEN '✅' END) AS `23`,
+			  MAX(CASE WHEN R.record_date = 23 AND is_present = 'Y' THEN R.salary END) AS `23Salary`,
+			  MAX(CASE WHEN R.record_date = 24 AND is_present = 'Y' THEN '✅' END) AS `24`,
+			  MAX(CASE WHEN R.record_date = 24 AND is_present = 'Y' THEN R.salary END) AS `24Salary`,
+			  MAX(CASE WHEN R.record_date = 25 AND is_present = 'Y' THEN '✅' END) AS `25`,
+			  MAX(CASE WHEN R.record_date = 25 AND is_present = 'Y' THEN R.salary END) AS `25Salary`,
+			  MAX(CASE WHEN R.record_date = 26 AND is_present = 'Y' THEN '✅' END) AS `26`,
+			  MAX(CASE WHEN R.record_date = 26 AND is_present = 'Y' THEN R.salary END) AS `26Salary`,
+			  MAX(CASE WHEN R.record_date = 27 AND is_present = 'Y' THEN '✅' END) AS `27`,
+			  MAX(CASE WHEN R.record_date = 27 AND is_present = 'Y' THEN R.salary END) AS `27Salary`,
+			  MAX(CASE WHEN R.record_date = 28 AND is_present = 'Y' THEN '✅' END) AS `28`,
+			  MAX(CASE WHEN R.record_date = 28 AND is_present = 'Y' THEN R.salary END) AS `28Salary`,
+			  MAX(CASE WHEN R.record_date = 29 AND is_present = 'Y' THEN '✅' END) AS `29`,
+			  MAX(CASE WHEN R.record_date = 29 AND is_present = 'Y' THEN R.salary END) AS `29Salary`,
+			  MAX(CASE WHEN R.record_date = 30 AND is_present = 'Y' THEN '✅' END) AS `30`,
+			  MAX(CASE WHEN R.record_date = 30 AND is_present = 'Y' THEN R.salary END) AS `30Salary`,
+			  MAX(CASE WHEN R.record_date = 31 AND is_present = 'Y' THEN '✅' END) AS `31`,
+			  MAX(CASE WHEN R.record_date = 31 AND is_present = 'Y' THEN R.salary END) AS `31Salary`
 			FROM tb_account_members_dispatch T
-			LEFT JOIN (
-			  SELECT
-			    account_id,
-			    member_id,
-			    record_year,
-			    record_month,
-			    record_date,
-			    MAX(salary) AS salary
-			  FROM tb_account_record_dispatch
-			  WHERE record_year = #{year}
-			    AND record_month = #{month}
-			  GROUP BY account_id, member_id, record_year, record_month, record_date
-			) R
-			  ON R.account_id = T.account_id
-			 AND R.member_id  = T.member_id
-			WHERE T.del_yn = #{del_yn}
+			LEFT JOIN ( 
+			    SELECT
+			        account_id,
+			        member_id,
+			        record_year,
+			        record_month,
+			        record_date,
+			        is_present,
+			        MAX(salary) AS salary
+			    FROM tb_account_record_dispatch
+			    GROUP BY account_id, member_id, record_year, record_month, record_date, is_present
+			) R ON T.account_id = R.account_id 
+			   AND T.member_id = R.member_id
+			WHERE T.del_yn = 'N'
 			  AND T.account_id = #{account_id}
+			  AND R.record_year = #{year}
+			  AND R.record_month = #{month}
 			GROUP BY
-			  T.account_id, T.member_id, T.name,
-			  T.del_dt, T.del_yn, T.rrn, T.account_number, T.note, T.type
-			ORDER BY T.account_id, T.member_id
+			    T.account_id, T.member_id, T.name, T.record_year, T.record_month,
+			    T.del_dt, T.del_yn, T.rrn, T.account_number, T.note, T.type
+			ORDER BY T.record_year DESC, T.record_month DESC, T.member_id ASC;
 	</select>
 	
 	<insert id="AccountDispatchMembersSave" parameterType="map">
@@ -1582,6 +1577,9 @@
 			20260127025437,
 			20260127025657
  		)
+ 		<if test='account_id !=null'>
+			AND a.account_id = #{account_id}
+ 		</if>
 	</select>
 	
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
