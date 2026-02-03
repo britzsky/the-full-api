@@ -28,8 +28,14 @@ public class UserService {
 		return userMapper.SelectApprovalPendingUsers(paramMap);
 	}
 
+	// 사용자 가입 승인 여부
 	public int UpdateUserUseYn(Map<String, Object> paramMap) {
 		return userMapper.UpdateUserUseYn(paramMap);
+	}
+
+	// 사용자 재직/퇴사 여부
+	public int UpdateUserDelYn(Map<String, Object> paramMap) {
+		return userMapper.UpdateUserDelYn(paramMap);
 	}
 
 	// ✅ 승인 저장 (리스트로 들어온 use_yn 반영)
@@ -55,6 +61,11 @@ public class UserService {
 			updated += userMapper.UpdateUserUseYn(param);
 		}
 		return updated;
+	}
+	
+	// 사용자관리 목록 조회
+	public List<Map<String, Object>> UserManageList(Map<String, Object> paramMap) {
+		return userMapper.UserManageList(paramMap);
 	}
 
 	// 사용자 등록

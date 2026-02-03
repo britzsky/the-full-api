@@ -66,6 +66,13 @@
         WHERE user_id = #{user_id}
     </update>
 
+    <update id="UpdateUserDelYn" parameterType="map">
+        UPDATE tb_user
+        SET del_yn = #{del_yn},
+            del_dt = CASE WHEN #{del_yn} = 'Y' THEN NOW() ELSE NULL END
+        WHERE user_id = #{user_id}
+    </update>
+
     <insert id="UserRgt" parameterType="map">
         INSERT INTO tb_user (
             user_id,
@@ -193,6 +200,29 @@
         WHERE T.del_yn = 'N'
         ORDER BY position
     </select>
+    
+    <select id="UserManageList" parameterType="map" resultType="hashmap">
+        SELECT
+            u.user_id,
+            u.user_name,
+            u.department,
+            u.account_id,
+            a.account_name,
+            u.position,
+            DATE_FORMAT(u.join_dt, '%Y-%m-%d') AS join_dt,
+            DATE_FORMAT(ud.birth_date, '%Y-%m-%d') AS birth_date,
+            ud.phone,
+            ud.address,
+            ud.address_detail,
+            u.del_yn
+        FROM tb_user u
+        LEFT JOIN tb_userdetail ud
+            ON u.user_id = ud.user_id
+        LEFT JOIN tb_account a
+            ON u.account_id = a.account_id
+        ORDER BY u.user_id
+    </select>
+
 
     <select id="ContractEndAccountList" resultType="hashmap">
         SELECT
