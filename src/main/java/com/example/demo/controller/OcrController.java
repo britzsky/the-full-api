@@ -289,7 +289,7 @@ public class OcrController {
                                 continue;
                             String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
                             if (formattedBizNo2.equals(normalizedBizNo)) {
-                                purchase.put("type", m.get("type"));
+                                // purchase.put("type", m.get("type"));
                                 hasMapping = true;
                                 break;
                             }
