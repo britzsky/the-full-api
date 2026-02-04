@@ -69,6 +69,19 @@ public class AccountController {
     }
     
     /*
+     * method 	: AccountList
+     * comment 	: 거래처 조회
+     */
+    @GetMapping("/Account/AccountListV2")
+    public String AccountListV2(@RequestParam(required = false) Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
+    	resultList = accountService.AccountListV2(iAccountType);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
      * method 	: AccountDirectList
      * comment 	: 신사업팀 -> 직영점 조회
      */
@@ -1011,6 +1024,7 @@ public class AccountController {
     	int iResult = 0;
     	
     	for (Map<String, Object> paramMap : paramList) {
+    		System.out.println(paramMap.get("payType"));
             iResult += accountService.AccountPurchaseSave(paramMap);
             // 여러 타입의 날짜형식을 매핑.
             LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
