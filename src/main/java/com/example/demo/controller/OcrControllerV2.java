@@ -118,8 +118,8 @@ public class OcrControllerV2 {
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
         
-        if (!sale_id.isEmpty()) {
-        	purchase.put("sale_id", sale_id); // saleId 세팅.
+        if (sale_id != null && !sale_id.isBlank()) {
+            purchase.put("sale_id", sale_id);
         }
         
         purchase.put("account_id", objectValue);
@@ -218,10 +218,11 @@ public class OcrControllerV2 {
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
             
-            if (!sale_id.isEmpty()) {
-            	corporateCard.put("sale_id", sale_id); // saleId 세팅.
+            // ✅ sale_id가 null이면 NPE 발생하므로 방어
+            if (sale_id != null && !sale_id.isBlank()) {
+                corporateCard.put("sale_id", sale_id); // saleId 세팅.
             } else {
-            	corporateCard.put("sale_id", saleId); // saleId 세팅.
+                corporateCard.put("sale_id", saleId); // saleId 세팅.
             }
             
             corporateCard.put("use_name", result.merchant.name); // use_name 세팅.
@@ -392,8 +393,12 @@ public class OcrControllerV2 {
         LocalDateTime now = LocalDateTime.now();
         String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
         
-        if (purchase.get("sale_id").toString().isEmpty()) {
-        	corporateCard.put("sale_id", saleId);
+        // ✅ purchase에 sale_id가 없을 수 있으므로 null-safe 처리
+        Object saleObj = purchase.get("sale_id");
+        if (saleObj == null || saleObj.toString().isBlank()) {
+            corporateCard.put("sale_id", saleId);
+        } else {
+            corporateCard.put("sale_id", saleObj.toString());
         }
         
         corporateCard.put("account_id", purchase.get("account_id"));
