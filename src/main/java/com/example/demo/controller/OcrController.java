@@ -184,7 +184,7 @@ public class OcrController {
             }
 
             // 4) 파싱 결과가 없거나 핵심 meta가 없으면 fallback
-            if (result == null || result.meta == null || result.meta.saleDate == null) {
+            if (result == null || result.meta == null) {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             }
 
@@ -221,8 +221,8 @@ public class OcrController {
             String monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
 
             purchase.put("sale_id", saleId);
-            purchase.put("saleDate", date);
-            purchase.put("payment_dt", date);
+//            purchase.put("saleDate", date);
+//            purchase.put("payment_dt", date);
 
             if (result.totals.total == 0 || result.totals.total == null) {
                 purchase.put("total", total); // total 세팅.

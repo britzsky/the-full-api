@@ -43,6 +43,35 @@
  		)
 	</select>
 	
+	<select id="AccountListV2" parameterType="int" resultType="hashmap">
+		SELECT account_id, 
+			   account_name, 
+			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address,
+			   case account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
+			   account_rqd_member,
+			   account_headcount,
+			   meal_type,
+			   del_yn
+		FROM tb_account
+		WHERE del_yn = 'N'
+		<if test='accountType == 0'>
+			AND account_type in (1,2,4,5)
+ 		</if>
+ 		<if test='accountType != 0'>
+			AND account_type = #{accountType}
+ 		</if>
+ 		AND account_id not in 
+ 		(
+ 			20260122065002,
+			20260122071337,
+			20260122071857,
+			20260122072114,
+			20260122072245,
+			20260122072529,
+			20260122072732
+ 		)
+	</select>
+	
 	<select id="AccountDirectList" resultType="hashmap">
 		SELECT account_id, 
 			   account_name, 
@@ -347,6 +376,7 @@
 		    AND T.member_id = T2.member_id
 		    AND T.record_year = #{year}   
 		    AND T.record_month = #{month}
+		    AND T2.use_yn = 'D'
 		WHERE T2.account_id = #{account_id}
 		AND T2.use_yn = 'D' 
         UNION ALL
@@ -379,9 +409,9 @@
 		ORDER BY CASE X.gubun WHEN 'nor' THEN 1
 							  WHEN 'rec' THEN 2
                               ELSE 3 END 
-				 , CASE X.position WHEN '영양사' THEN 1
-								   WHEN '조리팀장' THEN 2
-								   WHEN '조리사' THEN 3
+				 , CASE X.position_type WHEN 1 THEN 1
+								   WHEN 2 THEN 2
+								   WHEN 3 THEN 3
 								   ELSE 4 END,X.member_id;
 	</select>
 	

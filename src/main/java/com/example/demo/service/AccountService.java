@@ -35,6 +35,12 @@ public class AccountService {
 		return resultList;
 	}
 	
+	public List<Map<String, Object>> AccountListV2(int accountType) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountListV2(accountType);
+		return resultList;
+	}
+	
 	// 유틸 직원 조회
 	public List<Map<String, Object>> AccountUtilMemberList() {
 		List<Map<String, Object>> resultList = new ArrayList<>();
