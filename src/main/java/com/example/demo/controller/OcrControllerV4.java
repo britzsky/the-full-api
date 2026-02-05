@@ -245,10 +245,12 @@ public class OcrControllerV4 {
             purchase.put("account_id", account_id); 				// account_id 세팅.
             purchase.put("sale_id", saleId); 						// saleId 세팅.
             
-            if (result.totals.total != null) {
-            	purchase.put("total", result.totals.total); 			// total 세팅.
+            Integer parsedTotal = (result.totals != null ? result.totals.total : null);
+            if (parsedTotal == null || parsedTotal == 0) {
+            	// 파싱 실패/0원인 경우 사용자 입력값 사용
+            	purchase.put("total", total);
             } else {
-            	purchase.put("total", total); 			// total 세팅.
+            	purchase.put("total", parsedTotal);
             }
             
             purchase.put("discount", result.totals.discount); 		// discount 세팅.

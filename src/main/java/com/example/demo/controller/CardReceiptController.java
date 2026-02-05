@@ -128,6 +128,7 @@ public class CardReceiptController {
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
             // ✅ 요청으로 받은 영수증 타입 저장 (DB에 UNKNOWN 기본값 들어가는 것 방지)
+            corporateCard.put("type", type);
             corporateCard.put("receipt_type", type);
             corporateCard.put("sale_id", saleId);
             corporateCard.put("use_name", result.merchant != null ? result.merchant.name : null);
