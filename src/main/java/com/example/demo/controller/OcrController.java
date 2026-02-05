@@ -289,7 +289,7 @@ public class OcrController {
                                 continue;
                             String formattedBizNo2 = BizNoUtils.normalizeBizNo(bizNoObj.toString());
                             if (formattedBizNo2.equals(normalizedBizNo)) {
-                                purchase.put("type", m.get("type"));
+                                // purchase.put("type", m.get("type"));
                                 hasMapping = true;
                                 break;
                             }
@@ -298,15 +298,15 @@ public class OcrController {
                     }
                 }
 
-                if (!hasMapping) {
-                    Map<String, Object> error = new HashMap<>();
-                    error.put("code", 400);
-                    error.put("message",
-                            "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
-                                    "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
-                    error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
-                    return ResponseEntity.badRequest().body(error);
-                }
+//                if (!hasMapping) {
+//                    Map<String, Object> error = new HashMap<>();
+//                    error.put("code", 400);
+//                    error.put("message",
+//                            "해당 영수증의 사업자번호가 현재 선택한 거래처에 매핑되어 있지 않습니다.\n" +
+//                                    "먼저 [거래처 연결]에서 사업자번호를 매핑해 주세요.");
+//                    error.put("bizNo", normalizedBizNo != null ? normalizedBizNo : merchantBizNoRaw);
+//                    return ResponseEntity.badRequest().body(error);
+//                }
             }
 
             // 상세 저장 리스트
