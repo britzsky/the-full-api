@@ -1289,7 +1289,9 @@
 			   a.account_name,
 		       adi.year, 
 			   adi.month, 
-			   adi.note
+			   adi.note,
+			   adi.solution,
+			   adi.event_note
 		FROM tb_account a
 		LEFT OUTER JOIN tb_account_issue adi
 		ON adi.account_id = a.account_id
@@ -1306,6 +1308,8 @@
 	        month,
 	        note,
 	        type,
+	        solution,
+			event_note
 	    </trim>
 	    
 	    VALUES
@@ -1316,6 +1320,8 @@
 	        #{month},
 	        #{note},
 	        #{type},
+	        #{solution},
+	        #{event_note}
 	    </trim>
 	    
 	    ON DUPLICATE KEY UPDATE
@@ -1325,6 +1331,12 @@
 	        month=#{month},
 	        note=#{note},
 	        type=#{type},
+	        <if test="solution != null">
+	            solution = #{solution},
+	        </if>
+	        <if test="event_note != null">
+	            event_note = #{event_note}
+	        </if>
 	    </trim>
 	</insert>
 	
