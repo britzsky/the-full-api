@@ -16,8 +16,8 @@ public class WebConfig implements WebMvcConfigurer {
 
 	final static String LOCAL_HANDLE = "/image/**";
 	final static String LOCAL_PATH = "file:///C:/Users/손경원/git/the-full-api/src/main/resources/static/image/";
-	// final static String LOCAL_PATH = "file:///C:/Users/wonu/git/the-full-api/src/main/resources/static/image/";
-	
+	// final static String LOCAL_PATH =
+	// "file:///C:/Users/wonu/git/the-full-api/src/main/resources/static/image/";
 
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
@@ -37,8 +37,8 @@ public class WebConfig implements WebMvcConfigurer {
 	}
 
 	@Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-		registry.addResourceHandler(REAL_HANDLE)
-		.addResourceLocations(REAL_PATH);
-    }
+	public void addResourceHandlers(ResourceHandlerRegistry registry) {
+		registry.addResourceHandler(DEV_HANDLE)
+				.addResourceLocations(DEV_PATH);
+	}
 }
