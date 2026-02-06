@@ -301,6 +301,7 @@
 			 , X.end_time
 			 , X.salary
 		     , X.note
+		     , X.pay_yn
 		FROM
 		(
 			SELECT
@@ -318,6 +319,7 @@
 		    T.end_time,
 		    CASE WHEN T.type = 6 THEN T.salary ELSE 0 END AS salary,
 		    T.note
+		    , '' as pay_yn
 		FROM tb_account_members T2 
 		LEFT JOIN tb_account_record T
 		    ON T.account_id = T2.account_id
@@ -343,6 +345,7 @@
 		    T.end_time,
 		    CASE WHEN T3.type = 6 THEN T3.salary ELSE 0 END AS salary,
 		    T.note
+		    , '' as pay_yn
 		FROM tb_account_util_member_mapping T2 
 		LEFT JOIN tb_account_members T
 		    ON T.member_id = T2.member_id
@@ -370,6 +373,7 @@
 		    T.end_time,
 		    T.salary,
 		    T.note
+		    , '' as pay_yn
 		FROM tb_account_rec_management T2  
 		LEFT JOIN tb_account_rec_record T
 		    ON T.account_id = T2.account_id
@@ -395,6 +399,7 @@
 		    T.end_time,
 		    T.salary,
 		    T.note
+		    , ifnull(T.pay_yn,'N') as pay_yn
 		FROM tb_account_members_dispatch T2  
 		LEFT JOIN tb_account_record_dispatch T
 		    ON T.account_id = T2.account_id
@@ -408,11 +413,19 @@
 		) as X
 		ORDER BY CASE X.gubun WHEN 'nor' THEN 1
 							  WHEN 'rec' THEN 2
-                              ELSE 3 END 
+                              ELSE 3 END
 				 , CASE X.position_type WHEN 1 THEN 1
 								   WHEN 2 THEN 2
 								   WHEN 3 THEN 3
-								   ELSE 4 END,X.member_id;
+								   ELSE 4 END
+				 , CASE
+				     WHEN X.account_id = '20250819193632'
+				      AND X.member_id = '20260123085804162515037' THEN 0
+				     WHEN X.account_id = '20250819193632'
+				      AND X.member_id = '20260123085804162515030' THEN 1
+				     ELSE 2
+				   END
+				 , X.member_id;
 	</select>
 	
 	<select id="AccountRecordDispatchList" parameterType="map" resultType="hashmap">
@@ -527,7 +540,16 @@
 		    AND T.del_yn = 'N'
 		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position_type
 		) AS subquery
-		ORDER BY subquery.position_type, subquery.member_id
+			ORDER BY
+			subquery.position_type ASC,
+			  CASE
+			    WHEN subquery.account_id = '20250819193632'
+			     AND subquery.member_id = '20260123085804162515037' THEN 0
+			    WHEN subquery.account_id = '20250819193632'
+			     AND subquery.member_id = '20260123085804162515030' THEN 1
+			    ELSE 2
+			  END ASC,
+			  subquery.member_id DESC
 	</select>
 	
 	<select id="AccountMemberRecordTime" parameterType="map" resultType="hashmap">
@@ -576,15 +598,16 @@
 	
 	<insert id="AccountDispatchRecordSave" parameterType="map">
 		INSERT INTO tb_account_record_dispatch
-		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)
+		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary, pay_yn)
 		VALUES
-		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary})
+		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary}, IFNULL(#{pay_yn}, 'N'))
 		ON DUPLICATE KEY UPDATE
 		type = #{type},
 		start_time = #{start_time},
 		end_time = #{end_time},
 		note = #{note},
-		salary = #{salary}
+		salary = #{salary},
+		pay_yn = IFNULL(#{pay_yn}, 'N')
 	</insert>
 	
 	<insert id="AccountDispatchMemberSave" parameterType="map">
@@ -1472,7 +1495,7 @@
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
 	        bizNo=#{bizNo},
-	        receipt_image=#{receipt_image},
+	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
 	        note=#{note},
 	        use_name = #{use_name},
 	        cashReceiptType = #{cashReceiptType},
@@ -1562,6 +1585,7 @@
 	        AND apt.totalCard != 0
         </if>
         AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        ORDER BY apt.saleDate ASC, apt.sale_id ASC
 	</select>
 	
 	<select id="AccountPurchaseDetailList" parameterType="map" resultType="hashmap">
@@ -1591,6 +1615,7 @@
 	        AND apt.totalCard != 0
         </if>
 		AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
 	</select>
 	
 	<select id="AccountPurchaseDetailList_tmp" parameterType="map" resultType="hashmap">
@@ -1612,6 +1637,7 @@
 		JOIN tb_account_purchase_tally_detail aptd
 		ON aptd.sale_id = apt.sale_id
 		WHERE aptd.sale_id = #{sale_id}
+		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
 	</select>
 	
 	<select id="AccountPurchaseTallyPaymentList" parameterType="map" resultType="hashmap">
@@ -1632,7 +1658,8 @@
 		       receipt_image,
 		       note,
 		       bizNo,
-		       receipt_type
+		       receipt_type,
+		       cashReceiptType as cash_receipt_type
 		FROM tb_account_purchase_tally
 		WHERE account_id = #{account_id}
 		AND type = #{type}
@@ -1667,6 +1694,7 @@
 		WHERE DATE_FORMAT(payment_dt, '%Y') = ${year}
 		AND DATE_FORMAT(payment_dt, '%m') = ${month}
 		AND account_id = #{account_id}
+		ORDER BY payment_dt ASC, sale_id ASC
 	</select>
 	
 	<select id="HeadOfficeCorporateCardPaymentDetailList" parameterType="map" resultType="hashmap">
@@ -1762,7 +1790,7 @@
 	        totalCard=#{totalCard},
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
-	        receipt_image=#{receipt_image},
+	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
 	        note=#{note},
 	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        user_id=#{user_id},
@@ -1828,6 +1856,7 @@
 		    </choose>
 		    AND account_id = #{account_id}
 		</where>
+		ORDER BY payment_dt ASC, sale_id ASC
 	</select>
 	
 	<select id="AccountCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">
@@ -1926,7 +1955,7 @@
 	        totalCard=#{totalCard},
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
-	        receipt_image=#{receipt_image},
+	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
 	        note=#{note},
 	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	        user_id=#{user_id},

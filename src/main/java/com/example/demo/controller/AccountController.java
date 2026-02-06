@@ -413,7 +413,9 @@ public class AccountController {
         		}
         	}
         }
-        for (Map<String, Object> row : disRecords) {	
+        for (Map<String, Object> row : disRecords) {
+        	// 파출 지급 저장 시 연/월/일 누락 보정
+        	normalizeDispatchRecordDate(row);
         	iResult += accountService.AccountDispatchRecordSave(row);
         	iResult += accountService.processProfitLossV2(row);
         }
@@ -436,6 +438,35 @@ public class AccountController {
         // %02d: 2자리로 표현하며, 2자리보다 작으면 앞에 0으로 채웁니다.
         return String.format("%d-%02d-%02d", year, month, day);
     }
+
+	// 파출 지급 저장 시 연/월/일 누락 보정
+	private void normalizeDispatchRecordDate(Map<String, Object> row) {
+		if (row == null) return;
+
+		if (row.get("record_year") == null && row.get("year") != null) {
+			row.put("record_year", row.get("year"));
+		}
+		if (row.get("record_month") == null && row.get("month") != null) {
+			row.put("record_month", row.get("month"));
+		}
+		if (row.get("record_date") == null) {
+			if (row.get("record_day") != null) row.put("record_date", row.get("record_day"));
+			else if (row.get("day") != null) row.put("record_date", row.get("day"));
+		}
+
+		Object rd = row.get("record_date");
+		if (rd != null) {
+			String s = String.valueOf(rd).trim();
+			if (s.matches("^\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2}.*$")) {
+				LocalDate d = DateUtils.parseFlexibleDate(s);
+				if (d != null) {
+					row.put("record_year", d.getYear());
+					row.put("record_month", d.getMonthValue());
+					row.put("record_date", d.getDayOfMonth());
+				}
+			}
+		}
+	}
     
     /*
      * part		: 현장
@@ -1069,7 +1100,28 @@ public class AccountController {
         Map<String, Object> paramMap = new HashMap<>(params);
 
         // ✅ 프론트에서 보내는 필드명에 맞춰 날짜 파싱 (saleDate가 아니라 cell_date)
-        LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
+        String saleDateStr = String.valueOf(paramMap.get("saleDate"));
+        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+        	Object cellDate = paramMap.get("cell_date");
+        	if (cellDate != null) saleDateStr = String.valueOf(cellDate);
+        }
+        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+        	Object cellDate = paramMap.get("cellDate");
+        	if (cellDate != null) saleDateStr = String.valueOf(cellDate);
+        }
+        paramMap.put("saleDate", saleDateStr);
+        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+        	saleDateStr = java.time.LocalDate.now().toString();
+        	paramMap.put("saleDate", saleDateStr);
+        }
+
+
+        // cash_receipt_type -> cashReceiptType ??
+        if (paramMap.get("cashReceiptType") == null && paramMap.get("cash_receipt_type") != null) {
+        	paramMap.put("cashReceiptType", paramMap.get("cash_receipt_type"));
+        }
+
+        LocalDate date = DateUtils.parseFlexibleDate(saleDateStr);
 
         int year = date.getYear();
         int month = date.getMonthValue();
@@ -1454,10 +1506,23 @@ public class AccountController {
     	if (mainList != null) {
     		for (Map<String, Object> mainMap : mainList) {
         		iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
-        		
-        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-        		String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
 
+        		// 손익표, 예산 프로시저용 연/월 계산 전에 입력값을 정규화한다.
+        		// idx가 ""이면 NULL로, 금액 필드는 비어있으면 0으로, 결제일이 없으면 오늘 날짜로 보정.
+        		Object idxVal = mainMap.get("idx");
+        		if (idxVal != null && String.valueOf(idxVal).trim().isEmpty()) mainMap.put("idx", null);
+        		String[] numKeys = {"total", "vat", "taxFree", "tax", "totalCard"};
+        		for (String k : numKeys) {
+        			Object v = mainMap.get(k);
+        			if (v == null || String.valueOf(v).trim().isEmpty()) mainMap.put(k, 0);
+        		}
+        		String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+        		if (paymentDate == null || paymentDate.trim().isEmpty() || "null".equalsIgnoreCase(paymentDate)) {
+        			paymentDate = java.time.LocalDate.now().toString();
+        			mainMap.put("payment_dt", paymentDate);
+        		}
+
+        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
         		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
         		int year = payDate.getYear();        // 2026
         		int month = payDate.getMonthValue(); // 1~12
