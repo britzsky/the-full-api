@@ -203,7 +203,11 @@
 		    business_profit_ratio,
 		    update_dt,
 		    event_cost,
-		    event_ratio
+		    event_ratio,
+		    not_budget_cost,
+		    not_budget_ratio,
+		    etc_indirect_cost,
+		    etc_indirect_ratio
 		)
 		VALUES
 		(
@@ -261,7 +265,11 @@
 		    #{business_profit_ratio},
 		    NOW(),
 		    #{event_cost},
-		    #{event_ratio}
+		    #{event_ratio},
+		    #{not_budget_cost},
+		    #{not_budget_ratio},
+		    #{etc_indirect_cost},
+		    #{etc_indirect_ratio}
 		)
 		ON DUPLICATE KEY UPDATE
 		<trim suffixOverrides=",">
@@ -419,6 +427,18 @@
 		    <if test="event_ratio != null">
 		        event_ratio = #{event_ratio},
 		    </if>
+		    <if test="not_budget_cost != null">
+		        not_budget_cost = #{not_budget_cost},
+		    </if>
+		    <if test="not_budget_ratio != null">
+		        not_budget_ratio = #{not_budget_ratio},
+		    </if>
+		    <if test="etc_indirect_cost != null">
+		        etc_indirect_cost = #{etc_indirect_cost},
+		    </if>
+		    <if test="etc_indirect_ratio != null">
+		        etc_indirect_ratio = #{etc_indirect_ratio},
+		    </if>
 		</trim>
     </insert>
     
@@ -477,7 +497,11 @@
 			    ifnull(business_profit_ratio,0) as business_profit_ratio,
 			    ifnull(event_cost,0) as event_cost,
 			    ifnull(event_ratio,0) as event_ratio,
-			    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt
+			    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
+			    ifnull(not_budget_cost,0) as not_budget_cost,
+			    ifnull(not_budget_ratio,0) as not_budget_ratio,
+			    ifnull(etc_indirect_cost,0) as etc_indirect_cost,
+			    ifnull(etc_indirect_ratio,0) as etc_indirect_ratio
 			FROM the_full.tb_account_managerment_table
 			WHERE year = #{year}
 			AND account_id = #{account_id}
