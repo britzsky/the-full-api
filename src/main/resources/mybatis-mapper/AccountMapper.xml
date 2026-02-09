@@ -446,6 +446,7 @@
 		    IFNULL(subquery.salary, 0) as salary,
 		    subquery.rrn,
 		    subquery.account_number,
+		    subquery.note,
 		    subquery.del_yn
 		FROM (
 		    SELECT
@@ -455,6 +456,7 @@
 		        T.phone,
 		        T.rrn,
 		        T.account_number,
+		        T.note,
 		        COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
                 IFNULL(SUM(salary),0) as salary,
 		        T.del_yn
@@ -471,7 +473,7 @@
 				AND T.del_yn = #{del_yn}
 			</if>
             AND T2.is_present = 'Y'
-		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T2.is_present
+		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.note, T2.is_present
 		) AS subquery
 		ORDER BY subquery.member_id
 	</select>
@@ -2055,3 +2057,5 @@
 	    ) }
 	</select>
 </mapper>
+
+
