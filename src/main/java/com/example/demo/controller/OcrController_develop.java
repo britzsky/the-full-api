@@ -116,7 +116,8 @@ public class OcrController_develop {
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "total", required = false) int total) {
+            @RequestParam(value = "total", required = false) int total,
+            @RequestParam(value = "use_name", required = false) String use_name) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -132,6 +133,7 @@ public class OcrController_develop {
         purchase.put("payment_dt", cell_date);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
+        purchase.put("use_name", use_name);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -220,7 +222,7 @@ public class OcrController_develop {
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
             purchase.put("taxFree", result.totals.taxFree);
-            purchase.put("use_name", result.merchant != null ? result.merchant.name : null);
+            //purchase.put("use_name", result.merchant != null ? result.merchant.name : null);
 
             // 결제금액
             String approvalAmt = (result.payment != null ? result.payment.approvalAmt : null);

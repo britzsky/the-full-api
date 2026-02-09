@@ -437,44 +437,46 @@
 	</select>
 	
 	<select id="AccountRecordDispatchList" parameterType="map" resultType="hashmap">
-		SELECT
-		    subquery.member_id,
-		    subquery.account_id,
-		    subquery.name,
-		    subquery.phone,
-		    CONCAT(subquery.work_cnt , "회, ", subquery.salary, "원") as total,
-		    IFNULL(subquery.salary, 0) as salary,
-		    subquery.rrn,
-		    subquery.account_number,
-		    subquery.del_yn
-		FROM (
-		    SELECT
-		        T.member_id,
-		        T.account_id,
-		        T.name,
-		        T.phone,
-		        T.rrn,
-		        T.account_number,
-		        COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
+      SELECT
+          subquery.member_id,
+          subquery.account_id,
+          subquery.name,
+          subquery.phone,
+          CONCAT(subquery.work_cnt , "회, ", subquery.salary, "원") as total,
+          IFNULL(subquery.salary, 0) as salary,
+          subquery.rrn,
+          subquery.account_number,
+          subquery.note,
+          subquery.del_yn
+      FROM (
+          SELECT
+              T.member_id,
+              T.account_id,
+              T.name,
+              T.phone,
+              T.rrn,
+              T.account_number,
+              T.note,
+              COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
                 IFNULL(SUM(salary),0) as salary,
-		        T.del_yn
-		    FROM tb_account_members_dispatch AS T
-		    LEFT JOIN tb_account_record_dispatch AS T2
-		    ON T.account_id = T2.account_id 
-		    AND T.member_id = T2.member_id
-		    AND T.record_year = T2.record_year
+              T.del_yn
+          FROM tb_account_members_dispatch AS T
+          LEFT JOIN tb_account_record_dispatch AS T2
+          ON T.account_id = T2.account_id 
+          AND T.member_id = T2.member_id
+          AND T.record_year = T2.record_year
             AND T.record_month = T2.record_month
-		    WHERE T.record_year = #{year}
-			AND T.record_month = #{month}
-			AND T.account_id = #{account_id}
-			<if test="del_yn != null">
-				AND T.del_yn = #{del_yn}
-			</if>
+          WHERE T.record_year = #{year}
+         AND T.record_month = #{month}
+         AND T.account_id = #{account_id}
+         <if test="del_yn != null">
+            AND T.del_yn = #{del_yn}
+         </if>
             AND T2.is_present = 'Y'
-		    GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T2.is_present
-		) AS subquery
-		ORDER BY subquery.member_id
-	</select>
+          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.note, T2.is_present
+      ) AS subquery
+      ORDER BY subquery.member_id
+   </select>
 	
 	<select id="AccountRecordMemberList" parameterType="map" resultType="hashmap">
 		SELECT
@@ -1242,7 +1244,9 @@
 	        difference_price,
 	        input_price,
 	        note,
-	        deposit_amount
+	        deposit_amount,
+	        year,
+	        month
 	    </trim>
 	    
 	    VALUES
@@ -1263,7 +1267,9 @@
 	        #{difference_price},
 	        #{input_price},
 	        #{note},
-	        #{deposit_amount}
+	        #{deposit_amount},
+	        #{year},
+	        #{month}
 	    </trim>
 	</insert>
 	
@@ -1541,6 +1547,8 @@
 	        qty,
 	        amount,
 	        unitPrice,
+	        vat,
+	        tax,
 	        taxType,
 	        itemType,
 	        note,
@@ -1555,6 +1563,8 @@
 	        #{qty},
 	        #{amount},
 	        #{unitPrice},
+	        #{vat},
+	        #{tax},
 	        #{taxType},
 	        #{itemType},
 	        #{note},
@@ -1567,6 +1577,8 @@
 	        qty=#{qty},
 	        amount=#{amount},
 	        unitPrice=#{unitPrice},
+	        vat = #{vat},
+	        tax = #{tax},
 	        taxType=#{taxType},
 	        itemType=#{itemType},
 	        note=#{note},
@@ -1654,6 +1666,8 @@
 			   aptd.name, 
 			   aptd.qty, 
 			   aptd.unitPrice, 
+			   aptd.vat,
+			   aptd.tax,
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
