@@ -891,6 +891,15 @@ public class AccountController {
                     	iResult += accountService.processProfitLossV3(profitMap);
     				}
                 }
+                if (accountService.AccountDepositEmptyUse(param) != 0) {
+                	if (param.get("account_id") != null && param.get("year") != null && param.get("month") != null) {
+        				Map<String, Object> recalcMap = new HashMap<String, Object>();
+        				recalcMap.put("account_id", param.get("account_id"));
+        				recalcMap.put("year", param.get("year"));
+        				recalcMap.put("month", param.get("month"));
+        				iResult += accountService.AccountDepositHistoryRecalc(recalcMap);
+        			}
+                }
             }
             
             
