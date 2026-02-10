@@ -337,6 +337,32 @@
 		WHERE T2.account_id = #{account_id}
 		AND T2.del_yn = 'N' 
 		UNION ALL
+		-- 아래는 직원파출.
+		SELECT 'nor' as gubun,
+	       T.dispatch_account_id as account_id,
+	       T.member_id,
+	       T3.position,
+	       T3.position_type,
+	       T3.name,
+	       T2.record_year,
+	       T2.record_month,
+	       T2.record_date,
+	       T2.type,
+	       T2.start_time,
+	       T2.end_time,
+		   T2.salary,
+	       T2.note,
+	       '' as pay_yn
+	FROM tb_account_member_dispatch_mapping T
+	JOIN tb_account_record T2
+	    ON T.dispatch_account_id = T2.account_id 
+	    AND T.member_id = T2.member_id  -- ⭐ 이 조건이 반드시 필요합니다!
+	JOIN tb_account_members T3
+	    ON T3.member_id = T.member_id
+	WHERE T.dispatch_account_id = #{account_id}
+	  AND T.record_year = #{year}
+	  AND T.record_month = #{month}
+		UNION ALL
 		-- 아래는 유틸 직원
 		SELECT
             'nor' as gubun,
@@ -480,77 +506,86 @@
 	
 	<select id="AccountRecordMemberList" parameterType="map" resultType="hashmap">
 		SELECT
-		    subquery.member_id,
-		    subquery.account_id,
-		    subquery.name,
-            ifnull(subquery.salary,0) AS salary,
-		    case WHEN subquery.position_type = 1 THEN '영양사'
-             WHEN subquery.position_type = 2 THEN '조리팀장'
-                 WHEN subquery.position_type = 3 THEN '조리장'
-                 WHEN subquery.position_type = 4 THEN '조리사'
-                 WHEN subquery.position_type = 5 THEN '조리원'
-                 ELSE '유틸' END AS position,
-            CONCAT('근로일수 : ', ifnull(subquery.working_day,0), '회') as working_day,
-		    CONCAT('총 ',ifnull(subquery.employ_dispatch_cnt,0), '회,', ' 합계금액 : ', ifnull(subquery.employ_dispatch_salary,0)) AS employ_dispatch,
-            ifnull(subquery.employ_dispatch_cnt,0) as employ_dispatch_cnt,
-            ifnull(subquery.employ_dispatch_salary,0) as employ_dispatch_salary,
-		    CONCAT('초과 : ', ifnull(subquery.over_work,0), '회') as over_work,
-		    ifnull(subquery.over_work,0) AS over_count,
-		    CONCAT('결근 : ', ifnull(subquery.non_work,0), '회') as non_work,
-		    ifnull(subquery.non_work,0) AS non_count,
-		    subquery.note
-		FROM (
-		    SELECT
-		        T.member_id,
-		        T.account_id,
-		        T.name,
-		        T.position_type,
-		        T.salary,
-		        (SELECT sum(salary)
-					FROM tb_account_record
-					WHERE account_id = T.account_id
-					AND member_id = T.member_id
-					AND type = 6
-					AND record_year = #{year} AND record_month = #{month}
-				) AS employ_dispatch_salary,
-		        (SELECT count(1)
-					FROM tb_account_record
-					WHERE account_id = T.account_id
-					AND member_id = T.member_id
-					AND type = 6
-					AND record_year = #{year} AND record_month = #{month}
-				) AS employ_dispatch_cnt,
-		        (SELECT count(1)
-					FROM tb_account_record
-					WHERE account_id = T.account_id
-					AND member_id = T.member_id
-					AND type = 3
-					AND record_year = #{year} AND record_month = #{month}
-				) AS over_work,
-		        (SELECT count(1)
-					FROM tb_account_record
-					WHERE account_id = T.account_id
-					AND member_id = T.member_id
-					AND type = 4
-					AND record_year = #{year} AND record_month = #{month}
-				) AS non_work,
-				(SELECT count(1)
-					FROM tb_account_record
-					WHERE account_id = T.account_id
-					AND member_id = T.member_id
-					AND type in (1,2,3)
-                    AND record_year = #{year} AND record_month = #{month}
-				) AS working_day,
-		        T.note
-		    FROM tb_account_members AS T
-		    LEFT JOIN tb_account_record AS T2
-		    ON T.account_id = T2.account_id 
-		    AND T.member_id = T2.member_id
-		    WHERE T.account_id = #{account_id}
-		    AND T.del_yn = 'N'
-		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position_type
-		) AS subquery
-			ORDER BY
+			subquery.member_id,
+			subquery.account_id,
+			subquery.name,
+			ifnull(subquery.salary,0) AS salary,
+			case WHEN subquery.position_type = 1 THEN '영양사'
+			 WHEN subquery.position_type = 2 THEN '조리팀장'
+				 WHEN subquery.position_type = 3 THEN '조리장'
+				 WHEN subquery.position_type = 4 THEN '조리사'
+				 WHEN subquery.position_type = 5 THEN '조리원'
+				 ELSE '유틸' END AS position,
+			CONCAT('근로일수 : ', ifnull(subquery.working_day,0), '회') as working_day,
+			CONCAT('총 ',ifnull(subquery.employ_dispatch_cnt,0), '회,', ' 합계금액 : ', ifnull(subquery.employ_dispatch_salary,0)) AS employ_dispatch,
+			ifnull(subquery.employ_dispatch_cnt,0) as employ_dispatch_cnt,
+			ifnull(subquery.employ_dispatch_salary,0) as employ_dispatch_salary,
+			CONCAT('초과 : ', ifnull(subquery.over_work,0), '회') as over_work,
+			ifnull(subquery.over_work,0) AS over_count,
+			CONCAT('결근 : ', ifnull(subquery.non_work,0), '회') as non_work,
+			ifnull(subquery.non_work,0) AS non_count,
+			subquery.note
+	FROM (
+	    SELECT
+	        T.member_id,
+	        T.account_id,
+	        T.name,
+	        T.position_type,
+	        T.salary,
+	        -- 파출 급여 서브쿼리 수정
+	        (SELECT SUM(T2.salary) -- 여러 건일 경우를 대비해 SUM 권장
+	         FROM tb_account_member_dispatch_mapping TM
+	         JOIN tb_account_record T2
+	           ON TM.dispatch_account_id = T2.account_id 
+	          AND TM.member_id = T2.member_id
+	         WHERE TM.member_id = T.member_id  
+	           AND TM.account_id = #{account_id} 
+	           AND T2.record_year = #{year}
+	           AND T2.record_month = #{month}
+	           AND T2.type = 6
+	           AND TM.del_yn = 'N'
+	        ) AS employ_dispatch_salary,
+	        -- 파출 횟수 서브쿼리 수정
+	        (SELECT COUNT(1)
+	         FROM tb_account_member_dispatch_mapping TM
+	         JOIN tb_account_record T2
+	           ON TM.dispatch_account_id = T2.account_id 
+	          AND TM.member_id = T2.member_id
+	         WHERE TM.member_id = T.member_id 
+	           AND TM.account_id = #{account_id}
+	           AND T2.record_year = #{year}
+	           AND T2.record_month = #{month}
+	           AND T2.type = 6
+	           AND TM.del_yn = 'N'
+	        ) AS employ_dispatch_cnt,
+	       (SELECT count(1)
+				FROM tb_account_record
+				WHERE account_id = T.account_id
+				AND member_id = T.member_id
+				AND type = 3
+				AND record_year = #{year} AND record_month = #{month}
+			) AS over_work,
+			(SELECT count(1)
+				FROM tb_account_record
+				WHERE account_id = T.account_id
+				AND member_id = T.member_id
+				AND type = 4
+				AND record_year = #{year} AND record_month = #{month}
+			) AS non_work,
+			(SELECT count(1)
+				FROM tb_account_record
+				WHERE account_id = T.account_id
+				AND member_id = T.member_id
+				AND type in (1,2,3)
+				AND record_year = #{year} AND record_month = #{month}
+			) AS working_day,
+	        T.note
+	    FROM tb_account_members AS T
+	    WHERE T.account_id = #{account_id}
+	      AND T.del_yn = 'N'
+	    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position_type
+	) AS subquery
+	ORDER BY
 			subquery.position_type ASC,
 			  CASE
 			    WHEN subquery.account_id = '20250819193632'
@@ -559,7 +594,7 @@
 			     AND subquery.member_id = '20260123085804162515030' THEN 1
 			    ELSE 2
 			  END ASC,
-			  subquery.member_id DESC
+			  subquery.member_id DESC;
 	</select>
 	
 	<select id="AccountMemberRecordTime" parameterType="map" resultType="hashmap">
@@ -1277,7 +1312,8 @@
 		SELECT ifnull(difference_price,0) as difference_price
 		FROM tb_account_deposit_history
 		WHERE account_id = #{account_id}
-		AND DATE_FORMAT(input_dt, '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		AND year = #{year}
+		AND month = #{month}
 		AND type = #{type}
 		ORDER BY input_dt DESC
 		LIMIT 1
@@ -1616,7 +1652,7 @@
 		ON apt.account_id = a.account_id
 		AND apt.type = amv.type
 		WHERE a.account_id = #{account_id}
-		AND a.account_type = #{type}
+		AND apt.type = #{type}
 		<if test="payType == 1">
 	        AND apt.totalCash != 0
         </if>
@@ -2067,6 +2103,66 @@
 	        #{type, mode=IN, jdbcType=INTEGER},
 	        #{result, mode=OUT, jdbcType=INTEGER}
 	    ) }
+	</select>
+	
+	<insert id="AccountMemberDispatchMappingSave" parameterType="map">
+		INSERT INTO tb_account_member_dispatch_mapping
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	idx,
+	        member_id,
+	        account_id,
+	        dispatch_account_id,
+	        record_year,
+	        record_month,
+	        record_date,
+	        del_yn,
+	        reg_dt,
+	        user_id
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	    	#{idx},
+	        #{member_id},
+	        #{account_id},
+	        #{dispatch_account_id},
+	        #{record_year},
+	        #{record_month},
+	        #{record_date},
+	        'N',
+	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        #{user_id}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	idx=#{idx},
+	        member_id=#{member_id},
+	        account_id=#{account_id},
+	        dispatch_account_id=#{dispatch_account_id},
+	        record_year=#{record_year},
+	        record_month=#{record_month},
+	        record_date=#{record_date},
+	        del_yn=#{del_yn},
+	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        user_id=#{user_id}
+	    </trim>
+	</insert>
+	
+	<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
+		SELECT T.idx, T.member_id, T.account_id, T.dispatch_account_id, T3.name, 
+		(SELECT account_name FROM tb_account WHERE account_id =  T.dispatch_account_id),
+		CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
+		case WHEN T3.position_type = 1 THEN '영양사'
+             WHEN T3.position_type = 2 THEN '조리팀장'
+                 WHEN T3.position_type = 3 THEN '조리장'
+                 WHEN T3.position_type = 4 THEN '조리사'
+                 WHEN T3.position_type = 5 THEN '조리원'
+                 ELSE '유틸' END AS position
+		FROM tb_account_member_dispatch_mapping T
+		JOIN tb_account T2
+		ON T2.account_id = T.account_id
+		JOIN tb_account_members T3
+		ON T3.member_id = T.member_id
+		WHERE T.member_id = #{member_id}
 	</select>
 </mapper>
 

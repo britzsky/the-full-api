@@ -73,4 +73,6 @@ public interface AccountMapper {
 	void TallySheetCorporateCardPaymentSaveV2(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 집계표 적용
 	List<Map<String, Object>> AccountPurchaseTallyPaymentList(Map<String, Object> paramMap); 			// 집계표 -> 결제 리스트 조회
 	void TallySheetPaymentSave(Map<String, Object> paramMap);											// 집계표 -> 집계표 적용
+	int AccountMemberDispatchMappingSave(Map<String, Object> paramMap);									// 인사 -> 직원파출 매핑 저장
+	List<Map<String, Object>> AccountMemberDispatchMappingList(Map<String, Object> paramMap); 			// 인사 -> 직원파출 매핑 조회
 }

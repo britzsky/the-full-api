@@ -262,6 +262,9 @@ public class AccountController {
         }
         
         for (Map<String, Object> row : objRecords) {
+        	
+        	System.out.println("==================  salary  + " + row.get("salary"));
+        	
         	if (bType) {
         		iResult += accountService.AccountMemberRecordSave(row);
             	iResult += accountService.processProfitLossV2(row);
@@ -824,15 +827,73 @@ public class AccountController {
         	// accountDataMap을 사용하여 로직 처리
             if(param.get("balance_price") != null || param.get("before_price") != null) {
                 Map<String, Object> balanceMap = new HashMap<String, Object>();
+                Map<String, Object> profitMap = new HashMap<String, Object>();
                 balanceMap.put("balance_price", param.get("balance_price"));
                 balanceMap.put("before_price", param.get("before_price"));
                 balanceMap.put("account_id", param.get("account_id")); // account_id 정상 추출!
                 
                 // 총 미수잔액 저장
                 iResult += accountService.AccountBalancePriceSave(balanceMap);
+                iResult += accountService.processProfitLoss(param);
+                
+                if (iResult > 0 ) {
+                	// 주간보호 업장 금액 세팅
+                    if (param.get("account_id").toString().equals("20260122065002")) {	// 한결주간보호는 한결.
+                    	profitMap.put("account_id", "20250819193455");
+                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                    }
+                    if (param.get("account_id").toString().equals("20260122071337")) {	// 어르신사랑주간보호는 어르신사랑.
+                    	profitMap.put("account_id", "20250819193504");      
+                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+    				}
+    				if (param.get("account_id").toString().equals("20260122071857")) {	// 청평설악 주간보호는 청평설악.
+    					profitMap.put("account_id", "20250819193603");   
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+    				}
+    				if (param.get("account_id").toString().equals("20260122072114")) {	// 늘사랑(부천) 주간보호는 늘사랑부천.
+    					profitMap.put("account_id", "20250919162439");
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+    				}
+    				if (param.get("account_id").toString().equals("20260122072245")) {	// 지안 주간보호는 지안.
+    					profitMap.put("account_id", "20250819193620");
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+    				}
+    				if (param.get("account_id").toString().equals("20260122072732")) {	// 사랑의 주간보호는 사랑의.
+    					profitMap.put("account_id", "20250819193632");
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+    				}
+                }
             }
             
-            iResult += accountService.processProfitLoss(param);
+            
         }
         
         JsonObject obj = new JsonObject();
@@ -1552,5 +1613,45 @@ public class AccountController {
     	
     	return obj.toString();
     }
-    
+    /*
+     * part		: 인사
+     * method 	: AccountMemberDispatchMappingSave
+     * comment 	: 현장관리 -> 현장 직원관리 -> 직원파출 매핑정보 저장
+     */
+    @PostMapping("Account/AccountMemberDispatchMappingSave")
+    private String AccountMemberDispatchMappingSave(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+    		iResult += accountService.AccountMemberDispatchMappingSave(paramMap);
+    		paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
+    		iResult += accountService.AccountMemberRecordSave(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
+    /*
+     * part		: 인사
+     * method 	: AccountMemberDispatchMappingList
+     * comment 	: 인사 -> 직원파출 매핑 조회
+     */
+    @GetMapping("Account/AccountMemberDispatchMappingList")
+    public String AccountMemberDispatchMappingList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountMemberDispatchMappingList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
 }

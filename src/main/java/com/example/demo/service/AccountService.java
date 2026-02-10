@@ -346,7 +346,28 @@ public class AccountService {
 
         return 1; // ✅ 전체 성공
     }
-	
+	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
+    public int processProfitLossV3(Map<String, Object> param) {
+
+        int result = 0;
+
+        // ② 손익표 저장
+        if (headOfficeMapper.ProfitLossTableSave(param) <= 0) {
+            throw new RuntimeException("❌ ProfitLossTableSave 실패");
+        }
+        
+        // ③ 손익표 합계 + 비율 저장 프로시저 호출
+        param.put("result", 0); // OUT 값 초기화
+        headOfficeMapper.ProfitLossTotalSave(param);
+        
+        // OUT 값 확인
+        result = (int) param.get("result");
+        if (result != 1) {
+            throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+        }
+
+        return 1; // ✅ 전체 성공
+    }
 	// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	public List<Map<String, Object>> AccountMappingList (String account_id) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -568,5 +589,17 @@ public class AccountService {
         }
         
 		return result;
+	}
+	// 인사 -> 직원파출 매핑 저장
+	public int AccountMemberDispatchMappingSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountMemberDispatchMappingSave(paramMap);
+		return iResult;
+	}
+	// 인사 -> 직원파출 매핑 조회
+	public List<Map<String, Object>> AccountMemberDispatchMappingList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountMemberDispatchMappingList(paramMap);
+		return resultList;
 	}
 }
