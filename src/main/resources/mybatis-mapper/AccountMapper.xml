@@ -2164,6 +2164,89 @@
 		ON T3.member_id = T.member_id
 		WHERE T.member_id = #{member_id}
 	</select>
+	
+	<select id="AccountDepositEmptyUse" parameterType="map" resultType="integer">
+		SELECT COUNT(1)
+		FROM tb_account_deposit_history
+		WHERE year = #{year}
+		AND month = #{month}
+		AND account_id = #{account_id}
+	</select>
+	
+	<update id="AccountDepositHistoryRecalc" parameterType="map">
+		UPDATE tb_account_deposit_history dh
+		INNER JOIN (
+			SELECT dh0.account_id, dh0.year, dh0.month, dh0.type,
+				MAX(dh0.input_dt) AS max_input_dt,
+				(
+					CASE dh0.type
+						WHEN 1 THEN ifnull(adb.living_cost,0)
+						WHEN 2 THEN ifnull(adb.basic_cost,0)
+						WHEN 3 THEN ifnull(adb.employ_cost,0)
+						WHEN 5 THEN ifnull(adb.integrity_cost,0)
+						WHEN 4 THEN ifnull(abp.balance_price,0)
+						ELSE 0
+					END
+					+ ifnull(prev.difference_price,0)
+				) AS expected_total,
+				ifnull(paid.paid_total,0) AS paid_total
+			FROM tb_account_deposit_history dh0
+			INNER JOIN tb_account_deadline_balance adb
+			ON adb.account_id = dh0.account_id
+			AND adb.year = dh0.year
+			AND adb.month = dh0.month
+			LEFT OUTER JOIN tb_account_balance_price abp
+			ON abp.account_id = dh0.account_id
+			LEFT OUTER JOIN (
+				SELECT p.account_id, p.type, p.year, p.month, p.difference_price
+				FROM tb_account_deposit_history p
+				INNER JOIN (
+					SELECT account_id, type, year, month, MAX(input_dt) AS max_dt
+					FROM tb_account_deposit_history
+					GROUP BY account_id, type, year, month
+				) pm
+				ON pm.account_id = p.account_id
+				AND pm.type = p.type
+				AND pm.year = p.year
+				AND pm.month = p.month
+				AND pm.max_dt = p.input_dt
+			) prev
+			ON prev.account_id = dh0.account_id
+			AND prev.type = dh0.type
+			AND prev.year = CASE WHEN dh0.month = 1 THEN dh0.year - 1 ELSE dh0.year END
+			AND prev.month = CASE WHEN dh0.month = 1 THEN 12 ELSE dh0.month - 1 END
+			LEFT OUTER JOIN (
+				SELECT account_id, year, month, type, SUM(ifnull(input_price,0)) AS paid_total
+				FROM tb_account_deposit_history
+				GROUP BY account_id, year, month, type
+			) paid
+			ON paid.account_id = dh0.account_id
+			AND paid.year = dh0.year
+			AND paid.month = dh0.month
+			AND paid.type = dh0.type
+			WHERE dh0.account_id = #{account_id}
+			AND dh0.year = #{year}
+			AND dh0.month = #{month}
+			GROUP BY dh0.account_id, dh0.year, dh0.month, dh0.type, prev.difference_price
+		) calc
+		ON calc.account_id = dh.account_id
+		AND calc.year = dh.year
+		AND calc.month = dh.month
+		AND calc.type = dh.type
+		AND dh.input_dt = calc.max_input_dt
+		SET
+			dh.deposit_amount = calc.expected_total,
+			dh.difference_price = calc.expected_total - calc.paid_total
+		WHERE dh.account_id = #{account_id}
+		AND dh.year = #{year}
+		AND dh.month = #{month}
+		AND calc.expected_total > ifnull(dh.deposit_amount,0)
+	</update>
+	
 </mapper>
+
+
+
+
 
 

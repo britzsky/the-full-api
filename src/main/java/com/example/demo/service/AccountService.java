@@ -602,4 +602,17 @@ public class AccountService {
 		resultList = accountMapper.AccountMemberDispatchMappingList(paramMap);
 		return resultList;
 	}
+	// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정
+	public int AccountDepositHistoryRecalc(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDepositHistoryRecalc(paramMap);
+		return iResult;
+	}
+	// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 조회
+	public int AccountDepositEmptyUse(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDepositEmptyUse(paramMap);
+		return iResult;
+	}
+	
 }

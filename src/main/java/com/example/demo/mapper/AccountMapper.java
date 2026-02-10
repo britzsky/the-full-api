@@ -75,4 +75,6 @@ public interface AccountMapper {
 	void TallySheetPaymentSave(Map<String, Object> paramMap);											// 집계표 -> 집계표 적용
 	int AccountMemberDispatchMappingSave(Map<String, Object> paramMap);									// 인사 -> 직원파출 매핑 저장
 	List<Map<String, Object>> AccountMemberDispatchMappingList(Map<String, Object> paramMap); 			// 인사 -> 직원파출 매핑 조회
+	int AccountDepositEmptyUse(Map<String, Object> paramMap);											// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 조회
+	int AccountDepositHistoryRecalc(Map<String, Object> paramMap);										// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정							
 }
