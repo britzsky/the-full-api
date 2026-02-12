@@ -76,5 +76,8 @@ public interface AccountMapper {
 	int AccountMemberDispatchMappingSave(Map<String, Object> paramMap);									// 인사 -> 직원파출 매핑 저장
 	List<Map<String, Object>> AccountMemberDispatchMappingList(Map<String, Object> paramMap); 			// 인사 -> 직원파출 매핑 조회
 	int AccountDepositEmptyUse(Map<String, Object> paramMap);											// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 조회
-	int AccountDepositHistoryRecalc(Map<String, Object> paramMap);										// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정							
+	int AccountDepositHistoryRecalc(Map<String, Object> paramMap);										// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정					
+	int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
+	List<Map<String, Object>> AccountPersonPurchaseTallyList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 조회
+	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
 }

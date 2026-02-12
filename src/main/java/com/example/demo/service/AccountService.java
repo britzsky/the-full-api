@@ -229,6 +229,12 @@ public class AccountService {
 		iResult = accountMapper.AccountBalancePriceSave(paramMap);
 		return iResult;
 	}
+	// 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
+	public int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDeadlineMonthBalanceUpdate(paramMap);
+		return iResult;
+	}
 	// 회계 -> 매출마감/미수잔액 입금내역 저장
 	public int AccountDepositHistorySave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -396,6 +402,18 @@ public class AccountService {
 	public List<Map<String, Object>> AccountPurchaseDetailList_tmp (Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.AccountPurchaseDetailList_tmp(paramMap);
+		return resultList;
+	}
+	// 회계 -> 개인구매 관리 -> 개인구매 조회
+	public List<Map<String, Object>> AccountPersonPurchaseTallyList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPersonPurchaseTallyList(paramMap);
+		return resultList;
+	}
+	// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
+	public List<Map<String, Object>> AccountPersonPurchaseDetailList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPersonPurchaseDetailList(paramMap);
 		return resultList;
 	}
 	// 집계표 -> 결제 리스트 조회

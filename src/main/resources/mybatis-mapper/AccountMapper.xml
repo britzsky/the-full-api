@@ -392,7 +392,6 @@
          where T.account_id = #{account_id}
           AND IFNULL(T2.display_yn,'Y') = 'Y'
         UNION ALL
-		
 		SELECT
 			'rec' as gubun,
 		    T2.account_id,
