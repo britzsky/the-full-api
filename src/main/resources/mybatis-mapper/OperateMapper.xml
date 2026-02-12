@@ -781,7 +781,8 @@
 		    T.name,
 		    T.join_dt,
 		    T.del_dt,
-		    T.del_yn,
+ 			T.del_yn,
+ 			T.display_yn,
 		    T.position_type,
 		    T.idx,
 		    T.start_time,
@@ -832,6 +833,7 @@
 			T.join_dt,
 			T.del_dt,
 			T.del_yn,
+			T.display_yn,
 			T.position_type,
 			T.idx,
 			T.start_time,
@@ -865,9 +867,16 @@
 			<if test='del_yn != null'>
 				AND T.del_yn = #{del_yn}
 	 		</if>
-			<if test='account_id !=null'>
-				AND T.account_id = #{account_id}
-	 		</if>
+			<choose>
+				<when test='name != null and name != ""'>
+					AND T.name LIKE CONCAT('%', #{name}, '%')
+				</when>
+				<otherwise>
+					<if test='account_id != null and account_id != ""'>
+						AND T.account_id = #{account_id}
+					</if>
+				</otherwise>
+			</choose>
 		)
 		UNION ALL
 		(
@@ -879,7 +888,8 @@
 			A.cor_type,
 			A.join_dt,
 			A.del_dt,
-			A.del_yn,
+ 			A.del_yn,
+ 			A.display_yn,
 			A.position_type,
 			A.idx,
 			A.start_time,
@@ -915,9 +925,16 @@
 				AND (A.del_yn = #{del_yn}
             	OR M.del_yn = #{del_yn})
 	 		</if>
-			<if test='account_id !=null'>
-				AND M.account_id = #{account_id}
-	 		</if>
+			<choose>
+				<when test='name != null and name != ""'>
+					AND A.name LIKE CONCAT('%', #{name}, '%')
+				</when>
+				<otherwise>
+					<if test='account_id != null and account_id != ""'>
+						AND M.account_id = #{account_id}
+					</if>
+				</otherwise>
+			</choose>
 		)
 		ORDER BY account_id;
 	</select>
@@ -930,6 +947,7 @@
 	        join_dt,
 	        del_dt,
 	        del_yn,
+	        display_yn,
 	        position,
 	        idx,
 	        start_time,
@@ -989,6 +1007,7 @@
 	        </choose>
 	
 	        'N',
+	        #{display_yn},
 	        #{position},
 	        #{idx},
 	        #{start_time},
@@ -1057,6 +1076,7 @@
 	        </choose>,
 	
 	        del_yn = #{del_yn},
+	        display_yn = #{display_yn},
 	        position = #{position},
 	        idx = #{idx},
 	        start_time = #{start_time},
