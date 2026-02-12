@@ -335,7 +335,7 @@
 		    AND T.record_year = #{year}
 		    AND T.record_month = #{month}
 		WHERE T2.account_id = #{account_id}
-		AND T2.del_yn = 'N' 
+		AND IFNULL(T2.display_yn,'Y') = 'Y'
 		UNION ALL
 		-- 아래는 직원파출.
 		SELECT 'nor' as gubun,
@@ -366,30 +366,31 @@
 		-- 아래는 유틸 직원
 		SELECT
             'nor' as gubun,
-		    T3.account_id,
-		    T.member_id,
-		    T.position,
-            T.position_type,
-		    T.name,
-		    T2.record_year,
-		    T2.record_month,
-		    T2.record_date,
-		    T2.type,
-		    T2.start_time,
-		    T2.end_time,
-		    CASE WHEN T2.type = 6 THEN T.salary ELSE 0 END AS salary,
-		    T2.note
-		    , '' as pay_yn
-		FROM tb_account_members T 
-		LEFT JOIN tb_account_record T2
-		    ON T2.member_id = T.member_id
-		LEFT JOIN  tb_account_util_member_mapping T3
-            ON T3.member_id = T2.member_id
-		   AND T3.account_id = T2.account_id
-		   AND T2.record_year = #{year}
-		   AND T2.record_month = #{month}
-		 WHERE T3.account_id = #{account_id}
-           AND T.del_yn = 'N'
+          T.account_id,
+          T.member_id,
+          T2.position,
+            T2.position_type,
+          T2.name,
+          T3.record_year,
+          T3.record_month,
+          T3.record_date,
+          T3.type,
+          T3.start_time,
+          T3.end_time,
+          CASE WHEN T3.type = 6 THEN T2.salary ELSE 0 END AS salary,
+          T2.note
+          , '' as pay_yn
+         from tb_account_util_member_mapping T
+         join tb_account_members T2
+         on T2.member_id = T.member_id
+         left join tb_account_record T3
+         on T3.account_id = T.account_id
+         and T3.member_id = T.member_id
+         AND T3.record_year = #{year}
+       AND T3.record_month = #{month}
+         AND type = 7
+         where T.account_id = #{account_id}
+          AND IFNULL(T2.display_yn,'Y') = 'Y'
         UNION ALL
 		
 		SELECT
@@ -472,7 +473,8 @@
           IFNULL(subquery.salary, 0) as salary,
           subquery.rrn,
           subquery.account_number,
-          subquery.note,
+            subquery.dispatch_account,
+            subquery.note,
           subquery.del_yn
       FROM (
           SELECT
@@ -482,7 +484,8 @@
               T.phone,
               T.rrn,
               T.account_number,
-              T.note,
+                T.dispatch_account,
+                T.note,
               COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
                 IFNULL(SUM(salary),0) as salary,
               T.del_yn
@@ -499,7 +502,7 @@
             AND T.del_yn = #{del_yn}
          </if>
             AND T2.is_present = 'Y'
-          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.note, T2.is_present
+          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.dispatch_account, T.note, T2.is_present
       ) AS subquery
       ORDER BY subquery.member_id
    </select>
@@ -572,17 +575,27 @@
 				AND type = 4
 				AND record_year = #{year} AND record_month = #{month}
 			) AS non_work,
-			(SELECT count(1)
-				FROM tb_account_record
-				WHERE account_id = T.account_id
-				AND member_id = T.member_id
-				AND type in (1,2,3)
-				AND record_year = #{year} AND record_month = #{month}
+			(SELECT COUNT(DISTINCT record_date)
+				FROM (
+					SELECT record_date
+					FROM tb_account_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type in (1,2,3)
+					AND record_year = #{year} AND record_month = #{month}
+					UNION ALL
+					SELECT record_date
+					FROM tb_account_rec_record
+					WHERE account_id = T.account_id
+					AND member_id = T.member_id
+					AND type in (1,2,3)
+					AND record_year = #{year} AND record_month = #{month}
+				) AS working_day_rows
 			) AS working_day,
 	        T.note
 	    FROM tb_account_members AS T
 	    WHERE T.account_id = #{account_id}
-	      AND T.del_yn = 'N'
+	      AND IFNULL(T.display_yn,'Y') = 'Y'
 	    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position_type
 	) AS subquery
 	ORDER BY
@@ -604,7 +617,7 @@
 			   end_time
 		FROM tb_account_members T
 		WHERE account_id = #{account_id}
-		AND del_yn = 'N'
+		AND IFNULL(display_yn,'Y') = 'Y'
         UNION ALL
               SELECT member_id,
 			   account_id,
@@ -628,6 +641,8 @@
 		VALUES
 		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary})
 		ON DUPLICATE KEY UPDATE
+		<!-- 직원파출(동일 날짜 중복) 저장 시 계정도 갱신 -->
+		account_id = #{account_id},
 		type = #{type},
 		start_time = #{start_time},
 		end_time = #{end_time},
@@ -664,9 +679,9 @@
 	
 	<insert id="AccountDispatchMemberSave" parameterType="map">
 		INSERT INTO tb_account_members_dispatch
-		(account_id, member_id, name, phone, rrn, account_number, note, del_yn, record_year, record_month)
+		(account_id, member_id, name, phone, rrn, account_number, note, del_yn, dispatch_account, record_year, record_month)
 		VALUES
-		(#{account_id}, #{member_id}, #{name}, #{phone}, #{rrn}, #{account_number}, #{note}, #{del_yn}, #{record_year}, #{record_month})
+		(#{account_id}, #{member_id}, #{name}, #{phone}, #{rrn}, #{account_number}, #{note}, #{del_yn}, #{dispatch_account}, #{record_year}, #{record_month})
 		ON DUPLICATE KEY UPDATE
 		name = #{name},
 		phone = #{phone},
@@ -674,6 +689,7 @@
 		account_number = #{account_number},
 		note = #{note},
 		del_yn = #{del_yn},
+		dispatch_account = #{dispatch_account},
 		record_year = #{record_year}, 
 		record_month = #{record_month}
 	</insert>
@@ -1159,6 +1175,7 @@
 		       ifnull(adb.employ_cost,0) as employ_cost,
 		       ifnull(adb.integrity_cost,0) as integrity_cost,
 		       adb.input_exp,
+		       ifnull(adb.month_balance_price,0) as month_balance_price,
 		       ifnull(abp.balance_price,0) as balance_price,
 		       ifnull(abp.balance_price,0) as before_price,
 		       ifnull(abp.before_price,0) as before_price2
@@ -1266,6 +1283,24 @@
 	    </trim>
 	</insert>
 	
+	<insert id="AccountDeadlineMonthBalanceUpdate" parameterType="map">
+		UPDATE tb_account_deadline_balance A
+        INNER JOIN 
+        (
+			SELECT SUM(input_price) as input_price
+				 , account_id
+            FROM tb_account_deposit_history
+            WHERE DATE_FORMAT(input_dt, '%Y') = #{year}
+			AND DATE_FORMAT(input_dt, '%m') = #{month}
+			AND account_id = #{account_id}
+            GROUP BY account_id
+        ) as C
+        ON A.account_id = C.account_id
+		SET A.month_balance_price = (A.living_cost + A.basic_cost + employ_cost + integrity_cost) - C.input_price
+        WHERE (A.living_cost + A.basic_cost + employ_cost + integrity_cost) != 0
+        AND A.account_id = #{account_id}
+	</insert>
+	
 	<insert id="AccountDepositHistorySave" parameterType="map">
 		INSERT INTO tb_account_deposit_history
     
@@ -1315,7 +1350,7 @@
 		AND year = #{year}
 		AND month = #{month}
 		AND type = #{type}
-		ORDER BY input_dt DESC
+		ORDER BY input_dt ASC
 		LIMIT 1
 	</select>
 	
@@ -1694,6 +1729,72 @@
 	</select>
 	
 	<select id="AccountPurchaseDetailList_tmp" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id, 
+			   aptd.sale_id,
+			   aptd.item_id,
+			   a.account_name,
+			   DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+			   aptd.name, 
+			   aptd.qty, 
+			   aptd.unitPrice, 
+			   aptd.vat,
+			   aptd.tax,
+			   aptd.amount, 
+			   aptd.taxType, 
+			   aptd.itemType,
+			   apt.receipt_image
+		FROM tb_account a
+		JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		JOIN tb_account_purchase_tally_detail aptd
+		ON aptd.sale_id = apt.sale_id
+		WHERE aptd.sale_id = #{sale_id}
+		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
+	</select>
+	
+	<select id="AccountPersonPurchaseTallyList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name, 
+		       amv.type, 
+		       apt.use_name, 
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+		       ifnull(apt.total, 0) as total, 
+		       ifnull(apt.vat, 0) as vat,
+		       ifnull(apt.taxFree, 0) as taxFree,
+		       ifnull(apt.tax, 0) as tax,
+		       ifnull(apt.totalCash, 0) as totalCash,
+		       ifnull(apt.totalCard, 0) as totalCard,
+		       apt.payType,
+		       apt.cardNo,
+		       apt.cardBrand,
+		       apt.receipt_image,
+		       apt.note,
+		       apt.bizNo,
+		       am.ceo_name,
+		       apt.sale_id,
+		       apt.receipt_type
+		FROM tb_account a
+		JOIN tb_account_mapping_v2 amv
+		ON amv.account_id = a.account_id
+		JOIN tb_account_mapping am
+		ON am.type = amv.type
+		LEFT OUTER JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		AND apt.type = amv.type
+		WHERE a.account_id = #{account_id}
+		AND apt.type in (1008, 1)
+		<if test="payType == 1">
+	        AND apt.totalCash != 0
+        </if>
+        <if test="payType == 2">
+	        AND apt.totalCard != 0
+        </if>
+        AND DATE_FORMAT(apt.saleDate, '%Y') = ${year}
+		AND DATE_FORMAT(apt.saleDate, '%m') = ${month}
+        ORDER BY apt.saleDate ASC, apt.sale_id ASC
+	</select>
+	
+	<select id="AccountPersonPurchaseDetailList" parameterType="map" resultType="hashmap">
 		SELECT apt.account_id, 
 			   aptd.sale_id,
 			   aptd.item_id,
@@ -2108,8 +2209,7 @@
 	<insert id="AccountMemberDispatchMappingSave" parameterType="map">
 		INSERT INTO tb_account_member_dispatch_mapping
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	idx,
-	        member_id,
+	    	member_id,
 	        account_id,
 	        dispatch_account_id,
 	        record_year,
@@ -2121,8 +2221,7 @@
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	#{idx},
-	        #{member_id},
+	    	#{member_id},
 	        #{account_id},
 	        #{dispatch_account_id},
 	        #{record_year},
@@ -2134,8 +2233,7 @@
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
-	    	idx=#{idx},
-	        member_id=#{member_id},
+	    	    member_id=#{member_id},
 	        account_id=#{account_id},
 	        dispatch_account_id=#{dispatch_account_id},
 	        record_year=#{record_year},
@@ -2147,11 +2245,17 @@
 	    </trim>
 	</insert>
 	
-	<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
-		SELECT T.idx, T.member_id, T.account_id, T.dispatch_account_id, T3.name, 
-		(SELECT account_name FROM tb_account WHERE account_id =  T.dispatch_account_id),
-		CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
-		case WHEN T3.position_type = 1 THEN '영양사'
+		<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
+		SELECT
+			T.idx,
+			T.member_id,
+			T.account_id,
+			T.dispatch_account_id,
+			T3.name,
+			T2.account_name AS origin_account_name,
+			(SELECT account_name FROM tb_account WHERE account_id = T.dispatch_account_id) AS dispatch_account_name,
+			CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
+			case WHEN T3.position_type = 1 THEN '영양사'
              WHEN T3.position_type = 2 THEN '조리팀장'
                  WHEN T3.position_type = 3 THEN '조리장'
                  WHEN T3.position_type = 4 THEN '조리사'
@@ -2162,7 +2266,22 @@
 		ON T2.account_id = T.account_id
 		JOIN tb_account_members T3
 		ON T3.member_id = T.member_id
-		WHERE T.member_id = #{member_id}
+		WHERE 1=1
+		<if test="member_id != null and member_id != ''">
+			AND T.member_id = #{member_id}
+		</if>
+		<if test="dispatch_account_id != null and dispatch_account_id != ''">
+			AND T.dispatch_account_id = #{dispatch_account_id}
+		</if>
+		<if test="account_id != null and account_id != ''">
+			AND T.account_id = #{account_id}
+		</if>
+		<if test="record_year != null and record_year != ''">
+			AND T.record_year = #{record_year}
+		</if>
+		<if test="record_month != null and record_month != ''">
+			AND T.record_month = #{record_month}
+		</if>
 	</select>
 	
 	<select id="AccountDepositEmptyUse" parameterType="map" resultType="integer">
@@ -2227,6 +2346,7 @@
 			WHERE dh0.account_id = #{account_id}
 			AND dh0.year = #{year}
 			AND dh0.month = #{month}
+			AND dh0.type IN (1,2,3,5)
 			GROUP BY dh0.account_id, dh0.year, dh0.month, dh0.type, prev.difference_price
 		) calc
 		ON calc.account_id = dh.account_id
@@ -2235,15 +2355,16 @@
 		AND calc.type = dh.type
 		AND dh.input_dt = calc.max_input_dt
 		SET
-			dh.deposit_amount = calc.expected_total,
+			dh.deposit_amount = calc.expected_total - (calc.paid_total - ifnull(dh.input_price,0)),
 			dh.difference_price = calc.expected_total - calc.paid_total
 		WHERE dh.account_id = #{account_id}
 		AND dh.year = #{year}
 		AND dh.month = #{month}
-		AND calc.expected_total > ifnull(dh.deposit_amount,0)
+		AND dh.type IN (1,2,3,5)
 	</update>
 	
 </mapper>
+
 
 
 
