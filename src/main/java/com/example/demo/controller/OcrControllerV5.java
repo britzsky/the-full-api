@@ -52,7 +52,7 @@ import com.google.cloud.documentai.v1.Document;
         "http://thefull.kr", // 운영 도메인
         "http://thefull.kr:8080" // 운영 도메인
 })
-public class OcrControllerV4 {
+public class OcrControllerV5 {
 
     @Autowired
     private OcrService ocrService;
@@ -69,7 +69,7 @@ public class OcrControllerV4 {
     private final String uploadDir;
 
     @Autowired
-    public OcrControllerV4(@Value("${file.upload-dir}") String uploadDir) {
+    public OcrControllerV5(@Value("${file.upload-dir}") String uploadDir) {
         this.uploadDir = uploadDir;
     }
 
@@ -107,20 +107,14 @@ public class OcrControllerV4 {
      * 집계표 type : 1008
      * 개인결제 전용 영수증 파서
      */
-    @PostMapping("/receipt-scanV4")
+    @PostMapping("/receipt-scanV5")
     public ResponseEntity<?> scanReceipt(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "type", required = false) int type,
             @RequestParam(value = "account_id", required = false) String account_id,
-            @RequestParam(value = "cell_day", required = false) String cell_day,
-            @RequestParam(value = "cell_date", required = false) String cell_date,
-            @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
-            @RequestParam(value = "payType", required = false) String payType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "cash_receipt_type", required = false) String cash_receipt_type,
-            @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
-            @RequestParam(value = "use_name", required = false) String use_name) {
+            @RequestParam(value = "saleDate", required = false) String saleDate) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -130,14 +124,8 @@ public class OcrControllerV4 {
         purchase.put("account_id", account_id);
         purchase.put("type", type);
         purchase.put("user_id", user_id);
-        purchase.put("saveType", saveType);
-        purchase.put("cell_day", cell_day);
-        purchase.put("cell_date", cell_date);
         purchase.put("receipt_type", receiptType);
-        purchase.put("total", Optional.ofNullable(total).orElse(0));
-        purchase.put("payType", payType);
-        purchase.put("cashReceiptType", cash_receipt_type);
-        purchase.put("use_name", Optional.ofNullable(use_name).orElse(""));
+        purchase.put("saleDate", saleDate);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -193,12 +181,13 @@ public class OcrControllerV4 {
             String yearStr = "";
             String monthStr = "";
             LocalDate date;
+            String dayz = "";
             
             if (result == null || result.meta == null || result.meta.saleDate == null) {
 //                return ResponseEntity.badRequest()
 //                        .body("❌ 영수증 날짜를 인식하지 못했습니다.");
             	
-            	date = DateUtils.parseFlexibleDate(cell_date);
+            	date = DateUtils.parseFlexibleDate(saleDate);
             	LocalTime nowTime = LocalTime.now(); // 시:분:초
                 LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
@@ -213,6 +202,8 @@ public class OcrControllerV4 {
                 // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
                 int year = date.getYear();							 	// 2026
                 int month = date.getMonthValue(); 						// 1~12
+                int day = date.getDayOfMonth();
+                dayz = String.valueOf(day);
                 
                 purchase.put("year", year);
                 purchase.put("month", month);
@@ -237,6 +228,8 @@ public class OcrControllerV4 {
                 // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
                 int year = date.getYear();							 	// 2026
                 int month = date.getMonthValue(); 						// 1~12
+                int day = date.getDayOfMonth();
+                dayz = String.valueOf(day);
                 
                 purchase.put("year", year);
                 purchase.put("month", month);
@@ -249,7 +242,7 @@ public class OcrControllerV4 {
             Integer parsedTotal = (result.totals != null ? result.totals.total : null);
             if (parsedTotal == null || parsedTotal == 0) {
             	// 파싱 실패/0원인 경우 사용자 입력값 사용
-            	purchase.put("total", Optional.ofNullable(total).orElse(0));
+            	purchase.put("total", 0);
             } else {
             	purchase.put("total", parsedTotal);
             }
@@ -261,19 +254,6 @@ public class OcrControllerV4 {
             purchase.put("type", type); 							// type 세팅.
             purchase.put("use_name", result.merchant.name); 		// use_name 세팅.
             purchase.put("user_id", user_id); 						// user_id 세팅.
-            purchase.put("cashReceiptType", cash_receipt_type); 	// cashReceiptType 세팅.
-
-            // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
-            if (!receiptDate.equals(cell_date)) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("code", 400);
-                error.put("message",
-                        "선택된 집계표 일자와 영수증 거래일자가 일치하지 않습니다.\n");
-                error.put("[집계표]", cell_date);
-                error.put("[거래일자]", date);
-
-                return ResponseEntity.badRequest().body(error);
-            }
 
             String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
 
@@ -358,7 +338,7 @@ public class OcrControllerV4 {
             int iResult = 0;
 
             // tall sheet 테이블 저장을 위한 값 세팅.
-            String day = "day_" + cell_day;
+            String day = "day_" + dayz;
             int total2 = 0;
             Object totalObj = purchase.get("total");
             total2 = Integer.parseInt(totalObj.toString());

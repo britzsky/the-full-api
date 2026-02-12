@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -957,6 +958,7 @@ public class AccountController {
     	
     	iResult += accountService.AccountDepositHistorySave(paramMap);
     	iResult += accountService.AccountBalancePriceSave(paramMap);
+    	iResult += accountService.AccountDeadlineMonthBalanceUpdate(paramMap);
     	
     	JsonObject obj = new JsonObject();
     	
@@ -1347,6 +1349,94 @@ public class AccountController {
     	resultList = accountService.AccountPurchaseDetailList_tmp(paramMap);
     	
     	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPersonPurchaseTallyList
+     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 조회
+     */
+    @GetMapping("Account/AccountPersonPurchaseTallyList")
+    public String AccountPersonPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountPersonPurchaseTallyList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPurchaseTallyList_tmp
+     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 상세 조회
+     */
+    @GetMapping("Account/AccountPersonPurchaseDetailList")
+    public String AccountPersonPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountPersonPurchaseDetailList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountCorporateCardPaymentAllSave
+     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 저장
+     */
+    @PostMapping("Account/AccountPersonPurchasePaymentAllSave")
+    private String AccountPersonPurchasePaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+    	
+    	// 1. 'main' 리스트 추출
+        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+        
+        // 2. 'item' 리스트 추출
+        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+    	
+        int iResult = 0;
+        
+    	if (mainList != null) {
+    		for (Map<String, Object> mainMap : mainList) {
+    			
+    			if (mainMap.get("sale_id").toString().isEmpty()) {
+    				
+    				String saleId = "";
+    				
+    				LocalDate date = LocalDate.now();
+                    LocalTime nowTime = LocalTime.now(); // 시:분:초
+                    LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+
+                    // 원하는 형식으로 출력 (예: 20251009152744)
+                    saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                    
+                    mainMap.put("sale_id", saleId);
+    			}
+    			
+        		iResult += accountService.AccountPurchaseSave(mainMap);
+                // 여러 타입의 날짜형식을 매핑.
+                LocalDate date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
+                // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+                int year = date.getYear();        // 2026
+                int month = date.getMonthValue(); // 1~12
+                mainMap.put("year", year);
+                mainMap.put("month", month);
+                iResult += accountService.TallySheetPaymentSave(mainMap);
+            }
+    	}
+    	if (itemList != null) {
+    		for (Map<String, Object> itemMap : itemList) {
+        		iResult += accountService.AccountPurchaseDetailSave(itemMap);
+            }
+    	}
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
     }
     /*
      * part		: 현장

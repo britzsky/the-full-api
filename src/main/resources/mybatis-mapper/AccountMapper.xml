@@ -366,32 +366,32 @@
 		-- 아래는 유틸 직원
 		SELECT
             'nor' as gubun,
-		    T3.account_id,
+		    T.account_id,
 		    T.member_id,
-		    T.position,
-            T.position_type,
-		    T.name,
-		    T2.record_year,
-		    T2.record_month,
-		    T2.record_date,
-		    T2.type,
-		    T2.start_time,
-		    T2.end_time,
-		    CASE WHEN T2.type = 6 THEN T.salary ELSE 0 END AS salary,
+		    T2.position,
+            T2.position_type,
+		    T2.name,
+		    T3.record_year,
+		    T3.record_month,
+		    T3.record_date,
+		    T3.type,
+		    T3.start_time,
+		    T3.end_time,
+		    CASE WHEN T3.type = 6 THEN T2.salary ELSE 0 END AS salary,
 		    T2.note
 		    , '' as pay_yn
-		FROM tb_account_members T 
-		LEFT JOIN tb_account_record T2
-		    ON T2.member_id = T.member_id
-		LEFT JOIN  tb_account_util_member_mapping T3
-            ON T3.member_id = T2.member_id
-		   AND T3.account_id = T2.account_id
-		   AND T2.record_year = #{year}
-		   AND T2.record_month = #{month}
-		 WHERE T3.account_id = #{account_id}
-           AND T.del_yn = 'N'
+         from tb_account_util_member_mapping T
+         join tb_account_members T2
+         on T2.member_id = T.member_id
+         left join tb_account_record T3
+         on T3.account_id = T.account_id
+         and T3.member_id = T.member_id
+         AND T3.record_year = #{year}
+		 AND T3.record_month = #{month}
+         AND type = 7
+         where T.account_id = #{account_id}
+         AND T2.del_yn = 'N'
         UNION ALL
-		
 		SELECT
 			'rec' as gubun,
 		    T2.account_id,
@@ -1159,6 +1159,7 @@
 		       ifnull(adb.employ_cost,0) as employ_cost,
 		       ifnull(adb.integrity_cost,0) as integrity_cost,
 		       adb.input_exp,
+		       ifnull(adb.month_balance_price,0) as month_balance_price,
 		       ifnull(abp.balance_price,0) as balance_price,
 		       ifnull(abp.balance_price,0) as before_price,
 		       ifnull(abp.before_price,0) as before_price2
@@ -1264,6 +1265,24 @@
 	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
 	        before_price=#{before_price},
 	    </trim>
+	</insert>
+	
+	<insert id="AccountDeadlineMonthBalanceUpdate" parameterType="map">
+		UPDATE tb_account_deadline_balance A
+        INNER JOIN 
+        (
+			SELECT SUM(input_price) as input_price
+				 , account_id
+            FROM tb_account_deposit_history
+            WHERE DATE_FORMAT(input_dt, '%Y') = #{year}
+			AND DATE_FORMAT(input_dt, '%m') = #{month}
+			AND account_id = #{account_id}
+            GROUP BY account_id
+        ) as C
+        ON A.account_id = C.account_id
+		SET A.month_balance_price = (A.living_cost + A.basic_cost + employ_cost + integrity_cost) - C.input_price
+        WHERE (A.living_cost + A.basic_cost + employ_cost + integrity_cost) != 0
+        AND A.account_id = #{account_id}
 	</insert>
 	
 	<insert id="AccountDepositHistorySave" parameterType="map">
@@ -1694,6 +1713,72 @@
 	</select>
 	
 	<select id="AccountPurchaseDetailList_tmp" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id, 
+			   aptd.sale_id,
+			   aptd.item_id,
+			   a.account_name,
+			   DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+			   aptd.name, 
+			   aptd.qty, 
+			   aptd.unitPrice, 
+			   aptd.vat,
+			   aptd.tax,
+			   aptd.amount, 
+			   aptd.taxType, 
+			   aptd.itemType,
+			   apt.receipt_image
+		FROM tb_account a
+		JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		JOIN tb_account_purchase_tally_detail aptd
+		ON aptd.sale_id = apt.sale_id
+		WHERE aptd.sale_id = #{sale_id}
+		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
+	</select>
+	
+	<select id="AccountPersonPurchaseTallyList" parameterType="map" resultType="hashmap">
+		SELECT a.account_id, 
+			   a.account_name, 
+		       amv.type, 
+		       apt.use_name, 
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+		       ifnull(apt.total, 0) as total, 
+		       ifnull(apt.vat, 0) as vat,
+		       ifnull(apt.taxFree, 0) as taxFree,
+		       ifnull(apt.tax, 0) as tax,
+		       ifnull(apt.totalCash, 0) as totalCash,
+		       ifnull(apt.totalCard, 0) as totalCard,
+		       apt.payType,
+		       apt.cardNo,
+		       apt.cardBrand,
+		       apt.receipt_image,
+		       apt.note,
+		       apt.bizNo,
+		       am.ceo_name,
+		       apt.sale_id,
+		       apt.receipt_type
+		FROM tb_account a
+		JOIN tb_account_mapping_v2 amv
+		ON amv.account_id = a.account_id
+		JOIN tb_account_mapping am
+		ON am.type = amv.type
+		LEFT OUTER JOIN tb_account_purchase_tally apt
+		ON apt.account_id = a.account_id
+		AND apt.type = amv.type
+		WHERE a.account_id = #{account_id}
+		AND apt.type in (1008, 1)
+		<if test="payType == 1">
+	        AND apt.totalCash != 0
+        </if>
+        <if test="payType == 2">
+	        AND apt.totalCard != 0
+        </if>
+        AND DATE_FORMAT(apt.saleDate, '%Y') = ${year}
+		AND DATE_FORMAT(apt.saleDate, '%m') = ${month}
+        ORDER BY apt.saleDate ASC, apt.sale_id ASC
+	</select>
+	
+	<select id="AccountPersonPurchaseDetailList" parameterType="map" resultType="hashmap">
 		SELECT apt.account_id, 
 			   aptd.sale_id,
 			   aptd.item_id,
