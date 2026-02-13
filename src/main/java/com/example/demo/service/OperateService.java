@@ -205,6 +205,12 @@ public class OperateService {
 		iResult = operateMapper.AccountRecordSetRecRecordDataSave(paramMap);
 		return iResult;
 	}
+	// 급식사업부 -> 운영->현장관리 채용확정 또는 채용취소 시, 채용현황 출근부 삭제 적용
+	public int AccountRecRecordDataDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.AccountRecRecordDataDelete(paramMap);
+		return iResult;
+	}
 	// 급식사업부 -> 운영 -> 채용관리 -> 현장 채용현황 조회
 	public List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

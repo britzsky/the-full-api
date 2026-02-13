@@ -643,6 +643,7 @@ public class OperateController {
         			row.put("del_yn", "N");
         			iResult += operateService.AccountMembersSave(row);
         			iResult += operateService.AccountRecordSetRecRecordDataSave(row);
+        			iResult += operateService.AccountRecRecordDataDelete(row);
         		}
         		
         		// 현장채용 관리에서 채용취소면 현재 현장직원 테이블에 데이터 존재유무를 체크.
@@ -655,6 +656,7 @@ public class OperateController {
         				row.put("del_yn", "Y");
         				row.put("del_dt", today);
             			iResult += operateService.AccountMembersSave(row);
+            			// iResult += operateService.AccountRecRecordDataDelete(row); -> 월말 급여 지급을 위해 주석 처리
         			}
         		}
         	}

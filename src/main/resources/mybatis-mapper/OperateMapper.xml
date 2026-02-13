@@ -1851,4 +1851,8 @@
 	      note       = VALUES(note),
 	      salary     = VALUES(salary)
     </insert>
+    
+    <insert id="AccountRecRecordDataDelete" parameterType="map">
+        DELETE FROM tb_account_rec_record WHERE member_id = #{member_id} AND account_id = #{account_id}
+    </insert>
 </mapper>
