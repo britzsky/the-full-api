@@ -42,6 +42,7 @@ public interface AccountMapper {
 	int AccountDeadlineBalanceSave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 저장
 	int AccountBalancePriceSave(Map<String, Object> paramMap);											// 회계 -> 매출마감/미수잔액 총 미수금액 저장
 	int AccountDepositHistorySave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 입금내역 저장
+	int AccountDeadlineBalanceIntegrityCost(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 월 보전금액 조회
 	List<Map<String, Object>> AccountDeadlineDifferencePriceSearch(Map<String, Object> paramMap); 		// 회계 -> 타입별 차액 조회
 	int AccountDeadlineFilesSave(Map<String, Object> paramMap);											// 회계 -> 마감자료 저장
 	List<Map<String, Object>> AccountDeadlineFilesList(Map<String, Object> paramMap); 					// 회계 -> 마감자료 조회

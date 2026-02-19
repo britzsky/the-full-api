@@ -161,12 +161,24 @@ public class HeadOfficeController {
 	
 	/* 
 	 * part		: 본사
-     * method 	: WeekMenuList
+     * method 	: ProfitLossTableList
      * comment 	: 본사 -> 관리표 -> 손익표 조회
      */
 	@GetMapping("HeadOffice/ProfitLossTableList")
 	public String ProfitLossTableList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.ProfitLossTableList(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/* 
+	 * part		: 본사
+     * method 	: WeekMenuList
+     * comment 	: 본사 -> 관리표 -> 손익표 엑섹다운
+     */
+	@GetMapping("HeadOffice/ExcelDaownProfitLossTableList")
+	public String ExcelDaownProfitLossTableList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.ExcelDaownProfitLossTableList(paramMap);
 		
 		return new Gson().toJson(resultList);
 	}
@@ -297,7 +309,6 @@ public class HeadOfficeController {
 	    return new Gson().toJson(deptList);
 	}
 
-	
 	/* 
 	 * part		: 본사
      * method 	: HeadOfficeDepartmentList
