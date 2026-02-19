@@ -1161,6 +1161,14 @@
 		WHERE a.del_yn = 'N'
 	</select>
 	
+	<select id="AccountDeadlineBalanceIntegrityCost" parameterType="map" resultType="int">
+		SELECT ifnull(integrity_cost,0) as integrity_cost
+		FROM tb_account_deadline_balance
+		WHERE year = #{year}
+		AND month = #{month}
+		AND account_id = #{account_id}
+	</select>
+	
 	<select id="AccountDepositHistoryList" parameterType="map" resultType="hashmap">
 		SELECT account_id,
 			   CASE WHEN type = 1 

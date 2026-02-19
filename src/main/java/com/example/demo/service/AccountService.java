@@ -223,6 +223,12 @@ public class AccountService {
 		iResult = accountMapper.AccountDeadlineBalanceSave(paramMap);
 		return iResult;
 	}
+	// 회계 -> 매출마감/미수잔액 월 보전금액 조회
+	public int AccountDeadlineBalanceIntegrityCost(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDeadlineBalanceIntegrityCost(paramMap);
+		return iResult;
+	}
 	// 회계 -> 매출마감/미수잔액 총 미수금액 저장
 	public int AccountBalancePriceSave(Map<String, Object> paramMap) {
 		int iResult = 0;

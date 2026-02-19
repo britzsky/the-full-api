@@ -538,7 +538,7 @@
 	
 	<insert id="AccountRetailBusinessSave">
 	    INSERT INTO tb_account_mapping
-	    (type, name, biz_no, ceo_name, tel, bank_name, bank_no, bank_image, biz_image, del_yn, add_yn, add_name)
+	    (type, name, biz_no, ceo_name, tel, bank_name, bank_no, bank_image, biz_image, del_yn, add_yn, add_name, account_type)
 	    VALUES
 	    (
 	        #{type},
@@ -552,7 +552,8 @@
 	        #{biz_image},
 	        #{del_yn},
 	        #{add_yn}, 
-	        #{add_name}
+	        #{add_name},
+	        #{account_type}
 	    )
 	    ON DUPLICATE KEY UPDATE
 	    type = #{type}, 
@@ -566,7 +567,8 @@
 	    biz_image = #{biz_image},
 	    del_yn = #{del_yn},
 	    add_yn = #{add_yn},
-	    add_name = #{add_name}
+	    add_name = #{add_name},
+	    account_type = #{account_type}
 	</insert>
 	
 	<select id="AccountRetailBusinessList" parameterType="map" resultType="hashmap">
@@ -1855,4 +1857,69 @@
     <insert id="AccountRecRecordDataDelete" parameterType="map">
         DELETE FROM tb_account_rec_record WHERE member_id = #{member_id} AND account_id = #{account_id}
     </insert>
+    
+    <select id="AccountRecordStandardList" parameterType="map" resultType="hashmap">
+    	SELECT
+    	    T.master_idx,
+		    T2.account_id,
+		    T.work_system,
+		    T.position_type,
+		    T.mon,
+		    T.tue,
+		    T.wed,
+		    T.thu,
+		    T.fri,
+		    T.sat,
+		    T.sun,
+		    T.position_type,
+		    T.start_time,
+		    T.end_time
+		FROM tb_account T2
+		JOIN tb_account_record_standard_master_table T 
+		  ON T.account_id = T2.account_id
+		 AND T.account_id = #{account_id}
+		ORDER BY T2.account_id;
+    </select>
+    
+    <insert id="AccountRecordStandardSave" parameterType="map">
+        INSERT INTO tb_account_record_standard_master_table
+		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt)
+		  VALUES
+		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		ON DUPLICATE KEY UPDATE
+		  mon       	= VALUES(mon),
+	      tue 			= VALUES(tue),
+	      wed  			= VALUES(wed),
+	      thu       	= VALUES(thu),
+	      fri     		= VALUES(fri),
+	      sat     		= VALUES(sat),
+	      sun     		= VALUES(sun),
+	      position_type = VALUES(position_type),
+	      start_time	= VALUES(start_time),
+	      end_time		= VALUES(end_time),
+	      user_id     	= VALUES(user_id),
+	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d')
+    </insert>
+    
+    <select id="EmergencyPersonList" parameterType="map" resultType="hashmap">
+    	SELECT s.name, s.job_type, a.area_name, a.area_level, sa.priority
+		FROM staff s
+		JOIN staff_area sa ON sa.staff_id = s.staff_id
+		JOIN area a ON a.area_id = sa.area_id
+		<if test="name != null">
+            WHERE s.name = #{name}
+        </if>
+		ORDER BY sa.priority, a.area_level, a.area_name
+    </select>
+    
+    <select id="EmergencyPersonList" parameterType="map" resultType="hashmap">
+    	SELECT s.name, s.job_type, a.area_name, a.area_level, sa.priority
+		FROM staff s
+		JOIN staff_area sa ON sa.staff_id = s.staff_id
+		JOIN area a ON a.area_id = sa.area_id
+		<if test="name != null">
+            WHERE s.name = #{name}
+        </if>
+		ORDER BY sa.priority, a.area_level, a.area_name
+    </select>
 </mapper>

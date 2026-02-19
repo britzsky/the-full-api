@@ -935,5 +935,48 @@ public class OperateController {
     	
     	return obj.toString();
 	}
+	
+	/*
+     * part		: 운영
+     * method 	: AccountRecordStandardList
+     * comment 	: 운영 -> 긴급인력 -> 업장별 요일 인력 기준 조회
+     */
+    @GetMapping("Operate/AccountRecordStandardList")
+    public String AccountRecordStandardList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.AccountRecordStandardList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: AccountRecordStandardSave
+     * comment 	: 운영 -> 긴급인력 -> 업장별 요일 인력 기준 저장
+     */
+    @PostMapping("Operate/AccountRecordStandardSave")
+    private String AccountRecordStandardSave(@RequestBody Map<String, Object> payload) {
+		
+		// payload에서 rows만 꺼냄
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("data");
+    	
+	    int iResult = 0;
+	    
+	    for (Map<String, Object> paramMap : rows) {
+	    	iResult += operateService.AccountRecordStandardSave(paramMap);
+	    }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+    }
     
 }

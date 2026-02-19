@@ -323,4 +323,16 @@ public class OperateService {
 		iResult = operateMapper.OperateScheduleSave(paramMap);
 		return iResult;
 	}
+	// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 조회
+	public List<Map<String, Object>> AccountRecordStandardList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.AccountRecordStandardList(paramMap);
+		return resultList;
+	}
+	// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 저장
+	public int AccountRecordStandardSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.AccountRecordStandardSave(paramMap);
+		return iResult;
+	}
 }

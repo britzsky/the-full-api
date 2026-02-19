@@ -54,4 +54,6 @@ public interface OperateMapper {
 	int OperateScheduleSave(Map<String, Object> paramMap);										// 운영관리 -> 일정관리 저장
 	List<Map<String, Object>> OperateScheduleList(Map<String, Object> paramMap);				// 운영관리 -> 일정관리 조회
 	List<Map<String, Object>> OperateScheduleTodayList(Map<String, Object> paramMap);			// 메인화면 -> 운영팀 당일 일정 조회
+	List<Map<String, Object>> AccountRecordStandardList(Map<String, Object> paramMap);			// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 조회
+	int AccountRecordStandardSave(Map<String, Object> paramMap);								// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 저장
 }
