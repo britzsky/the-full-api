@@ -838,60 +838,282 @@ public class AccountController {
                 iResult += accountService.processProfitLoss(param);
                 
                 if (iResult > 0 ) {
-                	// 주간보호 업장 금액 세팅
-                    if (param.get("account_id").toString().equals("20260122065002")) {	// 한결주간보호는 한결.
-                    	profitMap.put("account_id", "20250819193455");
-                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                	// 한결일 때..
+                	if (param.get("account_id").toString().equals("20250819193455")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122065002");
                     	profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250819193455");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
+                	// 주간보호 업장 금액 세팅
+                    if (param.get("account_id").toString().equals("20260122065002")) {	// 한결주간보호는 한결.
+                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20250819193455");
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
                     	
                     	iResult += accountService.processProfitLossV3(profitMap);
                     }
+                    // 어르신사랑일 때..
+                	if (param.get("account_id").toString().equals("20250819193504")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122071337");
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250819193504");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
                     if (param.get("account_id").toString().equals("20260122071337")) {	// 어르신사랑주간보호는 어르신사랑.
-                    	profitMap.put("account_id", "20250819193504");      
                     	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
                     	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20250819193504");      
                     	profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
                     	
+                    	int iIntegrity2 = 0;
+                    	iIntegrity2 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity2);
+                    	
                     	iResult += accountService.processProfitLossV3(profitMap);
     				}
+                    // 청평설악일 때..
+                	if (param.get("account_id").toString().equals("20250819193603")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122071857");
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250819193603");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
     				if (param.get("account_id").toString().equals("20260122071857")) {	// 청평설악 주간보호는 청평설악.
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
     					profitMap.put("account_id", "20250819193603");   
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	profitMap.put("year", param.get("year"));
+    					profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
+    					
+                    	int iIntegrity3 = 0;
+                    	iIntegrity3 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity3);
                     	
                     	iResult += accountService.processProfitLossV3(profitMap);
     				}
+    				// 늘사랑(부천)일 때..
+                	if (param.get("account_id").toString().equals("20250919162439")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122072114");
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250919162439");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
     				if (param.get("account_id").toString().equals("20260122072114")) {	// 늘사랑(부천) 주간보호는 늘사랑부천.
-    					profitMap.put("account_id", "20250919162439");
     					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
                     	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	profitMap.put("year", param.get("year"));
+    					
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+    					profitMap.put("account_id", "20250919162439");
+    					profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
+    					
+                    	int iIntegrity4 = 0;
+                    	iIntegrity4 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity4);
                     	
                     	iResult += accountService.processProfitLossV3(profitMap);
     				}
+    				// 지안일 때..
+                	if (param.get("account_id").toString().equals("20250819193620")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122072245");
+                    	profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250819193620");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
     				if (param.get("account_id").toString().equals("20260122072245")) {	// 지안 주간보호는 지안.
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
     					profitMap.put("account_id", "20250819193620");
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	profitMap.put("year", param.get("year"));
+    					profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity5 = 0;
+                    	iIntegrity5 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity5);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
     				}
-    				if (param.get("account_id").toString().equals("20260122072732")) {	// 사랑의 주간보호는 사랑의.
-    					profitMap.put("account_id", "20250819193632");
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+    				// 사랑의일 때..
+                	if (param.get("account_id").toString().equals("20250819193632")) {
+                		Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+                    	profitMap.put("account_id", "20260122072732");
                     	profitMap.put("year", param.get("year"));
                     	profitMap.put("month", param.get("month"));
+                    	
+                    	int iIntegrity1 = 0;
+                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("account_id", "20250819193632");
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                    	
+                    	iResult += accountService.processProfitLossV3(profitMap);
+                	}
+    				if (param.get("account_id").toString().equals("20260122072732")) {	// 사랑의 주간보호는 사랑의.
+    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                    	
+                    	Object objIntegrity = 0;
+                    	int iIntegrity = 0;
+                    	objIntegrity = param.getOrDefault("integrity_cost",0);
+                    	iIntegrity = (int)objIntegrity;
+                    	
+    					profitMap.put("account_id", "20250819193632");
+    					profitMap.put("year", param.get("year"));
+                    	profitMap.put("month", param.get("month"));
+    					
+                    	int iIntegrity6 = 0;
+                    	iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                    	
+                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
                     	
                     	iResult += accountService.processProfitLossV3(profitMap);
     				}
                 }
+                // 사랑복지일 때..
+            	if (param.get("account_id").toString().equals("20250819193615")) {
+            		Object objIntegrity = 0;
+                	int iIntegrity = 0;
+                	objIntegrity = param.getOrDefault("integrity_cost",0);
+                	iIntegrity = (int)objIntegrity;
+                	
+                	profitMap.put("account_id", "20260219024021");
+                	profitMap.put("year", param.get("year"));
+                	profitMap.put("month", param.get("month"));
+                	
+                	int iIntegrity1 = 0;
+                	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                	
+                	profitMap.put("account_id", "20250819193615");
+                	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+                	
+                	iResult += accountService.processProfitLossV3(profitMap);
+            	}
+				if (param.get("account_id").toString().equals("20260219024021")) {	// 사랑복지센터는 사랑복지요양원.
+					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
+                	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
+                	
+                	Object objIntegrity = 0;
+                	int iIntegrity = 0;
+                	objIntegrity = param.getOrDefault("integrity_cost",0);
+                	iIntegrity = (int)objIntegrity;
+                	
+					profitMap.put("account_id", "20250819193615");
+					profitMap.put("year", param.get("year"));
+                	profitMap.put("month", param.get("month"));
+					
+                	int iIntegrity6 = 0;
+                	iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+                	
+                	profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
+                	
+                	iResult += accountService.processProfitLossV3(profitMap);
+				}
+                
                 if (accountService.AccountDepositEmptyUse(param) != 0) {
                 	if (param.get("account_id") != null && param.get("year") != null && param.get("month") != null) {
         				Map<String, Object> recalcMap = new HashMap<String, Object>();
@@ -1290,7 +1512,112 @@ public class AccountController {
     	
     	return obj.toString();
     }
-    public double roundHalfUpToFirstDecimalSafe(double value) {
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingList
+	 * comment 	: 운영,영업 -> 구분 조회
+	 */
+	@GetMapping("Account/AccountCommunicationMappingList")
+	public String AccountCommunicationMappingList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountCommunicationMappingList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingSave
+	 * comment 	: 운영,영업 -> 구분 저장
+	 */
+	@PostMapping("Account/AccountCommunicationMappingSave")
+	private String AccountCommunicationMappingSave(@RequestBody Map<String, Object> paramMap) {
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+		int iResult = 0;
+		if (dataList != null) {
+			for (Map<String, Object> row : dataList) {
+				iResult += accountService.AccountCommunicationMappingSave(row);
+			}
+		}
+		JsonObject obj = new JsonObject();
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingDelete
+	 * comment 	: 운영,영업 -> 구분 삭제
+	 */
+	@PostMapping("Account/AccountCommunicationMappingDelete")
+	private String AccountCommunicationMappingDelete(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		List<Object> ids = (List<Object>) paramMap.get("ids");
+		if (ids == null || ids.isEmpty()) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+			return obj.toString();
+		}
+		int iResult = accountService.AccountCommunicationMappingDelete(paramMap);
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationList
+	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 조회
+	 */
+	@GetMapping("Account/AccountCommunicationList")
+	public String AccountCommunicationList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountCommunicationList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+	
+	/*
+	 * part		: 운영,영업 
+	 * method 	: AccountCommunicationSave
+	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 저장
+	 */
+	@PostMapping("Account/AccountCommunicationSave")
+	private String AccountCommunicationSave(@RequestBody Map<String, Object> paramMap) {
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+		int iResult = 0;
+		if (dataList != null) {
+			for (Map<String, Object> row : dataList) {
+				Object idxObj = row.get("idx");
+				String idxStr = idxObj == null ? "" : idxObj.toString();
+				if (idxStr == null || idxStr.trim().isEmpty()) {
+					iResult += accountService.AccountCommunicationInsert(row);
+				} else {
+					iResult += accountService.AccountCommunicationUpdate(row);
+				}
+			}
+		}
+		JsonObject obj = new JsonObject();
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	public double roundHalfUpToFirstDecimalSafe(double value) {
         // 1. double 값을 BigDecimal로 변환
         BigDecimal bd = new BigDecimal(String.valueOf(value));
         
