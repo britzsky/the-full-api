@@ -511,6 +511,7 @@
 		    subquery.member_id,
 		    subquery.account_id,
 		    subquery.name,
+		    subquery.del_yn,
 		    ifnull(subquery.salary,0) AS salary,
 		    CASE WHEN subquery.position_type = 1 THEN '영양사'
 		         WHEN subquery.position_type = 2 THEN '조리팀장'
@@ -532,6 +533,7 @@
 		        T.member_id,
 		        T.account_id,
 		        T.name,
+		        T.del_yn,
 		        T.position_type,
 		        T.salary,
 		        -- 파출 급여
@@ -570,7 +572,7 @@
 		    FROM tb_account_members AS T
 		    WHERE T.account_id = #{account_id}
 		      AND IFNULL(T.display_yn,'Y') = 'Y'
-		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.position_type
+		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.del_yn, T.position_type
 		) AS subquery
 		ORDER BY
 		    subquery.position_type ASC,
@@ -1171,6 +1173,8 @@
 	
 	<select id="AccountDepositHistoryList" parameterType="map" resultType="hashmap">
 		SELECT account_id,
+			   year,
+			   month,
 			   CASE WHEN type = 1 
 			   		THEN '생계비'
 			   		WHEN type = 2 
@@ -1190,6 +1194,7 @@
 		FROM tb_account_deposit_history
 		WHERE account_id = #{account_id}
 		AND DATE_FORMAT(input_dt, '%Y') = #{year}
+		ORDER BY year DESC, month DESC, input_dt DESC
 	</select>
 	
 	<insert id="AccountDeadlineBalanceSave" parameterType="map">
@@ -1323,15 +1328,35 @@
 	    </trim>
 	</insert>
 	
-	<select id="AccountDeadlineDifferencePriceSearch" parameterType="map" resultType="hashmap">
-		SELECT ifnull(difference_price,0) as difference_price
-		FROM tb_account_deposit_history
-		WHERE account_id = #{account_id}
-		AND year = #{year}
-		AND month = #{month}
-		AND type = #{type}
-		ORDER BY input_dt ASC
-		LIMIT 1
+		<select id="AccountDeadlineDifferencePriceSearch" parameterType="map" resultType="hashmap">
+		SELECT
+			(
+			  CASE #{type}
+			    WHEN 1 THEN IFNULL(db.living_cost, 0)
+			    WHEN 2 THEN IFNULL(db.basic_cost, 0)
+			    WHEN 3 THEN IFNULL(db.employ_cost, 0)
+			    WHEN 5 THEN IFNULL(db.integrity_cost, 0)
+			    WHEN 4 THEN IFNULL(abp.balance_price, 0)
+			    ELSE 0
+			  END
+			  -
+			  IFNULL((
+			    SELECT SUM(IFNULL(dh.input_price, 0))
+			    FROM tb_account_deposit_history dh
+			    WHERE dh.account_id = #{account_id}
+			      AND dh.year = #{year}
+			      AND dh.month = #{month}
+			      AND dh.type = #{type}
+			      AND IFNULL(dh.note, '') NOT LIKE '%[환불]%'
+			  ), 0)
+			) AS difference_price
+			FROM tb_account_deadline_balance db
+			LEFT OUTER JOIN tb_account_balance_price abp
+			ON abp.account_id = db.account_id
+			WHERE db.account_id = #{account_id}
+			  AND db.year = #{year}
+			  AND db.month = #{month}
+			LIMIT 1
 	</select>
 	
 	<select id="AccountDeadlineFilesList" parameterType="map" resultType="hashmap">
@@ -1434,6 +1459,111 @@
 	        </if>
 	    </trim>
 	</insert>
+
+	<select id="AccountCommunicationMappingList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+			   team_code,
+			   type
+		FROM tb_account_communication_mapping
+		WHERE team_code = #{team_code}
+		ORDER BY idx ASC
+	</select>
+	
+	<insert id="AccountCommunicationMappingSave" parameterType="map">
+		INSERT INTO tb_account_communication_mapping
+	
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        <if test="idx != null and idx != ''">idx,</if>
+	        team_code,
+	        type
+	    </trim>
+	
+	    VALUES
+	
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        <if test="idx != null and idx != ''">#{idx},</if>
+	        #{team_code},
+	        #{type}
+	    </trim>
+	
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        team_code = #{team_code},
+	        type = #{type}
+	    </trim>
+	</insert>
+	
+	<delete id="AccountCommunicationMappingDelete" parameterType="map">
+		DELETE FROM tb_account_communication_mapping
+		WHERE idx IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">
+			#{id}
+		</foreach>
+	</delete>
+	
+	<select id="AccountCommunicationList" parameterType="map" resultType="hashmap">
+		SELECT c.idx,
+			   c.team_code,
+			   DATE_FORMAT(c.sub_date, '%Y-%m-%d') AS sub_date,
+			   c.account_id,
+			   a.account_name,
+			   c.type,
+			   c.issue,
+			   c.result,
+			   DATE_FORMAT(c.end_date, '%Y-%m-%d') AS end_date,
+			   c.note,
+			   c.user_id
+		FROM tb_account_communication c
+		LEFT OUTER JOIN tb_account a
+		ON c.account_id = a.account_id
+		WHERE c.team_code = #{team_code}
+		ORDER BY c.sub_date ASC, c.idx ASC
+	</select>
+	
+	<insert id="AccountCommunicationInsert" parameterType="map">
+		INSERT INTO tb_account_communication
+	
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        team_code,
+	        sub_date,
+	        account_id,
+	        type,
+	        issue,
+	        result,
+	        end_date,
+	        note,
+	        user_id
+	    </trim>
+	
+	    VALUES
+	
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{team_code},
+	        #{sub_date},
+	        #{account_id},
+	        #{type},
+	        #{issue},
+	        #{result},
+	        #{end_date},
+	        #{note},
+	        #{user_id}
+	    </trim>
+	</insert>
+	
+	<update id="AccountCommunicationUpdate" parameterType="map">
+		UPDATE tb_account_communication
+		SET team_code = #{team_code},
+		    sub_date = #{sub_date},
+		    account_id = #{account_id},
+		    type = #{type},
+		    issue = #{issue},
+		    result = #{result},
+		    end_date = #{end_date},
+		    note = #{note},
+		    user_id = CASE WHEN #{user_id} IS NULL OR #{user_id} = '' THEN user_id ELSE #{user_id} END
+		WHERE idx = #{idx}
+	</update>
+
 	
 	<!-- 배치성 데이터 -->
 	<select id="BatchForPayBack" parameterType="map" resultType="hashmap">
@@ -2271,83 +2401,110 @@
 		AND month = #{month}
 		AND account_id = #{account_id}
 	</select>
-	
+
 	<update id="AccountDepositHistoryRecalc" parameterType="map">
 		UPDATE tb_account_deposit_history dh
 		INNER JOIN (
-			SELECT dh0.account_id, dh0.year, dh0.month, dh0.type,
-				MAX(dh0.input_dt) AS max_input_dt,
-				(
-					CASE dh0.type
-						WHEN 1 THEN ifnull(adb.living_cost,0)
-						WHEN 2 THEN ifnull(adb.basic_cost,0)
-						WHEN 3 THEN ifnull(adb.employ_cost,0)
-						WHEN 5 THEN ifnull(adb.integrity_cost,0)
-						WHEN 4 THEN ifnull(abp.balance_price,0)
-						ELSE 0
-					END
-					+ ifnull(prev.difference_price,0)
-				) AS expected_total,
-				ifnull(paid.paid_total,0) AS paid_total
-			FROM tb_account_deposit_history dh0
-			INNER JOIN tb_account_deadline_balance adb
-			ON adb.account_id = dh0.account_id
-			AND adb.year = dh0.year
-			AND adb.month = dh0.month
-			LEFT OUTER JOIN tb_account_balance_price abp
-			ON abp.account_id = dh0.account_id
-			LEFT OUTER JOIN (
-				SELECT p.account_id, p.type, p.year, p.month, p.difference_price
-				FROM tb_account_deposit_history p
-				INNER JOIN (
-					SELECT account_id, type, year, month, MAX(input_dt) AS max_dt
-					FROM tb_account_deposit_history
-					GROUP BY account_id, type, year, month
-				) pm
-				ON pm.account_id = p.account_id
-				AND pm.type = p.type
-				AND pm.year = p.year
-				AND pm.month = p.month
-				AND pm.max_dt = p.input_dt
-			) prev
-			ON prev.account_id = dh0.account_id
-			AND prev.type = dh0.type
-			AND prev.year = CASE WHEN dh0.month = 1 THEN dh0.year - 1 ELSE dh0.year END
-			AND prev.month = CASE WHEN dh0.month = 1 THEN 12 ELSE dh0.month - 1 END
-			LEFT OUTER JOIN (
-				SELECT account_id, year, month, type, SUM(ifnull(input_price,0)) AS paid_total
-				FROM tb_account_deposit_history
-				GROUP BY account_id, year, month, type
-			) paid
-			ON paid.account_id = dh0.account_id
-			AND paid.year = dh0.year
-			AND paid.month = dh0.month
-			AND paid.type = dh0.type
-			WHERE dh0.account_id = #{account_id}
-			AND dh0.year = #{year}
-			AND dh0.month = #{month}
-			AND dh0.type IN (1,2,3,5)
-			GROUP BY dh0.account_id, dh0.year, dh0.month, dh0.type, prev.difference_price
+		    SELECT
+		        t.account_id,
+		        t.year,
+		        t.month,
+		        t.type,
+		        t.max_input_dt,
+		        -- 기대총액 = 마감비용 + 전월 difference
+		        (
+		            CASE t.type
+		                WHEN 1 THEN IFNULL(adb.living_cost, 0)
+		                WHEN 2 THEN IFNULL(adb.basic_cost, 0)
+		                WHEN 3 THEN IFNULL(adb.employ_cost, 0)
+		                WHEN 5 THEN IFNULL(adb.integrity_cost, 0)
+		                ELSE 0
+		            END
+		            + IFNULL(prev.difference_price, 0)
+		        ) AS expected_total,
+		        -- 당월 입금합계
+		        IFNULL(paid.paid_total, 0) AS paid_total
+		    FROM (
+		        -- 당월 타입별 max(input_dt)
+		        SELECT
+		            account_id,
+		            year,
+		            month,
+		            type,
+		            MAX(input_dt) AS max_input_dt
+		        FROM tb_account_deposit_history
+		        WHERE account_id = #{account_id}
+		          AND year = #{year}
+		          AND month = #{month}
+		          AND type IN (1,2,3,5)
+		          AND IFNULL(note, '') NOT LIKE '%[환불]%'
+		        GROUP BY account_id, year, month, type
+		    ) t
+		    INNER JOIN tb_account_deadline_balance adb
+		        ON adb.account_id = t.account_id
+		       AND adb.year = t.year
+		       AND adb.month = t.month
+		
+		    -- 전월 최신 difference_price
+		    LEFT JOIN (
+		        SELECT
+		            p.account_id,
+		            p.type,
+		            p.difference_price
+		        FROM tb_account_deposit_history p
+		        INNER JOIN (
+		            SELECT
+		                account_id,
+		                type,
+		                MAX(input_dt) AS max_dt
+		            FROM tb_account_deposit_history
+		            WHERE account_id = #{account_id}
+		              AND year  = CASE WHEN #{month} = 1 THEN #{year} - 1 ELSE #{year} END
+		              AND month = CASE WHEN #{month} = 1 THEN 12        ELSE #{month} - 1 END
+		              AND IFNULL(note, '') NOT LIKE '%[환불]%'
+		            GROUP BY account_id, type
+		        ) pm
+		            ON pm.account_id = p.account_id
+		           AND pm.type = p.type
+		           AND pm.max_dt = p.input_dt
+		        WHERE IFNULL(p.note, '') NOT LIKE '%[환불]%'
+		    ) prev
+		        ON prev.account_id = t.account_id
+		       AND prev.type = t.type
+		
+		    -- 당월 타입별 입금합계
+		    LEFT JOIN (
+		        SELECT
+		            account_id,
+		            type,
+		            SUM(IFNULL(input_price, 0)) AS paid_total
+		        FROM tb_account_deposit_history
+		        WHERE account_id = #{account_id}
+		          AND year = #{year}
+		          AND month = #{month}
+		          AND IFNULL(note, '') NOT LIKE '%[환불]%'
+		        GROUP BY account_id, type
+		    ) paid
+		        ON paid.account_id = t.account_id
+		       AND paid.type = t.type
 		) calc
-		ON calc.account_id = dh.account_id
-		AND calc.year = dh.year
-		AND calc.month = dh.month
-		AND calc.type = dh.type
-		AND dh.input_dt = calc.max_input_dt
+		    ON calc.account_id = dh.account_id
+		   AND calc.year = dh.year
+		   AND calc.month = dh.month
+		   AND calc.type = dh.type
+		   AND calc.max_input_dt = dh.input_dt
+		
 		SET
-			dh.deposit_amount = calc.expected_total - (calc.paid_total - ifnull(dh.input_price,0)),
-			dh.difference_price = calc.expected_total - calc.paid_total
+		    -- 기대총액 - (현재행 제외 누적입금)
+		    dh.deposit_amount   = calc.expected_total - (calc.paid_total - IFNULL(dh.input_price, 0)),
+		    -- 기대총액 - 누적입금 
+		    dh.difference_price = calc.expected_total - calc.paid_total
+		
 		WHERE dh.account_id = #{account_id}
-		AND dh.year = #{year}
-		AND dh.month = #{month}
-		AND dh.type IN (1,2,3,5)
+		  AND dh.year = #{year}
+		  AND dh.month = #{month}
+		  AND dh.type IN (1,2,3,5)
+		  AND IFNULL(dh.note, '') NOT LIKE '%[환불]%';
 	</update>
 	
 </mapper>
-
-
-
-
-
-
-

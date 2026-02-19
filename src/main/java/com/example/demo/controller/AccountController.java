@@ -1512,7 +1512,112 @@ public class AccountController {
     	
     	return obj.toString();
     }
-    public double roundHalfUpToFirstDecimalSafe(double value) {
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingList
+	 * comment 	: 운영,영업 -> 구분 조회
+	 */
+	@GetMapping("Account/AccountCommunicationMappingList")
+	public String AccountCommunicationMappingList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountCommunicationMappingList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingSave
+	 * comment 	: 운영,영업 -> 구분 저장
+	 */
+	@PostMapping("Account/AccountCommunicationMappingSave")
+	private String AccountCommunicationMappingSave(@RequestBody Map<String, Object> paramMap) {
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+		int iResult = 0;
+		if (dataList != null) {
+			for (Map<String, Object> row : dataList) {
+				iResult += accountService.AccountCommunicationMappingSave(row);
+			}
+		}
+		JsonObject obj = new JsonObject();
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationMappingDelete
+	 * comment 	: 운영,영업 -> 구분 삭제
+	 */
+	@PostMapping("Account/AccountCommunicationMappingDelete")
+	private String AccountCommunicationMappingDelete(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		List<Object> ids = (List<Object>) paramMap.get("ids");
+		if (ids == null || ids.isEmpty()) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+			return obj.toString();
+		}
+		int iResult = accountService.AccountCommunicationMappingDelete(paramMap);
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+	
+	/*
+	 * part		: 운영,영업
+	 * method 	: AccountCommunicationList
+	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 조회
+	 */
+	@GetMapping("Account/AccountCommunicationList")
+	public String AccountCommunicationList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountCommunicationList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+	
+	/*
+	 * part		: 운영,영업 
+	 * method 	: AccountCommunicationSave
+	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 저장
+	 */
+	@PostMapping("Account/AccountCommunicationSave")
+	private String AccountCommunicationSave(@RequestBody Map<String, Object> paramMap) {
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+		int iResult = 0;
+		if (dataList != null) {
+			for (Map<String, Object> row : dataList) {
+				Object idxObj = row.get("idx");
+				String idxStr = idxObj == null ? "" : idxObj.toString();
+				if (idxStr == null || idxStr.trim().isEmpty()) {
+					iResult += accountService.AccountCommunicationInsert(row);
+				} else {
+					iResult += accountService.AccountCommunicationUpdate(row);
+				}
+			}
+		}
+		JsonObject obj = new JsonObject();
+		if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	public double roundHalfUpToFirstDecimalSafe(double value) {
         // 1. double 값을 BigDecimal로 변환
         BigDecimal bd = new BigDecimal(String.valueOf(value));
         

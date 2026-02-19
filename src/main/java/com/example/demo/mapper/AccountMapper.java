@@ -12,7 +12,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountList(int accountType);												// 거래처 목록
 	List<Map<String, Object>> AccountListV2(int accountType);											// 거래처 목록
 	List<Map<String, Object>> AccountDirectList();														// 신사업 -> 직영점 목록
-	List<Map<String, Object>> AccountMemberList();
+	List<Map<String, Object>> AccountMemberList();														// 직원 목록
 	List<Map<String, Object>> AccountUtilMemberList();													// 직원관리 -> 유틸직원 조회
 	List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap);						// 직원관리 -> 유틸 직원 매핑정보 조회
 	int AccountUtilMemberMappingSave(Map<String, Object> paramMap);										// 직원관리 -> 유틸 직원 매핑정보 저장
@@ -47,7 +47,13 @@ public interface AccountMapper {
 	int AccountDeadlineFilesSave(Map<String, Object> paramMap);											// 회계 -> 마감자료 저장
 	List<Map<String, Object>> AccountDeadlineFilesList(Map<String, Object> paramMap); 					// 회계 -> 마감자료 조회
 	int AccountIssueSave(Map<String, Object> paramMap);													// 운영,회계 -> 거래처 이슈 저장
-	List<Map<String, Object>> AccountIssueList(Map<String, Object> paramMap); 							// 운영,회계 -> 거래처 이슈 조회
+	List<Map<String, Object>> AccountIssueList(Map<String, Object> paramMap);							// 운영,회계 -> 거래처 이슈 조회
+	List<Map<String, Object>> AccountCommunicationMappingList(Map<String, Object> paramMap);			// 운영,영업 -> 구분 조회
+	int AccountCommunicationMappingSave(Map<String, Object> paramMap);									// 운영,영업 -> 구분 저장
+	int AccountCommunicationMappingDelete(Map<String, Object> paramMap);								// 운영,영업 -> 구분 삭제
+	List<Map<String, Object>> AccountCommunicationList(Map<String, Object> paramMap);					// 운영,영업 -> 마감이슈, 고객사이슈 조회
+	int AccountCommunicationInsert(Map<String, Object> paramMap);										// 운영,영업 -> 마감이슈, 고객사이슈 저장
+	int AccountCommunicationUpdate(Map<String, Object> paramMap);										// 운영,영업 -> 마감이슈, 고객사이슈 업데이트
 	// 배치성 데이터
 	List<Map<String, Object>> BatchForPayBack(Map<String, Object> paramMap); 							// 본사 -> 관리표 -> 손익표 (판장금)
 	int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 연차관리 저장

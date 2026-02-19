@@ -281,6 +281,49 @@ public class AccountService {
 		resultList = accountMapper.AccountIssueList(paramMap);
 		return resultList;
 	}
+
+	// 운영,영업 -> 구분 조회
+	public List<Map<String, Object>> AccountCommunicationMappingList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCommunicationMappingList(paramMap);
+		return resultList;
+	}
+	
+	// 운영,영업 -> 구분 저장
+	public int AccountCommunicationMappingSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCommunicationMappingSave(paramMap);
+		return iResult;
+	}
+	
+	// 운영,영업 -> 구분 삭제
+	public int AccountCommunicationMappingDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCommunicationMappingDelete(paramMap);
+		return iResult;
+	}
+	
+	// 운영,영업 -> 마감이슈, 고객사이슈 조회
+	public List<Map<String, Object>> AccountCommunicationList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCommunicationList(paramMap);
+		return resultList;
+	}
+	
+	// 운영,영업 -> 마감이슈, 고객사이슈 저장
+	public int AccountCommunicationInsert(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCommunicationInsert(paramMap);
+		return iResult;
+	}
+	
+	// 운영,영업 -> 마감이슈, 고객사이슈 업데이트
+	public int AccountCommunicationUpdate(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCommunicationUpdate(paramMap);
+		return iResult;
+	}
+
 	/*
 	 * 배치성 데이터 처리
 	*/
