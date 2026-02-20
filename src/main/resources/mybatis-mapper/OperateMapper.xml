@@ -1911,15 +1911,4 @@
         </if>
 		ORDER BY sa.priority, a.area_level, a.area_name
     </select>
-    
-    <select id="EmergencyPersonList" parameterType="map" resultType="hashmap">
-    	SELECT s.name, s.job_type, a.area_name, a.area_level, sa.priority
-		FROM staff s
-		JOIN staff_area sa ON sa.staff_id = s.staff_id
-		JOIN area a ON a.area_id = sa.area_id
-		<if test="name != null">
-            WHERE s.name = #{name}
-        </if>
-		ORDER BY sa.priority, a.area_level, a.area_name
-    </select>
 </mapper>
