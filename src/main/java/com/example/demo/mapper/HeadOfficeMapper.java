@@ -17,6 +17,7 @@ public interface HeadOfficeMapper {
 	int ProfitLossTableSave(Map<String, Object> paramMap);											// 본사 -> 손익표 저장
 	List<Map<String, Object>> ProfitLossTableList(Map<String, Object> paramMap);					// 본사 -> 손익표 조회
 	List<Map<String, Object>> ExcelDaownProfitLossTableList(Map<String, Object> paramMap);			// 본사 -> 손익표 엑셀다운
+	List<Map<String, Object>> ExcelDaownMonthProfitLossTableList(Map<String, Object> paramMap);		// 본사 -> 손익표 엑셀다운
 	void ProfitLossTotalSave(Map<String, Object> paramMap);											// 손익표 계산 프로시저
 	List<Map<String, Object>> AccountManagermentTableList(Map<String, Object> paramMap); 			// 본사 -> 관리표 조회
 	List<Map<String, Object>> AccountMappingPurchaseList(Map<String, Object> paramMap); 			// 본사 -> 관리표 -> 거래처 통계

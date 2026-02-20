@@ -1113,6 +1113,18 @@ public class AccountController {
                 	
                 	iResult += accountService.processProfitLossV3(profitMap);
 				}
+				
+				if (param.get("account_id").toString().equals("20260122072529")) {	// 인천강남일 때, 강남의 일반,직원,생계 각각 2로 세팅.
+					profitMap.put("basic_cost2", param.getOrDefault("basic_cost",0));
+                	profitMap.put("employ_cost2", param.getOrDefault("employ_cost",0));
+                	profitMap.put("living_cost2", param.getOrDefault("living_cost",0));
+                	
+					profitMap.put("account_id", "20250819193630");
+					profitMap.put("year", param.get("year"));
+                	profitMap.put("month", param.get("month"));
+                	
+                	iResult += accountService.processProfitLossV3(profitMap);
+				}
                 
                 if (accountService.AccountDepositEmptyUse(param) != 0) {
                 	if (param.get("account_id") != null && param.get("year") != null && param.get("month") != null) {

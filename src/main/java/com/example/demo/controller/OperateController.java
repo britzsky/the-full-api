@@ -979,4 +979,77 @@ public class OperateController {
     	return obj.toString();
     }
     
+    /*
+     * part		: 운영
+     * method 	: TallySheetPointList
+     * comment 	: 집계표 -> 셀 포인트 조회
+     */
+    @GetMapping("Operate/TallySheetPointList")
+    public String TallySheetPointList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.TallySheetPointList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 운영
+     * method 	: TallySheetPointSave
+     * comment 	: 집계표 -> 셀 포인트 저장
+     */
+	@PostMapping("Operate/TallySheetPointSave")
+	public String TallySheetPointSave(@RequestBody Map<String, Object> paramMap) {
+		
+		int iResult = 0;
+		iResult = operateService.TallySheetPointSave(paramMap);
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
+	
+	/*
+     * part		: 운영
+     * method 	: TallySheetUseList
+     * comment 	: 집계표 -> type 입력가능여부 조회
+     */
+    @GetMapping("Operate/TallySheetUseList")
+    public String TallySheetUseList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.TallySheetUseList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 운영
+     * method 	: TallySheetUseSave
+     * comment 	: 집계표 -> type 입력가능여부 저장
+     */
+	@PostMapping("Operate/TallySheetUseSave")
+	public String TallySheetUseSave(@RequestBody Map<String, Object> paramMap) {
+		
+		int iResult = 0;
+		iResult = operateService.TallySheetUseSave(paramMap);
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
 }

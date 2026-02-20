@@ -56,6 +56,10 @@ public class HeadOfficeService {
 	public List<Map<String, Object>> ExcelDaownProfitLossTableList(Map<String, Object> paramMap) {
 		return headOfficeMapper.ExcelDaownProfitLossTableList(paramMap);
 	}
+	// 본사 -> 관리표 -> 손익표 엑셀다운
+	public List<Map<String, Object>> ExcelDaownMonthProfitLossTableList(Map<String, Object> paramMap) {
+		return headOfficeMapper.ExcelDaownMonthProfitLossTableList(paramMap);
+	}
 	// 본사 -> 관리표 -> 손익표 합계 및 비율 저장
 	public void ProfitLossTotalSave(Map<String, Object> paramMap) {
 		headOfficeMapper.ProfitLossTotalSave(paramMap);

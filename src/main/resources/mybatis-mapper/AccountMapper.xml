@@ -39,7 +39,8 @@
 			20260126093808,
 			20260127025350,
 			20260127025437,
-			20260127025657
+			20260127025657,
+			20260219024021
  		)
 	</select>
 	
@@ -68,7 +69,8 @@
 			20260122072114,
 			20260122072245,
 			20260122072529,
-			20260122072732
+			20260122072732,
+			20260219024021
  		)
 	</select>
 	
@@ -1502,67 +1504,71 @@
 	</delete>
 	
 	<select id="AccountCommunicationList" parameterType="map" resultType="hashmap">
-		SELECT c.idx,
-			   c.team_code,
-			   DATE_FORMAT(c.sub_date, '%Y-%m-%d') AS sub_date,
-			   c.account_id,
-			   a.account_name,
-			   c.type,
-			   c.issue,
-			   c.result,
-			   DATE_FORMAT(c.end_date, '%Y-%m-%d') AS end_date,
-			   c.note,
-			   c.user_id
-		FROM tb_account_communication c
-		LEFT OUTER JOIN tb_account a
-		ON c.account_id = a.account_id
-		WHERE c.team_code = #{team_code}
-		ORDER BY c.sub_date ASC, c.idx ASC
-	</select>
-	
-	<insert id="AccountCommunicationInsert" parameterType="map">
-		INSERT INTO tb_account_communication
-	
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        team_code,
-	        sub_date,
-	        account_id,
-	        type,
-	        issue,
-	        result,
-	        end_date,
-	        note,
-	        user_id
-	    </trim>
-	
-	    VALUES
-	
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        #{team_code},
-	        #{sub_date},
-	        #{account_id},
-	        #{type},
-	        #{issue},
-	        #{result},
-	        #{end_date},
-	        #{note},
-	        #{user_id}
-	    </trim>
-	</insert>
-	
-	<update id="AccountCommunicationUpdate" parameterType="map">
-		UPDATE tb_account_communication
-		SET team_code = #{team_code},
-		    sub_date = #{sub_date},
-		    account_id = #{account_id},
-		    type = #{type},
-		    issue = #{issue},
-		    result = #{result},
-		    end_date = #{end_date},
-		    note = #{note},
-		    user_id = CASE WHEN #{user_id} IS NULL OR #{user_id} = '' THEN user_id ELSE #{user_id} END
-		WHERE idx = #{idx}
-	</update>
+      SELECT c.idx,
+            c.team_code,
+            DATE_FORMAT(c.sub_date, '%Y-%m-%d') AS sub_date,
+            c.account_id,
+            a.account_name,
+            c.type,
+            c.issue,
+            c.result,
+            DATE_FORMAT(c.end_date, '%Y-%m-%d') AS end_date,
+            c.solution,
+            c.note,
+            c.user_id
+      FROM tb_account_communication c
+      LEFT OUTER JOIN tb_account a
+      ON c.account_id = a.account_id
+      WHERE c.team_code = #{team_code}
+      ORDER BY c.sub_date ASC, c.idx ASC
+   </select>
+   
+   <insert id="AccountCommunicationInsert" parameterType="map">
+      INSERT INTO tb_account_communication
+   
+       <trim prefix="(" suffix=")" suffixOverrides=",">
+           team_code,
+           sub_date,
+           account_id,
+           type,
+           issue,
+           result,
+           end_date,
+           solution,
+           note,
+           user_id
+       </trim>
+   
+       VALUES
+   
+       <trim prefix="(" suffix=")" suffixOverrides=",">
+           #{team_code},
+           #{sub_date},
+           #{account_id},
+           #{type},
+           #{issue},
+           #{result},
+           #{end_date},
+           #{solution},
+           #{note},
+           #{user_id}
+       </trim>
+   </insert>
+   
+   <update id="AccountCommunicationUpdate" parameterType="map">
+      UPDATE tb_account_communication
+      SET team_code = #{team_code},
+          sub_date = #{sub_date},
+          account_id = #{account_id},
+          type = #{type},
+          issue = #{issue},
+          result = #{result},
+          end_date = #{end_date},
+          solution = #{solution},
+          note = #{note},
+          user_id = CASE WHEN #{user_id} IS NULL OR #{user_id} = '' THEN user_id ELSE #{user_id} END
+      WHERE idx = #{idx}
+   </update>
 
 	
 	<!-- 배치성 데이터 -->

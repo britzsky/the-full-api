@@ -335,4 +335,28 @@ public class OperateService {
 		iResult = operateMapper.AccountRecordStandardSave(paramMap);
 		return iResult;
 	}
+	// 집계표 -> 셀 포인트 조회
+	public List<Map<String, Object>> TallySheetPointList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.TallySheetPointList(paramMap);
+		return resultList;
+	}
+	// 집계표 -> 셀 포인트 저장
+	public int TallySheetPointSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.TallySheetPointSave(paramMap);
+		return iResult;
+	}
+	// 집계표 -> type 입력가능여부 조회
+	public List<Map<String, Object>> TallySheetUseList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.TallySheetUseList(paramMap);
+		return resultList;
+	}
+	// 집계표 -> type 입력가능여부 저장
+	public int TallySheetUseSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.TallySheetUseSave(paramMap);
+		return iResult;
+	}
 }

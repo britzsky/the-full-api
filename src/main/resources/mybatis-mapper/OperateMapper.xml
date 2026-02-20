@@ -58,28 +58,30 @@
 	
 	<insert id="TallyNowMonthSave" parameterType="map">
 		INSERT INTO tb_account_tally_sheet
-		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31)
+		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31, user_id, mod_dt)
 		VALUES
 		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
-		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31})
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
 		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
 		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
-		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31}
+		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31},
+		user_id = #{user_id}, mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
 	</insert>
 	
 	<insert id="TallyBeforeMonthSave" parameterType="map">
 		INSERT INTO tb_account_tally_sheet
-		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31)
+		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31, user_id, mod_dt)
 		VALUES
 		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
-		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31})
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
 		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
 		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
-		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31}
+		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31},
+		user_id = #{user_id}, mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
 	</insert>
 	
 	<select id="PropertiesList" parameterType="map" resultType="hashmap">
@@ -1899,6 +1901,65 @@
 	      end_time		= VALUES(end_time),
 	      user_id     	= VALUES(user_id),
 	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d')
+    </insert>
+    
+    <select id="TallySheetPointList" parameterType="map" resultType="hashmap">
+    	SELECT
+    	    idx,
+		    count_year,
+		    count_month,
+		    count_date,
+		    account_id,
+		    type,
+		    gubun
+		FROM tb_account_tally_sheet_point
+		WHERE account_id = #{account_id}
+		AND count_year = ${year}
+		AND count_month = ${month}
+    </select>
+    
+    <insert id="TallySheetPointSave" parameterType="map">
+    	INSERT INTO tb_account_tally_sheet_point
+    	(idx,count_year, count_month, count_date, account_id, type, gubun, reg_dt, user_id)
+    	VALUES
+    	(#{idx},#{year},#{month},#{count_date},#{account_id},#{type},#{gubun},DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    	ON DUPLICATE KEY UPDATE
+    	count_year=#{year},
+    	count_month=#{month},
+    	count_date=#{count_date},
+    	account_id=#{account_id},
+    	type=#{type},
+    	gubun=#{gubun},
+    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
+    </insert>
+    
+    <select id="TallySheetUseList" parameterType="map" resultType="hashmap">
+    	SELECT
+		    count_year,
+		    count_month,
+		    account_id,
+		    type,
+		    input_yn
+		FROM tb_account_tally_sheet_input_use
+		WHERE account_id = #{account_id}
+		AND count_year = ${year}
+		AND count_month = ${month}
+    </select>
+    
+    <insert id="TallySheetUseSave" parameterType="map">
+    	INSERT INTO tb_account_tally_sheet_input_use
+    	(count_year, count_month, account_id, type, input_yn, reg_dt, user_id)
+    	VALUES
+    	(#{year},#{month},#{account_id},#{type},#{input_yn},DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    	ON DUPLICATE KEY UPDATE
+    	count_year=#{year},
+    	count_month=#{month},
+    	account_id=#{account_id},
+    	type=#{type},
+    	input_yn=#{input_yn},
+    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
     </insert>
     
     <select id="EmergencyPersonList" parameterType="map" resultType="hashmap">
