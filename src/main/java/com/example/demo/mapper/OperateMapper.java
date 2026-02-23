@@ -34,6 +34,7 @@ public interface OperateMapper {
 	int AccountMemberWorkSystemSave(Map<String, Object> paramMap);								// 운영/인사 근무형태 저장
 	List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 고객사관리 -> 인사기록카드 조회
 	List<Map<String, Object>> AccountMemberAllList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 조회
+	List<Map<String, Object>> AccountMemberAllListExcel(Map<String, Object> paramMap);       	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 전체엑셀 조회
 	int AccountMembersSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
 	List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 조회
 	int AccountRecMembersSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영->채용관리 -> 현장 채용현황 저장
@@ -60,4 +61,9 @@ public interface OperateMapper {
 	int TallySheetPointSave(Map<String, Object> paramMap);										// 집계표 -> 셀 포인트 저장
 	List<Map<String, Object>> TallySheetUseList(Map<String, Object> paramMap);					// 집계표 -> type 입력가능여부 조회
 	int TallySheetUseSave(Map<String, Object> paramMap);										// 집계표 -> type 입력가능여부 저장
+	List<Map<String, Object>> SidoList(Map<String, Object> paramMap);							// 긴급인력관리 -> 근무가능지역 관리 -> 시도 조회
+	List<Map<String, Object>> SigunguList(Map<String, Object> paramMap);						// 긴급인력관리 -> 근무가능지역 관리 -> 시군구 조회
+	List<Map<String, Object>> EupmyeondongList(Map<String, Object> paramMap);					// 긴급인력관리 -> 근무가능지역 관리 -> 읍면동 조회
+	List<Map<String, Object>> RootList(Map<String, Object> paramMap);							// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 조회
+	int RootSave(Map<String, Object> paramMap);													// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 저장
 }

@@ -943,6 +943,109 @@
 		ORDER BY account_id;
 	</select>
 	
+	   <!-- 
+      전체 거래처 엑셀 전용 조회
+      - 기존 AccountMemberAllList는 화면/모달에서 계속 사용
+      - 엑셀 버튼에서만 별도 호출
+   -->
+	<select id="AccountMemberAllListExcel" parameterType="map" resultType="map">
+	   (
+	     SELECT
+	       T.member_id,
+	       T.account_id,
+	       T2.account_name,
+	       T.name,
+	       T.cor_type,
+	      T.join_dt,
+	      T.del_dt,
+	      T.del_yn,
+	      T.display_yn,
+	      T.position_type,
+	      T.idx,
+	      T.start_time,
+	      T.end_time,
+	      T.salary,
+	      T.relation,
+	      T.del_note,
+	      T.rct_notice,
+	      T.note,
+	      T.position_type,
+	      T.address,
+	      T.rrn,
+	      T.account_number,
+	      T.phone,
+	      T.contract_type,
+	      DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+	      DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
+	      DATE_FORMAT(T.national_pension, '%Y-%m-%d') AS national_pension,
+	      DATE_FORMAT(T.health_insurance, '%Y-%m-%d') AS health_insurance,
+	      DATE_FORMAT(T.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
+	      DATE_FORMAT(T.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+	      DATE_FORMAT(T.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
+	      T.employment_contract,
+	      T.subsidy,
+	      T.headoffice_note,
+	      T.id,
+	      T.bankbook
+	     FROM tb_account_members T
+	     JOIN tb_account T2 ON T.account_id = T2.account_id
+	     WHERE 1=1
+	     <if test='del_yn != null and del_yn != ""'>
+	        AND T.del_yn = #{del_yn}
+	     </if>
+	   )
+	   UNION ALL
+	   (
+	     SELECT
+	       A.member_id,
+	       A.account_id,
+	       CASE WHEN A.position_type = '6' THEN '유틸' 
+	              WHEN A.position_type = '7' THEN '통합'
+	              END AS account_name,
+	       A.name,
+	      A.cor_type,
+	      A.join_dt,
+	      A.del_dt,
+	       A.del_yn,
+	       A.display_yn,
+	      A.position_type,
+	      A.idx,
+	      A.start_time,
+	      A.end_time,
+	         CASE WHEN A.position_type = 7 THEN 
+	         A.salary * (SELECT COUNT(1) FROM tb_account_util_member_mapping T WHERE T.member_id = A.member_id) 
+	             ELSE A.salary END AS salary,
+	      A.relation,
+	      A.del_note,
+	      A.rct_notice,
+	      A.note,
+	      A.position_type,
+	      A.address,
+	      A.rrn,
+	      A.account_number,
+	      A.phone,
+	      A.contract_type,
+	      DATE_FORMAT(A.act_join_dt, '%Y-%m-%d') AS act_join_dt,
+	      DATE_FORMAT(A.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
+	      DATE_FORMAT(A.national_pension, '%Y-%m-%d') AS national_pension,
+	      DATE_FORMAT(A.health_insurance, '%Y-%m-%d') AS health_insurance,
+	      DATE_FORMAT(A.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
+	      DATE_FORMAT(A.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+	      DATE_FORMAT(A.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
+	      A.employment_contract,
+	      A.subsidy,
+	      A.headoffice_note,
+	      A.id,
+	      A.bankbook
+	     FROM tb_account_members A
+	     WHERE A.position_type in (6,7)
+	     <if test='del_yn != null and del_yn != ""'>
+	        AND A.del_yn = #{del_yn}
+	     </if>
+	   )
+	   ORDER BY account_id;
+	</select>
+	
 	<insert id="AccountMembersSave" parameterType="map">
 	    INSERT INTO tb_account_members (
 	        member_id,
@@ -1875,7 +1978,9 @@
 		    T.sun,
 		    T.position_type,
 		    T.start_time,
-		    T.end_time
+		    T.end_time,
+		    sido_code,
+		    sigungu_code
 		FROM tb_account T2
 		JOIN tb_account_record_standard_master_table T 
 		  ON T.account_id = T2.account_id
@@ -1885,9 +1990,9 @@
     
     <insert id="AccountRecordStandardSave" parameterType="map">
         INSERT INTO tb_account_record_standard_master_table
-		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt)
+		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, sido_code, sigungu_code)
 		  VALUES
-		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{sido_code}, #{sigungu_code})
 		ON DUPLICATE KEY UPDATE
 		  mon       	= VALUES(mon),
 	      tue 			= VALUES(tue),
@@ -1900,7 +2005,10 @@
 	      start_time	= VALUES(start_time),
 	      end_time		= VALUES(end_time),
 	      user_id     	= VALUES(user_id),
-	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d')
+	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	      sido_code		= VALUES(sido_code), 
+	      sigungu_code	= VALUES(sigungu_code)
+	      
     </insert>
     
     <select id="TallySheetPointList" parameterType="map" resultType="hashmap">
@@ -1972,4 +2080,51 @@
         </if>
 		ORDER BY sa.priority, a.area_level, a.area_name
     </select>
+    
+    <select id="SidoList" parameterType="map" resultType="map">
+    	SELECT sido_code, sido_name 
+		FROM sido
+		<if test="sido_code != null">
+            WHERE sido_code = #{sido_code}
+        </if>
+    </select>
+    
+    <select id="SigunguList" parameterType="map" resultType="map">
+    	SELECT sigungu_code, sigungu_name
+		FROM sigungu
+		WHERE sido_code = #{sido_code}
+    </select>
+    
+    <select id="EupmyeondongList" parameterType="map" resultType="map">
+    	SELECT emd_code, emd_name
+		FROM eupmyeondong
+		WHERE sigungu_code = #{sigungu_code}
+    </select>
+    
+    <select id="RootList" parameterType="map" resultType="map">
+    	SELECT A.root_idx, A.sido_code, B.sido_name, A.sigungu_code, C.sigungu_name, A.emd_code, D.emd_name, A.del_yn
+		FROM tb_account_root_master A
+		LEFT JOIN sido B
+		ON B.sido_code= A.sido_code
+		LEFT JOIN sigungu C
+		ON C.sigungu_code = A.sigungu_code
+		LEFT JOIN eupmyeondong D
+		ON D.emd_code = A.emd_code
+		WHERE A.del_yn = 'N'
+		ORDER BY A.root_idx ASC
+    </select>
+    
+    <insert id="RootSave" parameterType="map">
+    	INSERT INTO tb_account_root_master
+    	(root_idx, sido_code, sigungu_code, emd_code, del_yn, reg_dt, user_id)
+    	VALUES
+    	(#{root_idx},#{sido_code},#{sigungu_code},#{emd_code},'N',DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    	ON DUPLICATE KEY UPDATE
+    	sido_code=#{sido_code},
+    	sigungu_code=#{sigungu_code},
+    	emd_code=#{emd_code},
+    	del_yn=#{del_yn},
+    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
+    </insert>
 </mapper>

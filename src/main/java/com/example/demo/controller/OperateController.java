@@ -555,6 +555,19 @@ public class OperateController {
     }
     
     /*
+     * part      : 운영,인사
+     * method    : AccountMemberAllListExcel
+     * comment    : 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 전체 엑셀 조회
+     */
+    @GetMapping("Operate/AccountMemberAllListExcel")
+    public String AccountMemberAllListExcel(@RequestParam Map<String, Object> paramMap) {
+       List<Map<String, Object>> resultList = new ArrayList<>();
+       resultList = operateService.AccountMemberAllListExcel(paramMap);
+       
+       return new Gson().toJson(resultList);
+    }
+    
+    /*
      * part		: 운영,인사
      * method 	: AccountSubRestaurantSave
      * comment 	: 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
@@ -1039,6 +1052,88 @@ public class OperateController {
 		
 		int iResult = 0;
 		iResult = operateService.TallySheetUseSave(paramMap);
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
+	
+	/*
+     * part		: 운영
+     * method 	: SidoList
+     * comment 	: 긴급인력관리 -> 근무가능지역 관리 -> 시도 조회
+     */
+    @GetMapping("Operate/SidoList")
+    public String SidoList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.SidoList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: SigunguList
+     * comment 	: 긴급인력관리 -> 근무가능지역 관리 -> 시군구 조회
+     */
+    @GetMapping("Operate/SigunguList")
+    public String SigunguList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.SigunguList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: EupmyeondongList
+     * comment 	: 긴급인력관리 -> 근무가능지역 관리 -> 읍면동 조회
+     */
+    @GetMapping("Operate/EupmyeondongList")
+    public String EupmyeondongList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.EupmyeondongList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: RootList
+     * comment 	: 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 조회
+     */
+    @GetMapping("Operate/RootList")
+    public String RootList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.RootList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 운영
+     * method 	: RootSave
+     * comment 	: 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 저장
+     */
+    @PostMapping("Operate/RootSave")
+	public String RootSave(@RequestBody Map<String, Object> payload) {
+		
+		// payload에서 rows만 꺼냄
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("list");
+    	
+		int iResult = 0;
+		
+		for (Map<String, Object> paramMap : rows) {
+			iResult += operateService.RootSave(paramMap);
+		}
 		
 		JsonObject obj =new JsonObject();
     	
