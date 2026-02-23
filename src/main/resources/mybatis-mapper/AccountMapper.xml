@@ -93,7 +93,7 @@
 	<select id="AccountUtilMemberList" parameterType="map" resultType="map">
 		SELECT member_id, name, position_type
 		FROM tb_account_members T
-		WHERE position_type = 6
+		WHERE position_type in (6,7)
 		AND del_yn = 'N'
 	</select>
 	
@@ -102,7 +102,7 @@
 		FROM tb_account_members T
 		LEFT OUTER JOIN tb_account_util_member_mapping T2
 		ON T2.member_id = T.member_id
-		AND T.position_type = 6 
+		AND T.position_type in (6,7) 
 		AND T.del_yn = 'N'
 		WHERE T2.member_id = #{member_id}
 	</select>
@@ -311,6 +311,7 @@
 			 , X.end_time
 			 , X.salary
 		     , X.note
+		     , X.act_join_dt
 		     , X.pay_yn
 		FROM
 		(
@@ -329,6 +330,7 @@
 		    T.end_time,
 		    CASE WHEN T.type = 6 THEN T.salary ELSE 0 END AS salary,
 		    T.note
+		    , '' as act_join_dt
 		    , '' as pay_yn
 		FROM tb_account_members T2 
 		LEFT JOIN tb_account_record T
@@ -354,6 +356,7 @@
 	       T2.end_time,
 		   T2.salary,
 	       T2.note,
+	       '' as act_join_dt,
 	       '' as pay_yn
 	FROM tb_account_member_dispatch_mapping T
 	JOIN tb_account_record T2
@@ -381,6 +384,7 @@
           T3.end_time,
           CASE WHEN T3.type = 6 THEN T2.salary ELSE 0 END AS salary,
           T2.note
+          , '' as act_join_dt
           , '' as pay_yn
          from tb_account_util_member_mapping T
          join tb_account_members T2
@@ -409,6 +413,7 @@
 		    T.end_time,
 		    T.salary,
 		    T.note
+		    , DATE_FORMAT(T2.act_join_dt, '%Y-%m-%d') as act_join_dt
 		    , '' as pay_yn
 		FROM tb_account_rec_management T2  
 		LEFT JOIN tb_account_rec_record T
@@ -416,9 +421,20 @@
 		    AND T.member_id = T2.member_id
 		    AND T.record_year = #{year}   
 		    AND T.record_month = #{month}
-		    AND T2.use_yn = 'D'
+		    AND (
+		    	T2.act_join_dt IS NULL
+		    	OR T2.act_join_dt <![CDATA[ < ]]> STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')
+		    	OR T.record_date >= DAY(T2.act_join_dt)
+		    )
 		WHERE T2.account_id = #{account_id}
-		AND T2.use_yn = 'D' 
+		AND T2.use_yn = 'D'
+		AND (
+			T2.act_join_dt IS NULL
+			OR T2.act_join_dt <![CDATA[ < ]]> DATE_ADD(
+				STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'),
+				INTERVAL 1 MONTH
+			)
+		)
         UNION ALL
         SELECT
 			'dis' as gubun,
@@ -435,6 +451,7 @@
 		    T.end_time,
 		    T.salary,
 		    T.note
+		    , '' as act_join_dt
 		    , ifnull(T.pay_yn,'N') as pay_yn
 		FROM tb_account_members_dispatch T2  
 		LEFT JOIN tb_account_record_dispatch T
