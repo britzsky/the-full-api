@@ -193,6 +193,12 @@ public class OperateService {
 		resultList = operateMapper.AccountMemberAllList(paramMap);
 		return resultList;
 	}
+	 // 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 전체 엑셀 조회
+   public List<Map<String, Object>> AccountMemberAllListExcel(Map<String, Object> paramMap) {
+      List<Map<String, Object>> resultList = new ArrayList<>();
+      resultList = operateMapper.AccountMemberAllListExcel(paramMap);
+      return resultList;
+   }
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
 	public int AccountMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -357,6 +363,36 @@ public class OperateService {
 	public int TallySheetUseSave (Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallySheetUseSave(paramMap);
+		return iResult;
+	}
+	// 긴급인력관리 -> 근무가능지역 관리 -> 시도 조회
+	public List<Map<String, Object>> SidoList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.SidoList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 근무가능지역 관리 -> 시군구 조회
+	public List<Map<String, Object>> SigunguList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.SigunguList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 근무가능지역 관리 -> 읍면동 조회
+	public List<Map<String, Object>> EupmyeondongList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.EupmyeondongList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 조회
+	public List<Map<String, Object>> RootList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.RootList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 저장
+	public int RootSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.RootSave(paramMap);
 		return iResult;
 	}
 }
