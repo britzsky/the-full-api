@@ -23,6 +23,21 @@ public class UserService {
 		return userMapper.Login(paramMap);
 	}
 
+	// 공통 키 생성값
+	public String NowDateKey() {
+		return userMapper.NowDateKey();
+	}
+
+	// user_id 존재 여부
+	public int CountUserId(Map<String, Object> paramMap) {
+		return userMapper.CountUserId(paramMap);
+	}
+
+	// 통합/유틸 인력 기존 member_id 조회
+	public String SelectUtilMemberIdByUserId(Map<String, Object> paramMap) {
+		return userMapper.SelectUtilMemberIdByUserId(paramMap);
+	}
+
 	// ✅ 승인대기 목록 (use_yn='N')
 	public List<Map<String, Object>> SelectApprovalPendingUsers(Map<String, Object> paramMap) {
 		return userMapper.SelectApprovalPendingUsers(paramMap);
@@ -76,6 +91,25 @@ public class UserService {
 	// 사용자 상세등록
 	public int UserRgtDetail(Map<String, Object> paramMap) {
 		return userMapper.UserRgtDetail(paramMap);
+	}
+
+	// 통합/유틸 인력 등록(tb_account_members)
+	public int UserRgtAccountMember(Map<String, Object> paramMap) {
+		return userMapper.UserRgtAccountMember(paramMap);
+	}
+
+	// 사용자 + 상세 + (선택)통합/유틸 인력정보 저장
+	@Transactional(rollbackFor = Exception.class)
+	public int UserRgtAll(Map<String, Object> info, Map<String, Object> detail, Map<String, Object> accountMember) {
+		int iResult = 0;
+		iResult += userMapper.UserRgt(info);
+		iResult += userMapper.UserRgtDetail(detail);
+
+		if (accountMember != null && !accountMember.isEmpty()) {
+			iResult += userMapper.UserRgtAccountMember(accountMember);
+		}
+
+		return iResult;
 	}
 
 	// 직원 정보 조회

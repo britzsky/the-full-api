@@ -159,22 +159,91 @@ public class UserController {
 	@PostMapping("/User/UserRgt")
 	public String UserRgt(@RequestBody Map<String, Object> paramMap) {
 
+		JsonObject obj = new JsonObject();
 		int iResult = 0;
 
-		Map<String, Object> info = (Map<String, Object>) paramMap.get("info");
-		Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
+		try {
+			Map<String, Object> info = (Map<String, Object>) paramMap.get("info");
+			Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
+			Map<String, Object> reqAccountMember = (Map<String, Object>) paramMap.get("account_member");
+			Map<String, Object> accountMember = null;
 
-		iResult += userService.UserRgt(info);
-		iResult += userService.UserRgtDetail(detail);
+			if (info == null || detail == null) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "요청 형식이 올바르지 않습니다.");
+				return obj.toString();
+			}
 
-		JsonObject obj = new JsonObject();
+			String userType = info == null ? "" : String.valueOf(info.getOrDefault("user_type", "")).trim();
+			String userId = info == null ? "" : String.valueOf(info.getOrDefault("user_id", "")).trim();
+			String isUpdateRaw = String.valueOf(paramMap.getOrDefault("is_update", "")).trim();
+			boolean isUpdate = "true".equalsIgnoreCase(isUpdateRaw) || "y".equalsIgnoreCase(isUpdateRaw)
+					|| "1".equals(isUpdateRaw);
 
-		if (iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-		} else {
+			if (userId.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "user_id는 필수입니다.");
+				return obj.toString();
+			}
+
+			Map<String, Object> userIdParam = new HashMap<>();
+			userIdParam.put("user_id", userId);
+			int existsUserId = userService.CountUserId(userIdParam);
+			if (existsUserId > 0 && !isUpdate) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "이미 사용 중인 아이디입니다.");
+				return obj.toString();
+			}
+
+			if ("4".equals(userType)) {
+				info.put("department", 7); // 통합/유틸은 현장(7) 고정
+				String positionType = "";
+				if (reqAccountMember != null && reqAccountMember.get("position_type") != null) {
+					positionType = String.valueOf(reqAccountMember.get("position_type")).trim();
+				}
+				if (positionType.isEmpty() && info != null && info.get("util_member_type") != null) {
+					positionType = String.valueOf(info.get("util_member_type")).trim();
+				}
+
+				if (!"6".equals(positionType) && !"7".equals(positionType)) {
+					obj.addProperty("code", 400);
+					obj.addProperty("message", "통합/유틸 구분값이 필요합니다.");
+					return obj.toString();
+				}
+
+				// 통합/유틸 인력의 member_id는 기존값 재사용, 없으면 기존 키 생성 로직으로 신규 발급
+				String utilMemberId = userService.SelectUtilMemberIdByUserId(userIdParam);
+				if (utilMemberId == null || utilMemberId.trim().isEmpty()) {
+					utilMemberId = userService.NowDateKey();
+				}
+
+				accountMember = new HashMap<>();
+				accountMember.put("member_id", utilMemberId);
+				accountMember.put("account_id", "6".equals(positionType) ? "2" : "1"); // 유틸:2, 통합:1
+				accountMember.put("name", info == null ? "" : info.get("user_name"));
+				accountMember.put("join_dt", info == null ? null : info.get("join_dt"));
+				accountMember.put("del_yn", "N");
+				accountMember.put("display_yn", "Y");
+				accountMember.put("position_type", Integer.valueOf(positionType)); // 유틸:6, 통합:7
+				accountMember.put("address", detail == null ? null : detail.get("address"));
+				accountMember.put("phone", detail == null ? null : detail.get("phone"));
+				accountMember.put("note", reqAccountMember == null ? null : reqAccountMember.get("note"));
+				accountMember.put("user_id", userId);
+			}
+
+			iResult += userService.UserRgtAll(info, detail, accountMember);
+
+			if (iResult > 0) {
+				obj.addProperty("code", 200);
+				obj.addProperty("message", "성공");
+			} else {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "실패");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
 			obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
+			obj.addProperty("message", e.getMessage() == null ? "실패" : e.getMessage());
 		}
 
 		return obj.toString();

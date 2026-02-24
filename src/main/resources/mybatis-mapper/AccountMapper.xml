@@ -100,11 +100,32 @@
 	<select id="AccountUtilMappingList" parameterType="map" resultType="map">
 		SELECT T2.idx, T2.account_id, T.member_id, T.name, T.position_type
 		FROM tb_account_members T
-		LEFT OUTER JOIN tb_account_util_member_mapping T2
+		JOIN tb_account_util_member_mapping T2
 		ON T2.member_id = T.member_id
-		AND T.position_type in (6,7) 
-		AND T.del_yn = 'N'
-		WHERE T2.member_id = #{member_id}
+		WHERE T.position_type IN (6,7)
+		AND IFNULL(T.del_yn, 'N') = 'N'
+		AND IFNULL(T2.del_yn, 'N') = 'N'
+		<choose>
+			<when test="member_id != null and member_id != ''">
+				AND T2.member_id = #{member_id}
+			</when>
+			<when test="user_id != null and user_id != ''">
+				AND (
+					-- 기존 데이터(member_id=user_id)와 신규 데이터(user_id 컬럼 저장)를 모두 대응
+					T2.member_id = #{user_id}
+					OR T2.member_id IN (
+						SELECT M.member_id
+						FROM tb_account_members M
+						WHERE M.user_id = #{user_id}
+						AND IFNULL(M.del_yn, 'N') = 'N'
+						AND M.position_type IN (6,7)
+					)
+				)
+			</when>
+			<otherwise>
+				AND 1 = 0
+			</otherwise>
+		</choose>
 	</select>
 	
 	<insert id="AccountUtilMemberMappingSave" parameterType="map">
@@ -1183,7 +1204,7 @@
 	</select>
 	
 	<select id="AccountDeadlineBalanceIntegrityCost" parameterType="map" resultType="int">
-		SELECT ifnull(integrity_cost,0) as integrity_cost
+		SELECT ifnull(MAX(integrity_cost),0) as integrity_cost
 		FROM tb_account_deadline_balance
 		WHERE year = #{year}
 		AND month = #{month}
