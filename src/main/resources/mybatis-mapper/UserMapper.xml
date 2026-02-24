@@ -13,6 +13,7 @@
             SELECT
                 u.user_id,
                 u.user_name,
+                u.password,
                 u.user_type,
                 u.department,
                 u.account_id,
@@ -205,6 +206,7 @@
         SELECT
             u.user_id,
             u.user_name,
+            u.password,
             u.department,
             u.account_id,
             a.account_name,
