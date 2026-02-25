@@ -484,6 +484,15 @@
 	        <if test="mod_dt != null and mod_dt != ''">
 	        mod_dt=DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),
 	        </if>
+	        <if test="check_team != null and check_team != ''">
+	        check_team=#{check_team},
+	        </if>
+	        <if test="check_name != null and check_name != ''">
+	        check_name=#{check_name},
+	        </if>
+	        <if test="acquisition_name != null and acquisition_name != ''">
+	        acquisition_name=#{acquisition_name},
+	        </if>
 	    </trim>
 	</insert>
 	
