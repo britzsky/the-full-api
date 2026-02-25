@@ -395,4 +395,46 @@ public class OperateService {
 		iResult = operateMapper.RootSave(paramMap);
 		return iResult;
 	}
+	// 긴급인력관리 -> 현재 출근부 현황 조회
+	public List<Map<String, Object>> RecordSituationList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.RecordSituationList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 필수인력 조회
+	public List<Map<String, Object>> RecordStandardList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.RecordStandardList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 인력정보 조회
+	public List<Map<String, Object>> FieldPersonMasterList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.FieldPersonMasterList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 인력, 루트 매핑 조회
+	public List<Map<String, Object>> PersonToRootList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.PersonToRootList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 긴급인력 조회
+	public List<Map<String, Object>> EmergencyPersonList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.EmergencyPersonList(paramMap);
+		return resultList;
+	}
+	// 긴급인력관리 -> 인력, 근무가능지역 매핑 저장
+	public int PersonToRootSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.PersonToRootSave(paramMap);
+		return iResult;
+	}
+	// 긴급인력관리 -> 인력정보 저장
+	public int FieldPersonSave (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.FieldPersonSave(paramMap);
+		return iResult;
+	}
 }

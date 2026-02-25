@@ -66,4 +66,11 @@ public interface OperateMapper {
 	List<Map<String, Object>> EupmyeondongList(Map<String, Object> paramMap);					// 긴급인력관리 -> 근무가능지역 관리 -> 읍면동 조회
 	List<Map<String, Object>> RootList(Map<String, Object> paramMap);							// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 조회
 	int RootSave(Map<String, Object> paramMap);													// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 저장
+	List<Map<String, Object>> RecordSituationList(Map<String, Object> paramMap);				// 긴급인력관리 -> 현재 출근부 현황 조회
+	List<Map<String, Object>> RecordStandardList(Map<String, Object> paramMap);					// 긴급인력관리 -> 필수인력 조회
+	List<Map<String, Object>> FieldPersonMasterList(Map<String, Object> paramMap);				// 긴급인력관리 -> 인력정보 조회
+	List<Map<String, Object>> PersonToRootList(Map<String, Object> paramMap);					// 긴급인력관리 -> 인력, 루트 매핑 조회
+	List<Map<String, Object>> EmergencyPersonList(Map<String, Object> paramMap);				// 긴급인력관리 -> 긴급인력 조회
+	int PersonToRootSave(Map<String, Object> paramMap);											// 긴급인력관리 -> 인력, 근무가능지역 매핑 저장
+	int FieldPersonSave(Map<String, Object> paramMap);											// 긴급인력관리 -> 인력정보 저장
 }

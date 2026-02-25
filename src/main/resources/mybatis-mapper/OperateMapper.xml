@@ -327,165 +327,174 @@
 	</select>
 	
 	<insert id="HandOverSave" parameterType="map">
-		INSERT INTO tb_account_handover_management
-    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        account_id,
-	        handover_company,
-	        handover_name,
-	        <if test="handover_dt != null and handover_dt != ''">handover_dt,</if>
-	        acquisition_company,
-	        acquisition_name,
-	        <if test="acquisition_dt != null and acquisition_dt != ''">acquisition_dt,</if>
-	        check_team,
-	        check_name,
-	        handover_location,
-	        meal_number,
-	        catering_ration,
-	        normal_diet,
-	        kitchen_member,
-	        work_type,
-	        order_program_info,
-	        ingredients_order_type,
-	        inspection_store_type,
-	        stock_manage_type,
-	        diet_submit_cycle,
-	        hygiene_note,
-	        hot_issue,
-	        program_use_whether,
-	        rounding_satis_whether,
-	        complain_note,
-	        manager_phone,
-	        trash_treatment_type,
-	        regular_schedule,
-	        special_note,
-	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
-	        <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
-	        user_id
-	    </trim>
-	    
-	    VALUES
-	    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        #{account_id},
-	        #{handover_company},
-	        #{handover_name},
-	        <if test="handover_dt != null and handover_dt != ''">DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),</if>
-	        #{acquisition_company},
-	        #{acquisition_name},
-	        <if test="acquisition_dt != null and acquisition_dt != ''">DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),</if>
-	        #{check_team},
-	        #{check_name},
-	        #{handover_location},
-	        #{meal_number},
-	        #{catering_ration},
-	        #{normal_diet},
-	        #{kitchen_member},
-	        #{work_type},
-	        #{order_program_info},
-	        #{ingredients_order_type},
-	        #{inspection_store_type},
-	        #{stock_manage_type},
-	        #{diet_submit_cycle},
-	        #{hygiene_note},
-	        #{hot_issue},
-	        #{program_use_whether},
-	        #{rounding_satis_whether},
-	        #{complain_note},
-	        #{manager_phone},
-	        #{trash_treatment_type},
-	        #{regular_schedule},
-	        #{special_note},
-	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
-	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
-	        #{user_id}
-	    </trim>
-	    ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	        account_id=#{account_id},
-	        <if test="handover_company != null">
-	        handover_company=#{handover_company},
-	        </if>
-	        <if test="handover_name != null">
-	        handover_name=#{handover_name},
-	        </if>
-	        <if test="handover_location != null">
-	        handover_location=#{handover_location},
-	        </if>
-	        <if test="meal_number != null">
-	        meal_number=#{meal_number},
-	        </if>
-	        <if test="catering_ration != null">
-	        catering_ration=#{catering_ration},
-	        </if>
-	        <if test="normal_diet != null">
-	        normal_diet=#{normal_diet},
-	        </if>
-	        <if test="kitchen_member != null">
-	        kitchen_member=#{kitchen_member},
-	        </if>
-	        <if test="work_type != null">
-	        work_type=#{work_type},
-	        </if>
-	        <if test="order_program_info != null">
-	        order_program_info=#{order_program_info},
-	        </if>
-	        <if test="ingredients_order_type != null">
-	        ingredients_order_type=#{ingredients_order_type},
-	        </if>
-	        <if test="inspection_store_type != null">
-	        inspection_store_type=#{inspection_store_type},
-	        </if>
-	        <if test="stock_manage_type != null">
-	        stock_manage_type=#{stock_manage_type},
-	        </if>
-	        <if test="diet_submit_cycle != null">
-	        diet_submit_cycle=#{diet_submit_cycle},
-	        </if>
-	        <if test="hygiene_note != null">
-	        hygiene_note=#{hygiene_note},
-	        </if>
-	        <if test="hot_issue != null">
-	        hot_issue=#{hot_issue},
-	        </if>
-	        <if test="program_use_whether != null">
-	        program_use_whether=#{program_use_whether},
-	        </if>
-	        <if test="rounding_satis_whether != null">
-	        rounding_satis_whether=#{rounding_satis_whether},
-	        </if>
-	        <if test="complain_note != null">
-	        complain_note=#{complain_note},
-	        </if>
-	        <if test="manager_phone != null">
-	        manager_phone=#{manager_phone},
-	        </if>
-	        <if test="trash_treatment_type != null">
-	        trash_treatment_type=#{trash_treatment_type},
-	        </if>
-	        <if test="regular_schedule != null">
-	        regular_schedule=#{regular_schedule},
-	        </if>
-	        <if test="special_note != null">
-	        special_note=#{special_note},
-	        </if>
-	        <if test="handover_dt != null and handover_dt != ''">
-	        handover_dt=DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),
-	        </if>
-	        <if test="acquisition_dt != null and acquisition_dt != ''">
-	        acquisition_dt=DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),
-	        </if>
-	        <if test="user_id != null">
-	        user_id=#{user_id},
-	        </if>
-	        <if test="reg_dt != null and reg_dt != ''">
-	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
-	        </if>
-	        <if test="mod_dt != null and mod_dt != ''">
-	        mod_dt=DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),
-	        </if>
-	    </trim>
-	</insert>
+	     INSERT INTO tb_account_handover_management
+	   
+	      <trim prefix="(" suffix=")" suffixOverrides=",">
+	          account_id,
+	          handover_company,
+	          handover_name,
+	          <if test="handover_dt != null and handover_dt != ''">handover_dt,</if>
+	          acquisition_company,
+	          acquisition_name,
+	          <if test="acquisition_dt != null and acquisition_dt != ''">acquisition_dt,</if>
+	          check_team,
+	          check_name,
+	          handover_location,
+	          meal_number,
+	          catering_ration,
+	          normal_diet,
+	          kitchen_member,
+	          work_type,
+	          order_program_info,
+	          ingredients_order_type,
+	          inspection_store_type,
+	          stock_manage_type,
+	          diet_submit_cycle,
+	          hygiene_note,
+	          hot_issue,
+	          program_use_whether,
+	          rounding_satis_whether,
+	          complain_note,
+	          manager_phone,
+	          trash_treatment_type,
+	          regular_schedule,
+	          special_note,
+	          <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+	          <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
+	          user_id
+	      </trim>
+	      
+	      VALUES
+	      
+	      <trim prefix="(" suffix=")" suffixOverrides=",">
+	          #{account_id},
+	          #{handover_company},
+	          #{handover_name},
+	          <if test="handover_dt != null and handover_dt != ''">DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),</if>
+	          #{acquisition_company},
+	          #{acquisition_name},
+	          <if test="acquisition_dt != null and acquisition_dt != ''">DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),</if>
+	          #{check_team},
+	          #{check_name},
+	          #{handover_location},
+	          #{meal_number},
+	          #{catering_ration},
+	          #{normal_diet},
+	          #{kitchen_member},
+	          #{work_type},
+	          #{order_program_info},
+	          #{ingredients_order_type},
+	          #{inspection_store_type},
+	          #{stock_manage_type},
+	          #{diet_submit_cycle},
+	          #{hygiene_note},
+	          #{hot_issue},
+	          #{program_use_whether},
+	          #{rounding_satis_whether},
+	          #{complain_note},
+	          #{manager_phone},
+	          #{trash_treatment_type},
+	          #{regular_schedule},
+	          #{special_note},
+	          <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+	          <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
+	          #{user_id}
+	      </trim>
+	      ON DUPLICATE KEY UPDATE
+	      <trim suffixOverrides=",">
+	          account_id=#{account_id},
+	          <if test="handover_company != null">
+	          handover_company=#{handover_company},
+	          </if>
+	          <if test="handover_name != null">
+	          handover_name=#{handover_name},
+	          </if>
+	          <if test="handover_location != null">
+	          handover_location=#{handover_location},
+	          </if>
+	          <if test="meal_number != null">
+	          meal_number=#{meal_number},
+	          </if>
+	          <if test="catering_ration != null">
+	          catering_ration=#{catering_ration},
+	          </if>
+	          <if test="normal_diet != null">
+	          normal_diet=#{normal_diet},
+	          </if>
+	          <if test="kitchen_member != null">
+	          kitchen_member=#{kitchen_member},
+	          </if>
+	          <if test="work_type != null">
+	          work_type=#{work_type},
+	          </if>
+	          <if test="order_program_info != null">
+	          order_program_info=#{order_program_info},
+	          </if>
+	          <if test="ingredients_order_type != null">
+	          ingredients_order_type=#{ingredients_order_type},
+	          </if>
+	          <if test="inspection_store_type != null">
+	          inspection_store_type=#{inspection_store_type},
+	          </if>
+	          <if test="stock_manage_type != null">
+	          stock_manage_type=#{stock_manage_type},
+	          </if>
+	          <if test="diet_submit_cycle != null">
+	          diet_submit_cycle=#{diet_submit_cycle},
+	          </if>
+	          <if test="hygiene_note != null">
+	          hygiene_note=#{hygiene_note},
+	          </if>
+	          <if test="hot_issue != null">
+	          hot_issue=#{hot_issue},
+	          </if>
+	          <if test="program_use_whether != null">
+	          program_use_whether=#{program_use_whether},
+	          </if>
+	          <if test="rounding_satis_whether != null">
+	          rounding_satis_whether=#{rounding_satis_whether},
+	          </if>
+	          <if test="complain_note != null">
+	          complain_note=#{complain_note},
+	          </if>
+	          <if test="manager_phone != null">
+	          manager_phone=#{manager_phone},
+	          </if>
+	          <if test="trash_treatment_type != null">
+	          trash_treatment_type=#{trash_treatment_type},
+	          </if>
+	          <if test="regular_schedule != null">
+	          regular_schedule=#{regular_schedule},
+	          </if>
+	          <if test="special_note != null">
+	          special_note=#{special_note},
+	          </if>
+	          <if test="handover_dt != null and handover_dt != ''">
+	          handover_dt=DATE_FORMAT(#{handover_dt}, '%Y-%m-%d'),
+	          </if>
+	          <if test="acquisition_dt != null and acquisition_dt != ''">
+	          acquisition_dt=DATE_FORMAT(#{acquisition_dt}, '%Y-%m-%d'),
+	          </if>
+	          <if test="user_id != null">
+	          user_id=#{user_id},
+	          </if>
+	          <if test="reg_dt != null and reg_dt != ''">
+	          reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	          </if>
+	          <if test="mod_dt != null and mod_dt != ''">
+	          mod_dt=DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),
+	          </if>
+	          <if test="check_team != null and check_team != ''">
+	          check_team=#{check_team},
+	          </if>
+	          <if test="check_name != null and check_name != ''">
+	          check_name=#{check_name},
+	          </if>
+	          <if test="acquisition_name != null and acquisition_name != ''">
+	          acquisition_name=#{acquisition_name},
+	          </if>
+	      </trim>
+	  </insert>
 	
 	<select id="AccountMappingList" parameterType="map" resultType="hashmap">
 		SELECT *
@@ -1979,8 +1988,8 @@
 		    T.position_type,
 		    T.start_time,
 		    T.end_time,
-		    sido_code,
-		    sigungu_code
+		    ifnull(sido_code, '') as sido_code,
+		    ifnull(sigungu_code, '') as sigungu_code
 		FROM tb_account T2
 		JOIN tb_account_record_standard_master_table T 
 		  ON T.account_id = T2.account_id
@@ -2070,17 +2079,6 @@
     	user_id=#{user_id}
     </insert>
     
-    <select id="EmergencyPersonList" parameterType="map" resultType="hashmap">
-    	SELECT s.name, s.job_type, a.area_name, a.area_level, sa.priority
-		FROM staff s
-		JOIN staff_area sa ON sa.staff_id = s.staff_id
-		JOIN area a ON a.area_id = sa.area_id
-		<if test="name != null">
-            WHERE s.name = #{name}
-        </if>
-		ORDER BY sa.priority, a.area_level, a.area_name
-    </select>
-    
     <select id="SidoList" parameterType="map" resultType="map">
     	SELECT sido_code, sido_name 
 		FROM sido
@@ -2127,4 +2125,195 @@
     	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
+    
+    <select id="RecordSituationList" parameterType="map" resultType="map">
+    	WITH base AS (
+		  SELECT
+		    A.is_present,
+		    B.position_type,
+		    STR_TO_DATE(
+		      CONCAT(A.record_year,'-',LPAD(A.record_month,2,'0'),'-',LPAD(A.record_date,2,'0')),
+		      '%Y-%m-%d'
+		    ) AS d
+		  FROM tb_account_record A
+		  JOIN tb_account_members B
+		    ON B.account_id = A.account_id
+		   AND B.member_id  = A.member_id
+		  WHERE A.record_year  = #{year}
+		    AND A.record_month = #{month}
+		    AND A.account_id   = #{account_id}
+		    AND B.position_type IN (4,5)
+		
+		  UNION ALL
+		
+		  SELECT
+		    A.is_present,
+		    B.position_type,
+		    STR_TO_DATE(
+		      CONCAT(A.record_year,'-',LPAD(A.record_month,2,'0'),'-',LPAD(A.record_date,2,'0')),
+		      '%Y-%m-%d'
+		    ) AS d
+		  FROM tb_account_record_dispatch A
+		  JOIN tb_account_members_dispatch B
+		    ON B.account_id = A.account_id
+		   AND B.member_id  = A.member_id
+		  WHERE A.record_year  = #{year}
+		    AND A.record_month = #{month}
+		    AND A.account_id   = #{account_id}
+		    AND B.position_type IN (4,5)
+		),
+		params AS (
+		  SELECT
+		    DATE('2026-02-01') AS first_day,
+		    LAST_DAY('2026-02-01') AS last_day,
+		    DATE_SUB(DATE('2026-02-01'), INTERVAL WEEKDAY(DATE('2026-02-01')) DAY) AS month_week1_monday
+		),
+		wk AS (
+		  SELECT
+		    b.*,
+		    DATE_SUB(b.d, INTERVAL WEEKDAY(b.d) DAY) AS week_monday
+		  FROM base b
+		)
+		SELECT
+		  FLOOR(DATEDIFF(w.week_monday, p.month_week1_monday) / 7) + 1 AS week_number,
+			
+		  CASE 
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 0 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 0 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=2 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'mon',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 1 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 1 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=3 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'tue',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 2 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 2 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=4 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'wed',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 3 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 3 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=5 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'thu',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 4 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 4 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=6 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'fri',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 5 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 5 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=7 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'sat',
+		
+		  CASE
+		  <![CDATA[
+		    WHEN DATE_ADD(w.week_monday, INTERVAL 6 DAY) < p.first_day
+		      OR DATE_ADD(w.week_monday, INTERVAL 6 DAY) > p.last_day
+		  ]]>
+		    THEN 'none'
+		    ELSE CAST(SUM(CASE WHEN DAYOFWEEK(w.d)=1 AND w.is_present='Y' THEN 1 ELSE 0 END) AS CHAR)
+		  END AS 'sun',
+		
+		  w.position_type
+		FROM wk w
+		CROSS JOIN params p
+		GROUP BY w.week_monday, w.position_type, p.month_week1_monday
+		ORDER BY week_number, w.position_type;
+    </select>
+    
+    <select id="RecordStandardList" parameterType="map" resultType="map">
+    	SELECT mon, tue, wed, thu, fri, sat, sun, position_type
+		FROM tb_account_record_standard_master_table
+		WHERE account_id = #{account_id}
+    </select>
+    
+    <select id="FieldPersonMasterList" parameterType="map" resultType="map">
+    	SELECT *
+    	FROM tb_account_field_person_master_table
+    </select>
+    
+    <select id="PersonToRootList" parameterType="map" resultType="map">
+    	SELECT A.root_idx, A.idx, B.sido_code, C.sido_name, B.sigungu_code, D.sigungu_name, B.emd_code, E.emd_name
+    	FROM tb_account_field_root_mapping_table A
+        JOIN tb_account_root_master B
+        ON B.root_idx = A.root_idx
+        JOIN sido C
+        ON C.sido_code = B.sido_code
+        JOIN sigungu D
+        ON D.sigungu_code = B.sigungu_code
+        LEFT JOIN eupmyeondong E
+        ON E.emd_code = B.emd_code
+    	WHERE idx = #{idx}
+    </select>
+    
+    <insert id="PersonToRootSave" parameterType="map">
+    	INSERT INTO tb_account_field_root_mapping_table
+    	(idx, root_idx, del_yn, reg_dt, user_id)
+    	VALUES
+    	(#{idx}, #{root_idx}, 'N', DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+    	ON DUPLICATE KEY UPDATE
+    	del_yn=#{del_yn},
+    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
+    </insert>
+    
+    <insert id="FieldPersonSave" parameterType="map">
+    	INSERT INTO tb_account_field_person_master_table
+    	(idx, name, salary, car_yn, note, status, manpower_type, reg_dt, user_id, mod_dt)
+    	VALUES
+    	(#{idx}, #{name}, #{salary}, #{car_yn}, #{note}, #{status}, #{manpower_type}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+    	ON DUPLICATE KEY UPDATE
+    	name=#{name},
+    	salary=#{salary},
+    	car_yn=#{car_yn},
+    	note=#{note},
+    	status=#{status},
+    	manpower_type=#{manpower_type},
+    	mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
+    </insert>
+    
+    <select id="EmergencyPersonList" parameterType="map" resultType="map">
+    	SELECT *
+		FROM tb_account_field_person_master_table
+		WHERE idx in 
+		(
+			SELECT idx
+			FROM tb_account_field_root_mapping_table
+			WHERE root_idx = 
+			(
+				SELECT root_idx
+				FROM tb_account_root_master
+				WHERE sido_code = #{sido_code}
+				AND sigungu_code = #{sigungu_code}
+			)
+		)
+		AND position_type = #{position_type}
+    </select>
 </mapper>

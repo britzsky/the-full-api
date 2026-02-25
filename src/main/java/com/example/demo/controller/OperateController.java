@@ -1147,4 +1147,129 @@ public class OperateController {
     	
     	return obj.toString();
 	}
+    
+    /*
+     * part		: 운영
+     * method 	: RecordSituationList
+     * comment 	: 긴급인력관리 -> 현재 출근부 현황 조회
+     */
+    @GetMapping("Operate/RecordSituationList")
+    public String RecordSituationList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.RecordSituationList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: RecordStandardList
+     * comment 	: 긴급인력관리 -> 필수인력 조회
+     */
+    @GetMapping("Operate/RecordStandardList")
+    public String RecordStandardList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.RecordStandardList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: FieldPersonMasterList
+     * comment 	: 긴급인력관리 -> 인력정보 조회
+     */
+    @GetMapping("Operate/FieldPersonMasterList")
+    public String FieldPersonMasterList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.FieldPersonMasterList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: PersonToRootList
+     * comment 	: 긴급인력관리 -> 인력, 루트 매핑 조회
+     */
+    @GetMapping("Operate/PersonToRootList")
+    public String PersonToRootList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.PersonToRootList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /*
+     * part		: 운영
+     * method 	: EmergencyPersonList
+     * comment 	: 긴급인력관리 -> 긴급인력 조회
+     */
+    @GetMapping("Operate/EmergencyPersonList")
+    public String EmergencyPersonList(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	resultList = operateService.EmergencyPersonList(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    
+    /* 
+	 * part		: 운영
+     * method 	: PersonToRootSave
+     * comment 	: 긴급인력관리 -> 인력, 근무가능지역 매핑 저장
+     */
+    @PostMapping("Operate/PersonToRootSave")
+	public String PersonToRootSave(@RequestBody Map<String, Object> payload) {
+		
+		// payload에서 rows만 꺼냄
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("list");
+    	
+		int iResult = 0;
+		
+		for (Map<String, Object> paramMap : rows) {
+			iResult += operateService.PersonToRootSave(paramMap);
+		}
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
+    
+    /* 
+	 * part		: 운영
+     * method 	: FieldPersonSave
+     * comment 	: 긴급인력관리 -> 인력정보 저장
+     */
+    @PostMapping("Operate/FieldPersonSave")
+	public String FieldPersonSave(@RequestBody Map<String, Object> payload) {
+		
+		// payload에서 rows만 꺼냄
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("list");
+    	
+		int iResult = 0;
+		
+		for (Map<String, Object> paramMap : rows) {
+			iResult += operateService.FieldPersonSave(paramMap);
+		}
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
 }

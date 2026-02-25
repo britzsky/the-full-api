@@ -693,9 +693,9 @@
 	
 	<insert id="AccountDispatchMemberSave" parameterType="map">
 		INSERT INTO tb_account_members_dispatch
-		(account_id, member_id, name, phone, rrn, account_number, note, del_yn, dispatch_account, record_year, record_month)
+		(account_id, member_id, name, phone, rrn, account_number, note, del_yn, dispatch_account, record_year, record_month, position_type)
 		VALUES
-		(#{account_id}, #{member_id}, #{name}, #{phone}, #{rrn}, #{account_number}, #{note}, #{del_yn}, #{dispatch_account}, #{record_year}, #{record_month})
+		(#{account_id}, #{member_id}, #{name}, #{phone}, #{rrn}, #{account_number}, #{note}, #{del_yn}, #{dispatch_account}, #{record_year}, #{record_month}, #{position_type})
 		ON DUPLICATE KEY UPDATE
 		name = #{name},
 		phone = #{phone},
@@ -705,7 +705,8 @@
 		del_yn = #{del_yn},
 		dispatch_account = #{dispatch_account},
 		record_year = #{record_year}, 
-		record_month = #{record_month}
+		record_month = #{record_month},
+		position_type = #{position_type}
 	</insert>
 	
 	<select id="AccountPropertiesList" parameterType="map" resultType="hashmap">
