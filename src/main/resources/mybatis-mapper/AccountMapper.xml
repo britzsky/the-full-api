@@ -1370,35 +1370,89 @@
 	</insert>
 	
 		<select id="AccountDeadlineDifferencePriceSearch" parameterType="map" resultType="hashmap">
-		SELECT
-			(
-			  CASE #{type}
-			    WHEN 1 THEN IFNULL(db.living_cost, 0)
-			    WHEN 2 THEN IFNULL(db.basic_cost, 0)
-			    WHEN 3 THEN IFNULL(db.employ_cost, 0)
-			    WHEN 5 THEN IFNULL(db.integrity_cost, 0)
-			    WHEN 4 THEN IFNULL(abp.balance_price, 0)
-			    ELSE 0
-			  END
-			  -
-			  IFNULL((
-			    SELECT SUM(IFNULL(dh.input_price, 0))
-			    FROM tb_account_deposit_history dh
-			    WHERE dh.account_id = #{account_id}
-			      AND dh.year = #{year}
-			      AND dh.month = #{month}
-			      AND dh.type = #{type}
-			      AND IFNULL(dh.note, '') NOT LIKE '%[환불]%'
-			  ), 0)
-			) AS difference_price
-			FROM tb_account_deadline_balance db
-			LEFT OUTER JOIN tb_account_balance_price abp
-			ON abp.account_id = db.account_id
-			WHERE db.account_id = #{account_id}
-			  AND db.year = #{year}
-			  AND db.month = #{month}
-			LIMIT 1
-	</select>
+			SELECT
+				(
+				  CASE #{type}
+				    WHEN 1 THEN IFNULL(db.living_cost, 0)
+				    WHEN 2 THEN IFNULL(db.basic_cost, 0)
+				    WHEN 3 THEN IFNULL(db.employ_cost, 0)
+				    WHEN 5 THEN IFNULL(db.integrity_cost, 0)
+				    WHEN 4 THEN IFNULL(abp.balance_price, 0)
+				    ELSE 0
+				  END
+				  +
+				  CASE #{type}
+				    WHEN 1 THEN IFNULL(refund.refund_living, 0)
+				    WHEN 2 THEN IFNULL(refund.refund_basic, 0)
+				    WHEN 3 THEN IFNULL(refund.refund_employ, 0)
+				    WHEN 5 THEN IFNULL(refund.refund_integrity, 0)
+				    ELSE 0
+				  END
+				  -
+				  IFNULL((
+				    SELECT SUM(IFNULL(dh.input_price, 0))
+				    FROM tb_account_deposit_history dh
+				    WHERE dh.account_id = #{account_id}
+				      AND dh.year = #{year}
+				      AND dh.month = #{month}
+				      AND dh.type = #{type}
+				      AND IFNULL(dh.note, '') NOT LIKE '%[환불]%'
+				  ), 0)
+				) AS difference_price
+				FROM tb_account_deadline_balance db
+				LEFT OUTER JOIN tb_account_balance_price abp
+				ON abp.account_id = db.account_id
+				LEFT JOIN (
+					SELECT
+						account_id,
+						year,
+						month,
+						SUM(
+							CASE
+								WHEN IFNULL(note, '') LIKE '%[환불]%'
+								 AND IFNULL(note, '') LIKE '%생계비%'
+								THEN IFNULL(input_price, 0)
+								ELSE 0
+							END
+						) AS refund_living,
+						SUM(
+							CASE
+								WHEN IFNULL(note, '') LIKE '%[환불]%'
+								 AND IFNULL(note, '') LIKE '%일반식대%'
+								THEN IFNULL(input_price, 0)
+								ELSE 0
+							END
+						) AS refund_basic,
+						SUM(
+							CASE
+								WHEN IFNULL(note, '') LIKE '%[환불]%'
+								 AND IFNULL(note, '') LIKE '%직원식대%'
+								THEN IFNULL(input_price, 0)
+								ELSE 0
+							END
+						) AS refund_employ,
+						SUM(
+							CASE
+								WHEN IFNULL(note, '') LIKE '%[환불]%'
+								 AND IFNULL(note, '') LIKE '%보전%'
+								THEN IFNULL(input_price, 0)
+								ELSE 0
+							END
+						) AS refund_integrity
+					FROM tb_account_deposit_history
+					WHERE account_id = #{account_id}
+					  AND year = #{year}
+					  AND month = #{month}
+					GROUP BY account_id, year, month
+				) refund
+				ON refund.account_id = db.account_id
+				AND refund.year = db.year
+				AND refund.month = db.month
+				WHERE db.account_id = #{account_id}
+				  AND db.year = #{year}
+				  AND db.month = #{month}
+				LIMIT 1
+		</select>
 	
 	<select id="AccountDeadlineFilesList" parameterType="map" resultType="hashmap">
 		SELECT a.account_id, 
@@ -2456,13 +2510,13 @@
 		        t.month,
 		        t.type,
 		        t.max_input_dt,
-		        -- 기대총액 = 마감비용 + 전월 difference
+		        -- 기대총액 = (마감비용 + 당월 환불합계) + 전월 difference
 		        (
 		            CASE t.type
-		                WHEN 1 THEN IFNULL(adb.living_cost, 0)
-		                WHEN 2 THEN IFNULL(adb.basic_cost, 0)
-		                WHEN 3 THEN IFNULL(adb.employ_cost, 0)
-		                WHEN 5 THEN IFNULL(adb.integrity_cost, 0)
+		                WHEN 1 THEN IFNULL(adb.living_cost, 0) + IFNULL(refund.refund_living, 0)
+		                WHEN 2 THEN IFNULL(adb.basic_cost, 0) + IFNULL(refund.refund_basic, 0)
+		                WHEN 3 THEN IFNULL(adb.employ_cost, 0) + IFNULL(refund.refund_employ, 0)
+		                WHEN 5 THEN IFNULL(adb.integrity_cost, 0) + IFNULL(refund.refund_integrity, 0)
 		                ELSE 0
 		            END
 		            + IFNULL(prev.difference_price, 0)
@@ -2513,12 +2567,60 @@
 		           AND pm.type = p.type
 		           AND pm.max_dt = p.input_dt
 		        WHERE IFNULL(p.note, '') NOT LIKE '%[환불]%'
-		    ) prev
-		        ON prev.account_id = t.account_id
-		       AND prev.type = t.type
-		
-		    -- 당월 타입별 입금합계
-		    LEFT JOIN (
+			    ) prev
+			        ON prev.account_id = t.account_id
+			       AND prev.type = t.type
+
+			    -- 당월 환불합계(항목별)
+			    LEFT JOIN (
+			        SELECT
+			            account_id,
+			            year,
+			            month,
+			            SUM(
+			                CASE
+			                    WHEN IFNULL(note, '') LIKE '%[환불]%'
+			                     AND IFNULL(note, '') LIKE '%생계비%'
+			                    THEN IFNULL(input_price, 0)
+			                    ELSE 0
+			                END
+			            ) AS refund_living,
+			            SUM(
+			                CASE
+			                    WHEN IFNULL(note, '') LIKE '%[환불]%'
+			                     AND IFNULL(note, '') LIKE '%일반식대%'
+			                    THEN IFNULL(input_price, 0)
+			                    ELSE 0
+			                END
+			            ) AS refund_basic,
+			            SUM(
+			                CASE
+			                    WHEN IFNULL(note, '') LIKE '%[환불]%'
+			                     AND IFNULL(note, '') LIKE '%직원식대%'
+			                    THEN IFNULL(input_price, 0)
+			                    ELSE 0
+			                END
+			            ) AS refund_employ,
+			            SUM(
+			                CASE
+			                    WHEN IFNULL(note, '') LIKE '%[환불]%'
+			                     AND IFNULL(note, '') LIKE '%보전%'
+			                    THEN IFNULL(input_price, 0)
+			                    ELSE 0
+			                END
+			            ) AS refund_integrity
+			        FROM tb_account_deposit_history
+			        WHERE account_id = #{account_id}
+			          AND year = #{year}
+			          AND month = #{month}
+			        GROUP BY account_id, year, month
+			    ) refund
+			        ON refund.account_id = t.account_id
+			       AND refund.year = t.year
+			       AND refund.month = t.month
+			
+			    -- 당월 타입별 입금합계
+			    LEFT JOIN (
 		        SELECT
 		            account_id,
 		            type,
