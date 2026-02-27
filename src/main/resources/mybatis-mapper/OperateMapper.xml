@@ -864,10 +864,34 @@
 			T.contract_type,
 			DATE_FORMAT(T.act_join_dt, '%Y-%m-%d') AS act_join_dt,
 			DATE_FORMAT(T.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
-			DATE_FORMAT(T.national_pension, '%Y-%m-%d') AS national_pension,
-			DATE_FORMAT(T.health_insurance, '%Y-%m-%d') AS health_insurance,
-			DATE_FORMAT(T.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
-			DATE_FORMAT(T.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+			CASE
+				WHEN T.national_pension IS NULL OR TRIM(T.national_pension) = '' THEN ''
+				WHEN T.national_pension = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(T.national_pension, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(T.national_pension, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS national_pension,
+			CASE
+				WHEN T.health_insurance IS NULL OR TRIM(T.health_insurance) = '' THEN ''
+				WHEN T.health_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(T.health_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(T.health_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS health_insurance,
+			CASE
+				WHEN T.industrial_insurance IS NULL OR TRIM(T.industrial_insurance) = '' THEN ''
+				WHEN T.industrial_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(T.industrial_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(T.industrial_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS industrial_insurance,
+			CASE
+				WHEN T.employment_insurance IS NULL OR TRIM(T.employment_insurance) = '' THEN ''
+				WHEN T.employment_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(T.employment_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(T.employment_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS employment_insurance,
 			DATE_FORMAT(T.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
 			T.employment_contract,
 			T.subsidy,
@@ -920,10 +944,34 @@
 			A.contract_type,
 			DATE_FORMAT(A.act_join_dt, '%Y-%m-%d') AS act_join_dt,
 			DATE_FORMAT(A.ret_set_dt, '%Y-%m-%d') AS ret_set_dt,
-			DATE_FORMAT(A.national_pension, '%Y-%m-%d') AS national_pension,
-			DATE_FORMAT(A.health_insurance, '%Y-%m-%d') AS health_insurance,
-			DATE_FORMAT(A.industrial_insurance, '%Y-%m-%d') AS industrial_insurance,
-			DATE_FORMAT(A.employment_insurance, '%Y-%m-%d') AS employment_insurance,
+			CASE
+				WHEN A.national_pension IS NULL OR TRIM(A.national_pension) = '' THEN ''
+				WHEN A.national_pension = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(A.national_pension, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(A.national_pension, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS national_pension,
+			CASE
+				WHEN A.health_insurance IS NULL OR TRIM(A.health_insurance) = '' THEN ''
+				WHEN A.health_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(A.health_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(A.health_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS health_insurance,
+			CASE
+				WHEN A.industrial_insurance IS NULL OR TRIM(A.industrial_insurance) = '' THEN ''
+				WHEN A.industrial_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(A.industrial_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(A.industrial_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS industrial_insurance,
+			CASE
+				WHEN A.employment_insurance IS NULL OR TRIM(A.employment_insurance) = '' THEN ''
+				WHEN A.employment_insurance = '미해당' THEN '미해당'
+				WHEN STR_TO_DATE(A.employment_insurance, '%Y-%m-%d') IS NOT NULL
+					THEN DATE_FORMAT(STR_TO_DATE(A.employment_insurance, '%Y-%m-%d'), '%Y-%m-%d')
+				ELSE ''
+			END AS employment_insurance,
 			DATE_FORMAT(A.loss_major_insurances, '%Y-%m-%d') AS loss_major_insurances,
 			A.employment_contract,
 			A.subsidy,
