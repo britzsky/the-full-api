@@ -21,6 +21,7 @@ public interface HeadOfficeMapper {
 	void ProfitLossTotalSave(Map<String, Object> paramMap);											// 손익표 계산 프로시저
 	List<Map<String, Object>> AccountManagermentTableList(Map<String, Object> paramMap); 			// 본사 -> 관리표 조회
 	List<Map<String, Object>> AccountMappingPurchaseList(Map<String, Object> paramMap); 			// 본사 -> 관리표 -> 거래처 통계
+	List<Map<String, Object>> AccountMappingPurchaseDetailList(Map<String, Object> paramMap); 	// 본사 -> 관리표 -> 거래처 통계(업장별 상세)
 	List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList(Map<String, Object> paramMap); 	// 본사 -> 전자결재 관리 -> 전자결재 타입 리스트 조회
 	List<Map<String, Object>> HeadOfficeElectronicPaymentList(Map<String, Object> paramMap); 		// 본사 -> 전자결재 관리 -> 결재 문서 조회
 	int HeadOfficeElectronicPaymentSave(Map<String, Object> paramMap);								// 본사 -> 전자결재 관리 -> 소모품 구매 품의서 메인 저장(전자결제 main table)

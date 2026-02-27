@@ -1145,12 +1145,48 @@
 		FROM tb_account_tally_sheet T
 		JOIN tb_account_mapping T2
 		ON T2.type = T.type
+		AND IFNULL(T2.del_yn, 'N') = 'N'
 		WHERE T.count_year = #{year}
 		<if test="month != null">
 	    AND count_month = #{month}
 	    </if>
 		GROUP BY T2.type, T2.name, T.count_month
 		ORDER BY T2.type
+    </select>
+
+		<select id="AccountMappingPurchaseDetailList" parameterType="map" resultType="hashmap">
+	    	SELECT T.account_id,
+				   A.account_name,
+				   T2.type,
+				   T2.name,
+				   T.count_month,
+			   SUM(
+			   	(COALESCE(day_1, 0) + COALESCE(day_2, 0) + COALESCE(day_3, 0) + COALESCE(day_4, 0) +
+			   	 COALESCE(day_5, 0) + COALESCE(day_6, 0) + COALESCE(day_7, 0) + COALESCE(day_8, 0) +
+			   	 COALESCE(day_9, 0) + COALESCE(day_10, 0) + COALESCE(day_11, 0) + COALESCE(day_12, 0) +
+			   	 COALESCE(day_13, 0) + COALESCE(day_14, 0) + COALESCE(day_15, 0) + COALESCE(day_16, 0) +
+			   	 COALESCE(day_17, 0) + COALESCE(day_18, 0) + COALESCE(day_19, 0) + COALESCE(day_20, 0) +
+			   	 COALESCE(day_21, 0) + COALESCE(day_22, 0) + COALESCE(day_23, 0) + COALESCE(day_24, 0) +
+			   	 COALESCE(day_25, 0) + COALESCE(day_26, 0) + COALESCE(day_27, 0) + COALESCE(day_28, 0) +
+			   	 COALESCE(day_29, 0) + COALESCE(day_30, 0) + COALESCE(day_31, 0)
+			   )) AS total
+				FROM tb_account_tally_sheet T
+				JOIN tb_account_mapping T2
+				ON T2.type = T.type
+				LEFT OUTER JOIN tb_account A
+				ON A.account_id = T.account_id
+			WHERE T.count_year = #{year}
+		<if test="month != null and month != ''">
+			AND T.count_month = #{month}
+		</if>
+		<if test="type != null and type != ''">
+			AND T2.type = #{type}
+		</if>
+		<if test="name != null and name != ''">
+			AND T2.name = #{name}
+		</if>
+		GROUP BY T.account_id, A.account_name, T2.type, T2.name, T.count_month
+		ORDER BY A.account_name, T.account_id
     </select>
     
     <select id="HeadOfficeElectronicPaymentTypeList" parameterType="map" resultType="hashmap">

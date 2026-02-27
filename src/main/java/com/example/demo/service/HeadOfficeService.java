@@ -103,6 +103,12 @@ public class HeadOfficeService {
 		resultList = headOfficeMapper.AccountMappingPurchaseList(paramMap);
 		return resultList;
 	}
+	// 본사 -> 관리표 -> 거래처 통계(업장별 상세)
+	public List<Map<String, Object>> AccountMappingPurchaseDetailList (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.AccountMappingPurchaseDetailList(paramMap);
+		return resultList;
+	}
 	
 	// 본사 -> 전자결재 관리 -> 전자결재 타입 리스트 조회
 	public List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList (Map<String, Object> paramMap) {
