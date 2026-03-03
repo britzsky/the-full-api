@@ -954,6 +954,9 @@
 	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
 	        	chef_lounge_img,
 	        </if>
+	        <if test="meal_service_contract != null and meal_service_contract != ''">
+	        	meal_service_contract,
+	        </if>
 	        breakfast_time,
 	        lunch_time,
 	        dinner_time,
@@ -1040,6 +1043,9 @@
 	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
 	        	#{chef_lounge_img},
 	        </if>
+	        <if test="meal_service_contract != null and meal_service_contract != ''">
+	        	#{meal_service_contract},
+	        </if>
 	        #{breakfast_time},
 	        #{lunch_time},
 	        #{dinner_time},
@@ -1124,6 +1130,9 @@
 	        <if test="chef_lounge_img != null and chef_lounge_img != ''">
 	        	chef_lounge_img=#{chef_lounge_img},
 	        </if>
+	        <if test="meal_service_contract != null and meal_service_contract != ''">
+	        	meal_service_contract=#{meal_service_contract},
+	        </if>
 	        breakfast_time=#{breakfast_time},
 	        lunch_time=#{lunch_time},
 	        dinner_time=#{dinner_time},
@@ -1153,16 +1162,17 @@
 		       business_regist,
 		       kitchen_drawing,
 		       nutritionist_room_img,
-		       chef_lounge_img
+		       chef_lounge_img,
+		       meal_service_contract
 		FROM tb_account_info
 		WHERE account_id = #{account_id}
 	</select>
 	
 	<insert id="insertOrUpdateFile" parameterType="map">
 	    INSERT INTO tb_account_info
-	        (account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img)
+	        (account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img, meal_service_contract)
 	    VALUES
-	        (#{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img})
+	        (#{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img}, #{meal_service_contract})
 	    ON DUPLICATE KEY UPDATE
 	    <trim prefix="" suffix="" suffixOverrides=",">
 	        <if test='business_report != null'>
@@ -1178,7 +1188,10 @@
 	            chef_lounge_img = #{chef_lounge_img},
 	        </if>
 	        <if test='nutritionist_room_img != null'>
-	            nutritionist_room_img = #{nutritionist_room_img}
+	            nutritionist_room_img = #{nutritionist_room_img},
+	        </if>
+	        <if test='meal_service_contract != null'>
+	            meal_service_contract = #{meal_service_contract},
 	        </if>
 	    </trim>
 	</insert>
@@ -2658,4 +2671,35 @@
 		  AND IFNULL(dh.note, '') NOT LIKE '%[환불]%';
 	</update>
 	
+	<select id="AccountPurchaseTallyV2List" parameterType="map" resultType="map">
+		SELECT *
+		FROM tb_account_purchase_tally_v2
+		WHERE DATE_FORMAT(saleDate, '%Y-%m') = #{saleDate}
+		<if test="type != null and type != ''">
+			AND type = #{type}
+		</if>
+	</select>
+	
+	<insert id="AccountPurchaseTallyV2Save" parameterType="map">
+		INSERT INTO tb_account_purchase_tally_v2
+		(account_id, sale_id, type, saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note, user_id, reg_dt)
+		VALUES
+		(#{account_id}, #{sale_id}, #{type}, #{saleDate}, #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        type=#{type},
+	        saleDate=#{saleDate},
+	        expen_tax=#{expen_tax},
+	        expen_vat=#{expen_vat},
+	        expen_taxFree=#{expen_taxFree},
+	        expen_total=#{expen_total},
+	        food_tax=#{food_tax},
+	        food_vat=#{food_vat},
+	        food_taxFree=#{food_taxFree},
+	        food_total=#{food_total},
+	        note=#{note},
+	        mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        mod_id=#{user_id}
+	    </trim>
+	</insert>
 </mapper>
