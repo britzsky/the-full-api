@@ -2682,9 +2682,10 @@
 	</update>
 	
 	<select id="AccountPurchaseTallyV2List" parameterType="map" resultType="map">
-		SELECT *
+		SELECT account_id, sale_id, type, DATE_FORMAT(saleDate, '%Y-%m') as saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note
 		FROM tb_account_purchase_tally_v2
 		WHERE DATE_FORMAT(saleDate, '%Y-%m') = #{saleDate}
+		AND account_id = #{account_id}
 		<if test="type != null and type != ''">
 			AND type = #{type}
 		</if>
@@ -2694,11 +2695,11 @@
 		INSERT INTO tb_account_purchase_tally_v2
 		(account_id, sale_id, type, saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note, user_id, reg_dt)
 		VALUES
-		(#{account_id}, #{sale_id}, #{type}, #{saleDate}, #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		(#{account_id}, #{sale_id}, #{type}, STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'), #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        type=#{type},
-	        saleDate=#{saleDate},
+	        saleDate=STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'),
 	        expen_tax=#{expen_tax},
 	        expen_vat=#{expen_vat},
 	        expen_taxFree=#{expen_taxFree},

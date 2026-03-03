@@ -1151,7 +1151,10 @@
 	    AND count_month = #{month}
 	    </if>
 		GROUP BY T2.type, T2.name, T.count_month
-		ORDER BY T2.type
+		ORDER BY T2.type ASC
+		<if test="limit != null">
+	    LIMIT ${limit}
+	    </if>
     </select>
 
 		<select id="AccountMappingPurchaseDetailList" parameterType="map" resultType="hashmap">

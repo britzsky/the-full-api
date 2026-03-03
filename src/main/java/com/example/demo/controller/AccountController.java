@@ -1651,6 +1651,7 @@ public class AccountController {
      * method 	: AccountMappingList
      * comment 	: 현장 -> 집계표 -> 영수증 매장 확인 조회
      */
+	@GetMapping("Account/AccountMappingList")
     public List<Map<String, Object>> AccountMappingList(String account_id) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
     	resultList = accountService.AccountMappingList(account_id);
@@ -2123,6 +2124,23 @@ public class AccountController {
     	int iResult = 0;
     	
     	for (Map<String, Object> paramMap : paramList) {
+    		
+    		Object saleIdObj = paramMap.get("sale_id");
+
+    	    // null이거나 문자열로 변환했을 때 비어있다면 생성
+    	    if (saleIdObj == null || saleIdObj.toString().trim().isEmpty()) {
+    	    	
+    			// 원하는 형식으로 출력 (예: 20251009152744)
+            	LocalDate date = LocalDate.now();
+                LocalTime nowTime = LocalTime.now(); // 시:분:초
+                LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+                
+                // 원하는 형식으로 출력 (예: 20251009152744)
+                String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+                
+        		paramMap.put("sale_id", saleId);
+    		}
+    		
     		iResult += accountService.AccountPurchaseTallyV2Save(paramMap);
         }
     	
