@@ -87,4 +87,6 @@ public interface AccountMapper {
 	int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
 	List<Map<String, Object>> AccountPersonPurchaseTallyList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 조회
 	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
+	List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap); 				// 회계 -> 매입(본사용) 조회
+	int AccountPurchaseTallyV2Save(Map<String, Object> paramMap);										// 회계 -> 매입(본사용) 저장
 }

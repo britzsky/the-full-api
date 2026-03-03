@@ -681,5 +681,16 @@ public class AccountService {
 		iResult = accountMapper.AccountDepositEmptyUse(paramMap);
 		return iResult;
 	}
-	
+	// 회계 -> 매입(본사용) 조회
+	public List<Map<String, Object>> AccountPurchaseTallyV2List (Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPurchaseTallyV2List(paramMap);
+		return resultList;
+	}
+	// 회계 -> 매입(본사용) 저장
+	public int AccountPurchaseTallyV2Save(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountPurchaseTallyV2Save(paramMap);
+		return iResult;
+	}
 }

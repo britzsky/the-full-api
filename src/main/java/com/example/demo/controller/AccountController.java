@@ -695,7 +695,8 @@ public class AccountController {
             @RequestParam(value = "business_regist", required = false) MultipartFile businessRegist,
             @RequestParam(value = "kitchen_drawing", required = false) MultipartFile kitchenDrawing,
             @RequestParam(value = "nutritionist_room_img", required = false) MultipartFile nutritionistRoomImg,
-            @RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg
+            @RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg,
+            @RequestParam(value = "meal_service_contract", required = false) MultipartFile meal_service_contract
     ) throws IOException {
         Map<String, Object> filePathMap = new HashMap<>();
 
@@ -724,6 +725,11 @@ public class AccountController {
             filePathMap.put("chef_lounge_img", path);
         }
         
+        if (meal_service_contract != null && !meal_service_contract.isEmpty()) {
+            String path = saveFile(accountId, "meal_service_contract", meal_service_contract);
+            filePathMap.put("meal_service_contract", path);
+        }
+        
         filePathMap.put("account_id", accountId);
         
         System.out.println("account_id == " + filePathMap.get("account_id"));
@@ -732,6 +738,7 @@ public class AccountController {
         System.out.println("kitchen_drawing == " + filePathMap.get("kitchen_drawing"));
         System.out.println("nutritionist_room_img == " + filePathMap.get("nutritionist_room_img"));
         System.out.println("chef_lounge_img == " + filePathMap.get("chef_lounge_img"));
+        System.out.println("meal_service_contract == " + filePathMap.get("meal_service_contract"));
 
         accountService.insertOrUpdateFile(filePathMap);
     	
@@ -2091,5 +2098,44 @@ public class AccountController {
     	resultList = accountService.AccountMemberDispatchMappingList(paramMap);
     	
     	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPurchaseTallyV2List
+     * comment 	: 회계 -> 매입(본사용) 조회
+     */
+    @GetMapping("Account/AccountPurchaseTallyV2List")
+    public String AccountPurchaseTallyV2List(@RequestParam Map<String, Object> paramMap) {
+    	List<Map<String, Object>> resultList = new ArrayList<>();
+    	
+    	resultList = accountService.AccountPurchaseTallyV2List(paramMap);
+    	
+    	return new Gson().toJson(resultList);
+    }
+    /*
+     * part		: 회계
+     * method 	: AccountPurchaseTallyV2Save
+     * comment 	: 회계 -> 매입(본사용) 저장
+     */
+    @PostMapping("Account/AccountPurchaseTallyV2Save")
+    private String AccountPurchaseTallyV2Save(@RequestBody List<Map<String, Object>> paramList) {
+    	
+    	int iResult = 0;
+    	
+    	for (Map<String, Object> paramMap : paramList) {
+    		iResult += accountService.AccountPurchaseTallyV2Save(paramMap);
+        }
+    	
+    	JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
     }
 }
