@@ -323,6 +323,7 @@
 			 , X.member_id
 			 , X.position
              , X.position_type
+			 , X.cor_type
 			 , X.name
 			 , X.record_year
 			 , X.record_month
@@ -342,6 +343,7 @@
 		    T2.member_id,
 		    T2.position,
             T2.position_type,
+		    T2.cor_type,
 		    T2.name,
 		    T.record_year,
 		    T.record_month,
@@ -368,6 +370,7 @@
 	       T.member_id,
 	       T3.position,
 	       T3.position_type,
+	       T3.cor_type,
 	       T3.name,
 	       T2.record_year,
 	       T2.record_month,
@@ -396,6 +399,7 @@
           T.member_id,
           T2.position,
             T2.position_type,
+          T2.cor_type,
           T2.name,
           T3.record_year,
           T3.record_month,
@@ -425,6 +429,7 @@
 		    T2.member_id,
 			T2.position,
             T2.position_type,
+		    '' as cor_type,
 		    T2.name,
 		    T.record_year,
 		    T.record_month,
@@ -463,6 +468,7 @@
 		    T2.member_id,
 			'' as position,
             '' as position_type,
+		    '' as cor_type,
 		    T2.name,
 		    T.record_year,
 		    T.record_month,
@@ -555,7 +561,9 @@
 		    subquery.member_id,
 		    subquery.account_id,
 		    subquery.name,
+		    subquery.cor_type,
 		    subquery.del_yn,
+		    DATE_FORMAT(subquery.del_dt, '%Y-%m-%d') AS del_dt,
 		    ifnull(subquery.salary,0) AS salary,
 		    CASE WHEN subquery.position_type = 1 THEN '영양사'
 		         WHEN subquery.position_type = 2 THEN '조리팀장'
@@ -577,7 +585,9 @@
 		        T.member_id,
 		        T.account_id,
 		        T.name,
+		        T.cor_type,
 		        T.del_yn,
+		        T.del_dt,
 		        T.position_type,
 		        T.salary,
 		        -- 파출 급여
@@ -616,7 +626,7 @@
 		    FROM tb_account_members AS T
 		    WHERE T.account_id = #{account_id}
 		      AND IFNULL(T.display_yn,'Y') = 'Y'
-		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.del_yn, T.position_type
+		    GROUP BY T.member_id, T.account_id, T.name, T.note, T.cor_type, T.del_yn, T.del_dt, T.position_type
 		) AS subquery
 		ORDER BY
 		    subquery.position_type ASC,
