@@ -657,6 +657,12 @@ public class AccountService {
         
 		return result;
 	}
+	// 집계표 -> 집계표 내역 삭제.
+	public int TallySheetPaymentDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.TallySheetPaymentDelete(paramMap);
+		return iResult;
+	}
 	// 인사 -> 직원파출 매핑 저장
 	public int AccountMemberDispatchMappingSave(Map<String, Object> paramMap) {
 		int iResult = 0;

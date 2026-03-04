@@ -2002,6 +2002,7 @@
 		       amv.type, 
 		       apt.use_name, 
 		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as orgSaleDate, 
 		       ifnull(apt.total, 0) as total, 
 		       ifnull(apt.vat, 0) as vat,
 		       ifnull(apt.taxFree, 0) as taxFree,
@@ -2449,6 +2450,15 @@
 	        #{result, mode=OUT, jdbcType=INTEGER}
 	    ) }
 	</select>
+	
+	<update id="TallySheetPaymentDelete" parameterType="map">
+		UPDATE tb_account_tally_sheet
+	    SET day_${day} = day_${day} - (
+	        SELECT IFNULL(SUM(total), 0) 
+	        FROM tb_account_purchase_tally 
+	        WHERE sale_id = #{sale_id}
+	    )
+	</update>
 	
 	<insert id="AccountMemberDispatchMappingSave" parameterType="map">
 		INSERT INTO tb_account_member_dispatch_mapping

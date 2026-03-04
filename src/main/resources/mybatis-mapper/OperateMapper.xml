@@ -2149,7 +2149,7 @@
     </select>
     
     <select id="RootList" parameterType="map" resultType="map">
-    	SELECT A.root_idx, A.sido_code, B.sido_name, A.sigungu_code, C.sigungu_name, A.emd_code, D.emd_name, A.del_yn
+    	SELECT A.root_idx, A.sido_code, B.sido_name, A.sigungu_code, CONCAT(C.city_name, ' ', C.sigungu_name) as sigungu_name, A.emd_code, D.emd_name, A.del_yn
 		FROM tb_account_root_master A
 		LEFT JOIN sido B
 		ON B.sido_code= A.sido_code

@@ -1757,14 +1757,42 @@ public class AccountController {
     			}
     			
         		iResult += accountService.AccountPurchaseSave(mainMap);
-                // 여러 타입의 날짜형식을 매핑.
-                LocalDate date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
-                // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-                int year = date.getYear();        // 2026
-                int month = date.getMonthValue(); // 1~12
-                mainMap.put("year", year);
-                mainMap.put("month", month);
-                iResult += accountService.TallySheetPaymentSave(mainMap);
+                
+        		String saleDate = mainMap.get("saleDate").toString();
+        		Object objOrgSaleDate = mainMap.get("orgSaleDate");
+        		
+     			LocalDate date;
+     			int year = 0;
+     			int month = 0;
+     			int day = 0;
+        		// 여러 타입의 날짜형식을 매핑.
+        		if (objOrgSaleDate != null) {
+        			
+        			String orgSaleDate = mainMap.get("orgSaleDate").toString();
+        			
+        			if (!saleDate.equals(orgSaleDate)) {
+	        			date = DateUtils.parseFlexibleDate(mainMap.get("orgSaleDate").toString());
+	        			year = date.getYear();        // 2026
+	                    month = date.getMonthValue(); // 1~12
+	                    day = date.getDayOfMonth();
+	                    
+	                    // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+	                    mainMap.put("year", year);
+	                    mainMap.put("month", month);
+	                    mainMap.put("day", day);
+	                    
+	                    iResult += accountService.TallySheetPaymentDelete(mainMap);
+        			}
+        		} else {
+        			date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
+        			year = date.getYear();        // 2026
+                    month = date.getMonthValue(); // 1~12
+                    // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+                    mainMap.put("year", year);
+                    mainMap.put("month", month);
+        		}
+        		
+        		iResult += accountService.TallySheetPaymentSave(mainMap);
             }
     	}
     	if (itemList != null) {
