@@ -2037,7 +2037,8 @@
 		    T.start_time,
 		    T.end_time,
 		    ifnull(sido_code, '') as sido_code,
-		    ifnull(sigungu_code, '') as sigungu_code
+		    ifnull(sigungu_code, '') as sigungu_code,
+		    ifnull(emd_code, '') as emd_code
 		FROM tb_account T2
 		JOIN tb_account_record_standard_master_table T 
 		  ON T.account_id = T2.account_id
@@ -2047,9 +2048,9 @@
     
     <insert id="AccountRecordStandardSave" parameterType="map">
         INSERT INTO tb_account_record_standard_master_table
-		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, sido_code, sigungu_code)
+		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, sido_code, sigungu_code, emd_code)
 		  VALUES
-		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{sido_code}, #{sigungu_code})
+		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{sido_code}, #{sigungu_code}, #{emd_code})
 		ON DUPLICATE KEY UPDATE
 		  mon       	= VALUES(mon),
 	      tue 			= VALUES(tue),
@@ -2064,8 +2065,8 @@
 	      user_id     	= VALUES(user_id),
 	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d'),
 	      sido_code		= VALUES(sido_code), 
-	      sigungu_code	= VALUES(sigungu_code)
-	      
+	      sigungu_code	= VALUES(sigungu_code),
+	      emd_code		= VALUES(emd_code)
     </insert>
     
     <select id="TallySheetPointList" parameterType="map" resultType="hashmap">
@@ -2136,7 +2137,7 @@
     </select>
     
     <select id="SigunguList" parameterType="map" resultType="map">
-    	SELECT sigungu_code, sigungu_name
+    	SELECT sigungu_code, CONCAT(city_name, ' ', sigungu_name) as sigungu_name
 		FROM sigungu
 		WHERE sido_code = #{sido_code}
     </select>
@@ -2360,6 +2361,7 @@
 				FROM tb_account_root_master
 				WHERE sido_code = #{sido_code}
 				AND sigungu_code = #{sigungu_code}
+				AND emd_code = #{emd_code}
 			)
 		)
 		AND position_type = #{position_type}

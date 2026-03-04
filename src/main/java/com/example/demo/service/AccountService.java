@@ -29,9 +29,9 @@ public class AccountService {
 		return accountKey;
 	}
 	
-	public List<Map<String, Object>> AccountMemberList(int accountType) {
+	public List<Map<String, Object>> AccountList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = accountMapper.AccountList(accountType);
+		resultList = accountMapper.AccountList(paramMap);
 		return resultList;
 	}
 	

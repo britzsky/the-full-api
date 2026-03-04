@@ -61,10 +61,10 @@ public class AccountController {
      * comment 	: 거래처 조회
      */
     @GetMapping("/Account/AccountList")
-    public String AccountList(@RequestParam(required = false) Map<String, Object> paramMap) {
+    public String AccountList(@RequestParam Map<String, Object> paramMap) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
     	int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
-    	resultList = accountService.AccountMemberList(iAccountType);
+    	resultList = accountService.AccountList(paramMap);
     	
     	return new Gson().toJson(resultList);
     }

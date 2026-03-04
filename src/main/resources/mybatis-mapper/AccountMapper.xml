@@ -8,7 +8,7 @@
 		SELECT DATE_FORMAT(NOW(6), '%Y%m%d%H%i%s%f')
 	</select>
 	
-	<select id="AccountList" parameterType="int" resultType="hashmap">
+	<select id="AccountList" parameterType="map" resultType="hashmap">
 		SELECT account_id, 
 			   account_name, 
 			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address,
@@ -18,12 +18,20 @@
 			   meal_type,
 			   del_yn
 		FROM tb_account
-		WHERE del_yn = 'N'
-		<if test='accountType == 0'>
+		<choose>
+			<when test="del_yn != null and del_yn != ''">
+				WHERE del_yn = #{del_yn}
+			</when>
+			<otherwise>
+				WHERE del_yn = 'N'
+			</otherwise>
+		</choose>
+		
+		<if test='account_type == 0'>
 			AND account_type in (1,2,4,5)
  		</if>
- 		<if test='accountType != 0'>
-			AND account_type = #{accountType}
+ 		<if test='account_type != 0'>
+			AND account_type = #{account_type}
  		</if>
  		AND account_id not in 
  		(
