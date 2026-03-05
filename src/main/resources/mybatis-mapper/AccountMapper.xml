@@ -380,25 +380,30 @@
 	       T3.position_type,
 	       T3.cor_type,
 	       T3.name,
-	       T2.record_year,
-	       T2.record_month,
-	       T2.record_date,
-	       T2.type,
-	       T2.start_time,
-	       T2.end_time,
-		   T2.salary,
-	       T2.note,
+	       IFNULL(T2.record_year, T.record_year) as record_year,
+	       IFNULL(T2.record_month, T.record_month) as record_month,
+	       IFNULL(T2.record_date, T.record_date) as record_date,
+	       IFNULL(T2.type, 6) as type,
+	       IFNULL(T2.start_time, T3.start_time) as start_time,
+	       IFNULL(T2.end_time, T3.end_time) as end_time,
+		   IFNULL(T2.salary, 0) as salary,
+	       IFNULL(T2.note, '') as note,
 	       '' as act_join_dt,
 	       '' as pay_yn
 	FROM tb_account_member_dispatch_mapping T
-	JOIN tb_account_record T2
+	LEFT JOIN tb_account_record T2
 	    ON T.dispatch_account_id = T2.account_id 
-	    AND T.member_id = T2.member_id  -- ⭐ 이 조건이 반드시 필요합니다!
+	    AND T.member_id = T2.member_id
+	    AND T2.record_year = T.record_year
+	    AND T2.record_month = T.record_month
+	    AND T2.record_date = T.record_date
+	    AND T2.type = 6
 	JOIN tb_account_members T3
 	    ON T3.member_id = T.member_id
 	WHERE T.dispatch_account_id = #{account_id}
 	  AND T.record_year = #{year}
 	  AND T.record_month = #{month}
+	  AND IFNULL(T.del_yn, 'N') = 'N'
 		UNION ALL
 		-- 아래는 유틸 직원
 		SELECT
@@ -2460,44 +2465,55 @@
 	    )
 	</update>
 	
-	<insert id="AccountMemberDispatchMappingSave" parameterType="map">
-		INSERT INTO tb_account_member_dispatch_mapping
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	member_id,
-	        account_id,
-	        dispatch_account_id,
-	        record_year,
-	        record_month,
-	        record_date,
-	        del_yn,
-	        reg_dt,
-	        user_id
-	    </trim>
-	    VALUES
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	#{member_id},
-	        #{account_id},
-	        #{dispatch_account_id},
-	        #{record_year},
-	        #{record_month},
-	        #{record_date},
-	        'N',
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        #{user_id}
-	    </trim>
-	    ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	    	    member_id=#{member_id},
-	        account_id=#{account_id},
-	        dispatch_account_id=#{dispatch_account_id},
-	        record_year=#{record_year},
-	        record_month=#{record_month},
-	        record_date=#{record_date},
-	        del_yn=#{del_yn},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        user_id=#{user_id}
-	    </trim>
-	</insert>
+	<update id="AccountMemberDispatchMappingSave" parameterType="map">
+		<choose>
+			<when test='del_yn != null and del_yn.toString() == "Y"'>
+				UPDATE tb_account_member_dispatch_mapping
+				SET del_yn = 'Y',
+					reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+					user_id = #{user_id}
+				WHERE idx = #{idx}
+			</when>
+			<otherwise>
+				INSERT INTO tb_account_member_dispatch_mapping
+			    <trim prefix="(" suffix=")" suffixOverrides=",">
+			    		member_id,
+			        account_id,
+			        dispatch_account_id,
+			        record_year,
+			        record_month,
+			        record_date,
+			        del_yn,
+			        reg_dt,
+			        user_id
+			    </trim>
+			    VALUES
+			    <trim prefix="(" suffix=")" suffixOverrides=",">
+			    	#{member_id},
+			        #{account_id},
+			        #{dispatch_account_id},
+			        #{record_year},
+			        #{record_month},
+			        #{record_date},
+			        'N',
+			        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+			        #{user_id}
+			    </trim>
+			    ON DUPLICATE KEY UPDATE
+			    <trim suffixOverrides=",">
+			    	    member_id=#{member_id},
+			        account_id=#{account_id},
+			        dispatch_account_id=#{dispatch_account_id},
+			        record_year=#{record_year},
+			        record_month=#{record_month},
+			        record_date=#{record_date},
+			        del_yn='N',
+			        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+			        user_id=#{user_id}
+			    </trim>
+			</otherwise>
+		</choose>
+	</update>
 	
 		<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
 		SELECT
@@ -2509,8 +2525,8 @@
 			T2.account_name AS origin_account_name,
 			(SELECT account_name FROM tb_account WHERE account_id = T.dispatch_account_id) AS dispatch_account_name,
 			CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
-			case WHEN T3.position_type = 1 THEN '영양사'
-             WHEN T3.position_type = 2 THEN '조리팀장'
+			CASE WHEN T3.position_type = 1 THEN '영양사'
+             	WHEN T3.position_type = 2 THEN '조리팀장'
                  WHEN T3.position_type = 3 THEN '조리장'
                  WHEN T3.position_type = 4 THEN '조리사'
                  WHEN T3.position_type = 5 THEN '조리원'
@@ -2521,6 +2537,7 @@
 		JOIN tb_account_members T3
 		ON T3.member_id = T.member_id
 		WHERE 1=1
+		AND IFNULL(T.del_yn, 'N') = IFNULL(NULLIF(#{del_yn}, ''), 'N')
 		<if test="member_id != null and member_id != ''">
 			AND T.member_id = #{member_id}
 		</if>

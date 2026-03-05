@@ -244,9 +244,9 @@ public class AccountController {
     @PostMapping("Account/AccountRecordSave")
     public String AccountMemberRecordSave(@RequestBody Map<String, List<Map<String, Object>>> payload) {
     	
-    	int iResult = 0;
+    		int iResult = 0;
     	
-    	List<Map<String, Object>> normalRecords = payload.get("normalRecords");
+    		List<Map<String, Object>> normalRecords = payload.get("normalRecords");
         List<Map<String, Object>> disRecords = payload.get("disRecords");
         List<Map<String, Object>> recRecords = payload.get("recRecords");
         
@@ -255,23 +255,23 @@ public class AccountController {
         // normalRecords, recRecords 를 조건에 따라 담을 List
         List<Map<String, Object>> objRecords = new ArrayList<Map<String, Object>>();
         if (!normalRecords.isEmpty()) {
-        	bType = true;
-        	objRecords = normalRecords;
+	        	bType = true;
+	        	objRecords = normalRecords;
         } else if (!recRecords.isEmpty()) {
-        	bType = false;
-        	objRecords = recRecords;
+	        	bType = false;
+	        	objRecords = recRecords;
         }
         
         for (Map<String, Object> row : objRecords) {
         	
-        	System.out.println("==================  salary  + " + row.get("salary"));
+        		System.out.println("==================  salary  + " + row.get("salary"));
         	
-        	if (bType) {
-        		iResult += accountService.AccountMemberRecordSave(row);
-            	iResult += accountService.processProfitLossV2(row);
-        	} else {
-        		iResult += accountService.AccountMemberRecRecordSave(row);
-            	iResult += accountService.processProfitLossV2(row);
+	        	if (bType) {
+	        		iResult += accountService.AccountMemberRecordSave(row);
+	            	iResult += accountService.processProfitLossV2(row);
+	        	} else {
+	        		iResult += accountService.AccountMemberRecRecordSave(row);
+	            	iResult += accountService.processProfitLossV2(row);
         	}
         	
         	if (row.get("type") != null) {
@@ -283,38 +283,38 @@ public class AccountController {
         		int iPositionType = Integer.parseInt(row.get("position_type").toString());
         		
         		// 1. 연, 월, 일로 LocalDate 객체 생성
-                LocalDate date = LocalDate.of((int)row.get("record_year"), (int)row.get("record_month"), (int)row.get("record_date"));
+            LocalDate date = LocalDate.of((int)row.get("record_year"), (int)row.get("record_month"), (int)row.get("record_date"));
 
-                // 2. 원하는 형식(YYYY-MM-DD)의 포맷터 정의
-                // 'MM'과 'dd'는 각각 월과 일을 2자리 숫자로 표현하며, 필요시 0으로 채웁니다.
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyyy-MM");
-                
-                String ledgerDt = date.format(formatter);			// 각 연차, 반차, 초과 등 부여 혹은 사용 날짜.
-                String ledgerMonth = date.format(formatter2);		// 대체근무 연차 부여 사용 기한.
-                String position = row.get("position").toString();	// 초과 일 때, 영양사만 지급.
-                
-                // 초과근무 시간 사용이 있는 지 체크.
-                if (iType == 1) {
-                	if (position.equals("영양사") || iPositionType == 1) {
+            // 2. 원하는 형식(YYYY-MM-DD)의 포맷터 정의
+            // 'MM'과 'dd'는 각각 월과 일을 2자리 숫자로 표현하며, 필요시 0으로 채웁니다.
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+            DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyyy-MM");
+            
+            String ledgerDt = date.format(formatter);			// 각 연차, 반차, 초과 등 부여 혹은 사용 날짜.
+            String ledgerMonth = date.format(formatter2);		// 대체근무 연차 부여 사용 기한.
+            String position = row.get("position").toString();	// 초과 일 때, 영양사만 지급.
+            
+            // 초과근무 시간 사용이 있는 지 체크.
+            if (iType == 1) {
+            		if (position.equals("영양사") || iPositionType == 1) {
                 		// 시각 파싱
-                		DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
+            			DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
                 		
-                        LocalTime startTime = LocalTime.parse(row.get("start_time").toString(), minutFormatter);
-                        LocalTime endTime = LocalTime.parse(row.get("end_time").toString(), minutFormatter);
-                        LocalTime orgStartTime = LocalTime.parse(row.get("org_start_time").toString(), minutFormatter);
-                        LocalTime orgEndTime = LocalTime.parse(row.get("org_end_time").toString(), minutFormatter);
-                        
-                        Duration startDuration = Duration.between(startTime, orgStartTime);
-                        Duration endDuration = Duration.between(endTime, orgEndTime);
-                        
-                        long startMinutes = startDuration.toMinutes(); // 결과: 90 (분)
-                        long endMinutes = endDuration.toMinutes(); // 결과: 90 (분)
-                        
-                        double decimalHours = startMinutes / 60.0;
-                        double decimalHours2 = endMinutes / 60.0;
-                        
-                        if (decimalHours != 0 || decimalHours2 != 0) {
+            			LocalTime startTime = LocalTime.parse(row.get("start_time").toString(), minutFormatter);
+            			LocalTime endTime = LocalTime.parse(row.get("end_time").toString(), minutFormatter);
+            			LocalTime orgStartTime = LocalTime.parse(row.get("org_start_time").toString(), minutFormatter);
+            			LocalTime orgEndTime = LocalTime.parse(row.get("org_end_time").toString(), minutFormatter);
+                    
+            			Duration startDuration = Duration.between(startTime, orgStartTime);
+            			Duration endDuration = Duration.between(endTime, orgEndTime);
+                    
+            			long startMinutes = startDuration.toMinutes(); // 결과: 90 (분)
+            			long endMinutes = endDuration.toMinutes(); // 결과: 90 (분)
+                    
+            			double decimalHours = startMinutes / 60.0;
+            			double decimalHours2 = endMinutes / 60.0;
+                    
+            			if (decimalHours != 0 || decimalHours2 != 0) {
                         	
                         	if (decimalHours != 0) {
                         		overMap.put("times", -decimalHours);
@@ -2098,10 +2098,17 @@ public class AccountController {
     	int iResult = 0;
     	
     	for (Map<String, Object> paramMap : paramList) {
+    		String del_yn = String.valueOf(paramMap.getOrDefault("del_yn", "N")).toUpperCase();
+    		paramMap.put("del_yn", del_yn);
+    		
     		iResult += accountService.AccountMemberDispatchMappingSave(paramMap);
-    		paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
-    		iResult += accountService.AccountMemberRecordSave(paramMap);
-        }
+    		
+    		// 삭제 처리(del_yn=Y)는 매핑 테이블만 반영하고 근무기록 저장은 수행하지 않음
+    		if (!"Y".equals(del_yn) && paramMap.get("dispatch_account_id") != null) {
+    			paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
+    			iResult += accountService.AccountMemberRecordSave(paramMap);
+    		}
+    }
     	
     	JsonObject obj = new JsonObject();
     	
