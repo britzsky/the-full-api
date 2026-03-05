@@ -699,4 +699,22 @@ public class AccountService {
 		iResult = accountMapper.AccountPurchaseTallyV2Save(paramMap);
 		return iResult;
 	}
+	// 긴급인력 파출 회원 정보 삭제
+	public int AccountDispatchMemberDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDispatchMemberDelete(paramMap);
+		return iResult;
+	}
+	// 긴급인력 파출 출근기록 삭제
+	public int AccountDispatchRecordDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDispatchRecordDelete(paramMap);
+		return iResult;
+	}
+	// 회계 -> 매입집계 삭제
+	public int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountPurchaseTallyV2Delete(paramMap);
+		return iResult;
+	}
 }

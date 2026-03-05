@@ -2036,9 +2036,7 @@
 		    T.position_type,
 		    T.start_time,
 		    T.end_time,
-		    ifnull(sido_code, '') as sido_code,
-		    ifnull(sigungu_code, '') as sigungu_code,
-		    ifnull(emd_code, '') as emd_code
+		    ifnull(root_idx, '') as root_idx
 		FROM tb_account T2
 		JOIN tb_account_record_standard_master_table T 
 		  ON T.account_id = T2.account_id
@@ -2048,9 +2046,9 @@
     
     <insert id="AccountRecordStandardSave" parameterType="map">
         INSERT INTO tb_account_record_standard_master_table
-		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, sido_code, sigungu_code, emd_code)
+		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, root_idx)
 		  VALUES
-		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{sido_code}, #{sigungu_code}, #{emd_code})
+		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{root_idx})
 		ON DUPLICATE KEY UPDATE
 		  mon       	= VALUES(mon),
 	      tue 			= VALUES(tue),
@@ -2064,9 +2062,7 @@
 	      end_time		= VALUES(end_time),
 	      user_id     	= VALUES(user_id),
 	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	      sido_code		= VALUES(sido_code), 
-	      sigungu_code	= VALUES(sigungu_code),
-	      emd_code		= VALUES(emd_code)
+	      root_idx		= VALUES(root_idx)
     </insert>
     
     <select id="TallySheetPointList" parameterType="map" resultType="hashmap">
@@ -2349,21 +2345,62 @@
     </insert>
     
     <select id="EmergencyPersonList" parameterType="map" resultType="map">
-    	SELECT *
-		FROM tb_account_field_person_master_table
-		WHERE idx in 
-		(
-			SELECT idx
-			FROM tb_account_field_root_mapping_table
-			WHERE root_idx = 
-			(
-				SELECT root_idx
-				FROM tb_account_root_master
-				WHERE sido_code = #{sido_code}
-				AND sigungu_code = #{sigungu_code}
-				AND emd_code = #{emd_code}
+    	SELECT
+			    T.idx,
+			    T.name,
+			    T.position_type,
+			    T.salary,
+			    T.car_yn,
+			    T.note,
+			    T.status,
+			    T.manpower_type,
+			
+			    -- ✅ 날짜와 무관하게 member_id/account_id가 있으면 나오도록
+			    COALESCE(NULLIF(T2.member_id, ''), TA.member_id, '') AS member_id,
+			    COALESCE(NULLIF(T2.account_id, ''), TA.account_id, '') AS account_id,
+			
+			    T2.record_year,
+			    T2.record_month,
+			    T2.record_date,
+			    COALESCE(NULLIF(T2.use_yn, ''), '') AS use_yn
+			
+			FROM tb_account_field_person_master_table T
+			
+			-- ✅ (1) 날짜 조건에 맞는 row (use_yn / record_* 보려는 용도)
+			LEFT JOIN tb_account_field_person_employment T2
+			  ON T2.idx = T.idx
+			 AND T2.record_year = #{record_year}
+			 AND T2.record_month = #{record_month}
+			 AND T2.record_date = #{record_date}
+			
+			-- ✅ (2) 날짜 무관 member_id/account_id 확보용 (한번이라도 등록된 값)
+			LEFT JOIN (
+			    SELECT
+			        idx,
+			        MAX(NULLIF(member_id, '')) AS member_id,
+			        MAX(NULLIF(account_id, '')) AS account_id
+			    FROM tb_account_field_person_employment
+			    GROUP BY idx
+			) TA
+			  ON TA.idx = T.idx
+			
+			WHERE T.idx IN (
+			    SELECT idx
+			    FROM tb_account_field_root_mapping_table
+			    WHERE root_idx = #{root_idx}
 			)
-		)
-		AND position_type = #{position_type}
+			AND T.position_type = #{position_type}
     </select>
+    
+    <insert id="EmergencyPersonEmployment" parameterType="map">
+    	INSERT INTO tb_account_field_person_employment
+    	(idx, member_id, account_id, record_year, record_month, record_date, use_yn, reg_dt, user_id)
+    	VALUES
+    	(#{idx}, #{member_id}, #{account_id}, #{record_year}, #{record_month}, #{record_date}, #{use_yn}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+    	ON DUPLICATE KEY UPDATE
+    	record_date=#{record_date},
+    	use_yn=#{use_yn},
+    	mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	user_id=#{user_id}
+    </insert>
 </mapper>

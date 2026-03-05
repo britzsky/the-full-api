@@ -2724,13 +2724,14 @@
 		<if test="type != null and type != ''">
 			AND type = #{type}
 		</if>
+		AND del_yn = 'N'
 	</select>
 	
 	<insert id="AccountPurchaseTallyV2Save" parameterType="map">
 		INSERT INTO tb_account_purchase_tally_v2
-		(account_id, sale_id, type, saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note, user_id, reg_dt)
+		(account_id, sale_id, type, saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note, user_id, reg_dt, del_yn)
 		VALUES
-		(#{account_id}, #{sale_id}, #{type}, STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'), #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		(#{account_id}, #{sale_id}, #{type}, STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'), #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), 'N')
 		ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        type=#{type},
@@ -2745,7 +2746,30 @@
 	        food_total=#{food_total},
 	        note=#{note},
 	        mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
-	        mod_id=#{user_id}
+	        mod_id=#{user_id},
+	        del_yn='N'
 	    </trim>
 	</insert>
+	
+	<delete id="AccountDispatchMemberDelete" parameterType="map">
+		DELETE FROM tb_account_members_dispatch
+		WHERE account_id = #{account_id}
+		AND member_id = #{member_id}
+	</delete>
+	
+	<delete id="AccountDispatchRecordDelete" parameterType="map">
+		DELETE FROM tb_account_record_dispatch
+		WHERE account_id = #{account_id}
+		AND member_id = #{member_id}
+		AND record_year = #{record_year}
+		AND record_month = #{record_month}
+		AND record_date = #{record_date}
+	</delete>
+	
+	<delete id="AccountPurchaseTallyV2Delete" parameterType="map">
+		UPDATE tb_account_purchase_tally_v2 SET del_yn = 'Y',
+		mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+		mod_id=#{user_id}
+		WHERE sale_id = #{sale_id}
+	</delete>
 </mapper>

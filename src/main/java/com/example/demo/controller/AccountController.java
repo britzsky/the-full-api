@@ -2191,4 +2191,29 @@ public class AccountController {
     	
     	return obj.toString();
     }
+    
+    /* 
+	 * part		: 회계
+     * method 	: AccountPurchaseTallyV2Delete
+     * comment 	: 매입집계 삭제
+     */
+    @PostMapping("Account/AccountPurchaseTallyV2Delete")
+	public String AccountPurchaseTallyV2Delete(@RequestBody Map<String, Object> paramMap) {
+		
+		int iResult = 0;
+		
+		iResult = accountService.AccountPurchaseTallyV2Delete(paramMap);
+		
+		JsonObject obj = new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
 }

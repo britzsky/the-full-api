@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
+import com.example.demo.service.AccountService;
 import com.example.demo.service.OperateService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -30,15 +31,18 @@ import com.google.gson.JsonObject;
 @RestController
 public class OperateController {
 
+	private final AccountService accountService;
 	private final OperateService operateService;
 	private final String uploadDir;
 	
     @Autowired
     public OperateController(
 	    		OperateService operateService, 
+	    		AccountService accountService,
 	    		WebConfig webConfig,
 	    		@Value("${file.upload-dir}") String uploadDir
     		) {
+    	this.accountService = accountService;
     	this.operateService = operateService;
     	this.uploadDir = uploadDir;
     }
@@ -1258,6 +1262,61 @@ public class OperateController {
 		
 		for (Map<String, Object> paramMap : rows) {
 			iResult += operateService.FieldPersonSave(paramMap);
+		}
+		
+		JsonObject obj =new JsonObject();
+    	
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+    	
+    	return obj.toString();
+	}
+    
+    /* 
+	 * part		: 운영
+     * method 	: FieldPersonSave
+     * comment 	: 긴급인력관리 -> 긴급인력 채용여부 저장
+     */
+    @PostMapping("Operate/EmergencyPersonEmployment")
+	public String EmergencyPersonEmployment(@RequestBody Map<String, Object> paramMap) {
+    	
+		int iResult = 0;
+		
+		Object objUseYn = paramMap.get("use_yn");
+		// ✅ member_id가 없을 때만 생성
+        Object memberIdObj = paramMap.get("member_id");
+        String memberId = memberIdObj == null ? "" : String.valueOf(memberIdObj).trim();
+        // ✅ member_id가 없을 때만 생성
+		if (memberId.isEmpty()) {
+            memberId = operateService.NowDateKey();
+            paramMap.put("member_id", memberId);
+        }
+		
+		// 어쨋든 채용여부 테이블 저장.
+		iResult += operateService.EmergencyPersonEmployment(paramMap);
+		
+		if (objUseYn != null) {
+			String strUseYn = objUseYn.toString();
+			int iUseYn = Integer.parseInt(strUseYn);
+			if (iUseYn == 3) {
+				
+				paramMap.put("del_yn", "N");
+				
+				// 채용여부 확정일 때, 파출직원, 파출출근부 저장.
+				iResult += accountService.AccountDispatchMemberSave(paramMap);
+				iResult += accountService.AccountDispatchRecordSave(paramMap);
+			}
+			if (iUseYn == 1 || iUseYn == 2) {
+				
+				// 채용여부 확정일 때, 파출직원, 파출출근부 저장.
+				iResult += accountService.AccountDispatchMemberDelete(paramMap);
+				iResult += accountService.AccountDispatchRecordDelete(paramMap);
+			}
 		}
 		
 		JsonObject obj =new JsonObject();

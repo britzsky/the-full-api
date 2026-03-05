@@ -437,4 +437,10 @@ public class OperateService {
 		iResult = operateMapper.FieldPersonSave(paramMap);
 		return iResult;
 	}
+	// 긴급인력관리 -> 긴급인력 채용정보 저장
+	public int EmergencyPersonEmployment (Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.EmergencyPersonEmployment(paramMap);
+		return iResult;
+	}
 }

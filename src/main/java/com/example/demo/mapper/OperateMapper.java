@@ -73,4 +73,5 @@ public interface OperateMapper {
 	List<Map<String, Object>> EmergencyPersonList(Map<String, Object> paramMap);				// 긴급인력관리 -> 긴급인력 조회
 	int PersonToRootSave(Map<String, Object> paramMap);											// 긴급인력관리 -> 인력, 근무가능지역 매핑 저장
 	int FieldPersonSave(Map<String, Object> paramMap);											// 긴급인력관리 -> 인력정보 저장
+	int EmergencyPersonEmployment(Map<String, Object> paramMap);								// 긴급인력관리 -> 긴급인력 채용정보 저장
 }

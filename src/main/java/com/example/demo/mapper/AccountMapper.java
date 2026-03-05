@@ -90,4 +90,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
 	List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap); 				// 회계 -> 매입(본사용) 조회
 	int AccountPurchaseTallyV2Save(Map<String, Object> paramMap);										// 회계 -> 매입(본사용) 저장
+	int AccountDispatchMemberDelete(Map<String, Object> paramMap);										// 긴급인력 파출 회원 정보 삭제
+	int AccountDispatchRecordDelete(Map<String, Object> paramMap);										// 긴급인력 파출 출근기록 삭제
+	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap);										// 회계 -> 매입집계 삭제
 }
