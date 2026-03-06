@@ -1256,7 +1256,7 @@ public class OperateController {
 	public String FieldPersonSave(@RequestBody Map<String, Object> payload) {
 		
 		// payload에서 rows만 꺼냄
-	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("list");
+	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("data");
     	
 		int iResult = 0;
 		

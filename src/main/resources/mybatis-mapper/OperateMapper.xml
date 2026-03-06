@@ -2209,9 +2209,12 @@
 		),
 		params AS (
 		  SELECT
-		    DATE('2026-02-01') AS first_day,
-		    LAST_DAY('2026-02-01') AS last_day,
-		    DATE_SUB(DATE('2026-02-01'), INTERVAL WEEKDAY(DATE('2026-02-01')) DAY) AS month_week1_monday
+		    STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d') AS first_day,
+		    LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')) AS last_day,
+		    DATE_SUB(
+		      STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'), 
+		      INTERVAL WEEKDAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')) DAY
+		    ) AS month_week1_monday
 		),
 		wk AS (
 		  SELECT
@@ -2299,8 +2302,17 @@
     </select>
     
     <select id="FieldPersonMasterList" parameterType="map" resultType="map">
-    	SELECT *
-    	FROM tb_account_field_person_master_table
+    	SELECT T.*, T2.*
+    	FROM tb_account_field_person_master_table T
+    	LEFT JOIN tb_account_field_root_mapping_table T2
+    	ON T2.idx = T.idx
+    	WHERE 1=1
+    	<if test="name != null and name != ''">
+        	AND T.name LIKE CONCAT('%', #{name}, '%')
+        </if>
+        <if test="root_idx != null and root_idx != ''">
+        	AND T2.root_idx = #{root_idx}
+        </if>
     </select>
     
     <select id="PersonToRootList" parameterType="map" resultType="map">
