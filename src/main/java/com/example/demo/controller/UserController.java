@@ -57,8 +57,10 @@ public class UserController {
 		// ===== 성공 응답 =====
 		obj.addProperty("user_id", String.valueOf(resultMap.get("user_id")));
 		obj.addProperty("user_type", String.valueOf(resultMap.get("user_type")));
-
+		obj.addProperty("position", String.valueOf(resultMap.get("position")));
+		
 		String userId = String.valueOf(resultMap.get("user_id"));
+		int position = Integer.parseInt(String.valueOf(resultMap.get("position")));
 
 		if ("ceo".equals(userId)) {
 			obj.addProperty("position_name", "CEO");
@@ -67,11 +69,12 @@ public class UserController {
 			obj.addProperty("position_name", "Team Leader");
 		} else if ("sy7".equals(userId) || "jr1".equals(userId)) {
 			obj.addProperty("position_name", "Part Leader");
+		} else if (position == 8) {
+			obj.addProperty("position_name", "Dietitian");
 		} else {
 			obj.addProperty("position_name", "Manager");
 		}
-
-		obj.addProperty("position", String.valueOf(resultMap.get("position")));
+		
 		obj.addProperty("department", String.valueOf(resultMap.get("department")));
 		obj.addProperty("account_id", String.valueOf(resultMap.get("account_id")));
 		obj.addProperty("user_name", String.valueOf(resultMap.get("user_name")));
