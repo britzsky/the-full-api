@@ -1,4 +1,4 @@
-  package com.example.demo.controller;
+package com.example.demo.controller;
 
 import java.io.File;
 import java.io.IOException;
@@ -39,413 +39,418 @@ import com.google.gson.JsonObject;
 
 @RestController
 public class AccountController {
-	
+
 	private final AccountService accountService;
 	private final HeadOfficeService headOfficeService;
 	private final String uploadDir;
-	
-    @Autowired
-    public AccountController(
-    			AccountService accountService, 
-    			HeadOfficeService headOfficeService, 
-    			WebConfig webConfig,
-    			@Value("${file.upload-dir}") String uploadDir
-    		) {
-    	this.accountService = accountService;
-    	this.headOfficeService = headOfficeService;
-    	this.uploadDir = uploadDir;
-    }
-    
-    /*
-     * method 	: AccountList
-     * comment 	: 거래처 조회
-     */
-    @GetMapping("/Account/AccountList")
-    public String AccountList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
-    	resultList = accountService.AccountList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * method 	: AccountList
-     * comment 	: 거래처 조회
-     */
-    @GetMapping("/Account/AccountListV2")
-    public String AccountListV2(@RequestParam(required = false) Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
-    	resultList = accountService.AccountListV2(iAccountType);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * method 	: AccountDirectList
-     * comment 	: 신사업팀 -> 직영점 조회
-     */
-    @GetMapping("/Account/AccountDirectList")
-    public String AccountDirectList() {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountDirectList();
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * method 	: AccountUtilMemberList
-     * comment 	: 유틸 직원 조회
-     */
-    @GetMapping("/Account/AccountUtilMemberList")
-    public String AccountUtilMemberList(@RequestParam(required = false) Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountUtilMemberList();
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * method 	: AccountUtilMappingList
-     * comment 	: 유틸 직원 매핑 정보 조회
-     */
-    @GetMapping("/Account/AccountUtilMappingList")
-    public String AccountUtilMappingList(@RequestParam(required = false) Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountUtilMappingList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * method 	: AccountUtilMemberMappingSave
-     * comment 	: 유틸 직원 매핑 정보 저장
-     */
-    @PostMapping("/Account/AccountUtilMemberMappingSave")
-    private String AccountUtilMemberMappingSave(@RequestBody List<Map<String, Object>> paramList) { 
-    	
-        int iResult = 0;
-        
-        for (Map<String, Object> paramMap : paramList) {
-        	iResult += accountService.AccountUtilMemberMappingSave(paramMap);
-        }
-        
-        JsonObject obj = new JsonObject();
-        
-        if(iResult > 0) {
-            obj.addProperty("code", 200);
-            obj.addProperty("message", "성공");
-        } else {
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "실패");
-        }
-        
-        return obj.toString();
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountTallySheetList
-     * comment 	: 거래처 -> 집계표 조회
-     */
-    @GetMapping("/Account/AccountTallySheetList")
-    public String AccountTallySheetList(@RequestParam Map<String, Object> paramMap) {
-    	int digits = 2; // 원하는 자릿수
 
-        // String.format()을 사용하여 숫자 앞에 0 추가
-    	// 1. Map에서 "month" 값을 String으로 가져옵니다. (확실하게 String임을 가정)
-    	String monthString = paramMap.get("month").toString(); // 안전하게 toString() 호출
+	@Autowired
+	public AccountController(
+			AccountService accountService,
+			HeadOfficeService headOfficeService,
+			WebConfig webConfig,
+			@Value("${file.upload-dir}") String uploadDir) {
+		this.accountService = accountService;
+		this.headOfficeService = headOfficeService;
+		this.uploadDir = uploadDir;
+	}
 
-    	// 2. String을 정수(int)로 변환합니다.
-    	int monthValue = Integer.parseInt(monthString); // 이 부분에서 d 타입에 맞는 정수가 됨
+	/*
+	 * method : AccountList
+	 * comment : 거래처 조회
+	 */
+	@GetMapping("/Account/AccountList")
+	public String AccountList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
+		resultList = accountService.AccountList(paramMap);
 
-    	// 3. String.format()을 사용하여 숫자 앞에 0 추가
-    	String formattedNumber = String.format("%0" + digits + "d", monthValue);
-    	
-    	paramMap.put("month", formattedNumber);
-        
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountTallySheetList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountSave
-     * comment 	: 거래처 -> 집계표 저장
-     */
-    @PostMapping("Account/AccountSave")
-    public String AccountSave(@RequestParam Map<String, Object> paramMap) {
-    	
-    	JsonObject obj =new JsonObject();
-    	
-    	if(accountService.AccountSave(paramMap) > 0) {
-    		obj.addProperty("code", 200);
-    		obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-    		obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountRecordDispatchList
-     * comment 	: 거래처 -> 출근부 -> 파출직원 조회
-     */
-    @GetMapping("Account/AccountRecordDispatchList")
-    public String AccountRecordDispatchList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountRecordDispatchList(paramMap);
-    	
-    	return new Gson().toJson(resultList); 
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountRecordMemberList
-     * comment 	: 거래처 -> 출근부 -> 직원 조회
-     */
-    @GetMapping("Account/AccountRecordMemberList")
-    public String AccountRecordMemberList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountRecordMemberList(paramMap);
-    	
-    	return new Gson().toJson(resultList); 
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountRecordMemberList
-     * comment 	: 거래처 -> 출근부 -> 출근현황 조회
-     */
-    @GetMapping("Account/AccountRecordSheetList")
-    public String AccountRecordSheetList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountRecordSheetList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    @GetMapping("Account/AccountMemberRecordTime")
-    public String AccountMemberRecordTime(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountMemberRecordTime(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountMemberRecordSave
-     * comment 	: 거래처 -> 출근부 -> 출근부 정보 저장
-     */
-    @PostMapping("Account/AccountRecordSave")
-    public String AccountMemberRecordSave(@RequestBody Map<String, List<Map<String, Object>>> payload) {
-    	
-    		int iResult = 0;
-    	
-    		List<Map<String, Object>> normalRecords = payload.get("normalRecords");
-        List<Map<String, Object>> disRecords = payload.get("disRecords");
-        List<Map<String, Object>> recRecords = payload.get("recRecords");
-        
-        boolean bType = true;
-        
-        // normalRecords, recRecords 를 조건에 따라 담을 List
-        List<Map<String, Object>> objRecords = new ArrayList<Map<String, Object>>();
-        if (!normalRecords.isEmpty()) {
-	        	bType = true;
-	        	objRecords = normalRecords;
-        } else if (!recRecords.isEmpty()) {
-	        	bType = false;
-	        	objRecords = recRecords;
-        }
-        
-        for (Map<String, Object> row : objRecords) {
-        	
-        		System.out.println("==================  salary  + " + row.get("salary"));
-        	
-	        	if (bType) {
-	        		iResult += accountService.AccountMemberRecordSave(row);
-	            	iResult += accountService.processProfitLossV2(row);
-	        	} else {
-	        		iResult += accountService.AccountMemberRecRecordSave(row);
-	            	iResult += accountService.processProfitLossV2(row);
-        	}
-        	
-        	if (row.get("type") != null) {
-        		
-        		Map<String, Object> annualMap = new HashMap<String, Object>();
-        		Map<String, Object> overMap = new HashMap<String, Object>();
-        		
-        		int iType = (int) row.get("type");
-        		int iPositionType = Integer.parseInt(row.get("position_type").toString());
-        		
-        		// 1. 연, 월, 일로 LocalDate 객체 생성
-            LocalDate date = LocalDate.of((int)row.get("record_year"), (int)row.get("record_month"), (int)row.get("record_date"));
+		return new Gson().toJson(resultList);
+	}
 
-            // 2. 원하는 형식(YYYY-MM-DD)의 포맷터 정의
-            // 'MM'과 'dd'는 각각 월과 일을 2자리 숫자로 표현하며, 필요시 0으로 채웁니다.
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyyy-MM");
-            
-            String ledgerDt = date.format(formatter);			// 각 연차, 반차, 초과 등 부여 혹은 사용 날짜.
-            String ledgerMonth = date.format(formatter2);		// 대체근무 연차 부여 사용 기한.
-            String position = row.get("position").toString();	// 초과 일 때, 영양사만 지급.
-            
-            // 초과근무 시간 사용이 있는 지 체크.
-            if (iType == 1) {
-            		if (position.equals("영양사") || iPositionType == 1) {
-                		// 시각 파싱
-            			DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
-                		
-            			LocalTime startTime = LocalTime.parse(row.get("start_time").toString(), minutFormatter);
-            			LocalTime endTime = LocalTime.parse(row.get("end_time").toString(), minutFormatter);
-            			LocalTime orgStartTime = LocalTime.parse(row.get("org_start_time").toString(), minutFormatter);
-            			LocalTime orgEndTime = LocalTime.parse(row.get("org_end_time").toString(), minutFormatter);
-                    
-            			Duration startDuration = Duration.between(startTime, orgStartTime);
-            			Duration endDuration = Duration.between(endTime, orgEndTime);
-                    
-            			long startMinutes = startDuration.toMinutes(); // 결과: 90 (분)
-            			long endMinutes = endDuration.toMinutes(); // 결과: 90 (분)
-                    
-            			double decimalHours = startMinutes / 60.0;
-            			double decimalHours2 = endMinutes / 60.0;
-                    
-            			if (decimalHours != 0 || decimalHours2 != 0) {
-                        	
-                        	if (decimalHours != 0) {
-                        		overMap.put("times", -decimalHours);
-                        	}
-                        	if (decimalHours2 != 0) {
-                        		overMap.put("times", -decimalHours2);
-                        	}
-                        	
-                        	overMap.put("member_id", row.get("member_id"));
-                        	overMap.put("type", "U");
-                        	overMap.put("over_dt", ledgerDt);
-                        	overMap.put("reason", "보상시간 사용");
-                        }
-                	}
-                }
-                
-                // 초과
-                if (iType == 3) {
-                	if (position.equals("영양사") || iPositionType == 1) {
-                		
-                        // 초과근무시간 추출.
-                		double dOver = Double.parseDouble(row.get("note").toString());
-                		
-                		overMap.put("member_id", row.get("member_id"));
-                		overMap.put("times", dOver);
-                		overMap.put("type", "G");
-            			overMap.put("over_dt", ledgerDt);
-            			overMap.put("reason", "초과근무로 보상시간 부여");
-                	}
-        		}
-                // 대체근무
-                if (iType == 8) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", 1);
-        			annualMap.put("type", "G");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "대체근무로 인한 연차 부여 " + ledgerMonth);
-        		}
-        		// 연차
-        		if (iType == 9) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", -1);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "개인사정으로 인한 연차 사용");
-        		}
-        		// 반차
-        		if (iType == 10) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", -0.5);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "개인사정으로 인한 반차 사용");
-        		}
-        		// 대체휴무
-        		if (iType == 11) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", 0);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", row.get("note").toString());
-        		}
-        		// 병가
-        		if (iType == 12) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", -1);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "개인사정으로 인한 반차 사용");
-        		}
-        		// 출산휴가
-        		if (iType == 13) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", 0);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "출산휴가");
-        		}
-        		// 육아휴직
-        		if (iType == 14) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", 0);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "육아휴직");
-        		}
-        		// 하계휴가
-        		if (iType == 15) {
-        			annualMap.put("member_id", row.get("member_id"));
-        			annualMap.put("days", 0);
-        			annualMap.put("type", "U");
-        			annualMap.put("ledger_dt", ledgerDt);
-        			annualMap.put("reason", "하계휴가");
-        		}
-        		if (!annualMap.isEmpty()) {
-        			iResult += accountService.AccountAnnualLeaveLedgerSave(annualMap);
-        		}
-        		if (!overMap.isEmpty()) {
-        			iResult += accountService.AccountOverTimeLedgerSave(overMap);
-        		}
-        	}
-        }
-        for (Map<String, Object> row : disRecords) {
-        	// 파출 지급 저장 시 연/월/일 누락 보정
-        	normalizeDispatchRecordDate(row);
-        	iResult += accountService.AccountDispatchRecordSave(row);
-        	iResult += accountService.processProfitLossV2(row);
-        }
-    	
-        JsonObject obj =new JsonObject();
-    	
-    	if(iResult > 0) {
-    		obj.addProperty("code", 200);
-    		obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-    		obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    public static String formatNumbers(int year, int month, int day) {
-        // C 스타일의 형식 지정자를 사용합니다.
-        // %d: 10진수 정수
-        // %02d: 2자리로 표현하며, 2자리보다 작으면 앞에 0으로 채웁니다.
-        return String.format("%d-%02d-%02d", year, month, day);
-    }
+	/*
+	 * method : AccountList
+	 * comment : 거래처 조회
+	 */
+	@GetMapping("/Account/AccountListV2")
+	public String AccountListV2(@RequestParam(required = false) Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
+		resultList = accountService.AccountListV2(iAccountType);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountDirectList
+	 * comment : 신사업팀 -> 직영점 조회
+	 */
+	@GetMapping("/Account/AccountDirectList")
+	public String AccountDirectList() {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDirectList();
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountUtilMemberList
+	 * comment : 유틸 직원 조회
+	 */
+	@GetMapping("/Account/AccountUtilMemberList")
+	public String AccountUtilMemberList(@RequestParam(required = false) Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountUtilMemberList();
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountUtilMappingList
+	 * comment : 유틸 직원 매핑 정보 조회
+	 */
+	@GetMapping("/Account/AccountUtilMappingList")
+	public String AccountUtilMappingList(@RequestParam(required = false) Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountUtilMappingList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountUtilMemberMappingSave
+	 * comment : 유틸 직원 매핑 정보 저장
+	 */
+	@PostMapping("/Account/AccountUtilMemberMappingSave")
+	private String AccountUtilMemberMappingSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			iResult += accountService.AccountUtilMemberMappingSave(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountTallySheetList
+	 * comment : 거래처 -> 집계표 조회
+	 */
+	@GetMapping("/Account/AccountTallySheetList")
+	public String AccountTallySheetList(@RequestParam Map<String, Object> paramMap) {
+		int digits = 2; // 원하는 자릿수
+
+		// String.format()을 사용하여 숫자 앞에 0 추가
+		// 1. Map에서 "month" 값을 String으로 가져옵니다. (확실하게 String임을 가정)
+		String monthString = paramMap.get("month").toString(); // 안전하게 toString() 호출
+
+		// 2. String을 정수(int)로 변환합니다.
+		int monthValue = Integer.parseInt(monthString); // 이 부분에서 d 타입에 맞는 정수가 됨
+
+		// 3. String.format()을 사용하여 숫자 앞에 0 추가
+		String formattedNumber = String.format("%0" + digits + "d", monthValue);
+
+		paramMap.put("month", formattedNumber);
+
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountTallySheetList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountSave
+	 * comment : 거래처 -> 집계표 저장
+	 */
+	@PostMapping("Account/AccountSave")
+	public String AccountSave(@RequestParam Map<String, Object> paramMap) {
+
+		JsonObject obj = new JsonObject();
+
+		if (accountService.AccountSave(paramMap) > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordDispatchList
+	 * comment : 거래처 -> 출근부 -> 파출직원 조회
+	 */
+	@GetMapping("Account/AccountRecordDispatchList")
+	public String AccountRecordDispatchList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountRecordDispatchList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordMemberList
+	 * comment : 거래처 -> 출근부 -> 직원 조회
+	 */
+	@GetMapping("Account/AccountRecordMemberList")
+	public String AccountRecordMemberList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountRecordMemberList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordMemberList
+	 * comment : 거래처 -> 출근부 -> 출근현황 조회
+	 */
+	@GetMapping("Account/AccountRecordSheetList")
+	public String AccountRecordSheetList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountRecordSheetList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	@GetMapping("Account/AccountMemberRecordTime")
+	public String AccountMemberRecordTime(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountMemberRecordTime(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountMemberRecordSave
+	 * comment : 거래처 -> 출근부 -> 출근부 정보 저장
+	 */
+	@PostMapping("Account/AccountRecordSave")
+	public String AccountMemberRecordSave(@RequestBody Map<String, List<Map<String, Object>>> payload) {
+
+		int iResult = 0;
+
+		List<Map<String, Object>> normalRecords = payload.get("normalRecords");
+		List<Map<String, Object>> disRecords = payload.get("disRecords");
+		List<Map<String, Object>> recRecords = payload.get("recRecords");
+
+		boolean bType = true;
+
+		// normalRecords, recRecords 를 조건에 따라 담을 List
+		List<Map<String, Object>> objRecords = new ArrayList<Map<String, Object>>();
+		if (!normalRecords.isEmpty()) {
+			bType = true;
+			objRecords = normalRecords;
+		} else if (!recRecords.isEmpty()) {
+			bType = false;
+			objRecords = recRecords;
+		}
+
+		for (Map<String, Object> row : objRecords) {
+
+			System.out.println("==================  salary  + " + row.get("salary"));
+
+			if (bType) {
+				iResult += accountService.AccountMemberRecordSave(row);
+				iResult += accountService.processProfitLossV2(row);
+			} else {
+				iResult += accountService.AccountMemberRecRecordSave(row);
+				iResult += accountService.processProfitLossV2(row);
+			}
+
+			if (row.get("type") != null) {
+
+				Map<String, Object> annualMap = new HashMap<String, Object>();
+				Map<String, Object> overMap = new HashMap<String, Object>();
+
+				int iType = (int) row.get("type");
+				int iPositionType = Integer.parseInt(row.get("position_type").toString());
+
+				// 1. 연, 월, 일로 LocalDate 객체 생성
+				LocalDate date = LocalDate.of((int) row.get("record_year"), (int) row.get("record_month"),
+						(int) row.get("record_date"));
+
+				// 2. 원하는 형식(YYYY-MM-DD)의 포맷터 정의
+				// 'MM'과 'dd'는 각각 월과 일을 2자리 숫자로 표현하며, 필요시 0으로 채웁니다.
+				DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+				DateTimeFormatter formatter2 = DateTimeFormatter.ofPattern("yyyy-MM");
+
+				String ledgerDt = date.format(formatter); // 각 연차, 반차, 초과 등 부여 혹은 사용 날짜.
+				String ledgerMonth = date.format(formatter2); // 대체근무 연차 부여 사용 기한.
+				String position = row.get("position").toString(); // 초과 일 때, 영양사만 지급.
+
+				// 초과근무 시간 사용이 있는 지 체크.
+				if (iType == 1) {
+					if (position.equals("영양사") || iPositionType == 1) {
+						// 시각 파싱
+						DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
+
+						LocalTime startTime = LocalTime.parse(row.get("start_time").toString(), minutFormatter);
+						LocalTime endTime = LocalTime.parse(row.get("end_time").toString(), minutFormatter);
+						LocalTime orgStartTime = LocalTime.parse(row.get("org_start_time").toString(), minutFormatter);
+						LocalTime orgEndTime = LocalTime.parse(row.get("org_end_time").toString(), minutFormatter);
+
+						Duration startDuration = Duration.between(startTime, orgStartTime);
+						Duration endDuration = Duration.between(endTime, orgEndTime);
+
+						long startMinutes = startDuration.toMinutes(); // 결과: 90 (분)
+						long endMinutes = endDuration.toMinutes(); // 결과: 90 (분)
+
+						double decimalHours = startMinutes / 60.0;
+						double decimalHours2 = endMinutes / 60.0;
+
+						if (decimalHours != 0 || decimalHours2 != 0) {
+
+							if (decimalHours != 0) {
+								overMap.put("times", -decimalHours);
+							}
+							if (decimalHours2 != 0) {
+								overMap.put("times", -decimalHours2);
+							}
+
+							overMap.put("member_id", row.get("member_id"));
+							overMap.put("type", "U");
+							overMap.put("over_dt", ledgerDt);
+							overMap.put("reason", "보상시간 사용");
+						}
+					}
+				}
+
+				// 초과
+				if (iType == 3) {
+					if (position.equals("영양사") || iPositionType == 1) {
+
+						// 초과근무시간 추출.
+						double dOver = Double.parseDouble(row.get("note").toString());
+
+						overMap.put("member_id", row.get("member_id"));
+						overMap.put("times", dOver);
+						overMap.put("type", "G");
+						overMap.put("over_dt", ledgerDt);
+						overMap.put("reason", "초과근무로 보상시간 부여");
+					}
+				}
+				// 대체근무
+				if (iType == 8) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 1);
+					annualMap.put("type", "G");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "대체근무로 인한 연차 부여 " + ledgerMonth);
+				}
+				// 연차
+				if (iType == 9) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", -1);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "개인사정으로 인한 연차 사용");
+				}
+				// 반차
+				if (iType == 10) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", -0.5);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "개인사정으로 인한 반차 사용");
+				}
+				// 대체휴무
+				if (iType == 11) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", row.get("note").toString());
+				}
+				// 병가
+				if (iType == 12) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", -1);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "개인사정으로 인한 반차 사용");
+				}
+				// 출산휴가
+				if (iType == 13) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "출산휴가");
+				}
+				// 육아휴직
+				if (iType == 14) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "육아휴직");
+				}
+				// 하계휴가
+				if (iType == 15) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "하계휴가");
+				}
+				if (!annualMap.isEmpty()) {
+					iResult += accountService.AccountAnnualLeaveLedgerSave(annualMap);
+				}
+				if (!overMap.isEmpty()) {
+					iResult += accountService.AccountOverTimeLedgerSave(overMap);
+				}
+			}
+		}
+		for (Map<String, Object> row : disRecords) {
+			// 파출 지급 저장 시 연/월/일 누락 보정
+			normalizeDispatchRecordDate(row);
+			iResult += accountService.AccountDispatchRecordSave(row);
+			iResult += accountService.processProfitLossV2(row);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	public static String formatNumbers(int year, int month, int day) {
+		// C 스타일의 형식 지정자를 사용합니다.
+		// %d: 10진수 정수
+		// %02d: 2자리로 표현하며, 2자리보다 작으면 앞에 0으로 채웁니다.
+		return String.format("%d-%02d-%02d", year, month, day);
+	}
 
 	// 파출 지급 저장 시 연/월/일 누락 보정
 	private void normalizeDispatchRecordDate(Map<String, Object> row) {
-		if (row == null) return;
+		if (row == null)
+			return;
 
 		if (row.get("record_year") == null && row.get("year") != null) {
 			row.put("record_year", row.get("year"));
@@ -454,8 +459,10 @@ public class AccountController {
 			row.put("record_month", row.get("month"));
 		}
 		if (row.get("record_date") == null) {
-			if (row.get("record_day") != null) row.put("record_date", row.get("record_day"));
-			else if (row.get("day") != null) row.put("record_date", row.get("day"));
+			if (row.get("record_day") != null)
+				row.put("record_date", row.get("record_day"));
+			else if (row.get("day") != null)
+				row.put("record_date", row.get("day"));
 		}
 
 		Object rd = row.get("record_date");
@@ -471,1070 +478,1068 @@ public class AccountController {
 			}
 		}
 	}
-    
-    /*
-     * part		: 현장
-     * method 	: AccountMemberRecordSave
-     * comment 	: 거래처 -> 출근부 -> 파출직원 저장
-     */
-    @PostMapping("Account/AccountDispatchMemberSave")
-    public String AccountDispatchMemberSave(@RequestParam Map<String, Object> paramMap) {
-    	
-    	int iResult = 0;
-    	
-    	// ✅ member_id가 없을 때만 생성
-        Object memberIdObj = paramMap.get("member_id");
-        String memberId = memberIdObj == null ? "" : String.valueOf(memberIdObj).trim();
-    	
-        if (memberId.isEmpty()) {
-            memberId = accountService.NowDateKey();
-            paramMap.put("member_id", memberId);
-        }
-    	
-    	iResult = accountService.AccountDispatchMemberSave(paramMap);
-    	
-        JsonObject obj =new JsonObject();
-    	
-    	if(iResult > 0) {
-    		obj.addProperty("code", 200);
-    		obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-    		obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    
-    
-    /*
-     * part		: 영업
-     * method 	: AccountInfoList
-     * comment 	: 거래처 -> 거래처 상세 조회
-     */
-    @GetMapping("Account/AccountInfoList")
-    public String AccountInfoList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountInfoList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 영업
-     * method 	: AccountInfoList_2
-     * comment 	: 거래처 -> 거래처 상세 조회
-     */
-    @GetMapping("Account/AccountInfoList_2")
-    public String AccountInfoList_2(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountInfoList_2(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 영업
-     * method 	: AccountInfoList_3
-     * comment 	: 거래처 -> 거래처 상세 조회
-     */
-    @GetMapping("Account/AccountInfoList_3")
-    public String AccountInfoList_3(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountInfoList_3(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 영업
-     * method 	: AccountInfoList_4
-     * comment 	: 거래처 -> 거래처 상세 조회
-     */
-    @GetMapping("Account/AccountInfoList_4")
-    public String AccountInfoList_4(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountInfoList_4(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 영업
-     * method 	: AccountInfoList_5
-     * comment 	: 거래처 -> 거래처 상세 조회
-     */
-    @GetMapping("Account/AccountInfoList_5")
-    public String AccountInfoList_5(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountInfoList_5(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 영업
-     * method 	: AccountMemberRecordSave
-     * comment 	: 거래처 -> 거래처 상세 저장
-     */
-    @SuppressWarnings("unchecked")
-    @PostMapping("Account/AccountInfoSave")
-    public String AccountInfoSave(@RequestBody(required = false) Map<String, Object> payload) {
 
-        JsonObject obj = new JsonObject();
+	/*
+	 * part : 현장
+	 * method : AccountMemberRecordSave
+	 * comment : 거래처 -> 출근부 -> 파출직원 저장
+	 */
+	@PostMapping("Account/AccountDispatchMemberSave")
+	public String AccountDispatchMemberSave(@RequestParam Map<String, Object> paramMap) {
 
-        if (payload == null) {
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "요청 데이터가 비어 있습니다.");
-            return obj.toString();
-        }
+		int iResult = 0;
 
-        int iResult = 0;
+		// ✅ member_id가 없을 때만 생성
+		Object memberIdObj = paramMap.get("member_id");
+		String memberId = memberIdObj == null ? "" : String.valueOf(memberIdObj).trim();
 
-        Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
-        Map<String, Object> payloadMap = new HashMap<>();
+		if (memberId.isEmpty()) {
+			memberId = accountService.NowDateKey();
+			paramMap.put("member_id", memberId);
+		}
 
-        if (formData != null) {
-            payloadMap.putAll(formData);
-            // 거래처 기본정보 저장
-            iResult += accountService.AccountSave(formData);
-        }
+		iResult = accountService.AccountDispatchMemberSave(paramMap);
 
-        List<Map<String, Object>> priceData   = (List<Map<String, Object>>) payload.get("priceData");
-        List<Map<String, Object>> etcData     = (List<Map<String, Object>>) payload.get("etcData");
-        List<Map<String, Object>> managerData = (List<Map<String, Object>>) payload.get("managerData");
-        List<Map<String, Object>> eventData   = (List<Map<String, Object>>) payload.get("eventData");
+		JsonObject obj = new JsonObject();
 
-        if (etcData != null) {
-            for (Map<String, Object> row : etcData) {
-                if (row != null) payloadMap.putAll(row);
-            }
-        }
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
 
-        if (eventData != null) {
-            for (Map<String, Object> row : eventData) {
-                if (row != null) payloadMap.putAll(row);
-            }
-        }
+		return obj.toString();
+	}
 
-        if (managerData != null) {
-            for (Map<String, Object> row : managerData) {
-                if (row != null) payloadMap.putAll(row);
-            }
-        }
+	/*
+	 * part : 영업
+	 * method : AccountInfoList
+	 * comment : 거래처 -> 거래처 상세 조회
+	 */
+	@GetMapping("Account/AccountInfoList")
+	public String AccountInfoList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountInfoList(paramMap);
 
-        if (priceData != null) {
-            for (Map<String, Object> row : priceData) {
-                if (row != null) {
-                	payloadMap.putAll(row);
-                	
-                	Object priceObj = row.get("diet_price");
-                	int dietPrice = 0;
+		return new Gson().toJson(resultList);
+	}
 
-                	if (priceObj != null && !priceObj.toString().isEmpty()) {
-                	    dietPrice = Integer.parseInt(priceObj.toString());
-                	}
-                	
-                	Object beforePriceObj = row.get("before_diet_price");
-                	int beforeDietPrice = 0;
+	/*
+	 * part : 영업
+	 * method : AccountInfoList_2
+	 * comment : 거래처 -> 거래처 상세 조회
+	 */
+	@GetMapping("Account/AccountInfoList_2")
+	public String AccountInfoList_2(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountInfoList_2(paramMap);
 
-                	if (beforePriceObj != null && !beforePriceObj.toString().isEmpty()) {
-                		beforeDietPrice = Integer.parseInt(beforePriceObj.toString());
-                	}
-                	
-                	List<Map<String, Object>> resultList = new ArrayList<>();
-                	resultList = accountService.AccountDietPriceHistoryList(payloadMap);
-                	
-                	for (Map<String, Object> dietRow : resultList) {
-                		
-                		Object dietPriceObj = dietRow.get("diet_price");
-                    	int dietPrice2 = 0;
+		return new Gson().toJson(resultList);
+	}
 
-                    	if (dietPriceObj != null && !dietPriceObj.toString().isEmpty()) {
-                    		dietPrice2 = Integer.parseInt(dietPriceObj.toString());
-                    	}
-                		
-                		// 식단가와 내역의 식단가가 다르면 저장.
-                    	if (dietPrice != dietPrice2) {
-                    		iResult += accountService.AccountDietPriceHistorySave(payloadMap);
-                    	}
-                	}
-                } 
-            }
-        }
-        
-        iResult += accountService.AccountInfoSave(payloadMap);
+	/*
+	 * part : 영업
+	 * method : AccountInfoList_3
+	 * comment : 거래처 -> 거래처 상세 조회
+	 */
+	@GetMapping("Account/AccountInfoList_3")
+	public String AccountInfoList_3(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountInfoList_3(paramMap);
 
-        if (iResult > 0) {
-            obj.addProperty("code", 200);
-            obj.addProperty("message", "성공");
-        } else {
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "실패");
-        }
+		return new Gson().toJson(resultList);
+	}
 
-        return obj.toString();
-    }
-    /*
-     * part		: 영업
-     * method 	: AccountBusinessImgList
-     * comment 	: 거래처 -> 거래처 상세 이미지 조회
-     */
-    @GetMapping("Account/AccountBusinessImgList")
-    public String AccountBusinessImgList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountBusinessImgList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    @PostMapping("Account/AccountBusinessImgUpload")
-    public String uploadFiles(
-            @RequestParam("account_id") String accountId,
-            @RequestParam(value = "business_report", required = false) MultipartFile businessReport,
-            @RequestParam(value = "business_regist", required = false) MultipartFile businessRegist,
-            @RequestParam(value = "kitchen_drawing", required = false) MultipartFile kitchenDrawing,
-            @RequestParam(value = "nutritionist_room_img", required = false) MultipartFile nutritionistRoomImg,
-            @RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg,
-            @RequestParam(value = "meal_service_contract", required = false) MultipartFile meal_service_contract
-    ) throws IOException {
-        Map<String, Object> filePathMap = new HashMap<>();
+	/*
+	 * part : 영업
+	 * method : AccountInfoList_4
+	 * comment : 거래처 -> 거래처 상세 조회
+	 */
+	@GetMapping("Account/AccountInfoList_4")
+	public String AccountInfoList_4(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountInfoList_4(paramMap);
 
-        if (businessReport != null && !businessReport.isEmpty()) {
-            String path = saveFile(accountId, "business_report", businessReport);
-            filePathMap.put("business_report", path);
-        }
+		return new Gson().toJson(resultList);
+	}
 
-        if (businessRegist != null && !businessRegist.isEmpty()) {
-            String path = saveFile(accountId, "business_regist", businessRegist);
-            filePathMap.put("business_regist", path);
-        }
+	/*
+	 * part : 영업
+	 * method : AccountInfoList_5
+	 * comment : 거래처 -> 거래처 상세 조회
+	 */
+	@GetMapping("Account/AccountInfoList_5")
+	public String AccountInfoList_5(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountInfoList_5(paramMap);
 
-        if (kitchenDrawing != null && !kitchenDrawing.isEmpty()) {
-            String path = saveFile(accountId, "kitchen_drawing", kitchenDrawing);
-            filePathMap.put("kitchen_drawing", path);
-        }
-        
-        if (nutritionistRoomImg != null && !nutritionistRoomImg.isEmpty()) {
-            String path = saveFile(accountId, "nutritionist_room_img", nutritionistRoomImg);
-            filePathMap.put("nutritionist_room_img", path);
-        }
-        
-        if (chefLoungeImg != null && !chefLoungeImg.isEmpty()) {
-            String path = saveFile(accountId, "chef_lounge_img", chefLoungeImg);
-            filePathMap.put("chef_lounge_img", path);
-        }
-        
-        if (meal_service_contract != null && !meal_service_contract.isEmpty()) {
-            String path = saveFile(accountId, "meal_service_contract", meal_service_contract);
-            filePathMap.put("meal_service_contract", path);
-        }
-        
-        filePathMap.put("account_id", accountId);
-        
-        System.out.println("account_id == " + filePathMap.get("account_id"));
-        System.out.println("business_report == " + filePathMap.get("business_report"));
-        System.out.println("business_regist == " + filePathMap.get("business_regist"));
-        System.out.println("kitchen_drawing == " + filePathMap.get("kitchen_drawing"));
-        System.out.println("nutritionist_room_img == " + filePathMap.get("nutritionist_room_img"));
-        System.out.println("chef_lounge_img == " + filePathMap.get("chef_lounge_img"));
-        System.out.println("meal_service_contract == " + filePathMap.get("meal_service_contract"));
+		return new Gson().toJson(resultList);
+	}
 
-        accountService.insertOrUpdateFile(filePathMap);
-    	
-    	return filePathMap.toString();
-    }
+	/*
+	 * part : 영업
+	 * method : AccountMemberRecordSave
+	 * comment : 거래처 -> 거래처 상세 저장
+	 */
+	@SuppressWarnings("unchecked")
+	@PostMapping("Account/AccountInfoSave")
+	public String AccountInfoSave(@RequestBody(required = false) Map<String, Object> payload) {
 
-    private String saveFile(String accountId, String type, MultipartFile file) throws IOException {
-        // 프로젝트 루트 대신 static 폴더 경로 사용
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + accountId + "/" + type + "/";
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath); // 폴더 없으면 생성
+		JsonObject obj = new JsonObject();
 
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
+		if (payload == null) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "요청 데이터가 비어 있습니다.");
+			return obj.toString();
+		}
 
-        file.transferTo(filePath.toFile()); // 파일 저장
+		int iResult = 0;
 
-        // 브라우저 접근용 경로 반환
-        return "/image/" + accountId + "/" + type + "/" + uniqueFileName;
-    }
-    
-    private String saveReceiptFile(String saleId, MultipartFile file) throws IOException {
-    	
-    	// 프로젝트 루트 대신 static 폴더 경로 사용
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + "receipt/" + saleId + "/";
-        
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath); // 폴더 없으면 생성
+		Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
+		Map<String, Object> payloadMap = new HashMap<>();
 
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
+		if (formData != null) {
+			payloadMap.putAll(formData);
+			// 거래처 기본정보 저장
+			iResult += accountService.AccountSave(formData);
+		}
 
-        file.transferTo(filePath.toFile()); // 파일 저장
-        
-        // 브라우저 접근용 경로 반환
-        return "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineBalanceList
-     * comment 	: 회계 -> 매출마감/미수잔액 조회
-     */
-    @GetMapping("Account/AccountDeadlineBalanceList")
-    public String AccountDeadlineBalanceList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountDeadlineBalanceList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineBalanceList
-     * comment 	: 회계 -> 매출마감/미수잔액 입금내역 조회
-     */
-    @GetMapping("Account/AccountDepositHistoryList")
-    public String AccountDepositHistoryList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountDepositHistoryList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineBalanceSave
-     * comment 	: 회계 -> 매출마감/미수잔액 저장
-     */
-    @PostMapping("Account/AccountDeadlineBalanceSave")
-    private String AccountDeadlineBalanceSave(@RequestBody Map<String, Object> paramMap) {
-        
-    	// 월의 총 일수 구함.
-    	LocalDate today = LocalDate.now();
-        int lastDay = today.lengthOfMonth(); // 이 달의 마지막 일자 (28,29,30,31 중 하나)
-    	
-        int iResult = 0;
-        
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) paramMap.get("rows");
-        
-        if (rows == null || rows.isEmpty()) {
-            JsonObject obj = new JsonObject();
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "데이터(rows)가 누락되었거나 비어있습니다.");
-            return obj.toString();
-        }
+		List<Map<String, Object>> priceData = (List<Map<String, Object>>) payload.get("priceData");
+		List<Map<String, Object>> etcData = (List<Map<String, Object>>) payload.get("etcData");
+		List<Map<String, Object>> managerData = (List<Map<String, Object>>) payload.get("managerData");
+		List<Map<String, Object>> eventData = (List<Map<String, Object>>) payload.get("eventData");
 
-        for (Map<String, Object> param : rows) {
-        	// accountDataMap을 사용하여 로직 처리
-            if(param.get("balance_price") != null || param.get("before_price") != null) {
-                Map<String, Object> balanceMap = new HashMap<String, Object>();
-                Map<String, Object> profitMap = new HashMap<String, Object>();
-                balanceMap.put("balance_price", param.get("balance_price"));
-                balanceMap.put("before_price", param.get("before_price"));
-                balanceMap.put("account_id", param.get("account_id")); // account_id 정상 추출!
-                
-                // 총 미수잔액 저장
-                iResult += accountService.AccountBalancePriceSave(balanceMap);
-                iResult += accountService.processProfitLoss(param);
-                
-                if (iResult > 0 ) {
-                	// 한결일 때..
-                	if (param.get("account_id").toString().equals("20250819193455")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122065002");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250819193455");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-                	// 주간보호 업장 금액 세팅
-                    if (param.get("account_id").toString().equals("20260122065002")) {	// 한결주간보호는 한결.
-                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20250819193455");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                    }
-                    // 어르신사랑일 때..
-                	if (param.get("account_id").toString().equals("20250819193504")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122071337");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250819193504");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-                    if (param.get("account_id").toString().equals("20260122071337")) {	// 어르신사랑주간보호는 어르신사랑.
-                    	profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20250819193504");      
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity2 = 0;
-                    	iIntegrity2 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity2);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-    				}
-                    // 청평설악일 때..
-                	if (param.get("account_id").toString().equals("20250819193603")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122071857");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250819193603");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-    				if (param.get("account_id").toString().equals("20260122071857")) {	// 청평설악 주간보호는 청평설악.
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-    					profitMap.put("account_id", "20250819193603");   
-    					profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-    					
-                    	int iIntegrity3 = 0;
-                    	iIntegrity3 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity3);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-    				}
-    				// 늘사랑(부천)일 때..
-                	if (param.get("account_id").toString().equals("20250919162439")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122072114");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250919162439");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-    				if (param.get("account_id").toString().equals("20260122072114")) {	// 늘사랑(부천) 주간보호는 늘사랑부천.
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-    					
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-    					profitMap.put("account_id", "20250919162439");
-    					profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-    					
-                    	int iIntegrity4 = 0;
-                    	iIntegrity4 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity4);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-    				}
-    				// 지안일 때..
-                	if (param.get("account_id").toString().equals("20250819193620")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122072245");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250819193620");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-    				if (param.get("account_id").toString().equals("20260122072245")) {	// 지안 주간보호는 지안.
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-    					profitMap.put("account_id", "20250819193620");
-    					profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity5 = 0;
-                    	iIntegrity5 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity5);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-    				}
-    				// 사랑의일 때..
-                	if (param.get("account_id").toString().equals("20250819193632")) {
-                		Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-                    	profitMap.put("account_id", "20260122072732");
-                    	profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-                    	
-                    	int iIntegrity1 = 0;
-                    	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("account_id", "20250819193632");
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-                	}
-    				if (param.get("account_id").toString().equals("20260122072732")) {	// 사랑의 주간보호는 사랑의.
-    					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                    	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                    	
-                    	Object objIntegrity = 0;
-                    	int iIntegrity = 0;
-                    	objIntegrity = param.getOrDefault("integrity_cost",0);
-                    	iIntegrity = (int)objIntegrity;
-                    	
-    					profitMap.put("account_id", "20250819193632");
-    					profitMap.put("year", param.get("year"));
-                    	profitMap.put("month", param.get("month"));
-    					
-                    	int iIntegrity6 = 0;
-                    	iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                    	
-                    	profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
-                    	
-                    	iResult += accountService.processProfitLossV3(profitMap);
-    				}
-                }
-                // 사랑복지일 때..
-            	if (param.get("account_id").toString().equals("20250819193615")) {
-            		Object objIntegrity = 0;
-                	int iIntegrity = 0;
-                	objIntegrity = param.getOrDefault("integrity_cost",0);
-                	iIntegrity = (int)objIntegrity;
-                	
-                	profitMap.put("account_id", "20260219024021");
-                	profitMap.put("year", param.get("year"));
-                	profitMap.put("month", param.get("month"));
-                	
-                	int iIntegrity1 = 0;
-                	iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                	
-                	profitMap.put("account_id", "20250819193615");
-                	profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
-                	
-                	iResult += accountService.processProfitLossV3(profitMap);
-            	}
-				if (param.get("account_id").toString().equals("20260219024021")) {	// 사랑복지센터는 사랑복지요양원.
-					profitMap.put("daycare_cost", param.getOrDefault("basic_cost",0));
-                	profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost",0));
-                	
-                	Object objIntegrity = 0;
-                	int iIntegrity = 0;
-                	objIntegrity = param.getOrDefault("integrity_cost",0);
-                	iIntegrity = (int)objIntegrity;
-                	
+		if (etcData != null) {
+			for (Map<String, Object> row : etcData) {
+				if (row != null)
+					payloadMap.putAll(row);
+			}
+		}
+
+		if (eventData != null) {
+			for (Map<String, Object> row : eventData) {
+				if (row != null)
+					payloadMap.putAll(row);
+			}
+		}
+
+		if (managerData != null) {
+			for (Map<String, Object> row : managerData) {
+				if (row != null)
+					payloadMap.putAll(row);
+			}
+		}
+
+		if (priceData != null) {
+			for (Map<String, Object> row : priceData) {
+				if (row != null) {
+					payloadMap.putAll(row);
+
+					Object priceObj = row.get("diet_price");
+					int dietPrice = 0;
+
+					if (priceObj != null && !priceObj.toString().isEmpty()) {
+						dietPrice = Integer.parseInt(priceObj.toString());
+					}
+
+					Object beforePriceObj = row.get("before_diet_price");
+					int beforeDietPrice = 0;
+
+					if (beforePriceObj != null && !beforePriceObj.toString().isEmpty()) {
+						beforeDietPrice = Integer.parseInt(beforePriceObj.toString());
+					}
+
+					List<Map<String, Object>> resultList = new ArrayList<>();
+					resultList = accountService.AccountDietPriceHistoryList(payloadMap);
+
+					for (Map<String, Object> dietRow : resultList) {
+
+						Object dietPriceObj = dietRow.get("diet_price");
+						int dietPrice2 = 0;
+
+						if (dietPriceObj != null && !dietPriceObj.toString().isEmpty()) {
+							dietPrice2 = Integer.parseInt(dietPriceObj.toString());
+						}
+
+						// 식단가와 내역의 식단가가 다르면 저장.
+						if (dietPrice != dietPrice2) {
+							iResult += accountService.AccountDietPriceHistorySave(payloadMap);
+						}
+					}
+				}
+			}
+		}
+
+		iResult += accountService.AccountInfoSave(payloadMap);
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 영업
+	 * method : AccountBusinessImgList
+	 * comment : 거래처 -> 거래처 상세 이미지 조회
+	 */
+	@GetMapping("Account/AccountBusinessImgList")
+	public String AccountBusinessImgList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountBusinessImgList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	@PostMapping("Account/AccountBusinessImgUpload")
+	public String uploadFiles(
+			@RequestParam("account_id") String accountId,
+			@RequestParam(value = "business_report", required = false) MultipartFile businessReport,
+			@RequestParam(value = "business_regist", required = false) MultipartFile businessRegist,
+			@RequestParam(value = "kitchen_drawing", required = false) MultipartFile kitchenDrawing,
+			@RequestParam(value = "nutritionist_room_img", required = false) MultipartFile nutritionistRoomImg,
+			@RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg,
+			@RequestParam(value = "meal_service_contract", required = false) MultipartFile meal_service_contract)
+			throws IOException {
+		Map<String, Object> filePathMap = new HashMap<>();
+
+		if (businessReport != null && !businessReport.isEmpty()) {
+			String path = saveFile(accountId, "business_report", businessReport);
+			filePathMap.put("business_report", path);
+		}
+
+		if (businessRegist != null && !businessRegist.isEmpty()) {
+			String path = saveFile(accountId, "business_regist", businessRegist);
+			filePathMap.put("business_regist", path);
+		}
+
+		if (kitchenDrawing != null && !kitchenDrawing.isEmpty()) {
+			String path = saveFile(accountId, "kitchen_drawing", kitchenDrawing);
+			filePathMap.put("kitchen_drawing", path);
+		}
+
+		if (nutritionistRoomImg != null && !nutritionistRoomImg.isEmpty()) {
+			String path = saveFile(accountId, "nutritionist_room_img", nutritionistRoomImg);
+			filePathMap.put("nutritionist_room_img", path);
+		}
+
+		if (chefLoungeImg != null && !chefLoungeImg.isEmpty()) {
+			String path = saveFile(accountId, "chef_lounge_img", chefLoungeImg);
+			filePathMap.put("chef_lounge_img", path);
+		}
+
+		if (meal_service_contract != null && !meal_service_contract.isEmpty()) {
+			String path = saveFile(accountId, "meal_service_contract", meal_service_contract);
+			filePathMap.put("meal_service_contract", path);
+		}
+
+		filePathMap.put("account_id", accountId);
+
+		System.out.println("account_id == " + filePathMap.get("account_id"));
+		System.out.println("business_report == " + filePathMap.get("business_report"));
+		System.out.println("business_regist == " + filePathMap.get("business_regist"));
+		System.out.println("kitchen_drawing == " + filePathMap.get("kitchen_drawing"));
+		System.out.println("nutritionist_room_img == " + filePathMap.get("nutritionist_room_img"));
+		System.out.println("chef_lounge_img == " + filePathMap.get("chef_lounge_img"));
+		System.out.println("meal_service_contract == " + filePathMap.get("meal_service_contract"));
+
+		accountService.insertOrUpdateFile(filePathMap);
+
+		return filePathMap.toString();
+	}
+
+	private String saveFile(String accountId, String type, MultipartFile file) throws IOException {
+		// 프로젝트 루트 대신 static 폴더 경로 사용
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		String basePath = staticPath + "/" + accountId + "/" + type + "/";
+		Path dirPath = Paths.get(basePath);
+		Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+		String originalFileName = file.getOriginalFilename();
+		String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+		Path filePath = dirPath.resolve(uniqueFileName);
+
+		file.transferTo(filePath.toFile()); // 파일 저장
+
+		// 브라우저 접근용 경로 반환
+		return "/image/" + accountId + "/" + type + "/" + uniqueFileName;
+	}
+
+	private String saveReceiptFile(String saleId, MultipartFile file) throws IOException {
+
+		// 프로젝트 루트 대신 static 폴더 경로 사용
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		String basePath = staticPath + "/" + "receipt/" + saleId + "/";
+
+		Path dirPath = Paths.get(basePath);
+		Files.createDirectories(dirPath); // 폴더 없으면 생성
+
+		String originalFileName = file.getOriginalFilename();
+		String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+		Path filePath = dirPath.resolve(uniqueFileName);
+
+		file.transferTo(filePath.toFile()); // 파일 저장
+
+		// 브라우저 접근용 경로 반환
+		return "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineBalanceList
+	 * comment : 회계 -> 매출마감/미수잔액 조회
+	 */
+	@GetMapping("Account/AccountDeadlineBalanceList")
+	public String AccountDeadlineBalanceList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDeadlineBalanceList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineBalanceList
+	 * comment : 회계 -> 매출마감/미수잔액 입금내역 조회
+	 */
+	@GetMapping("Account/AccountDepositHistoryList")
+	public String AccountDepositHistoryList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDepositHistoryList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineBalanceSave
+	 * comment : 회계 -> 매출마감/미수잔액 저장
+	 */
+	@PostMapping("Account/AccountDeadlineBalanceSave")
+	private String AccountDeadlineBalanceSave(@RequestBody Map<String, Object> paramMap) {
+
+		// 월의 총 일수 구함.
+		LocalDate today = LocalDate.now();
+		int lastDay = today.lengthOfMonth(); // 이 달의 마지막 일자 (28,29,30,31 중 하나)
+
+		int iResult = 0;
+
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> rows = (List<Map<String, Object>>) paramMap.get("rows");
+
+		if (rows == null || rows.isEmpty()) {
+			JsonObject obj = new JsonObject();
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "데이터(rows)가 누락되었거나 비어있습니다.");
+			return obj.toString();
+		}
+
+		for (Map<String, Object> param : rows) {
+			// accountDataMap을 사용하여 로직 처리
+			if (param.get("balance_price") != null || param.get("before_price") != null) {
+				Map<String, Object> balanceMap = new HashMap<String, Object>();
+				Map<String, Object> profitMap = new HashMap<String, Object>();
+				balanceMap.put("balance_price", param.get("balance_price"));
+				balanceMap.put("before_price", param.get("before_price"));
+				balanceMap.put("account_id", param.get("account_id")); // account_id 정상 추출!
+
+				// 총 미수잔액 저장
+				iResult += accountService.AccountBalancePriceSave(balanceMap);
+				iResult += accountService.processProfitLoss(param);
+
+				if (iResult > 0) {
+					// 한결일 때..
+					if (param.get("account_id").toString().equals("20250819193455")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122065002");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250819193455");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 주간보호 업장 금액 세팅
+					if (param.get("account_id").toString().equals("20260122065002")) { // 한결주간보호는 한결.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250819193455");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 어르신사랑일 때..
+					if (param.get("account_id").toString().equals("20250819193504")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122071337");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250819193504");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20260122071337")) { // 어르신사랑주간보호는 어르신사랑.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250819193504");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity2 = 0;
+						iIntegrity2 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity2);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 청평설악일 때..
+					if (param.get("account_id").toString().equals("20250819193603")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122071857");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250819193603");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20260122071857")) { // 청평설악 주간보호는 청평설악.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250819193603");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity3 = 0;
+						iIntegrity3 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity3);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 늘사랑(부천)일 때..
+					if (param.get("account_id").toString().equals("20250919162439")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122072114");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250919162439");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20260122072114")) { // 늘사랑(부천) 주간보호는 늘사랑부천.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250919162439");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity4 = 0;
+						iIntegrity4 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity4);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 지안일 때..
+					if (param.get("account_id").toString().equals("20250819193620")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122072245");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250819193620");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20260122072245")) { // 지안 주간보호는 지안.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250819193620");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity5 = 0;
+						iIntegrity5 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity5);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					// 사랑의일 때..
+					if (param.get("account_id").toString().equals("20250819193632")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260122072732");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20250819193632");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20260122072732")) { // 사랑의 주간보호는 사랑의.
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20250819193632");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity6 = 0;
+						iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+				}
+				// 사랑복지일 때..
+				if (param.get("account_id").toString().equals("20250819193615")) {
+					Object objIntegrity = 0;
+					int iIntegrity = 0;
+					objIntegrity = param.getOrDefault("integrity_cost", 0);
+					iIntegrity = (int) objIntegrity;
+
+					profitMap.put("account_id", "20260219024021");
+					profitMap.put("year", param.get("year"));
+					profitMap.put("month", param.get("month"));
+
+					int iIntegrity1 = 0;
+					iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+					profitMap.put("account_id", "20250819193615");
+					profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+					iResult += accountService.processProfitLossV3(profitMap);
+				}
+				if (param.get("account_id").toString().equals("20260219024021")) { // 사랑복지센터는 사랑복지요양원.
+					profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+					profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+					Object objIntegrity = 0;
+					int iIntegrity = 0;
+					objIntegrity = param.getOrDefault("integrity_cost", 0);
+					iIntegrity = (int) objIntegrity;
+
 					profitMap.put("account_id", "20250819193615");
 					profitMap.put("year", param.get("year"));
-                	profitMap.put("month", param.get("month"));
-					
-                	int iIntegrity6 = 0;
-                	iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
-                	
-                	profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
-                	
-                	iResult += accountService.processProfitLossV3(profitMap);
+					profitMap.put("month", param.get("month"));
+
+					int iIntegrity6 = 0;
+					iIntegrity6 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+					profitMap.put("integrity_cost", iIntegrity + iIntegrity6);
+
+					iResult += accountService.processProfitLossV3(profitMap);
 				}
-				
-				if (param.get("account_id").toString().equals("20260122072529")) {	// 인천강남일 때, 강남의 일반,직원,생계 각각 2로 세팅.
-					profitMap.put("basic_cost2", param.getOrDefault("basic_cost",0));
-                	profitMap.put("employ_cost2", param.getOrDefault("employ_cost",0));
-                	profitMap.put("living_cost2", param.getOrDefault("living_cost",0));
-                	
+
+				if (param.get("account_id").toString().equals("20260122072529")) { // 인천강남일 때, 강남의 일반,직원,생계 각각 2로 세팅.
+					profitMap.put("basic_cost2", param.getOrDefault("basic_cost", 0));
+					profitMap.put("employ_cost2", param.getOrDefault("employ_cost", 0));
+					profitMap.put("living_cost2", param.getOrDefault("living_cost", 0));
+
 					profitMap.put("account_id", "20250819193630");
 					profitMap.put("year", param.get("year"));
-                	profitMap.put("month", param.get("month"));
-                	
-                	iResult += accountService.processProfitLossV3(profitMap);
+					profitMap.put("month", param.get("month"));
+
+					iResult += accountService.processProfitLossV3(profitMap);
 				}
-                
-                if (accountService.AccountDepositEmptyUse(param) != 0) {
-                	if (param.get("account_id") != null && param.get("year") != null && param.get("month") != null) {
-        				Map<String, Object> recalcMap = new HashMap<String, Object>();
-        				recalcMap.put("account_id", param.get("account_id"));
-        				recalcMap.put("year", param.get("year"));
-        				recalcMap.put("month", param.get("month"));
-        				iResult += accountService.AccountDepositHistoryRecalc(recalcMap);
-        			}
-                }
-            }
-            
-            
-        }
-        
-        JsonObject obj = new JsonObject();
-        
-        if(iResult > 0) {
-            obj.addProperty("code", 200);
-            obj.addProperty("message", "성공");
-        } else {
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "실패");
-        }
-        
-        return obj.toString();
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountBalancePriceSave
-     * comment 	: 회계 -> 매출마감/미수잔액 총 미수금액 저장
-     */
-    @PostMapping("Account/AccountBalancePriceSave")
-    private String AccountBalancePriceSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-            iResult += accountService.AccountBalancePriceSave(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+
+				if (accountService.AccountDepositEmptyUse(param) != 0) {
+					if (param.get("account_id") != null && param.get("year") != null && param.get("month") != null) {
+						Map<String, Object> recalcMap = new HashMap<String, Object>();
+						recalcMap.put("account_id", param.get("account_id"));
+						recalcMap.put("year", param.get("year"));
+						recalcMap.put("month", param.get("month"));
+						iResult += accountService.AccountDepositHistoryRecalc(recalcMap);
+					}
+				}
+			}
+
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDepositHistorySave
-     * comment 	: 회계 -> 매출마감/미수잔액 입금내역 저장
-     */
-    @PostMapping("Account/AccountDepositHistorySave")
-    private String AccountDepositHistorySave(@RequestBody Map<String, Object> paramMap) {
-    	
-    	int iResult = 0;
-    	
-    	iResult += accountService.AccountDepositHistorySave(paramMap);
-    	iResult += accountService.AccountBalancePriceSave(paramMap);
-    	iResult += accountService.AccountDeadlineMonthBalanceUpdate(paramMap);
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountBalancePriceSave
+	 * comment : 회계 -> 매출마감/미수잔액 총 미수금액 저장
+	 */
+	@PostMapping("Account/AccountBalancePriceSave")
+	private String AccountBalancePriceSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			iResult += accountService.AccountBalancePriceSave(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineDifferencePriceSearch
-     * comment 	: 회계 -> 타입별 차액 조회
-     */
-    @GetMapping("Account/AccountDeadlineDifferencePriceSearch")
-    public String AccountDeadlineDifferencePriceSearch(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountDeadlineDifferencePriceSearch(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineFilesList
-     * comment 	: 회계 -> 마감자료 조회
-     */
-    @GetMapping("Account/AccountDeadlineFilesList")
-    public String AccountDeadlineFilesList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountDeadlineFilesList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountDeadlineFilesSave
-     * comment 	: 회계 -> 마감자료 저장
-     */
-    @PostMapping("Account/AccountDeadlineFilesSave")
-    private String AccountDeadlineFilesSave(@RequestParam("file") MultipartFile file,
-								    	    @RequestParam("account_id") String accountId,
-								    	    @RequestParam("year") String year,
-								    	    @RequestParam("month") String month,
-    										@RequestParam("file_yn") String file_yn) {
-    	
-    	Map<String, Object> paramMap = new HashMap<String, Object>();
-    	
-    	paramMap.put("account_id", accountId);
-    	paramMap.put("year", year);
-    	paramMap.put("month", month);
-    	paramMap.put("file_yn", file_yn);
-    	
-    	try {
-    		paramMap.put("deadline_file", saveFile(file, "deadline", "files", accountId));
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDepositHistorySave
+	 * comment : 회계 -> 매출마감/미수잔액 입금내역 저장
+	 */
+	@PostMapping("Account/AccountDepositHistorySave")
+	private String AccountDepositHistorySave(@RequestBody Map<String, Object> paramMap) {
+
+		int iResult = 0;
+
+		iResult += accountService.AccountDepositHistorySave(paramMap);
+		iResult += accountService.AccountBalancePriceSave(paramMap);
+		iResult += accountService.AccountDeadlineMonthBalanceUpdate(paramMap);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineDifferencePriceSearch
+	 * comment : 회계 -> 타입별 차액 조회
+	 */
+	@GetMapping("Account/AccountDeadlineDifferencePriceSearch")
+	public String AccountDeadlineDifferencePriceSearch(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDeadlineDifferencePriceSearch(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineFilesList
+	 * comment : 회계 -> 마감자료 조회
+	 */
+	@GetMapping("Account/AccountDeadlineFilesList")
+	public String AccountDeadlineFilesList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDeadlineFilesList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDeadlineFilesSave
+	 * comment : 회계 -> 마감자료 저장
+	 */
+	@PostMapping("Account/AccountDeadlineFilesSave")
+	private String AccountDeadlineFilesSave(@RequestParam("file") MultipartFile file,
+			@RequestParam("account_id") String accountId,
+			@RequestParam("year") String year,
+			@RequestParam("month") String month,
+			@RequestParam("file_yn") String file_yn) {
+
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+
+		paramMap.put("account_id", accountId);
+		paramMap.put("year", year);
+		paramMap.put("month", month);
+		paramMap.put("file_yn", file_yn);
+
+		try {
+			paramMap.put("deadline_file", saveFile(file, "deadline", "files", accountId));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-    	
-    	int iResult = 0;
-    	
-    	iResult = accountService.AccountDeadlineFilesSave(paramMap);
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+
+		int iResult = 0;
+
+		iResult = accountService.AccountDeadlineFilesSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * method 	: saveFile
-     * comment 	: 거래처 파일업로드 공통
-     */
-    private String saveFile(MultipartFile file, String type, String gubun, String folder) throws IOException {
-    	
-    	String resultPath = "";
-    	
-        // 프로젝트 루트 대신 static 폴더 경로 사용
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + type + "/" + gubun + "/"+ folder +  "/";
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath); // 폴더 없으면 생성
+		}
 
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
+		return obj.toString();
+	}
 
-        file.transferTo(filePath.toFile()); // 파일 저장
-        
-        // 브라우저 접근용 경로 반환
-        resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
-        
-        return resultPath;
-    }
-    
-    @DeleteMapping("Account/AccountDeadlineFilesDelete")
-    public String deleteDeadlineFile(@RequestParam("account_id") String accountId,
-						             @RequestParam("year") String year,
-						             @RequestParam("month") String month,
-						             @RequestParam("filePath") String filePath,
-						             @RequestParam("file_yn") String file_yn) {
-        JsonObject obj = new JsonObject();
-        try {
-            // ✅ 삭제할 파일 경로 구성
-            Path filePath2 = Paths.get(uploadDir + filePath);
-            File file = filePath2.toFile();
+	/*
+	 * method : saveFile
+	 * comment : 거래처 파일업로드 공통
+	 */
+	private String saveFile(MultipartFile file, String type, String gubun, String folder) throws IOException {
 
-            if (!file.exists()) {
-                obj.addProperty("code", 404);
-                obj.addProperty("message", "파일이 존재하지 않습니다: " + filePath2);
-                return obj.toString();
-            }
+		String resultPath = "";
 
-            boolean deleted = file.delete();
-            
-            Map<String, Object> paramMap = new HashMap<String, Object>();
-        	
-        	paramMap.put("account_id", accountId);
-        	paramMap.put("year", year);
-        	paramMap.put("month", month);
-        	paramMap.put("file_yn", file_yn);
-        	paramMap.put("deadline_file", null);
-        	
-        	int iResult = 0;
-        	
-        	iResult = accountService.AccountDeadlineFilesSave(paramMap);
+		// 프로젝트 루트 대신 static 폴더 경로 사용
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		String basePath = staticPath + "/" + type + "/" + gubun + "/" + folder + "/";
+		Path dirPath = Paths.get(basePath);
+		Files.createDirectories(dirPath); // 폴더 없으면 생성
 
-            if (deleted && iResult > 0) {
-                obj.addProperty("code", 200);
-                obj.addProperty("message", "파일 삭제 성공");
-            } else {
-                obj.addProperty("code", 500);
-                obj.addProperty("message", "파일 삭제 실패 (삭제 권한 또는 잠금 확인)");
-            }
+		String originalFileName = file.getOriginalFilename();
+		String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
+		Path filePath = dirPath.resolve(uniqueFileName);
 
-        } catch (Exception e) {
-            obj.addProperty("code", 500);
-            obj.addProperty("message", "서버 오류: " + e.getMessage());
-        }
+		file.transferTo(filePath.toFile()); // 파일 저장
 
-        return obj.toString();
-    }
-    
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseSave
-     * comment 	: 회계 -> 매입마감 저장
-     */
-    @PostMapping("Account/AccountPurchaseSave")
-    private String AccountPurchaseSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-    		System.out.println(paramMap.get("payType"));
-            iResult += accountService.AccountPurchaseSave(paramMap);
-            // 여러 타입의 날짜형식을 매핑.
-            LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
-            // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-            int year = date.getYear();        // 2026
-            int month = date.getMonthValue(); // 1~12
-            paramMap.put("year", year);
-            paramMap.put("month", month);
-            iResult += accountService.TallySheetPaymentSave(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+		// 브라우저 접근용 경로 반환
+		resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
+
+		return resultPath;
+	}
+
+	@DeleteMapping("Account/AccountDeadlineFilesDelete")
+	public String deleteDeadlineFile(@RequestParam("account_id") String accountId,
+			@RequestParam("year") String year,
+			@RequestParam("month") String month,
+			@RequestParam("filePath") String filePath,
+			@RequestParam("file_yn") String file_yn) {
+		JsonObject obj = new JsonObject();
+		try {
+			// ✅ 삭제할 파일 경로 구성
+			Path filePath2 = Paths.get(uploadDir + filePath);
+			File file = filePath2.toFile();
+
+			if (!file.exists()) {
+				obj.addProperty("code", 404);
+				obj.addProperty("message", "파일이 존재하지 않습니다: " + filePath2);
+				return obj.toString();
+			}
+
+			boolean deleted = file.delete();
+
+			Map<String, Object> paramMap = new HashMap<String, Object>();
+
+			paramMap.put("account_id", accountId);
+			paramMap.put("year", year);
+			paramMap.put("month", month);
+			paramMap.put("file_yn", file_yn);
+			paramMap.put("deadline_file", null);
+
+			int iResult = 0;
+
+			iResult = accountService.AccountDeadlineFilesSave(paramMap);
+
+			if (deleted && iResult > 0) {
+				obj.addProperty("code", 200);
+				obj.addProperty("message", "파일 삭제 성공");
+			} else {
+				obj.addProperty("code", 500);
+				obj.addProperty("message", "파일 삭제 실패 (삭제 권한 또는 잠금 확인)");
+			}
+
+		} catch (Exception e) {
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "서버 오류: " + e.getMessage());
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseSave
+	 * comment : 회계 -> 매입마감 저장
+	 */
+	@PostMapping("Account/AccountPurchaseSave")
+	private String AccountPurchaseSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			System.out.println(paramMap.get("payType"));
+			iResult += accountService.AccountPurchaseSave(paramMap);
+			// 여러 타입의 날짜형식을 매핑.
+			LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
+			// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+			int year = date.getYear(); // 2026
+			int month = date.getMonthValue(); // 1~12
+			paramMap.put("year", year);
+			paramMap.put("month", month);
+			iResult += accountService.TallySheetPaymentSave(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * part		: 현장
-     * method 	: AccountTallyToPurchaseSave
-     * comment 	: 집계표 -> 집계표 수정 시, 매입마감도 반영
-     */
-    @PostMapping(
-      value = "/Account/AccountTallyToPurchaseSave",
-      consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
-      produces = MediaType.APPLICATION_JSON_VALUE
-    )
-    public String AccountTallyToPurchaseSave(
-        @RequestParam Map<String, String> params,
-        @RequestPart(value = "file", required = false) MultipartFile file
-    ) {
-        int iResult = 0;
+		}
 
-        // ✅ String -> Object 맵으로 변환 (서비스에서 Object 기대하면)
-        Map<String, Object> paramMap = new HashMap<>(params);
+		return obj.toString();
+	}
 
-        // ✅ 프론트에서 보내는 필드명에 맞춰 날짜 파싱 (saleDate가 아니라 cell_date)
-        String saleDateStr = String.valueOf(paramMap.get("saleDate"));
-        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
-        	Object cellDate = paramMap.get("cell_date");
-        	if (cellDate != null) saleDateStr = String.valueOf(cellDate);
-        }
-        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
-        	Object cellDate = paramMap.get("cellDate");
-        	if (cellDate != null) saleDateStr = String.valueOf(cellDate);
-        }
-        paramMap.put("saleDate", saleDateStr);
-        if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
-        	saleDateStr = java.time.LocalDate.now().toString();
-        	paramMap.put("saleDate", saleDateStr);
-        }
+	/*
+	 * part : 현장
+	 * method : AccountTallyToPurchaseSave
+	 * comment : 집계표 -> 집계표 수정 시, 매입마감도 반영
+	 */
+	@PostMapping(value = "/Account/AccountTallyToPurchaseSave", consumes = MediaType.MULTIPART_FORM_DATA_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
+	public String AccountTallyToPurchaseSave(
+			@RequestParam Map<String, String> params,
+			@RequestPart(value = "file", required = false) MultipartFile file) {
+		int iResult = 0;
 
+		// ✅ String -> Object 맵으로 변환 (서비스에서 Object 기대하면)
+		Map<String, Object> paramMap = new HashMap<>(params);
 
-        // cash_receipt_type -> cashReceiptType ??
-        if (paramMap.get("cashReceiptType") == null && paramMap.get("cash_receipt_type") != null) {
-        	paramMap.put("cashReceiptType", paramMap.get("cash_receipt_type"));
-        }
+		// ✅ 프론트에서 보내는 필드명에 맞춰 날짜 파싱 (saleDate가 아니라 cell_date)
+		String saleDateStr = String.valueOf(paramMap.get("saleDate"));
+		if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+			Object cellDate = paramMap.get("cell_date");
+			if (cellDate != null)
+				saleDateStr = String.valueOf(cellDate);
+		}
+		if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+			Object cellDate = paramMap.get("cellDate");
+			if (cellDate != null)
+				saleDateStr = String.valueOf(cellDate);
+		}
+		paramMap.put("saleDate", saleDateStr);
+		if (saleDateStr == null || saleDateStr.trim().isEmpty() || "null".equalsIgnoreCase(saleDateStr)) {
+			saleDateStr = java.time.LocalDate.now().toString();
+			paramMap.put("saleDate", saleDateStr);
+		}
 
-        LocalDate date = DateUtils.parseFlexibleDate(saleDateStr);
+		// cash_receipt_type -> cashReceiptType ??
+		if (paramMap.get("cashReceiptType") == null && paramMap.get("cash_receipt_type") != null) {
+			paramMap.put("cashReceiptType", paramMap.get("cash_receipt_type"));
+		}
 
-        int year = date.getYear();
-        int month = date.getMonthValue();
-        paramMap.put("year", year);
-        paramMap.put("month", month);
+		LocalDate date = DateUtils.parseFlexibleDate(saleDateStr);
 
-        // ✅ file 처리 필요하면 paramMap에 담거나 별도 저장 후 경로 넣기
-        if (file != null && !file.isEmpty()) {
-        	try {
+		int year = date.getYear();
+		int month = date.getMonthValue();
+		paramMap.put("year", year);
+		paramMap.put("month", month);
+
+		// ✅ file 처리 필요하면 paramMap에 담거나 별도 저장 후 경로 넣기
+		if (file != null && !file.isEmpty()) {
+			try {
 				String resultPath = saveReceiptFile(paramMap.get("sale_id").toString(), file);
 				paramMap.put("receipt_image", resultPath);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-        }
+		}
 
-        iResult += accountService.AccountPurchaseSave(paramMap);
-        iResult += accountService.TallySheetPaymentSave(paramMap);
+		iResult += accountService.AccountPurchaseSave(paramMap);
+		iResult += accountService.TallySheetPaymentSave(paramMap);
 
-        JsonObject obj = new JsonObject();
-        obj.addProperty("code", iResult > 0 ? 200 : 400);
-        obj.addProperty("message", iResult > 0 ? "성공" : "실패");
-        return obj.toString();
-    }
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", iResult > 0 ? 200 : 400);
+		obj.addProperty("message", iResult > 0 ? "성공" : "실패");
+		return obj.toString();
+	}
 
-    
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseDetailSave
-     * comment 	: 회계 -> 매입집계 저장
-     */
-    @PostMapping("Account/AccountPurchaseDetailSave")
-    private String AccountPurchaseDetailSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-            iResult += accountService.AccountPurchaseDetailSave(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /*
-     * part		: 운영,회계
-     * method 	: AccountIssueList
-     * comment 	: 운영,회계 -> 거래처 이슈 조회
-     */
-    @GetMapping("Account/AccountIssueList")
-    public String AccountDeadlineIssueList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountIssueList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    
-    /*
-     * part		: 운영,회계
-     * method 	: AccountDeadlineIssueSave
-     * comment 	: 운영,회계 -> 거래처 이슈 저장
-     */
-    @PostMapping("Account/AccountIssueSave")
-    private String AccountIssueSave(@RequestBody Map<String, Object> paramMap) {
-    	
-    	// ✅ data 리스트 꺼내기
-        List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
-
-        int iResult = 0;
-        
-        for (Map<String, Object> row : dataList) {
-        	iResult += accountService.AccountIssueSave(row);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
 	/*
-	 * part		: 운영,영업
-	 * method 	: AccountCommunicationMappingList
-	 * comment 	: 운영,영업 -> 구분 조회
+	 * part : 회계
+	 * method : AccountPurchaseDetailSave
+	 * comment : 회계 -> 매입집계 저장
+	 */
+	@PostMapping("Account/AccountPurchaseDetailSave")
+	private String AccountPurchaseDetailSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			iResult += accountService.AccountPurchaseDetailSave(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 운영,회계
+	 * method : AccountIssueList
+	 * comment : 운영,회계 -> 거래처 이슈 조회
+	 */
+	@GetMapping("Account/AccountIssueList")
+	public String AccountDeadlineIssueList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountIssueList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 운영,회계
+	 * method : AccountDeadlineIssueSave
+	 * comment : 운영,회계 -> 거래처 이슈 저장
+	 */
+	@PostMapping("Account/AccountIssueSave")
+	private String AccountIssueSave(@RequestBody Map<String, Object> paramMap) {
+
+		// ✅ data 리스트 꺼내기
+		List<Map<String, Object>> dataList = (List<Map<String, Object>>) paramMap.get("data");
+
+		int iResult = 0;
+
+		for (Map<String, Object> row : dataList) {
+			iResult += accountService.AccountIssueSave(row);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 운영,영업
+	 * method : AccountCommunicationMappingList
+	 * comment : 운영,영업 -> 구분 조회
 	 */
 	@GetMapping("Account/AccountCommunicationMappingList")
 	public String AccountCommunicationMappingList(@RequestParam Map<String, Object> paramMap) {
@@ -1542,11 +1547,11 @@ public class AccountController {
 		resultList = accountService.AccountCommunicationMappingList(paramMap);
 		return new Gson().toJson(resultList);
 	}
-	
+
 	/*
-	 * part		: 운영,영업
-	 * method 	: AccountCommunicationMappingSave
-	 * comment 	: 운영,영업 -> 구분 저장
+	 * part : 운영,영업
+	 * method : AccountCommunicationMappingSave
+	 * comment : 운영,영업 -> 구분 저장
 	 */
 	@PostMapping("Account/AccountCommunicationMappingSave")
 	private String AccountCommunicationMappingSave(@RequestBody Map<String, Object> paramMap) {
@@ -1558,7 +1563,7 @@ public class AccountController {
 			}
 		}
 		JsonObject obj = new JsonObject();
-		if(iResult > 0) {
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
 		} else {
@@ -1567,11 +1572,11 @@ public class AccountController {
 		}
 		return obj.toString();
 	}
-	
+
 	/*
-	 * part		: 운영,영업
-	 * method 	: AccountCommunicationMappingDelete
-	 * comment 	: 운영,영업 -> 구분 삭제
+	 * part : 운영,영업
+	 * method : AccountCommunicationMappingDelete
+	 * comment : 운영,영업 -> 구분 삭제
 	 */
 	@PostMapping("Account/AccountCommunicationMappingDelete")
 	private String AccountCommunicationMappingDelete(@RequestBody Map<String, Object> paramMap) {
@@ -1583,7 +1588,7 @@ public class AccountController {
 			return obj.toString();
 		}
 		int iResult = accountService.AccountCommunicationMappingDelete(paramMap);
-		if(iResult > 0) {
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
 		} else {
@@ -1592,11 +1597,11 @@ public class AccountController {
 		}
 		return obj.toString();
 	}
-	
+
 	/*
-	 * part		: 운영,영업
-	 * method 	: AccountCommunicationList
-	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 조회
+	 * part : 운영,영업
+	 * method : AccountCommunicationList
+	 * comment : 운영,영업 -> 마감이슈, 고객사이슈 조회
 	 */
 	@GetMapping("Account/AccountCommunicationList")
 	public String AccountCommunicationList(@RequestParam Map<String, Object> paramMap) {
@@ -1604,11 +1609,11 @@ public class AccountController {
 		resultList = accountService.AccountCommunicationList(paramMap);
 		return new Gson().toJson(resultList);
 	}
-	
+
 	/*
-	 * part		: 운영,영업 
-	 * method 	: AccountCommunicationSave
-	 * comment 	: 운영,영업 -> 마감이슈, 고객사이슈 저장
+	 * part : 운영,영업
+	 * method : AccountCommunicationSave
+	 * comment : 운영,영업 -> 마감이슈, 고객사이슈 저장
 	 */
 	@PostMapping("Account/AccountCommunicationSave")
 	private String AccountCommunicationSave(@RequestBody Map<String, Object> paramMap) {
@@ -1626,7 +1631,7 @@ public class AccountController {
 			}
 		}
 		JsonObject obj = new JsonObject();
-		if(iResult > 0) {
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
 		} else {
@@ -1637,583 +1642,608 @@ public class AccountController {
 	}
 
 	public double roundHalfUpToFirstDecimalSafe(double value) {
-        // 1. double 값을 BigDecimal로 변환
-        BigDecimal bd = new BigDecimal(String.valueOf(value));
-        
-        // 2. 소수점 1자리까지 반올림 (HALF_UP 모드)
-        bd = bd.setScale(1, RoundingMode.HALF_UP);
-        
-        // 3. 다시 double로 변환하여 반환
-        return bd.doubleValue();
-    }
-    /*
-     * part		: 현장
-     * method 	: AccountMappingList
-     * comment 	: 현장 -> 집계표 -> 영수증 매장 확인 조회
-     */
+		// 1. double 값을 BigDecimal로 변환
+		BigDecimal bd = new BigDecimal(String.valueOf(value));
+
+		// 2. 소수점 1자리까지 반올림 (HALF_UP 모드)
+		bd = bd.setScale(1, RoundingMode.HALF_UP);
+
+		// 3. 다시 double로 변환하여 반환
+		return bd.doubleValue();
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountMappingList
+	 * comment : 현장 -> 집계표 -> 영수증 매장 확인 조회
+	 */
 	@GetMapping("Account/AccountMappingList")
-    public List<Map<String, Object>> AccountMappingList(String account_id) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = accountService.AccountMappingList(account_id);
-    	
-    	return resultList;
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyList
-     * comment 	: 회계 -> 매입 -> 매입마감 조회
-     */
-    @GetMapping("Account/AccountPurchaseTallyList")
-    public String AccountPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPurchaseTallyList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyList
-     * comment 	: 회계 -> 매입 -> 매입집계 조회
-     */
-    @GetMapping("Account/AccountPurchaseDetailList")
-    public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPurchaseDetailList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyList_tmp
-     * comment 	: 회계 -> 매입 -> 매입집계(임시) 조회
-     */
-    @GetMapping("Account/AccountPurchaseDetailList_tmp")
-    public String AccountPurchaseTallyList_tmp(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPurchaseDetailList_tmp(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPersonPurchaseTallyList
-     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 조회
-     */
-    @GetMapping("Account/AccountPersonPurchaseTallyList")
-    public String AccountPersonPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPersonPurchaseTallyList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyList_tmp
-     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 상세 조회
-     */
-    @GetMapping("Account/AccountPersonPurchaseDetailList")
-    public String AccountPersonPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPersonPurchaseDetailList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardPaymentAllSave
-     * comment 	: 회계 -> 개인구매 관리 -> 개인구매 저장
-     */
-    @PostMapping("Account/AccountPersonPurchasePaymentAllSave")
-    private String AccountPersonPurchasePaymentAllSave(@RequestBody Map<String, Object> paramMap) {
-    	
-    	// 1. 'main' 리스트 추출
-        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
-        
-        // 2. 'item' 리스트 추출
-        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
-    	
-        int iResult = 0;
-        
-    	if (mainList != null) {
-    		for (Map<String, Object> mainMap : mainList) {
-    			
-    			if (mainMap.get("sale_id").toString().isEmpty()) {
-    				
-    				String saleId = "";
-    				
-    				LocalDate date = LocalDate.now();
-                    LocalTime nowTime = LocalTime.now(); // 시:분:초
-                    LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+	public List<Map<String, Object>> AccountMappingList(String account_id) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountMappingList(account_id);
 
-                    // 원하는 형식으로 출력 (예: 20251009152744)
-                    saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-                    
-                    mainMap.put("sale_id", saleId);
-    			}
-    			
-        		iResult += accountService.AccountPurchaseSave(mainMap);
-                
-        		String saleDate = mainMap.get("saleDate").toString();
-        		Object objOrgSaleDate = mainMap.get("orgSaleDate");
-        		
-     			LocalDate date;
-     			int year = 0;
-     			int month = 0;
-     			int day = 0;
-        		// 여러 타입의 날짜형식을 매핑.
-        		if (objOrgSaleDate != null) {
-        			
-        			String orgSaleDate = mainMap.get("orgSaleDate").toString();
-        			
-        			if (!saleDate.equals(orgSaleDate)) {
-	        			date = DateUtils.parseFlexibleDate(mainMap.get("orgSaleDate").toString());
-	        			year = date.getYear();        // 2026
-	                    month = date.getMonthValue(); // 1~12
-	                    day = date.getDayOfMonth();
-	                    
-	                    // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-	                    mainMap.put("year", year);
-	                    mainMap.put("month", month);
-	                    mainMap.put("day", day);
-	                    
-	                    iResult += accountService.TallySheetPaymentDelete(mainMap);
-        			}
-        		} else {
-        			date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
-        			year = date.getYear();        // 2026
-                    month = date.getMonthValue(); // 1~12
-                    // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-                    mainMap.put("year", year);
-                    mainMap.put("month", month);
-        		}
-        		
-        		iResult += accountService.TallySheetPaymentSave(mainMap);
-            }
-    	}
-    	if (itemList != null) {
-    		for (Map<String, Object> itemMap : itemList) {
-        		iResult += accountService.AccountPurchaseDetailSave(itemMap);
-            }
-    	}
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 현장
-     * method 	: AccountPurchaseTallyPaymentList
-     * comment 	: 집계표 -> 결제 리스트 조회
-     */
-    @GetMapping("Account/AccountPurchaseTallyPaymentList")
-    public String AccountPurchaseTallyPaymentList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPurchaseTallyPaymentList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: HeadOfficeCorporateCardList
-     * comment 	: 회계 -> 본사 법인카드 목록 조회
-     */
-    @GetMapping("Account/HeadOfficeCorporateCardList")
-    public String HeadOfficeCorporateCardList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.HeadOfficeCorporateCardList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: HeadOfficeCorporateCardPaymentList
-     * comment 	: 회계 -> 본사 법인카드 결제내역 조회
-     */
-    @GetMapping("Account/HeadOfficeCorporateCardPaymentList")
-    public String HeadOfficeCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	System.out.println(paramMap);
-    	resultList = accountService.HeadOfficeCorporateCardPaymentList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: HeadOfficeCorporateCardPaymentDetailList
-     * comment 	: 회계 -> 본사 법인카드 결제 상세내역 조회
-     */
-    @GetMapping("Account/HeadOfficeCorporateCardPaymentDetailList")
-    public String HeadOfficeCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.HeadOfficeCorporateCardPaymentDetailList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: HeadOfficeCorporateCardSave
-     * comment 	: 회계 -> 본사 법인카드 저장
-     */
-    @PostMapping("Account/HeadOfficeCorporateCardSave")
-    private String HeadOfficeCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-    		iResult += accountService.HeadOfficeCorporateCardSave(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 회계
-     * method 	: HeadOfficeCorporateCardPaymentAllSave
-     * comment 	: 회계 -> 본사 법인카드 결제내역 전체 저장
-     */
-    @PostMapping("Account/HeadOfficeCorporateCardPaymentAllSave")
-    private String HeadOfficeCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
-    	
-    	// 1. 'main' 리스트 추출
-        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
-        
-        // 2. 'item' 리스트 추출
-        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
-    	
-        int iResult = 0;
-        
-    	if (mainList != null) {
-    		for (Map<String, Object> mainMap : mainList) {
-        		iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
-        		
-        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-        		String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+		return resultList;
+	}
 
-        		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
-        		int year = payDate.getYear();        // 2026
-        		int month = payDate.getMonthValue(); // 1~12
-        		
-        		mainMap.put("year", year);
-        		mainMap.put("month", month);
-        		
-        		// 집계표도 다시 적용.
-        		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(mainMap);
-            }
-    	}
-    	if (itemList != null) {
-    		for (Map<String, Object> itemMap : itemList) {
-        		iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
-        		
-        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-        		String paymentDate = String.valueOf(itemMap.get("payment_dt")); // "2026-01-01"
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyList
+	 * comment : 회계 -> 매입 -> 매입마감 조회
+	 */
+	@GetMapping("Account/AccountPurchaseTallyList")
+	public String AccountPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
 
-        		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
-        		int year = payDate.getYear();        // 2026
-        		int month = payDate.getMonthValue(); // 1~12
-        		
-        		itemMap.put("year", year);
-        		itemMap.put("month", month);
-        		
-        		// 집계표도 다시 적용.
-        		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
-            }
-    	}
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardList
-     * comment 	: 회계 -> 현장 법인카드 목록 조회
-     */
-    @GetMapping("Account/AccountCorporateCardList")
-    public String AccountCorporateCardList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountCorporateCardList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardPaymentList
-     * comment 	: 회계 -> 현장 법인카드 결제내역 조회
-     */
-    @GetMapping("Account/AccountCorporateCardPaymentList")
-    public String AccountCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountCorporateCardPaymentList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardPaymentDetailList
-     * comment 	: 회계 -> 현장 법인카드 결제 상세내역 조회
-     */
-    @GetMapping("Account/AccountCorporateCardPaymentDetailList")
-    public String AccountCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountCorporateCardPaymentDetailList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardSave
-     * comment 	: 현장 -> 현장 법인카드 저장
-     */
-    @PostMapping("Account/AccountCorporateCardSave")
-    private String AccountCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-    		iResult += accountService.AccountCorporateCardSave(paramMap);
-    		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountCorporateCardPaymentAllSave
-     * comment 	: 회계 -> 현장 법인카드 결제내역 전체 저장
-     */
-    @PostMapping("Account/AccountCorporateCardPaymentAllSave")
-    private String AccountCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
-    	
-    	// 1. 'main' 리스트 추출
-        List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
-        
-        // 2. 'item' 리스트 추출
-        List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
-    	
-        int iResult = 0;
-        
-    	if (mainList != null) {
-    		for (Map<String, Object> mainMap : mainList) {
-        		iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
+		resultList = accountService.AccountPurchaseTallyList(paramMap);
 
-        		// 손익표, 예산 프로시저용 연/월 계산 전에 입력값을 정규화한다.
-        		// idx가 ""이면 NULL로, 금액 필드는 비어있으면 0으로, 결제일이 없으면 오늘 날짜로 보정.
-        		Object idxVal = mainMap.get("idx");
-        		if (idxVal != null && String.valueOf(idxVal).trim().isEmpty()) mainMap.put("idx", null);
-        		String[] numKeys = {"total", "vat", "taxFree", "tax", "totalCard"};
-        		for (String k : numKeys) {
-        			Object v = mainMap.get(k);
-        			if (v == null || String.valueOf(v).trim().isEmpty()) mainMap.put(k, 0);
-        		}
-        		String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
-        		if (paymentDate == null || paymentDate.trim().isEmpty() || "null".equalsIgnoreCase(paymentDate)) {
-        			paymentDate = java.time.LocalDate.now().toString();
-        			mainMap.put("payment_dt", paymentDate);
-        		}
+		return new Gson().toJson(resultList);
+	}
 
-        		// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-        		LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
-        		int year = payDate.getYear();        // 2026
-        		int month = payDate.getMonthValue(); // 1~12
-        		
-        		mainMap.put("year", year);
-        		mainMap.put("month", month);
-        		
-        		// 집계표도 다시 적용.
-        		iResult += accountService.TallySheetCorporateCardPaymentSave(mainMap);
-            }
-    	}
-    	if (itemList != null) {
-    		for (Map<String, Object> itemMap : itemList) {
-        		iResult += accountService.AccountCorporateCardPaymentDetailLSave(itemMap);
-            }
-    	}
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 인사
-     * method 	: AccountMemberDispatchMappingSave
-     * comment 	: 현장관리 -> 현장 직원관리 -> 직원파출 매핑정보 저장
-     */
-    @PostMapping("Account/AccountMemberDispatchMappingSave")
-    private String AccountMemberDispatchMappingSave(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-    		String del_yn = String.valueOf(paramMap.getOrDefault("del_yn", "N")).toUpperCase();
-    		paramMap.put("del_yn", del_yn);
-    		
-    		iResult += accountService.AccountMemberDispatchMappingSave(paramMap);
-    		
-    		// 삭제 처리(del_yn=Y)는 매핑 테이블만 반영하고 근무기록 저장은 수행하지 않음
-    		if (!"Y".equals(del_yn) && paramMap.get("dispatch_account_id") != null) {
-    			paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
-    			iResult += accountService.AccountMemberRecordSave(paramMap);
-    		}
-    }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    /*
-     * part		: 인사
-     * method 	: AccountMemberDispatchMappingList
-     * comment 	: 인사 -> 직원파출 매핑 조회
-     */
-    @GetMapping("Account/AccountMemberDispatchMappingList")
-    public String AccountMemberDispatchMappingList(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountMemberDispatchMappingList(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyV2List
-     * comment 	: 회계 -> 매입(본사용) 조회
-     */
-    @GetMapping("Account/AccountPurchaseTallyV2List")
-    public String AccountPurchaseTallyV2List(@RequestParam Map<String, Object> paramMap) {
-    	List<Map<String, Object>> resultList = new ArrayList<>();
-    	
-    	resultList = accountService.AccountPurchaseTallyV2List(paramMap);
-    	
-    	return new Gson().toJson(resultList);
-    }
-    /*
-     * part		: 회계
-     * method 	: AccountPurchaseTallyV2Save
-     * comment 	: 회계 -> 매입(본사용) 저장
-     */
-    @PostMapping("Account/AccountPurchaseTallyV2Save")
-    private String AccountPurchaseTallyV2Save(@RequestBody List<Map<String, Object>> paramList) {
-    	
-    	int iResult = 0;
-    	
-    	for (Map<String, Object> paramMap : paramList) {
-    		
-    		Object saleIdObj = paramMap.get("sale_id");
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyList
+	 * comment : 회계 -> 매입 -> 매입집계 조회
+	 */
+	@GetMapping("Account/AccountPurchaseDetailList")
+	public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
 
-    	    // null이거나 문자열로 변환했을 때 비어있다면 생성
-    	    if (saleIdObj == null || saleIdObj.toString().trim().isEmpty()) {
-    	    	
-    			// 원하는 형식으로 출력 (예: 20251009152744)
-            	LocalDate date = LocalDate.now();
-                LocalTime nowTime = LocalTime.now(); // 시:분:초
-                LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
-                
-                // 원하는 형식으로 출력 (예: 20251009152744)
-                String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-                
-        		paramMap.put("sale_id", saleId);
-    		}
-    		
-    		iResult += accountService.AccountPurchaseTallyV2Save(paramMap);
-        }
-    	
-    	JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
-    }
-    
-    /* 
-	 * part		: 회계
-     * method 	: AccountPurchaseTallyV2Delete
-     * comment 	: 매입집계 삭제
-     */
-    @PostMapping("Account/AccountPurchaseTallyV2Delete")
-	public String AccountPurchaseTallyV2Delete(@RequestBody Map<String, Object> paramMap) {
-		
+		resultList = accountService.AccountPurchaseDetailList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyList_tmp
+	 * comment : 회계 -> 매입 -> 매입집계(임시) 조회
+	 */
+	@GetMapping("Account/AccountPurchaseDetailList_tmp")
+	public String AccountPurchaseTallyList_tmp(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPurchaseDetailList_tmp(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPersonPurchaseTallyList
+	 * comment : 회계 -> 개인구매 관리 -> 개인구매 조회
+	 */
+	@GetMapping("Account/AccountPersonPurchaseTallyList")
+	public String AccountPersonPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPersonPurchaseTallyList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyList_tmp
+	 * comment : 회계 -> 개인구매 관리 -> 개인구매 상세 조회
+	 */
+	@GetMapping("Account/AccountPersonPurchaseDetailList")
+	public String AccountPersonPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPersonPurchaseDetailList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentAllSave
+	 * comment : 회계 -> 개인구매 관리 -> 개인구매 저장
+	 */
+	@PostMapping("Account/AccountPersonPurchasePaymentAllSave")
+	private String AccountPersonPurchasePaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+
+		// 1. 'main' 리스트 추출
+		List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+
+		// 2. 'item' 리스트 추출
+		List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+
 		int iResult = 0;
-		
-		iResult = accountService.AccountPurchaseTallyV2Delete(paramMap);
-		
+
+		if (mainList != null) {
+			for (Map<String, Object> mainMap : mainList) {
+
+				if (mainMap.get("sale_id").toString().isEmpty()) {
+
+					String saleId = "";
+
+					LocalDate date = LocalDate.now();
+					LocalTime nowTime = LocalTime.now(); // 시:분:초
+					LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+
+					// 원하는 형식으로 출력 (예: 20251009152744)
+					saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+
+					mainMap.put("sale_id", saleId);
+				}
+
+				iResult += accountService.AccountPurchaseSave(mainMap);
+
+				String saleDate = mainMap.get("saleDate").toString();
+				Object objOrgSaleDate = mainMap.get("orgSaleDate");
+
+				LocalDate date;
+				int year = 0;
+				int month = 0;
+				int day = 0;
+				// 여러 타입의 날짜형식을 매핑.
+				if (objOrgSaleDate != null) {
+
+					String orgSaleDate = mainMap.get("orgSaleDate").toString();
+
+					if (!saleDate.equals(orgSaleDate)) {
+						date = DateUtils.parseFlexibleDate(mainMap.get("orgSaleDate").toString());
+						year = date.getYear(); // 2026
+						month = date.getMonthValue(); // 1~12
+						day = date.getDayOfMonth();
+
+						// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+						mainMap.put("year", year);
+						mainMap.put("month", month);
+						mainMap.put("day", day);
+
+						iResult += accountService.TallySheetPaymentDelete(mainMap);
+					}
+				}
+
+				date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
+				year = date.getYear(); // 2026
+				month = date.getMonthValue(); // 1~12
+
+				// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+				mainMap.put("year", year);
+				mainMap.put("month", month);
+
+				iResult += accountService.TallySheetPaymentSave(mainMap);
+			}
+		}
+		if (itemList != null) {
+			for (Map<String, Object> itemMap : itemList) {
+				iResult += accountService.AccountPurchaseDetailSave(itemMap);
+			}
+		}
+
 		JsonObject obj = new JsonObject();
-    	
-    	if(iResult > 0) {
+
+		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
-    	} else {
-    		obj.addProperty("code", 400);
+		} else {
+			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
-    	}
-    	
-    	return obj.toString();
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountPurchaseTallyPaymentList
+	 * comment : 집계표 -> 결제 리스트 조회
+	 */
+	@GetMapping("Account/AccountPurchaseTallyPaymentList")
+	public String AccountPurchaseTallyPaymentList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPurchaseTallyPaymentList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardList
+	 * comment : 회계 -> 본사 법인카드 목록 조회
+	 */
+	@GetMapping("Account/HeadOfficeCorporateCardList")
+	public String HeadOfficeCorporateCardList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.HeadOfficeCorporateCardList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentList
+	 * comment : 회계 -> 본사 법인카드 결제내역 조회
+	 */
+	@GetMapping("Account/HeadOfficeCorporateCardPaymentList")
+	public String HeadOfficeCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		System.out.println(paramMap);
+		resultList = accountService.HeadOfficeCorporateCardPaymentList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentDetailList
+	 * comment : 회계 -> 본사 법인카드 결제 상세내역 조회
+	 */
+	@GetMapping("Account/HeadOfficeCorporateCardPaymentDetailList")
+	public String HeadOfficeCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.HeadOfficeCorporateCardPaymentDetailList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardSave
+	 * comment : 회계 -> 본사 법인카드 저장
+	 */
+	@PostMapping("Account/HeadOfficeCorporateCardSave")
+	private String HeadOfficeCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			iResult += accountService.HeadOfficeCorporateCardSave(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentAllSave
+	 * comment : 회계 -> 본사 법인카드 결제내역 전체 저장
+	 */
+	@PostMapping("Account/HeadOfficeCorporateCardPaymentAllSave")
+	private String HeadOfficeCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+
+		// 1. 'main' 리스트 추출
+		List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+
+		// 2. 'item' 리스트 추출
+		List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+
+		int iResult = 0;
+
+		if (mainList != null) {
+			for (Map<String, Object> mainMap : mainList) {
+				iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
+
+				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
+				String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+
+				LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
+				int year = payDate.getYear(); // 2026
+				int month = payDate.getMonthValue(); // 1~12
+
+				mainMap.put("year", year);
+				mainMap.put("month", month);
+
+				// 집계표도 다시 적용.
+				iResult += accountService.TallySheetCorporateCardPaymentSaveV2(mainMap);
+			}
+		}
+		if (itemList != null) {
+			for (Map<String, Object> itemMap : itemList) {
+				iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
+
+				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
+				String paymentDate = String.valueOf(itemMap.get("payment_dt")); // "2026-01-01"
+
+				LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
+				int year = payDate.getYear(); // 2026
+				int month = payDate.getMonthValue(); // 1~12
+
+				itemMap.put("year", year);
+				itemMap.put("month", month);
+
+				// 집계표도 다시 적용.
+				iResult += accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
+			}
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardList
+	 * comment : 회계 -> 현장 법인카드 목록 조회
+	 */
+	@GetMapping("Account/AccountCorporateCardList")
+	public String AccountCorporateCardList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountCorporateCardList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentList
+	 * comment : 회계 -> 현장 법인카드 결제내역 조회
+	 */
+	@GetMapping("Account/AccountCorporateCardPaymentList")
+	public String AccountCorporateCardPaymentList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountCorporateCardPaymentList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentDetailList
+	 * comment : 회계 -> 현장 법인카드 결제 상세내역 조회
+	 */
+	@GetMapping("Account/AccountCorporateCardPaymentDetailList")
+	public String AccountCorporateCardPaymentDetailList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountCorporateCardPaymentDetailList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardSave
+	 * comment : 현장 -> 현장 법인카드 저장
+	 */
+	@PostMapping("Account/AccountCorporateCardSave")
+	private String AccountCorporateCardSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			iResult += accountService.AccountCorporateCardSave(paramMap);
+			iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentAllSave
+	 * comment : 회계 -> 현장 법인카드 결제내역 전체 저장
+	 */
+	@PostMapping("Account/AccountCorporateCardPaymentAllSave")
+	private String AccountCorporateCardPaymentAllSave(@RequestBody Map<String, Object> paramMap) {
+
+		// 1. 'main' 리스트 추출
+		List<Map<String, Object>> mainList = (List<Map<String, Object>>) paramMap.get("main");
+
+		// 2. 'item' 리스트 추출
+		List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
+
+		int iResult = 0;
+
+		if (mainList != null) {
+			for (Map<String, Object> mainMap : mainList) {
+				iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
+
+				// 손익표, 예산 프로시저용 연/월 계산 전에 입력값을 정규화한다.
+				// idx가 ""이면 NULL로, 금액 필드는 비어있으면 0으로, 결제일이 없으면 오늘 날짜로 보정.
+				Object idxVal = mainMap.get("idx");
+				if (idxVal != null && String.valueOf(idxVal).trim().isEmpty())
+					mainMap.put("idx", null);
+				String[] numKeys = { "total", "vat", "taxFree", "tax", "totalCard" };
+				for (String k : numKeys) {
+					Object v = mainMap.get(k);
+					if (v == null || String.valueOf(v).trim().isEmpty())
+						mainMap.put(k, 0);
+				}
+				String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+				if (paymentDate == null || paymentDate.trim().isEmpty() || "null".equalsIgnoreCase(paymentDate)) {
+					paymentDate = java.time.LocalDate.now().toString();
+					mainMap.put("payment_dt", paymentDate);
+				}
+
+				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
+				LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
+				int year = payDate.getYear(); // 2026
+				int month = payDate.getMonthValue(); // 1~12
+
+				mainMap.put("year", year);
+				mainMap.put("month", month);
+
+				// 집계표도 다시 적용.
+				iResult += accountService.TallySheetCorporateCardPaymentSave(mainMap);
+			}
+		}
+		if (itemList != null) {
+			for (Map<String, Object> itemMap : itemList) {
+				iResult += accountService.AccountCorporateCardPaymentDetailLSave(itemMap);
+			}
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 인사
+	 * method : AccountMemberDispatchMappingSave
+	 * comment : 현장관리 -> 현장 직원관리 -> 직원파출 매핑정보 저장
+	 */
+	@PostMapping("Account/AccountMemberDispatchMappingSave")
+	private String AccountMemberDispatchMappingSave(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+			String del_yn = String.valueOf(paramMap.getOrDefault("del_yn", "N")).toUpperCase();
+			paramMap.put("del_yn", del_yn);
+
+			iResult += accountService.AccountMemberDispatchMappingSave(paramMap);
+
+			// 삭제 처리(del_yn=Y)는 매핑 테이블만 반영하고 근무기록 저장은 수행하지 않음
+			if (!"Y".equals(del_yn) && paramMap.get("dispatch_account_id") != null) {
+				paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
+				iResult += accountService.AccountMemberRecordSave(paramMap);
+			}
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 인사
+	 * method : AccountMemberDispatchMappingList
+	 * comment : 인사 -> 직원파출 매핑 조회
+	 */
+	@GetMapping("Account/AccountMemberDispatchMappingList")
+	public String AccountMemberDispatchMappingList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountMemberDispatchMappingList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyV2List
+	 * comment : 회계 -> 매입(본사용) 조회
+	 */
+	@GetMapping("Account/AccountPurchaseTallyV2List")
+	public String AccountPurchaseTallyV2List(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPurchaseTallyV2List(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyV2Save
+	 * comment : 회계 -> 매입(본사용) 저장
+	 */
+	@PostMapping("Account/AccountPurchaseTallyV2Save")
+	private String AccountPurchaseTallyV2Save(@RequestBody List<Map<String, Object>> paramList) {
+
+		int iResult = 0;
+
+		for (Map<String, Object> paramMap : paramList) {
+
+			Object saleIdObj = paramMap.get("sale_id");
+
+			// null이거나 문자열로 변환했을 때 비어있다면 생성
+			if (saleIdObj == null || saleIdObj.toString().trim().isEmpty()) {
+
+				// 원하는 형식으로 출력 (예: 20251009152744)
+				LocalDate date = LocalDate.now();
+				LocalTime nowTime = LocalTime.now(); // 시:분:초
+				LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
+
+				// 원하는 형식으로 출력 (예: 20251009152744)
+				String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+
+				paramMap.put("sale_id", saleId);
+			}
+
+			iResult += accountService.AccountPurchaseTallyV2Save(paramMap);
+		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyV2Delete
+	 * comment : 매입집계 삭제
+	 */
+	@PostMapping("Account/AccountPurchaseTallyV2Delete")
+	public String AccountPurchaseTallyV2Delete(@RequestBody Map<String, Object> paramMap) {
+
+		int iResult = 0;
+
+		iResult = accountService.AccountPurchaseTallyV2Delete(paramMap);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
 	}
 }
