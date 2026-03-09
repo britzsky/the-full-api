@@ -2098,6 +2098,7 @@
     
     <select id="TallySheetUseList" parameterType="map" resultType="hashmap">
     	SELECT
+    			idx,
 		    count_year,
 		    count_month,
 		    account_id,
@@ -2111,17 +2112,13 @@
     
     <insert id="TallySheetUseSave" parameterType="map">
     	INSERT INTO tb_account_tally_sheet_input_use
-    	(count_year, count_month, account_id, type, input_yn, reg_dt, user_id)
+    		(idx, count_year, count_month, account_id, type, input_yn, reg_dt, user_id)
     	VALUES
-    	(#{year},#{month},#{account_id},#{type},#{input_yn},DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    		(#{idx},#{year},#{month},#{account_id},#{type},#{input_yn},DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),#{user_id})
     	ON DUPLICATE KEY UPDATE
-    	count_year=#{year},
-    	count_month=#{month},
-    	account_id=#{account_id},
-    	type=#{type},
-    	input_yn=#{input_yn},
-    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
-    	user_id=#{user_id}
+	    	input_yn=#{input_yn},
+	    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),
+	    	user_id=#{user_id}
     </insert>
     
     <select id="SidoList" parameterType="map" resultType="map">
