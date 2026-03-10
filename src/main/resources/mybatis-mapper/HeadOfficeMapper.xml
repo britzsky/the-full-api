@@ -650,6 +650,9 @@
 					        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 					    FROM the_full.tb_account_managerment_table
 					    WHERE year = #{year}
+					    <if test="month != ''">
+				            AND month = #{month}
+				        </if>
 					    GROUP BY year, month
 					) AS aggregated_data
 					ORDER BY year ASC, month ASC
@@ -728,6 +731,9 @@
 				    ifnull(return_ratio,0) as return_ratio
 				FROM the_full.tb_account_managerment_table
 				WHERE year = #{year}
+				<if test="month != ''">
+		            AND month = #{month}
+		        </if>
 				AND account_id = #{account_id}
 		        </otherwise>
 		    </choose>

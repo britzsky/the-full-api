@@ -635,9 +635,11 @@ public class AccountService {
             throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day 프로시저 실패");
         }
 		
-        // ③ 손익표 합계 + 비율 저장 프로시저 호출
-        paramMap.put("result", 0); // OUT 값 초기화
-        headOfficeMapper.ProfitLossTotalSave(paramMap);
+        if (result > 0) {
+        	// ③ 손익표 합계 + 비율 저장 프로시저 호출
+            paramMap.put("result", 0); // OUT 값 초기화
+            headOfficeMapper.ProfitLossTotalSave(paramMap);
+        }
         
         // OUT 값 확인
         result = (int) paramMap.get("result");
@@ -645,9 +647,11 @@ public class AccountService {
             throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
         }
         
-        // 예산 저장 프로시저 호출
-        paramMap.put("result", 0); // OUT 값 초기화
-        operateMapper.BudgetTotalSave(paramMap);
+        if (result > 0) {
+        	// 예산 저장 프로시저 호출
+            paramMap.put("result", 0); // OUT 값 초기화
+            operateMapper.BudgetTotalSave(paramMap);
+        }
 
         // OUT 값 확인
         result = (int) paramMap.get("result");

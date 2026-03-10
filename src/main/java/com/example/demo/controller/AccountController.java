@@ -40,6 +40,8 @@ import com.google.gson.JsonObject;
 @RestController
 public class AccountController {
 
+    private final OcrController ocrController;
+
 	private final AccountService accountService;
 	private final HeadOfficeService headOfficeService;
 	private final String uploadDir;
@@ -49,10 +51,11 @@ public class AccountController {
 			AccountService accountService,
 			HeadOfficeService headOfficeService,
 			WebConfig webConfig,
-			@Value("${file.upload-dir}") String uploadDir) {
+			@Value("${file.upload-dir}") String uploadDir, OcrController ocrController) {
 		this.accountService = accountService;
 		this.headOfficeService = headOfficeService;
 		this.uploadDir = uploadDir;
+		this.ocrController = ocrController;
 	}
 
 	/*

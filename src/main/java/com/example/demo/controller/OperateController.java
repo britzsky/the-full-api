@@ -1279,7 +1279,7 @@ public class OperateController {
     
     /* 
 	 * part		: 운영
-     * method 	: FieldPersonSave
+     * method 	: EmergencyPersonEmployment
      * comment 	: 긴급인력관리 -> 긴급인력 채용여부 저장
      */
     @PostMapping("Operate/EmergencyPersonEmployment")
@@ -1310,8 +1310,7 @@ public class OperateController {
 				// 채용여부 확정일 때, 파출직원, 파출출근부 저장.
 				iResult += accountService.AccountDispatchMemberSave(paramMap);
 				iResult += accountService.AccountDispatchRecordSave(paramMap);
-			}
-			if (iUseYn == 1 || iUseYn == 2) {
+			} else {
 				
 				// 채용여부 확정일 때, 파출직원, 파출출근부 저장.
 				iResult += accountService.AccountDispatchMemberDelete(paramMap);
