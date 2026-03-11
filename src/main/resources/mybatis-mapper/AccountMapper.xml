@@ -393,20 +393,20 @@
 	       DATE_FORMAT(T3.del_dt, '%Y-%m-%d') as del_dt,
 	       '' as act_join_dt,
 	       '' as pay_yn
-	FROM tb_account_member_dispatch_mapping T
-	LEFT JOIN tb_account_record T2
-	    ON T.dispatch_account_id = T2.account_id 
-	    AND T.member_id = T2.member_id
-	    AND T2.record_year = T.record_year
-	    AND T2.record_month = T.record_month
-	    AND T2.record_date = T.record_date
-	    AND T2.type = 6
-	JOIN tb_account_members T3
-	    ON T3.member_id = T.member_id
-	WHERE T.dispatch_account_id = #{account_id}
-	  AND T.record_year = #{year}
-	  AND T.record_month = #{month}
-	  AND IFNULL(T.del_yn, 'N') = 'N'
+		FROM tb_account_member_dispatch_mapping T
+		LEFT JOIN tb_account_record T2
+		    ON T.dispatch_account_id = T2.account_id 
+		    AND T.member_id = T2.member_id
+		    AND T2.record_year = T.record_year
+		    AND T2.record_month = T.record_month
+		    AND T2.record_date = T.record_date
+		    AND T2.type = 6
+		JOIN tb_account_members T3
+		    ON T3.member_id = T.member_id
+		WHERE T.dispatch_account_id = #{account_id}
+		  AND T.record_year = #{year}
+		  AND T.record_month = #{month}
+		  AND IFNULL(T.del_yn, 'N') = 'N'
 		UNION ALL
 		-- 아래는 유틸 직원
 		SELECT
@@ -1653,11 +1653,13 @@
             DATE_FORMAT(c.end_date, '%Y-%m-%d') AS end_date,
             c.solution,
             c.note,
-            c.user_id
+            c.user_id,
+            IFNULL(c.del_yn, 'N') AS del_yn
       FROM tb_account_communication c
       LEFT OUTER JOIN tb_account a
       ON c.account_id = a.account_id
       WHERE c.team_code = #{team_code}
+      AND IFNULL(c.del_yn, 'N') = IFNULL(NULLIF(#{del_yn}, ''), 'N')
       ORDER BY c.sub_date ASC, c.idx ASC
    </select>
    
@@ -1674,7 +1676,8 @@
            end_date,
            solution,
            note,
-           user_id
+           user_id,
+           del_yn
        </trim>
    
        VALUES
@@ -1689,7 +1692,8 @@
            #{end_date},
            #{solution},
            #{note},
-           #{user_id}
+           #{user_id},
+           IFNULL(NULLIF(#{del_yn}, ''), 'N')
        </trim>
    </insert>
    
@@ -1704,7 +1708,8 @@
           end_date = #{end_date},
           solution = #{solution},
           note = #{note},
-          user_id = CASE WHEN #{user_id} IS NULL OR #{user_id} = '' THEN user_id ELSE #{user_id} END
+          user_id = CASE WHEN #{user_id} IS NULL OR #{user_id} = '' THEN user_id ELSE #{user_id} END,
+          del_yn = IFNULL(NULLIF(#{del_yn}, ''), 'N')
       WHERE idx = #{idx}
    </update>
 
