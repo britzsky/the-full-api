@@ -40,7 +40,7 @@ import com.google.gson.JsonObject;
 @RestController
 public class AccountController {
 
-    private final OcrController ocrController;
+	private final OcrController ocrController;
 
 	private final AccountService accountService;
 	private final HeadOfficeService headOfficeService;
@@ -203,6 +203,19 @@ public class AccountController {
 	public String AccountRecordDispatchList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountService.AccountRecordDispatchList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountDispatchMemberHistoryList
+	 * comment : 거래처 -> 출근부 -> 파출등록 이력 인원 조회
+	 */
+	@GetMapping("Account/AccountDispatchMemberHistoryList")
+	public String AccountDispatchMemberHistoryList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountDispatchMemberHistoryList(paramMap);
 
 		return new Gson().toJson(resultList);
 	}
@@ -2130,13 +2143,60 @@ public class AccountController {
 		for (Map<String, Object> paramMap : paramList) {
 			String del_yn = String.valueOf(paramMap.getOrDefault("del_yn", "N")).toUpperCase();
 			paramMap.put("del_yn", del_yn);
+			// 직원파출관리 모달 저장은 tb_account_record.type을 항상 6으로 강제
+			if (!"Y".equals(del_yn)) {
+				paramMap.put("type", 6);
+			}
+
+			Object idxObj = paramMap.get("idx");
+			String idxStr = String.valueOf(idxObj == null ? "" : idxObj).trim();
+			boolean hasIdx = !idxStr.isEmpty() && !"null".equalsIgnoreCase(idxStr);
+			Map<String, Object> beforeMapping = null;
+
+			// 직원파출 시간은 tb_account_record 기준이라 수정 전 키를 먼저 확보해 둠
+			if (hasIdx) {
+				Map<String, Object> oneParam = new HashMap<>();
+				oneParam.put("idx", idxObj);
+				beforeMapping = accountService.AccountMemberDispatchMappingOne(oneParam);
+			}
 
 			iResult += accountService.AccountMemberDispatchMappingSave(paramMap);
 
-			// 삭제 처리(del_yn=Y)는 매핑 테이블만 반영하고 근무기록 저장은 수행하지 않음
+			// 매핑 저장과 별도로 직원파출 근무기록은 tb_account_record에 유지
 			if (!"Y".equals(del_yn) && paramMap.get("dispatch_account_id") != null) {
-				paramMap.put("account_id", paramMap.get("dispatch_account_id").toString());
-				iResult += accountService.AccountMemberRecordSave(paramMap);
+				String dispatchAccountId = String.valueOf(paramMap.get("dispatch_account_id"));
+				paramMap.put("account_id", dispatchAccountId);
+
+				int updatedRecord = 0;
+				if (beforeMapping != null && !beforeMapping.isEmpty()) {
+					Map<String, Object> updateRecordParam = new HashMap<>();
+					updateRecordParam.put("old_account_id",
+							String.valueOf(beforeMapping.getOrDefault("dispatch_account_id", "")));
+					updateRecordParam.put("old_member_id", String.valueOf(beforeMapping.getOrDefault("member_id", "")));
+					updateRecordParam.put("old_record_year", beforeMapping.get("record_year"));
+					updateRecordParam.put("old_record_month", beforeMapping.get("record_month"));
+					updateRecordParam.put("old_record_date", beforeMapping.get("record_date"));
+					updateRecordParam.put("old_type", 6);
+
+					updateRecordParam.put("new_account_id", dispatchAccountId);
+					updateRecordParam.put("new_member_id", paramMap.get("member_id"));
+					updateRecordParam.put("new_record_year", paramMap.get("record_year"));
+					updateRecordParam.put("new_record_month", paramMap.get("record_month"));
+					updateRecordParam.put("new_record_date", paramMap.get("record_date"));
+					updateRecordParam.put("new_type", 6);
+					updateRecordParam.put("new_start_time", paramMap.get("start_time"));
+					updateRecordParam.put("new_end_time", paramMap.get("end_time"));
+					updateRecordParam.put("new_note", paramMap.get("note"));
+					updateRecordParam.put("new_salary", paramMap.get("salary"));
+
+					updatedRecord = accountService.AccountMemberRecordUpdateByOldKey(updateRecordParam);
+				}
+
+				if (updatedRecord > 0) {
+					iResult += updatedRecord;
+				} else {
+					iResult += accountService.AccountMemberRecordSave(paramMap);
+				}
 			}
 		}
 

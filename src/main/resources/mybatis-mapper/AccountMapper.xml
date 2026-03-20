@@ -373,6 +373,14 @@
 		    AND T.record_month = #{month}
 		WHERE T2.account_id = #{account_id}
 		AND IFNULL(T2.display_yn,'Y') = 'Y'
+		AND T.record_date not in (
+			SELECT record_date
+			FROM tb_account_member_dispatch_mapping
+			WHERE dispatch_account_id = #{account_id}
+			AND record_year = #{year}
+			AND record_month = #{month}
+			AND IFNULL(del_yn, 'N') = 'N'
+		)
 		UNION ALL
 		-- 아래는 직원파출.
 		SELECT 'nor' as gubun,
@@ -553,8 +561,8 @@
               T.account_number,
                 T.dispatch_account,
                 T.note,
-              COUNT(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END) AS work_cnt,
-                IFNULL(SUM(salary),0) as salary,
+              IFNULL(SUM(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END), 0) AS work_cnt,
+                IFNULL(SUM(CASE WHEN T2.is_present = 'Y' THEN T2.salary ELSE 0 END),0) as salary,
               T.del_yn
           FROM tb_account_members_dispatch AS T
           LEFT JOIN tb_account_record_dispatch AS T2
@@ -568,11 +576,37 @@
          <if test="del_yn != null">
             AND T.del_yn = #{del_yn}
          </if>
-            AND T2.is_present = 'Y'
-          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.dispatch_account, T.note, T2.is_present
+          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.dispatch_account, T.note, T.del_yn
       ) AS subquery
       ORDER BY subquery.member_id
    </select>
+
+	<select id="AccountDispatchMemberHistoryList" parameterType="map" resultType="hashmap">
+		SELECT
+			T.member_id,
+			T.account_id,
+			T.name,
+			T.phone,
+			T.rrn,
+			T.account_number,
+			T.dispatch_account,
+			T.note,
+			T.position_type,
+			T.record_year,
+			T.record_month,
+			CASE
+				WHEN T.record_year = #{year} AND T.record_month = #{month} THEN 'Y'
+				ELSE 'N'
+			END AS already_registered
+		FROM tb_account_members_dispatch T
+		WHERE T.account_id = #{account_id}
+		AND IFNULL(T.del_yn, 'N') = 'N'
+		AND (
+			T.record_year <![CDATA[ < ]]> #{year}
+			OR (T.record_year = #{year} AND T.record_month <![CDATA[ <= ]]> #{month})
+		)
+		ORDER BY T.name ASC, T.member_id ASC
+	</select>
 	
 	<select id="AccountRecordMemberList" parameterType="map" resultType="hashmap">
 		SELECT
@@ -685,16 +719,35 @@
 		INSERT INTO tb_account_record
 		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)
 		VALUES
-		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, #{note}, #{salary})
+		(#{account_id}, #{member_id}, #{record_date}, #{type}, #{record_year}, #{record_month}, #{start_time}, #{end_time}, IFNULL(#{note}, ''), IFNULL(#{salary}, 0))
 		ON DUPLICATE KEY UPDATE
-		<!-- 직원파출(동일 날짜 중복) 저장 시 계정도 갱신 -->
 		account_id = #{account_id},
-		type = #{type},
-		start_time = #{start_time},
-		end_time = #{end_time},
-		note = #{note},
-		salary = #{salary}
+		type = IFNULL(#{type}, type),
+		start_time = IFNULL(#{start_time}, start_time),
+		end_time = IFNULL(#{end_time}, end_time),
+		note = IFNULL(#{note}, note),
+		salary = IFNULL(#{salary}, salary)
 	</insert>
+
+	<update id="AccountMemberRecordUpdateByOldKey" parameterType="map">
+		UPDATE tb_account_record
+		SET account_id = #{new_account_id},
+			member_id = #{new_member_id},
+			record_year = #{new_record_year},
+			record_month = #{new_record_month},
+			record_date = #{new_record_date},
+			type = IFNULL(#{new_type}, type),
+			start_time = IFNULL(#{new_start_time}, start_time),
+			end_time = IFNULL(#{new_end_time}, end_time),
+			note = IFNULL(#{new_note}, note),
+			salary = IFNULL(#{new_salary}, salary)
+		WHERE account_id = #{old_account_id}
+		AND member_id = #{old_member_id}
+		AND record_year = #{old_record_year}
+		AND record_month = #{old_record_month}
+		AND record_date = #{old_record_date}
+		AND type = #{old_type}
+	</update>
 	
 	<insert id="AccountMemberRecRecordSave" parameterType="map">
 		INSERT INTO tb_account_rec_record
@@ -2485,6 +2538,19 @@
 					user_id = #{user_id}
 				WHERE idx = #{idx}
 			</when>
+			<when test='idx != null and idx.toString() != ""'>
+				UPDATE tb_account_member_dispatch_mapping
+				SET member_id = #{member_id},
+					account_id = #{account_id},
+					dispatch_account_id = #{dispatch_account_id},
+					record_year = #{record_year},
+					record_month = #{record_month},
+					record_date = #{record_date},
+					del_yn = 'N',
+					reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+					user_id = #{user_id}
+				WHERE idx = #{idx}
+			</when>
 			<otherwise>
 				INSERT INTO tb_account_member_dispatch_mapping
 			    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -2525,8 +2591,15 @@
 			</otherwise>
 		</choose>
 	</update>
+
+	<select id="AccountMemberDispatchMappingOne" parameterType="map" resultType="hashmap">
+		SELECT idx, member_id, account_id, dispatch_account_id, record_year, record_month, record_date, del_yn
+		FROM tb_account_member_dispatch_mapping
+		WHERE idx = #{idx}
+		LIMIT 1
+	</select>
 	
-		<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
+	<select id="AccountMemberDispatchMappingList" parameterType="map" resultType="hashmap">
 		SELECT
 			T.idx,
 			T.member_id,
@@ -2536,6 +2609,9 @@
 			T2.account_name AS origin_account_name,
 			(SELECT account_name FROM tb_account WHERE account_id = T.dispatch_account_id) AS dispatch_account_name,
 			CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
+			IFNULL(TR.start_time, T3.start_time) AS start_time,
+			IFNULL(TR.end_time, T3.end_time) AS end_time,
+			IFNULL(TR.type, 6) AS type,
 			CASE WHEN T3.position_type = 1 THEN '영양사'
              	WHEN T3.position_type = 2 THEN '조리팀장'
                  WHEN T3.position_type = 3 THEN '조리장'
@@ -2547,6 +2623,13 @@
 		ON T2.account_id = T.account_id
 		JOIN tb_account_members T3
 		ON T3.member_id = T.member_id
+		LEFT JOIN tb_account_record TR
+		ON TR.account_id = T.dispatch_account_id
+		AND TR.member_id = T.member_id
+		AND TR.record_year = T.record_year
+		AND TR.record_month = T.record_month
+		AND TR.record_date = T.record_date
+		AND TR.type = 6
 		WHERE 1=1
 		AND IFNULL(T.del_yn, 'N') = IFNULL(NULLIF(#{del_yn}, ''), 'N')
 		<if test="member_id != null and member_id != ''">

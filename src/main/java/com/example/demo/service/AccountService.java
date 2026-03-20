@@ -86,6 +86,12 @@ public class AccountService {
 		resultList = accountMapper.AccountRecordDispatchList(paramMap);
 		return resultList;
 	}
+	// 거래처 -> 출근부 -> 파출등록 이력 인원 조회
+	public List<Map<String, Object>> AccountDispatchMemberHistoryList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountDispatchMemberHistoryList(paramMap);
+		return resultList;
+	}
 	// 거래처 -> 인사기록카드 조회
 	public List<Map<String, Object>> AccountRecordMemberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -667,11 +673,23 @@ public class AccountService {
 		iResult = accountMapper.TallySheetPaymentDelete(paramMap);
 		return iResult;
 	}
+	// 인사 -> 직원파출 매핑 수정 시 기존 출근기록 수정
+	public int AccountMemberRecordUpdateByOldKey(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountMemberRecordUpdateByOldKey(paramMap);
+		return iResult;
+	}
 	// 인사 -> 직원파출 매핑 저장
 	public int AccountMemberDispatchMappingSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = accountMapper.AccountMemberDispatchMappingSave(paramMap);
 		return iResult;
+	}
+	// 인사 -> 직원파출 매핑 단건 조회
+	public Map<String, Object> AccountMemberDispatchMappingOne(Map<String, Object> paramMap) {
+		Map<String, Object> result = null;
+		result = accountMapper.AccountMemberDispatchMappingOne(paramMap);
+		return result;
 	}
 	// 인사 -> 직원파출 매핑 조회
 	public List<Map<String, Object>> AccountMemberDispatchMappingList (Map<String, Object> paramMap) {
