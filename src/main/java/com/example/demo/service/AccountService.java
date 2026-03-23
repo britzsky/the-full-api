@@ -17,6 +17,50 @@ public class AccountService {
 	AccountMapper accountMapper;
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
+
+	private static String keepOnlyDigits(String value, int maxLen) {
+		if (value == null) return "";
+		String digits = value.replaceAll("\\D", "");
+		if (maxLen > 0 && digits.length() > maxLen) {
+			return digits.substring(0, maxLen);
+		}
+		return digits;
+	}
+
+	private static String formatDispatchRrn(Object rawValue) {
+		if (rawValue == null) return null;
+		String digits = keepOnlyDigits(String.valueOf(rawValue), 13);
+		if (digits.isEmpty()) return "";
+		if (digits.length() <= 6) return digits;
+		return digits.substring(0, 6) + "-" + digits.substring(6);
+	}
+
+	private static String formatDispatchPhone(Object rawValue) {
+		if (rawValue == null) return null;
+		String digits = keepOnlyDigits(String.valueOf(rawValue), 11);
+		if (digits.isEmpty()) return "";
+		if (digits.length() <= 3) return digits;
+		if (digits.length() <= 7) return digits.substring(0, 3) + "-" + digits.substring(3);
+		return digits.substring(0, 3) + "-" + digits.substring(3, 7) + "-" + digits.substring(7);
+	}
+
+	private static void normalizeDispatchMemberSensitiveFields(Map<String, Object> paramMap) {
+		if (paramMap == null) return;
+
+		if (paramMap.containsKey("rrn")) {
+			Object rrn = paramMap.get("rrn");
+			if (rrn != null) {
+				paramMap.put("rrn", formatDispatchRrn(rrn));
+			}
+		}
+
+		if (paramMap.containsKey("phone")) {
+			Object phone = paramMap.get("phone");
+			if (phone != null) {
+				paramMap.put("phone", formatDispatchPhone(phone));
+			}
+		}
+	}
 	
 	public AccountService(AccountMapper accountMapper, HeadOfficeMapper headOfficeMapper, OperateMapper operateMapper) {
 		this.accountMapper = accountMapper;
@@ -131,6 +175,8 @@ public class AccountService {
 	// 거래처 -> 출근부 -> 파출직원 정보 저장
 	public int AccountDispatchMemberSave(Map<String, Object> paramMap) {
 		int iResult = 0;
+		// ✅ 백엔드 저장 직전 연락처/주민번호 포맷을 강제 정규화
+		normalizeDispatchMemberSensitiveFields(paramMap);
 		iResult = accountMapper.AccountDispatchMemberSave(paramMap);
 		return iResult;
 	}

@@ -193,12 +193,13 @@
 	</select>
 	
 	<select id="CookWearOutList" parameterType="map" resultType="map">
-		SELECT acoh.type,
+		SELECT acoh.idx,
+			  acoh.type,
 			  acwi.type_name,
 			  acoh.account_id,
 			  DATE_FORMAT(acoh.out_dt, '%Y-%m-%d') as out_dt,
 		      ifnull(acoh.out_qty, 0) as out_qty,
-		      note
+		      acoh.note
 		FROM tb_account_cook_wear_out_history acoh
 		JOIN tb_account_cook_wear_inventory acwi
 		ON acwi.type = acoh.type
@@ -238,14 +239,31 @@
 	</insert>
 	
 	<insert id="CookWearOutSave" parameterType="map">
-		INSERT INTO tb_account_cook_wear_out_history(type,account_id,out_dt,out_qty)
-		VALUES
-		(#{type},#{account_id},DATE_FORMAT(#{out_dt}, '%Y-%m-%d'),#{out_qty})
-		ON DUPLICATE KEY UPDATE
-		type = VALUES(type),
-		account_id = VALUES(account_id),
-		out_dt = VALUES(out_dt),
-		out_qty = VALUES(out_qty)
+		INSERT INTO tb_account_cook_wear_out_history
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        <if test="idx != null and idx != ''">idx,</if>
+	        type,
+	        account_id,
+	        out_dt,
+	        out_qty,
+	        note
+	    </trim>
+	    <trim prefix="VALUES (" suffix=")" suffixOverrides=",">
+	        <if test="idx != null and idx != ''">#{idx},</if>
+	        #{type},
+	        #{account_id},
+	        DATE_FORMAT(#{out_dt}, '%Y-%m-%d'),
+	        #{out_qty},
+	        #{note}
+	    </trim>
+	    <if test="idx != null and idx != ''">
+	        ON DUPLICATE KEY UPDATE
+	        type = VALUES(type),
+	        account_id = VALUES(account_id),
+	        out_dt = VALUES(out_dt),
+	        out_qty = VALUES(out_qty),
+	        note = VALUES(note)
+	    </if>
 	</insert>
 	
 	<insert id="CookWearNewSave" parameterType="map">

@@ -602,10 +602,33 @@
 		WHERE T.account_id = #{account_id}
 		AND IFNULL(T.del_yn, 'N') = 'N'
 		AND (
-			T.record_year <![CDATA[ < ]]> #{year}
-			OR (T.record_year = #{year} AND T.record_month <![CDATA[ <= ]]> #{month})
+			IFNULL(TRIM(T.name), '') = ''
+			OR NOT EXISTS (
+				SELECT 1
+				FROM tb_account_members_dispatch T2
+				WHERE T2.account_id = T.account_id
+				AND IFNULL(T2.del_yn, 'N') = 'N'
+				AND IFNULL(TRIM(T2.name), '') = IFNULL(TRIM(T.name), '')
+				AND (
+					T2.member_id <![CDATA[ > ]]> T.member_id
+					OR (
+						T2.member_id = T.member_id
+						AND (
+							IFNULL(T2.record_year, 0) <![CDATA[ > ]]> IFNULL(T.record_year, 0)
+							OR (
+								IFNULL(T2.record_year, 0) = IFNULL(T.record_year, 0)
+								AND IFNULL(T2.record_month, 0) <![CDATA[ > ]]> IFNULL(T.record_month, 0)
+							)
+						)
+					)
+				)
+			)
 		)
-		ORDER BY T.name ASC, T.member_id ASC
+		ORDER BY
+			T.name ASC,
+			T.member_id DESC,
+			IFNULL(T.record_year, 0) DESC,
+			IFNULL(T.record_month, 0) DESC
 	</select>
 	
 	<select id="AccountRecordMemberList" parameterType="map" resultType="hashmap">
