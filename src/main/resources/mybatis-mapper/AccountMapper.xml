@@ -373,48 +373,40 @@
 		    AND T.record_month = #{month}
 		WHERE T2.account_id = #{account_id}
 		AND IFNULL(T2.display_yn,'Y') = 'Y'
-		AND T.record_date not in (
-			SELECT record_date
-			FROM tb_account_member_dispatch_mapping
-			WHERE dispatch_account_id = #{account_id}
-			AND record_year = #{year}
-			AND record_month = #{month}
-			AND IFNULL(del_yn, 'N') = 'N'
-		)
+		AND T.type not in (6)
 		UNION ALL
 		-- 아래는 직원파출.
 		SELECT 'nor' as gubun,
-	       T.dispatch_account_id as account_id,
-	       T.member_id,
-	       T3.position,
-	       T3.position_type,
-	       T3.cor_type,
-	       T3.name,
-	       IFNULL(T2.record_year, T.record_year) as record_year,
-	       IFNULL(T2.record_month, T.record_month) as record_month,
-	       IFNULL(T2.record_date, T.record_date) as record_date,
-	       IFNULL(T2.type, 6) as type,
-	       IFNULL(T2.start_time, T3.start_time) as start_time,
-	       IFNULL(T2.end_time, T3.end_time) as end_time,
-	       IFNULL(T2.salary, 0) as salary,
-	       IFNULL(T2.note, '') as note,
-	       DATE_FORMAT(T3.del_dt, '%Y-%m-%d') as del_dt,
-	       '' as act_join_dt,
-	       '' as pay_yn
+			T2.account_id,
+			T.member_id,
+			T3.position,
+			T3.position_type,
+			T3.cor_type,
+			T3.name,
+			T.record_year,
+			T.record_month,
+			T.record_date,
+			T2.type,
+			T2.start_time,
+			T2.end_time,
+			CASE WHEN T2.type = 6 THEN T2.salary ELSE 0 END AS salary,
+			T2.note
+			, DATE_FORMAT(T3.del_dt, '%Y-%m-%d') as del_dt
+			, '' as act_join_dt
+			, '' as pay_yn
 		FROM tb_account_member_dispatch_mapping T
-		LEFT JOIN tb_account_record T2
-		    ON T.dispatch_account_id = T2.account_id 
-		    AND T.member_id = T2.member_id
-		    AND T2.record_year = T.record_year
-		    AND T2.record_month = T.record_month
-		    AND T2.record_date = T.record_date
-		    AND T2.type = 6
+		JOIN tb_account_record T2
+		ON T2.account_id = T.dispatch_account_id
+		AND T2.record_year = T.record_year
+		AND T2.record_month = T.record_month
+		AND T2.record_date = T.record_date
 		JOIN tb_account_members T3
-		    ON T3.member_id = T.member_id
-		WHERE T.dispatch_account_id = #{account_id}
-		  AND T.record_year = #{year}
-		  AND T.record_month = #{month}
-		  AND IFNULL(T.del_yn, 'N') = 'N'
+		ON T3.member_id = T.member_id
+		WHERE T2.type = 6
+		AND T.dispatch_account_id = #{account_id}
+		AND T2.record_year = #{year}
+		AND T2.record_month = #{month}
+		AND IFNULL(T.del_yn,'N') = 'N'
 		UNION ALL
 		-- 아래는 유틸 직원
 		SELECT
@@ -447,6 +439,7 @@
          where T.account_id = #{account_id}
           AND IFNULL(T2.display_yn,'Y') = 'Y'
         UNION ALL
+        -- 채용예정 인원
 		SELECT
 			'rec' as gubun,
 		    T2.account_id,
@@ -487,6 +480,7 @@
 			)
 		)
         UNION ALL
+        -- 파출인원
         SELECT
 			'dis' as gubun,
 		    T2.account_id,
