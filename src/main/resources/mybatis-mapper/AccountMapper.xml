@@ -397,6 +397,7 @@
 		FROM tb_account_member_dispatch_mapping T
 		JOIN tb_account_record T2
 		ON T2.account_id = T.dispatch_account_id
+		AND T2.member_id = T.member_id
 		AND T2.record_year = T.record_year
 		AND T2.record_month = T.record_month
 		AND T2.record_date = T.record_date
@@ -410,11 +411,11 @@
 		UNION ALL
 		-- 아래는 유틸 직원
 		SELECT
-            'nor' as gubun,
+          'nor' as gubun,
           T.account_id,
           T.member_id,
           T2.position,
-            T2.position_type,
+          T2.position_type,
           T2.cor_type,
           T2.name,
           T3.record_year,
@@ -435,7 +436,7 @@
          on T3.account_id = T.account_id
          and T3.member_id = T.member_id
          AND T3.record_year = #{year}
-       AND T3.record_month = #{month}
+       	 AND T3.record_month = #{month}
          where T.account_id = #{account_id}
           AND IFNULL(T2.display_yn,'Y') = 'Y'
         UNION ALL
