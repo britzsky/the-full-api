@@ -1961,6 +1961,16 @@
 	        receipt_type = #{receipt_type}
 	    </trim>
 	</insert>
+
+	<select id="AccountPurchaseReceiptImageBySaleId" parameterType="map" resultType="string">
+		SELECT receipt_image
+		FROM tb_account_purchase_tally
+		WHERE sale_id = #{sale_id}
+		<if test="account_id != null and account_id != ''">
+			AND account_id = #{account_id}
+		</if>
+		LIMIT 1
+	</select>
 	
 	<insert id="AccountPurchaseDetailSave" parameterType="map">
 		INSERT INTO tb_account_purchase_tally_detail
@@ -2330,6 +2340,16 @@
 	        idx=#{idx}
 	    </trim>
 	</insert>
+
+	<select id="HeadOfficeCorporateCardReceiptImageBySaleId" parameterType="map" resultType="string">
+		SELECT receipt_image
+		FROM tb_headoffice_corporate_card_payment_list
+		WHERE sale_id = #{sale_id}
+		<if test="account_id != null and account_id != ''">
+			AND account_id = #{account_id}
+		</if>
+		LIMIT 1
+	</select>
 	
 	<insert id="HeadOfficeCorporateCardPaymentDetailLSave" parameterType="map">
 		INSERT INTO tb_headoffice_corporate_card_payment_detail_list
@@ -2495,6 +2515,16 @@
 	        idx=#{idx}
 	    </trim>
 	</insert>
+
+	<select id="AccountCorporateCardReceiptImageBySaleId" parameterType="map" resultType="string">
+		SELECT receipt_image
+		FROM tb_account_corporate_card_payment_list
+		WHERE sale_id = #{sale_id}
+		<if test="account_id != null and account_id != ''">
+			AND account_id = #{account_id}
+		</if>
+		LIMIT 1
+	</select>
 	
 	<insert id="AccountCorporateCardPaymentDetailLSave" parameterType="map">
 		INSERT INTO tb_account_corporate_card_payment_detail_list

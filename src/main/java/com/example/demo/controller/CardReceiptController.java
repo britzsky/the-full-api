@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,11 +31,20 @@ import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.CardReceiptParseService;
+import com.example.demo.utils.BizNoUtils;
 import com.example.demo.utils.DateUtils;
 
 @RestController
 @RequestMapping("/card-receipt/")
 public class CardReceiptController {
+    private static final Pattern BIZNO_DASH = Pattern.compile("\\b(\\d{3}-\\d{2}-\\d{5})\\b");
+    private static final Pattern BIZNO_10 = Pattern.compile("\\b(\\d{10})\\b");
+
+    private static final String[] OCR_LABELS = {
+            "카드종류", "카드번호", "거래종류", "거래금액", "거래일자", "부가세",
+            "승인번호", "합계", "주문번호", "할부구분", "상품명", "업체명", "대표자",
+            "사업자등록번호", "가맹점번호", "가맹점주소", "문의연락처", "신용카드 매출전표"
+    };
 
     @Autowired
     private CardReceiptParseService cardReceiptParseService;
@@ -56,7 +67,8 @@ public class CardReceiptController {
             @RequestParam(value = "folderValue", required = false) String folderValue,
             @RequestParam(value = "cardNo", required = false) String cardNo,
             @RequestParam(value = "cardBrand", required = false) String cardBrand,
-            @RequestParam(value = "saveType", required = false) String saveType) {
+            @RequestParam(value = "saveType", required = false) String saveType,
+            @RequestParam(value = "sale_id", required = false) String sale_id) {
         try {
             if (file == null || file.isEmpty()) {
                 return ResponseEntity.badRequest().body("file is empty");
@@ -91,19 +103,20 @@ public class CardReceiptController {
             } catch (Exception ex) {
                 // ✅ 파싱 실패해도 기본값으로 DB 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(
-                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath));
+                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath, sale_id));
             }
 
             if (result == null || result.meta == null || result.meta.saleDate == null) {
                 // ✅ 핵심 meta 없으면 기본값으로 DB 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(
-                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath));
+                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath, sale_id));
             }
 
             // ✅ 2) saleId 생성(영수증 날짜 기반)
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
             LocalDateTime dateTime = LocalDateTime.of(date, LocalTime.now());
-            String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+            String parsedSaleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+            String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : parsedSaleId;
 
             // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
             int year = date.getYear(); // 2026
@@ -130,9 +143,20 @@ public class CardReceiptController {
             // ✅ 요청으로 받은 영수증 타입 저장 (DB에 UNKNOWN 기본값 들어가는 것 방지)
             corporateCard.put("type", type);
             corporateCard.put("receipt_type", type);
-            corporateCard.put("sale_id", saleId);
-            corporateCard.put("use_name", result.merchant != null ? result.merchant.name : null);
-            corporateCard.put("bizNo", result.merchant != null ? result.merchant.bizNo : null);
+            corporateCard.put("sale_id", targetSaleId);
+
+            String rawText = extractRawText(result);
+            String merchantName = firstNonBlank(
+                    result.merchant != null ? cleanMerchantName(result.merchant.name) : null,
+                    cleanMerchantName(valueBelowLabel(rawText, "업체명"))
+            );
+            String merchantBizNo = firstNonBlank(
+                    normalizeBizNoSafe(result.merchant != null ? result.merchant.bizNo : null),
+                    normalizeBizNoSafe(valueBelowLabel(rawText, "사업자등록번호"))
+            );
+
+            corporateCard.put("use_name", merchantName);
+            corporateCard.put("bizNo", merchantBizNo);
             corporateCard.put("payment_dt", date);
             corporateCard.put("total", result.totals != null ? result.totals.total : null);
             corporateCard.put("discount", result.totals != null ? result.totals.discount : null);
@@ -146,7 +170,7 @@ public class CardReceiptController {
             if (result.items != null) {
                 for (Item it : result.items) {
                     Map<String, Object> detailMap = new HashMap<>();
-                    detailMap.put("sale_id", saleId);
+                    detailMap.put("sale_id", targetSaleId);
                     detailMap.put("name", it.name);
                     detailMap.put("qty", it.qty);
                     detailMap.put("amount", it.amount);
@@ -193,11 +217,13 @@ public class CardReceiptController {
             String cardBrand,
             String saveType,
             String receiptType,
-            String resultPath) {
+            String resultPath,
+            String sale_id) {
         Map<String, Object> corporateCard = new HashMap<>();
 
         LocalDateTime now = LocalDateTime.now();
-        String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        String generatedSaleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : generatedSaleId;
 
         corporateCard.put("account_id", objectValue);
         corporateCard.put("year", now.getYear());
@@ -206,7 +232,7 @@ public class CardReceiptController {
         corporateCard.put("cardBrand", cardBrand);
         // ✅ 파싱 실패 시에도 요청 타입은 그대로 저장
         corporateCard.put("receipt_type", receiptType);
-        corporateCard.put("sale_id", saleId);
+        corporateCard.put("sale_id", targetSaleId);
         corporateCard.put("use_name", null);
         corporateCard.put("bizNo", null);
         corporateCard.put("payment_dt", now.toLocalDate());
@@ -234,12 +260,15 @@ public class CardReceiptController {
     private static final String TAX_FREE = "면세";
 
     public static int taxify(String taxFlag) {
-        if (taxFlag == null || taxFlag.isEmpty())
+        if (taxFlag == null)
             return 3;
-        if (taxFlag.equals(VAT))
-            return 1;
-        if (taxFlag.equals(TAX_FREE))
+        String normalized = taxFlag.trim();
+        if (normalized.isEmpty())
+            return 3;
+        if (normalized.contains(TAX_FREE))
             return 2;
+        if (normalized.contains(VAT))
+            return 1;
         return 3;
     }
 
@@ -248,7 +277,8 @@ public class CardReceiptController {
             "마늘", "생강", "무", "배추", "파", "버섯", "양배추",
             "고기", "쇠고기", "소고기", "돼지고기", "돈육", "닭", "계육", "정육", "삼겹살", "계란", "달걀", "두부", "콩", "콩나물", "숙주",
             "생선", "연어", "참치", "고등어", "오징어", "새우", "조개", "해물", "김치", "고춧가루", "된장", "간장", "맛술", "참기름", "식초", "소금", "설탕",
-            "밀가루", "전분", "치즈", "버터", "우유", "생크림", "요거트", "사과", "바나나", "딸기", "배", "포도", "과일");
+            "밀가루", "전분", "치즈", "버터", "우유", "생크림", "요거트", "사과", "바나나", "딸기", "배", "포도", "과일",
+            "커피", "라떼", "모카", "카페", "맥심", "원두", "티백", "음료");
 
     private static final List<String> SUPPLY_KEYWORDS = Arrays.asList("칼", "식칼", "도마", "가위", "국자", "집게",
             "행주", "수건", "걸레", "키친타올", "종이타월", "휴지", "물티슈",
@@ -261,11 +291,11 @@ public class CardReceiptController {
 
     public static int classify(String itemName) {
         if (itemName == null || itemName.isEmpty())
-            return 3;
+            return 1;
 
         for (String ex : FOOD_EXCEPTIONS) {
             if (itemName.contains(ex))
-                return 3; // ✅ 네 기존 로직 유지
+                return 1;
         }
         for (String keyword : FOOD_KEYWORDS) {
             if (itemName.contains(keyword))
@@ -275,6 +305,88 @@ public class CardReceiptController {
             if (itemName.contains(keyword))
                 return 2;
         }
-        return 3;
+        return 1;
+    }
+
+    private String extractRawText(BaseReceiptParser.ReceiptResult result) {
+        if (result == null || result.extra == null) return null;
+        Object raw = result.extra.get("__raw_text");
+        return raw == null ? null : String.valueOf(raw);
+    }
+
+    private String valueBelowLabel(String rawText, String label) {
+        if (rawText == null || rawText.isBlank() || label == null || label.isBlank()) return null;
+
+        List<String> lines = new ArrayList<>();
+        String[] arr = rawText.replace("\r\n", "\n").replace("\r", "\n").split("\n");
+        for (String s : arr) {
+            if (s == null) continue;
+            String x = s.replace('\u00A0', ' ').trim();
+            if (!x.isEmpty()) lines.add(x);
+        }
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (!line.contains(label)) continue;
+
+            String inline = line.substring(line.indexOf(label) + label.length())
+                    .replaceFirst("^[\\s:：\\-/|]+", "")
+                    .trim();
+            if (isValueLine(inline)) return inline;
+
+            for (int j = i + 1; j < lines.size() && j <= i + 6; j++) {
+                String next = lines.get(j).trim();
+                if (!isValueLine(next)) continue;
+                return next;
+            }
+        }
+        return null;
+    }
+
+    private boolean isValueLine(String line) {
+        if (line == null || line.isBlank()) return false;
+        for (String l : OCR_LABELS) {
+            if (line.contains(l)) return false;
+        }
+        return true;
+    }
+
+    private String cleanMerchantName(String value) {
+        if (value == null) return null;
+        String x = value.trim();
+        if (x.isEmpty()) return null;
+        x = x.replaceAll("(?i)auction\\s*전자\\s*지불", "").trim();
+        x = x.replaceAll("(대표자|사업자등록번호|가맹점번호|가맹점주소|문의연락처).*", "").trim();
+        x = x.replaceAll("\\s{2,}", " ").trim();
+        return x.isEmpty() ? null : x;
+    }
+
+    private String normalizeBizNoSafe(String value) {
+        if (value == null || value.isBlank()) return null;
+        String x = value.trim();
+
+        Matcher m1 = BIZNO_DASH.matcher(x);
+        if (m1.find()) return m1.group(1);
+
+        String digits = x.replaceAll("[^0-9]", "");
+        Matcher m2 = BIZNO_10.matcher(digits);
+        if (m2.find()) {
+            String d = m2.group(1);
+            return d.substring(0, 3) + "-" + d.substring(3, 5) + "-" + d.substring(5);
+        }
+
+        try {
+            return BizNoUtils.normalizeBizNo(x);
+        } catch (Exception ignore) {
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) return null;
+        for (String v : values) {
+            if (v != null && !v.isBlank()) return v.trim();
+        }
+        return null;
     }
 }

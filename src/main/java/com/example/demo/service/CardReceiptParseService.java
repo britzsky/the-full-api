@@ -8,6 +8,7 @@ import com.example.demo.model.CardReceiptType;
 import com.example.demo.model.CardReceiptResponse;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.CardReceiptParserFactory;
+import com.example.demo.parser.HeadOfficeReceiptParserFactory;
 import com.google.cloud.documentai.v1.Document;
 
 @Service
@@ -23,6 +24,14 @@ public class CardReceiptParseService {
 
     public CardReceiptResponse parseFile(File file, String typeOverride) throws Exception {
         Document doc = ocrService.processDocumentFile(file);
+
+        // 본사 법인카드(auction/gmarket/11post/naver/homeplus/coupang)는 전용 파서 라우팅
+        String headOfficeType = normalizeHeadOfficeType(typeOverride);
+        if (isHeadOfficeType(headOfficeType)) {
+            BaseReceiptParser.ReceiptResult result = HeadOfficeReceiptParserFactory.parse(doc, headOfficeType);
+            attachRawText(result, doc);
+            return new CardReceiptResponse(CardReceiptType.CARD_SLIP_GENERIC, 1.0, result);
+        }
 
         CardReceiptType type;
         double conf;
@@ -40,8 +49,39 @@ public class CardReceiptParseService {
 
         BaseReceiptParser parser = factory.get(type);
         BaseReceiptParser.ReceiptResult result = parser.parse(doc);
+        attachRawText(result, doc);
 
         return new CardReceiptResponse(type, conf, result);
+    }
+
+    private void attachRawText(BaseReceiptParser.ReceiptResult result, Document doc) {
+        if (result == null || result.extra == null || doc == null) return;
+        String raw = doc.getText();
+        if (raw == null || raw.isBlank()) return;
+        result.extra.putIfAbsent("__raw_text", raw);
+    }
+
+    private boolean isHeadOfficeType(String normalized) {
+        if (normalized == null) return false;
+        return switch (normalized) {
+            case "auction", "gmarket", "11post", "naver", "homeplus", "coupang" -> true;
+            default -> false;
+        };
+    }
+
+    private String normalizeHeadOfficeType(String type) {
+        if (type == null) return "";
+        String t = type.trim().toLowerCase();
+        if (t.isEmpty()) return "";
+
+        if (t.contains("옥션") || t.equals("auction")) return "auction";
+        if (t.contains("g마켓") || t.equals("gmarket")) return "gmarket";
+        if (t.contains("11번가") || t.contains("11st") || t.equals("11post")) return "11post";
+        if (t.contains("네이버") || t.equals("naver")) return "naver";
+        if (t.contains("홈플러스") || t.equals("homeplus")) return "homeplus";
+        if (t.contains("쿠팡") || t.equals("coupang")) return "coupang";
+
+        return t;
     }
 
     // --------------------------------------------
