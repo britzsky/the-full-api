@@ -31,7 +31,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
+import com.example.demo.dao.Coordinate;
 import com.example.demo.service.AccountService;
+import com.example.demo.service.GeocodingService;
 import com.example.demo.service.HeadOfficeService;
 import com.example.demo.utils.DateUtils;
 import com.google.gson.Gson;
@@ -44,16 +46,19 @@ public class AccountController {
 
 	private final AccountService accountService;
 	private final HeadOfficeService headOfficeService;
+	private GeocodingService geocodingService;
 	private final String uploadDir;
 
 	@Autowired
 	public AccountController(
 			AccountService accountService,
 			HeadOfficeService headOfficeService,
+			GeocodingService geocodingService,
 			WebConfig webConfig,
 			@Value("${file.upload-dir}") String uploadDir, OcrController ocrController) {
 		this.accountService = accountService;
 		this.headOfficeService = headOfficeService;
+		this.geocodingService = geocodingService;
 		this.uploadDir = uploadDir;
 		this.ocrController = ocrController;
 	}
@@ -615,12 +620,27 @@ public class AccountController {
 
 		Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
 		Map<String, Object> payloadMap = new HashMap<>();
+		
+	    if (formData != null) {
+	        // 1. 거래처 기본정보 먼저 저장 (ID 확보 등)
+	        iResult += accountService.AccountSave(formData);
 
-		if (formData != null) {
-			payloadMap.putAll(formData);
-			// 거래처 기본정보 저장
-			iResult += accountService.AccountSave(formData);
-		}
+	        // 2. 주소값 가져오기 (formData에 저장된 필드명 확인 필요)
+	        String address = (String) formData.get("account_address"); 
+
+	        if (address != null && !address.isEmpty()) {
+	        	// 3. API 호출하여 좌표 구하기
+	        	Coordinate result = geocodingService.getCoordinates(address);
+	        	
+	        	if (result != null) {
+	        	    // Coordinate 클래스에 getX(), getY()가 있어야 빨간 줄이 사라집니다.
+	        	    formData.put("x_coordinate", result.getX()); 
+	        	    formData.put("y_coordinate", result.getY());
+	        	    
+	        	    iResult += accountService.AccountCoordinateSave(formData);
+	        	}
+	        }
+	    }
 
 		List<Map<String, Object>> priceData = (List<Map<String, Object>>) payload.get("priceData");
 		List<Map<String, Object>> etcData = (List<Map<String, Object>>) payload.get("etcData");

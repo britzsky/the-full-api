@@ -32,7 +32,9 @@ public class UserController {
 	 */
 	@PostMapping("/User/Login")
 	public String Login(@RequestBody HashMap<String, Object> map) {
-
+		
+		System.out.println(map);
+		
 		Map<String, Object> resultMap = userService.Login(map);
 		JsonObject obj = new JsonObject();
 

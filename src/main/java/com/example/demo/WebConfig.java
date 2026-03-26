@@ -27,7 +27,9 @@ public class WebConfig implements WebMvcConfigurer {
 						"http://52.64.151.137",
 						"http://52.64.151.137:8080",
 						"http://thefull.kr",
-						"http://thefull.kr:8080")
+						"http://thefull.kr:8080",
+						"http://localhost:8081",
+						"http://172.30.1.48:8081")
 				.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 				.allowedHeaders("Authorization", "x-refresh-token", "Content-Type")
 				.exposedHeaders("Authorization", "x-refresh-token")
@@ -37,7 +39,7 @@ public class WebConfig implements WebMvcConfigurer {
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
-		registry.addResourceHandler(REAL_HANDLE)
-				.addResourceLocations(REAL_PATH);
+		registry.addResourceHandler(LOCAL_HANDLE)
+				.addResourceLocations(LOCAL_PATH);
 	}
 }

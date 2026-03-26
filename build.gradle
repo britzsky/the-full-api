@@ -61,6 +61,7 @@ dependencies {
 	implementation 'org.openpnp:opencv:4.9.0-0'
 	// ✅ WebClient (Spring WebFlux)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
+    implementation 'org.locationtech.jts:jts-core:1.19.0'
 	
 }
 

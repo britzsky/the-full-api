@@ -1239,6 +1239,29 @@
 	    </trim>
 	</insert>
 	
+	<insert id="AccountCoordinateSave" parameterType="map">
+		INSERT INTO tb_account_coordinate
+    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        x_coordinate,
+	        y_coordinate
+	    </trim>
+	    
+	    VALUES
+	    
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{x_coordinate},
+	        #{y_coordinate}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        x_coordinate=#{x_coordinate},
+	        y_coordinate=#{y_coordinate},
+	    </trim>
+	</insert>
+	
 	<insert id="AccountDietPriceHistorySave" parameterType="map">
 		INSERT INTO tb_account_dietprice_history
 		(account_id,diet_price,before_diet_price,mod_dt,user_id)

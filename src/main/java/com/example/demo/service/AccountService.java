@@ -234,6 +234,12 @@ public class AccountService {
 		iResult = accountMapper.AccountInfoSave(paramMap);
 		return iResult;
 	}
+	// 거래처 -> 거래처 좌표저장
+	public int AccountCoordinateSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountCoordinateSave(paramMap);
+		return iResult;
+	}
 	public List<Map<String, Object>> AccountDietPriceHistoryList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.AccountDietPriceHistoryList(paramMap);
