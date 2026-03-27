@@ -60,10 +60,10 @@ public class AiReceiptAnalyzer {
      * 키워드 파일들을 로드
      */
     private void loadKeywords() {
-        keywordMap.put("mart", loadFile("keywords/mart_keywords.txt"));
-        keywordMap.put("convenience", loadFile("keywords/convenience_keywords.txt"));
-        keywordMap.put("coupang", loadFile("keywords/coupang_keywords.txt"));
-        keywordMap.put("delivery", loadFile("keywords/delivery_keywords.txt"));
+//        keywordMap.put("mart", loadFile("keywords/mart_keywords.txt"));
+//        keywordMap.put("convenience", loadFile("keywords/convenience_keywords.txt"));
+//        keywordMap.put("coupang", loadFile("keywords/coupang_keywords.txt"));
+//        keywordMap.put("delivery", loadFile("keywords/delivery_keywords.txt"));
 
         System.out.println("✅ AIReceiptAnalyzer 키워드 로드 완료");
     }
