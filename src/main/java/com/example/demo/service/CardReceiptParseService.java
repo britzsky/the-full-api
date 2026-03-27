@@ -25,7 +25,7 @@ public class CardReceiptParseService {
     public CardReceiptResponse parseFile(File file, String typeOverride) throws Exception {
         Document doc = ocrService.processDocumentFile(file);
 
-        // 본사 법인카드(auction/gmarket/11post/naver/homeplus/coupang)는 전용 파서 라우팅
+        // 본사 법인카드(auction/gmarket/11post/naver/homeplus/coupang/daiso)는 전용 파서 라우팅
         String headOfficeType = normalizeHeadOfficeType(typeOverride);
         if (isHeadOfficeType(headOfficeType)) {
             BaseReceiptParser.ReceiptResult result = HeadOfficeReceiptParserFactory.parse(doc, headOfficeType);
@@ -64,7 +64,7 @@ public class CardReceiptParseService {
     private boolean isHeadOfficeType(String normalized) {
         if (normalized == null) return false;
         return switch (normalized) {
-            case "auction", "gmarket", "11post", "naver", "homeplus", "coupang" -> true;
+            case "auction", "gmarket", "11post", "naver", "homeplus", "coupang", "daiso" -> true;
             default -> false;
         };
     }
@@ -80,6 +80,7 @@ public class CardReceiptParseService {
         if (t.contains("네이버") || t.equals("naver")) return "naver";
         if (t.contains("홈플러스") || t.equals("homeplus")) return "homeplus";
         if (t.contains("쿠팡") || t.equals("coupang")) return "coupang";
+        if (t.contains("다이소") || t.equals("daiso")) return "daiso";
 
         return t;
     }

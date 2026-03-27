@@ -86,7 +86,7 @@ public class OcrControllerV2 {
             "위생장갑", "고무장갑", "앞치마", "마스크",
             "종이컵", "비닐", "봉투", "랩", "호일", "포장",
             "세제", "주방세제", "락스", "세척제", "소독제",
-            "수세미", "스펀지", "필터", "호스");
+            "수세미", "스펀지", "필터", "호스", "밥솥");
 
     // ✅ 예외 케이스 (예: "칼국수" → 음식)
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList(
@@ -177,9 +177,18 @@ public class OcrControllerV2 {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             }
 
-            // 3) 파싱 결과가 없거나 핵심 meta가 없으면 fallback
-            if (result == null || result.meta == null || result.meta.saleDate == null) {
+            // 3) 파싱 결과가 없으면 fallback
+            if (result == null) {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+            }
+
+            // ✅ accountcorporatecardsheet(/card-receipt/parse)와 동작 차이를 줄이기 위해
+            // 날짜를 못 읽은 경우에도 전체 저장 플로우는 진행한다.
+            if (result.meta == null) {
+                result.meta = new BaseReceiptParser.Meta();
+            }
+            if (result.meta.saleDate == null || result.meta.saleDate.isBlank()) {
+                result.meta.saleDate = LocalDate.now().toString();
             }
 
             // 입력값을 LocalDate로 변환 (기본적으로 2000년대 기준으로 해석됨 → 2025년)
@@ -200,6 +209,8 @@ public class OcrControllerV2 {
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
             LocalDateTime dateTime = LocalDateTime.of(date, LocalTime.now());
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+            // 재업로드/수정 시 전달된 sale_id를 우선 사용한다.
+            String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : saleId;
 
             // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
             int year = date.getYear(); // 2026
@@ -214,16 +225,13 @@ public class OcrControllerV2 {
             corporateCard.put("year", year);
             corporateCard.put("month", month);
             corporateCard.put("receipt_type", receiptType);
+            // 본사 법인카드 집계표 프로시저는 정수 type이 필요하다.
+            corporateCard.put("type", resolveTallyType(type, isAccount));
 
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
             
-            // ✅ sale_id가 null이면 NPE 발생하므로 방어
-            if (sale_id != null && !sale_id.isBlank()) {
-                corporateCard.put("sale_id", sale_id); // saleId 세팅.
-            } else {
-                corporateCard.put("sale_id", saleId); // saleId 세팅.
-            }
+            corporateCard.put("sale_id", targetSaleId);
             
             corporateCard.put("use_name", result.merchant.name); // use_name 세팅.
             corporateCard.put("payment_dt", date); // payment_dt 세팅.
@@ -234,10 +242,12 @@ public class OcrControllerV2 {
 
             String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
 
+            String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
+
             if (approvalAmt == null) {
                 corporateCard.put("total", result.totals.total);
 
-                if (result.payment.cardBrand == null) {
+                if (paymentCardBrand == null) {
                     corporateCard.put("payType", 1);
                     corporateCard.put("totalCash", result.totals.total);
                     corporateCard.put("totalCard", 0);
@@ -256,9 +266,10 @@ public class OcrControllerV2 {
                     }
                 }
 
-                corporateCard.put("total", approvalAmt); // total 세팅.
+                // total(int 컬럼)에는 콤마 제거된 숫자값으로 저장해야 Data truncated(1265)를 피할 수 있다.
+                corporateCard.put("total", iApprovalAmt); // total 세팅.
 
-                if (result.payment.cardBrand == null) {
+                if (paymentCardBrand == null) {
                     corporateCard.put("payType", 1);
                     corporateCard.put("totalCash", iApprovalAmt);
                     corporateCard.put("totalCard", 0);
@@ -288,7 +299,7 @@ public class OcrControllerV2 {
             for (Item r : result.items) {
                 Map<String, Object> detailMap = new HashMap<String, Object>();
                 detailMap.put("account_id", objectValue);
-                detailMap.put("sale_id", saleId);
+                detailMap.put("sale_id", targetSaleId);
                 detailMap.put("name", r.name);
                 detailMap.put("qty", r.qty);
                 detailMap.put("amount", r.amount);
@@ -322,7 +333,7 @@ public class OcrControllerV2 {
 
                 // 프로젝트 루트 대신 static 폴더 경로 사용
                 String staticPath = new File(uploadDir).getAbsolutePath();
-                String basePath = staticPath + "/" + folderValue + "/" + saleId + "/";
+                String basePath = staticPath + "/" + folderValue + "/" + targetSaleId + "/";
 
                 Path dirPath = Paths.get(basePath);
                 Files.createDirectories(dirPath); // 폴더 없으면 생성
@@ -334,7 +345,7 @@ public class OcrControllerV2 {
                 file.transferTo(filePath.toFile()); // 파일 저장
 
                 // 브라우저 접근용 경로 반환
-                resultPath = "/image/" + folderValue + "/" + saleId + "/" + uniqueFileName;
+                resultPath = "/image/" + folderValue + "/" + targetSaleId + "/" + uniqueFileName;
                 corporateCard.put("receipt_image", resultPath);
             }
 
@@ -365,6 +376,11 @@ public class OcrControllerV2 {
 			}
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
+            try {
+                executor.awaitTermination(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             // 🔹 temp 파일 삭제
             if (tempFile != null && tempFile.exists()) {
                 boolean deleted = tempFile.delete();
@@ -395,16 +411,23 @@ public class OcrControllerV2 {
         
         // ✅ purchase에 sale_id가 없을 수 있으므로 null-safe 처리
         Object saleObj = purchase.get("sale_id");
+        String targetSaleId;
         if (saleObj == null || saleObj.toString().isBlank()) {
-            corporateCard.put("sale_id", saleId);
+            targetSaleId = saleId;
         } else {
-            corporateCard.put("sale_id", saleObj.toString());
+            targetSaleId = saleObj.toString();
         }
+        corporateCard.put("sale_id", targetSaleId);
         
+        String saveType = (String) purchase.get("saveType");
+        boolean isAccount = "account".equalsIgnoreCase(saveType);
+
         corporateCard.put("account_id", purchase.get("account_id"));
         corporateCard.put("year", now.getYear());
         corporateCard.put("month", now.getMonthValue());
         corporateCard.put("receipt_type", purchase.get("receipt_type"));
+        // fallback에서도 집계표 프로시저용 type을 숫자로 보정한다.
+        corporateCard.put("type", resolveTallyType(purchase.get("type"), isAccount));
 
         String cardNo = (String) purchase.get("cardNo");
         String cardBrand = (String) purchase.get("cardBrand");
@@ -432,12 +455,10 @@ public class OcrControllerV2 {
         }
 
         // 이미지 저장 및 경로 세팅
-        attachReceiptImage(corporateCard, file, saleId, folderValue);
+        attachReceiptImage(corporateCard, file, targetSaleId, folderValue);
 
         // DB 저장 (detail 저장은 없음)
         int iResult = 0;
-        String saveType = (String) purchase.get("saveType");
-        boolean isAccount = "account".equalsIgnoreCase(saveType);
         if (isAccount) {
             iResult += accountService.AccountCorporateCardPaymentSave(corporateCard);
             iResult += accountService.TallySheetCorporateCardPaymentSave(corporateCard);
@@ -465,6 +486,23 @@ public class OcrControllerV2 {
         file.transferTo(filePath.toFile());
         String resultPath = "/image/" + folderValue + "/" + saleId + "/" + uniqueFileName;
         corporateCard.put("receipt_image", resultPath);
+    }
+
+    // 집계표 프로시저 p_type은 정수 컬럼이므로 문자열 타입값(CONVENIENCE/MART_ITEMIZED)은 1000으로 보정한다.
+    private int resolveTallyType(Object rawType, boolean isAccount) {
+        if (isAccount) {
+            // account 경로는 별도 프로시저(TallySheetCorporateCardPaymentSave)를 사용하므로 값은 의미가 거의 없음.
+            return 1000;
+        }
+        if (rawType == null) return 1000;
+        String s = String.valueOf(rawType).trim();
+        if (s.isEmpty()) return 1000;
+        if (!s.matches("^-?\\d+$")) return 1000;
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return 1000;
+        }
     }
 
     /**

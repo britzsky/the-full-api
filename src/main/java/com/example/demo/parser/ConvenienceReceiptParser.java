@@ -78,6 +78,7 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
 
         // 2️⃣ 기본 정보
         r.merchant.name = safeExtract(text, "(CU\\s*[가-힣A-Za-z0-9]*점)", 1);
+        if (r.merchant.name != null) r.merchant.name = r.merchant.name.replaceAll("\\s+", " ").trim();
         r.merchant.address = safeExtract(text, "([가-힣]+시\\s*[가-힣]+구\\s*[가-힣0-9\\s]+\\d+번?)", 1);
         r.meta.saleDate = safeExtract(text, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1);
         r.meta.saleTime = safeExtract(text, "([0-2]?\\d:[0-5]\\d(?::[0-5]\\d)?)", 1);
@@ -117,6 +118,11 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
         Set<String> seen = new HashSet<>();
         items.removeIf(i -> !seen.add(i.name + "|" + i.amount));
 
+        // OCR 줄바꿈이 흔들려 기본 패턴이 실패한 경우 fallback 파싱으로 한번 더 시도
+        if (items.isEmpty()) {
+            items = parseItemsFallback(lines);
+        }
+
         r.items = items;
 
         // 4️⃣ 결제정보
@@ -127,9 +133,18 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
         r.approval.approvalNo = safeExtract(text, "승인번호[:\\s]*([0-9]{6,12})", 1);
 
         // 5️⃣ 총합
-        r.totals.total = firstInt(text, "결제금액[:\\s]*([0-9,]+)");
+        r.totals.total = firstInt(text, "(결제금액|총금액|합계|지불금액)[:\\s]*([0-9,]+)");
         r.totals.vat = null;
         r.totals.taxFree = firstInt(text, "면세물품가액[:\\s]*([0-9,]+)");
+        if (r.totals.total == null && r.payment.approvalAmt != null) {
+            r.totals.total = toInt(r.payment.approvalAmt);
+        }
+        if (r.totals.total == null && !r.items.isEmpty()) {
+            r.totals.total = r.items.stream()
+                    .filter(it -> it.amount != null)
+                    .mapToInt(it -> it.amount)
+                    .sum();
+        }
 
         System.out.println("📋 품목 수: " + r.items.size());
         for (Item i : r.items)
@@ -177,6 +192,7 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
                 safeExtract(text, "(CU\\s*[가-힣A-Za-z0-9]*점)", 1),
                 safeExtract(text, "(세븐일레븐\\s*[가-힣A-Za-z0-9]*점)", 1)
         );
+        if (r.merchant.name != null) r.merchant.name = r.merchant.name.replaceAll("\\s+", " ").trim();
         r.merchant.address = safeExtract(text, "([가-힣]+시\\s*[가-힣]+구\\s*[가-힣0-9\\s]+\\d+번)", 1);
 
         r.meta.saleDate = safeExtract(text, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1);
@@ -203,6 +219,10 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
 
         // 4️⃣ 품목 파싱
         r.items = parseItems(itemSection);
+        if (r.items.isEmpty()) {
+            // 섹션 컷팅이 잘못된 경우 전체 라인에서 한번 더 파싱
+            r.items = parseItemsFallback(lines);
+        }
 
         System.out.println("📋 추출된 품목 수: " + r.items.size());
         for (Item i : r.items)
@@ -210,7 +230,7 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
 
         // 5️⃣ 합계/결제 정보
         r.totals.vat   = firstInt(text, "(부가세)\\s*([0-9,]+)");
-        r.totals.total = firstInt(text, "(합계|총액|결제금액|계)\\s*([0-9,]+)");
+        r.totals.total = firstInt(text, "(합계|총액|결제금액|계|지불금액)\\s*([0-9,]+)");
 
         r.payment.type       = safeExtract(text, "(신용카드|현금|카카오페이|KB페이|네이버페이|토스페이|삼성페이)", 1);
         r.payment.cardBrand  = firstNonNull(
@@ -222,6 +242,9 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
                 safeExtract(text, "사용금액\\s*([0-9,]+)원?", 1),
                 safeExtract(text, "(결제금액)\\s*([0-9,]+)원?", 2)
         );
+        if (r.payment.approvalAmt == null && r.totals.total != null) {
+            r.payment.approvalAmt = String.valueOf(r.totals.total);
+        }
         r.payment.approvalTime = r.meta.saleTime;
         r.approval.approvalNo  = safeExtract(text, "승인번호\\s*([0-9]{6,12})", 1);
         r.payment.merchant     = safeExtract(text, "매입사[:：]\\s*([가-힣A-Za-z]+)", 1);
@@ -232,6 +255,86 @@ public class ConvenienceReceiptParser extends BaseReceiptParser {
         System.out.println("💳 사용금액: " + r.payment.approvalAmt);
 
         return r;
+    }
+
+    // OCR 줄 끊김이 어긋난 편의점 영수증용 fallback 파서
+    private List<Item> parseItemsFallback(String[] lines) {
+        List<Item> items = new ArrayList<>();
+
+        Pattern pInline = Pattern.compile("^(?:\\d{1,3}\\s+)?(.+?)\\s+(\\d{1,2})\\s+([0-9][0-9,]{2,})$");
+        Pattern pNameQty = Pattern.compile("^(?:\\d{1,3}\\s+)?(.+?)\\s+(\\d{1,2})$");
+        Pattern pAmountOnly = Pattern.compile("^[0-9][0-9,]{2,}$");
+
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i] == null ? "" : lines[i].trim();
+            if (line.isEmpty() || isNoiseLine(line)) continue;
+
+            Matcher inline = pInline.matcher(line);
+            if (inline.find()) {
+                String name = normalizeItemName(inline.group(1));
+                Integer qty = toInt(inline.group(2));
+                Integer amt = toInt(inline.group(3));
+                if (!isValidItemName(name) || qty == null || amt == null) continue;
+
+                Item it = new Item();
+                it.name = name;
+                it.qty = qty;
+                it.amount = amt;
+                it.unitPrice = amt / Math.max(1, qty);
+                items.add(it);
+                continue;
+            }
+
+            Matcher nameQty = pNameQty.matcher(line);
+            if (!nameQty.find()) continue;
+
+            String name = normalizeItemName(nameQty.group(1));
+            Integer qty = toInt(nameQty.group(2));
+            if (!isValidItemName(name) || qty == null) continue;
+
+            Integer amount = null;
+            for (int j = i + 1; j < Math.min(lines.length, i + 4); j++) {
+                String nxt = lines[j] == null ? "" : lines[j].trim();
+                if (nxt.isEmpty() || isNoiseLine(nxt)) continue;
+                if (pInline.matcher(nxt).find() || pNameQty.matcher(nxt).find()) break;
+                if (pAmountOnly.matcher(nxt).matches()) {
+                    Integer cand = toInt(nxt);
+                    if (cand != null && cand >= 100) {
+                        amount = cand;
+                        break;
+                    }
+                }
+            }
+            if (amount == null) continue;
+
+            Item it = new Item();
+            it.name = name;
+            it.qty = qty;
+            it.amount = amount;
+            it.unitPrice = amount / Math.max(1, qty);
+            items.add(it);
+        }
+
+        // 이름+금액 중복 제거
+        Set<String> seen = new LinkedHashSet<>();
+        List<Item> dedup = new ArrayList<>();
+        for (Item it : items) {
+            String k = (it.name == null ? "" : it.name) + "|" + (it.amount == null ? "" : it.amount);
+            if (seen.add(k)) dedup.add(it);
+        }
+        return dedup;
+    }
+
+    private String normalizeItemName(String raw) {
+        if (raw == null) return "";
+        return raw.replace("*", "")
+                .replaceAll("\\s+", " ")
+                .replaceAll("^[#\\-\\s]+", "")
+                .trim();
+    }
+
+    private boolean isNoiseLine(String line) {
+        return line.matches(".*(합계|총액|결제|승인번호|카드번호|면세|부가세|과세|정부방침|교환|환불|영수증|포인트|매출|POS|고객센터).*");
     }
     
     // ---------- 품목 영역 시작/끝 탐지 ----------

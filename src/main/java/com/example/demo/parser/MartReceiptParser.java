@@ -63,6 +63,14 @@ public class MartReceiptParser extends BaseReceiptParser {
         System.out.println("=== 📦 ITEM SECTION (" + itemSection.size() + " lines) ===");
         itemSection.forEach(System.out::println);
         r.items.addAll(parseItems(itemSection));
+        if (r.items.isEmpty()) {
+            // 섹션 분리가 빗나간 경우 전체 라인 기준으로 재시도
+            r.items.addAll(parseItems(lines));
+        }
+        if (r.items.isEmpty()) {
+            // 그래도 비면 느슨한 규칙으로 마지막 fallback
+            r.items.addAll(parseLooseFallbackItems(lines));
+        }
 
         // 7️⃣ 합계/결제/고객 정보
         String combinedTotals = String.join(" ", totalSection) + " " + String.join(" ", footerSection);
@@ -419,13 +427,17 @@ public class MartReceiptParser extends BaseReceiptParser {
     // -------------------- 결제/고객/계좌 --------------------
     private void fillTotalsAndPayment(String t, ReceiptResult r) {
         r.totals.discount = firstInt(t, "(할인금액|할인)[:：]?\\s*(-?[0-9,]+)");
-        r.totals.total    = firstInt(t, "(합 ?계|총 ?액|지불금액|내신금액|결제금액)[:：]?\\s*([0-9,]+)");
+        r.totals.total    = firstInt(t, "(합 ?계|총 ?액|지불금액|지불하실금액|내신금액|결제금액|총결제액)[:：]?\\s*([0-9,]+)");
         boolean hasCard = t.contains("카드");
         boolean hasCash = t.contains("현금");
         if (hasCard) {
             r.payment.type = "card";
             r.payment.cardBrand   = extract(t, "(국민|하나|신한|롯데|BC|삼성|현대) ?카드");
-            r.payment.approvalAmt = extract(t, "(승인금액|전표금액|일시불)[:：]?\\s*([0-9,]+)", 2);
+            r.payment.approvalAmt = firstNonNull(
+                    extract(t, "(승인금액|전표금액|일시불)[:：]?\\s*([0-9,]+)", 2),
+                    extract(t, "신용카드\\s*([0-9,]+)", 1),
+                    extract(t, "카드지불\\s*([0-9,]+)", 1)
+            );
         } else if (hasCash) {
             r.payment.type = "cash";
             r.payment.approvalAmt = extract(t, "(현금지불|현금영수증|내신금액|지출증빙)[:：]?\\s*([0-9,]+)", 2);
@@ -460,5 +472,84 @@ public class MartReceiptParser extends BaseReceiptParser {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    // 마트 OCR 포맷이 깨졌을 때를 위한 느슨한 fallback 파서
+    private List<Item> parseLooseFallbackItems(List<String> lines) {
+        List<Item> items = new ArrayList<>();
+        Pattern pInline4 = Pattern.compile("^(?:\\d{1,3}\\s+)?(.+?)\\s+(\\d{1,3}(?:,\\d{3})*)\\s+(\\d{1,2})\\s+(\\d{1,3}(?:,\\d{3})*)\\s*(#)?$");
+        Pattern pNameOnly = Pattern.compile("^(?:\\d{1,3}\\s+)?([가-힣A-Za-z].+)$");
+        Pattern pNums = Pattern.compile("^(\\d{1,3}(?:,\\d{3})*)\\s+(\\d{1,2})\\s+(\\d{1,3}(?:,\\d{3})*)\\s*(#)?$");
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i).trim();
+            if (line.isEmpty()) continue;
+            if (line.matches(".*(합계|총액|부가세|면세|과세|신용카드|카드지불|승인번호|거래NO|감사합니다).*")) continue;
+
+            Matcher m4 = pInline4.matcher(line);
+            if (m4.find()) {
+                String name = normalizeName(m4.group(1));
+                if (shouldSkipName(name)) continue;
+                Item it = new Item();
+                it.name = name;
+                it.unitPrice = toInt(m4.group(2));
+                it.qty = toInt(m4.group(3));
+                it.amount = toInt(m4.group(4));
+                it.taxFlag = (m4.group(5) != null) ? "면세" : "과세";
+                items.add(it);
+                continue;
+            }
+
+            Matcher mn = pNameOnly.matcher(line);
+            if (!mn.find()) continue;
+
+            String name = normalizeName(mn.group(1));
+            if (shouldSkipName(name)) continue;
+
+            Integer unit = null, qty = null, amt = null;
+            String taxFlag = "과세";
+            for (int j = i + 1; j < Math.min(lines.size(), i + 4); j++) {
+                String nxt = lines.get(j).trim();
+                Matcher nm = pNums.matcher(nxt);
+                if (nm.find()) {
+                    unit = toInt(nm.group(1));
+                    qty = toInt(nm.group(2));
+                    amt = toInt(nm.group(3));
+                    taxFlag = (nm.group(4) != null) ? "면세" : "과세";
+                    break;
+                }
+                if (nxt.matches("^(?:\\d{1,3}\\s+)?[가-힣A-Za-z].*")) break;
+            }
+            if (amt == null) continue;
+
+            Item it = new Item();
+            it.name = name;
+            it.unitPrice = unit;
+            it.qty = qty;
+            it.amount = amt;
+            it.taxFlag = taxFlag;
+            items.add(it);
+        }
+
+        // 이름+금액 기준 중복 제거
+        Map<String, Item> uniq = new LinkedHashMap<>();
+        for (Item it : items) {
+            String key = (it.name == null ? "" : it.name) + "|" + (it.amount == null ? "" : it.amount);
+            uniq.putIfAbsent(key, it);
+        }
+        return new ArrayList<>(uniq.values());
+    }
+
+    private String normalizeName(String s) {
+        if (s == null) return "";
+        return s.replaceAll("\\s+", " ")
+                .replaceAll("^\\d{8,14}$", "")
+                .trim();
+    }
+
+    private boolean shouldSkipName(String name) {
+        if (name == null || name.isEmpty()) return true;
+        if (name.matches("^[0-9,]+$")) return true;
+        return name.matches(".*(단가|수량|금액|합계|총액|과세|면세|부가세|신용카드|거래NO|승인번호|감사합니다).*");
     }
 }

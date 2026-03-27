@@ -78,7 +78,10 @@ public class OcrService {
         String name = String.format("projects/%s/locations/%s/processors/%s",
                 projectId, location, processorId);
         
-        ByteString content = ByteString.readFrom(new FileInputStream(optimized));
+        ByteString content;
+        try (FileInputStream inputStream = new FileInputStream(optimized)) {
+            content = ByteString.readFrom(inputStream);
+        }
     	
         RawDocument rawDocument = RawDocument.newBuilder()
                 .setContent(content)

@@ -91,7 +91,7 @@ public class OcrControllerV5 {
             "위생장갑", "고무장갑", "앞치마", "마스크",
             "종이컵", "비닐", "봉투", "랩", "호일", "포장",
             "세제", "주방세제", "락스", "세척제", "소독제",
-            "수세미", "스펀지", "필터", "호스");
+            "수세미", "스펀지", "필터", "호스", "밥솥");
 
     // ✅ 예외 케이스 (예: "칼국수" → 음식)
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList(
@@ -369,6 +369,11 @@ public class OcrControllerV5 {
 			}
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
+            try {
+                executor.awaitTermination(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
             // 🔹 temp 파일 삭제
             if (tempFile != null && tempFile.exists()) {
                 boolean deleted = tempFile.delete();

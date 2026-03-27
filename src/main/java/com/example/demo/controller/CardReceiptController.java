@@ -285,7 +285,7 @@ public class CardReceiptController {
             "위생장갑", "고무장갑", "앞치마", "마스크",
             "종이컵", "비닐", "봉투", "랩", "호일", "포장",
             "세제", "주방세제", "락스", "세척제", "소독제",
-            "수세미", "스펀지", "필터", "호스");
+            "수세미", "스펀지", "필터", "호스", "밥솥");
 
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList("칼국수", "가위살");
 
