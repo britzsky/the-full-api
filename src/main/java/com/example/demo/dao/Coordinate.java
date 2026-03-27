@@ -1,12 +1,10 @@
 package com.example.demo.dao;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
 public class Coordinate {
     private Double x; // 경도 (127.xxx)
     private Double y; // 위도 (37.xxx)
