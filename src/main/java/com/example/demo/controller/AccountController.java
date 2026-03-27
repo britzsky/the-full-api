@@ -778,14 +778,6 @@ public class AccountController {
 
 		filePathMap.put("account_id", accountId);
 
-		System.out.println("account_id == " + filePathMap.get("account_id"));
-		System.out.println("business_report == " + filePathMap.get("business_report"));
-		System.out.println("business_regist == " + filePathMap.get("business_regist"));
-		System.out.println("kitchen_drawing == " + filePathMap.get("kitchen_drawing"));
-		System.out.println("nutritionist_room_img == " + filePathMap.get("nutritionist_room_img"));
-		System.out.println("chef_lounge_img == " + filePathMap.get("chef_lounge_img"));
-		System.out.println("meal_service_contract == " + filePathMap.get("meal_service_contract"));
-
 		accountService.insertOrUpdateFile(filePathMap);
 
 		return filePathMap.toString();
