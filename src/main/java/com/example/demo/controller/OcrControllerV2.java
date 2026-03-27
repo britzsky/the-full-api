@@ -473,16 +473,19 @@ public class OcrControllerV2 {
      * @return
      */
     public static int taxify(String taxFlag) {
-        if (taxFlag == null || taxFlag.isEmpty()) {
+        if (taxFlag == null) {
             return 3;
         }
 
-        if (taxFlag.equals(VAT)) {
-            return 1;
+        String normalized = taxFlag.trim();
+        if (normalized.isEmpty()) {
+            return 3;
         }
-
-        if (taxFlag.equals(TAX_FREE)) {
+        if (normalized.contains(TAX_FREE)) {
             return 2;
+        }
+        if (normalized.contains(VAT)) {
+            return 1;
         }
 
         return 3;
@@ -495,13 +498,14 @@ public class OcrControllerV2 {
      */
     public static int classify(String itemName) {
         if (itemName == null || itemName.isEmpty()) {
-            return 3;
+            // 기본은 식재료로 둬서 "예산미발행(3)" 과다 분류를 줄인다.
+            return 1;
         }
 
         // 1) 예외 케이스부터 검사
         for (String ex : FOOD_EXCEPTIONS) {
             if (itemName.contains(ex)) {
-                return 3;
+                return 1;
             }
         }
 
@@ -519,8 +523,8 @@ public class OcrControllerV2 {
             }
         }
 
-        // 4) 해당 없으면 기타
-        return 3;
+        // 4) 해당 없으면 기본 식재료
+        return 1;
     }
 
     /**

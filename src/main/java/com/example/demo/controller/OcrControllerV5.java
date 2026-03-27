@@ -114,7 +114,8 @@ public class OcrControllerV5 {
             @RequestParam(value = "account_id", required = false) String account_id,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "saleDate", required = false) String saleDate) {
+            @RequestParam(value = "saleDate", required = false) String saleDate,
+            @RequestParam(value = "sale_id", required = false) String sale_id) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -126,6 +127,7 @@ public class OcrControllerV5 {
         purchase.put("user_id", user_id);
         purchase.put("receipt_type", receiptType);
         purchase.put("saleDate", saleDate);
+        purchase.put("sale_id", sale_id);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -236,8 +238,10 @@ public class OcrControllerV5 {
                 purchase.put("saleDate", date); 						// saleDate 세팅.
             }
 
+            String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : saleId;
+
             purchase.put("account_id", account_id); 				// account_id 세팅.
-            purchase.put("sale_id", saleId); 						// saleId 세팅.
+            purchase.put("sale_id", targetSaleId); 				// saleId 세팅.
             
             Integer parsedTotal = (result.totals != null ? result.totals.total : null);
             if (parsedTotal == null || parsedTotal == 0) {
@@ -302,7 +306,7 @@ public class OcrControllerV5 {
 
             for (Item r : result.items) {
                 Map<String, Object> detailMap = new HashMap<String, Object>();
-                detailMap.put("sale_id", saleId);
+                detailMap.put("sale_id", targetSaleId);
                 detailMap.put("name", r.name);
                 detailMap.put("qty", r.qty);
                 detailMap.put("amount", r.amount);
@@ -382,7 +386,10 @@ public class OcrControllerV5 {
             throws Exception {
         // sale_id 생성
         LocalDateTime now = LocalDateTime.now();
-        String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+        Object saleIdObj = purchase.get("sale_id");
+        String saleId = (saleIdObj != null && !String.valueOf(saleIdObj).isBlank())
+                ? String.valueOf(saleIdObj)
+                : now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
         purchase.put("sale_id", saleId);
 
         // cell_date 기준으로 count_year/count_month 세팅 (없으면 오늘)
