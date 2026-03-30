@@ -55,6 +55,18 @@
         AND amv.del_yn = 'N'
 		ORDER BY amv.type asc
 	</select>
+
+	<select id="TallySheetNote" parameterType="map" resultType="hashmap">
+		SELECT IFNULL((
+		    SELECT ats.note
+		    FROM tb_account_tally_sheet ats
+		    WHERE ats.account_id = #{account_id}
+		      AND ats.count_year = #{year}
+		      AND ats.count_month = #{month}
+		    ORDER BY ats.mod_dt DESC
+		    LIMIT 1
+		), '') AS note
+	</select>
 	
 	<insert id="TallyNowMonthSave" parameterType="map">
 		INSERT INTO tb_account_tally_sheet
@@ -82,6 +94,50 @@
 		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
 		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31},
 		user_id = #{user_id}, mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
+	</insert>
+
+	<update id="TallySheetNoteSave" parameterType="map">
+		UPDATE tb_account_tally_sheet
+		SET note = #{note}
+		WHERE account_id = #{account_id}
+		  AND count_year = #{year}
+		  AND count_month = #{month}
+	</update>
+
+	<insert id="TallySheetNoteInitSave" parameterType="map">
+		INSERT INTO tb_account_tally_sheet
+		(
+			account_id,
+			type,
+			count_year,
+			count_month,
+			day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10,
+			day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20,
+			day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31,
+			note,
+			user_id,
+			mod_dt
+		)
+		VALUES
+		(
+			#{account_id},
+			COALESCE((
+				SELECT MIN(amv.type)
+				FROM tb_account_mapping_v2 amv
+				WHERE amv.account_id = #{account_id}
+				  AND amv.del_yn = 'N'
+			), 1),
+			#{year},
+			#{month},
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			#{note},
+			#{user_id},
+			DATE_FORMAT(NOW(), '%Y-%m-%d')
+		)
+		ON DUPLICATE KEY UPDATE
+			note = VALUES(note)
 	</insert>
 	
 	<select id="PropertiesList" parameterType="map" resultType="hashmap">
@@ -1769,10 +1825,13 @@
 	</select>
 	
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
+		<!-- ✅ status_yn 미전달(기존 호출) 시에도 기존 동작 유지되도록 기본값 N 사용 -->
+		<bind name="statusYn" value="status_yn != null and status_yn != '' ? status_yn : 'N'" />
 	    { CALL BudgetTotalSave(
 	        #{year, mode=IN, jdbcType=INTEGER},
 	        #{month, mode=IN, jdbcType=INTEGER},
 	        #{account_id, mode=IN, jdbcType=VARCHAR},
+	        #{statusYn, mode=IN, jdbcType=CHAR},
 	        #{result, mode=OUT, jdbcType=INTEGER}
 	    ) }
 	</select>

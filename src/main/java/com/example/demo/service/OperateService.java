@@ -31,6 +31,12 @@ public class OperateService {
 		resultList = operateMapper.TallySheetList(paramMap);
 		return resultList;
 	}
+	// 급식사업부 -> 운영관리 -> 집계표 메모 조회
+	public Map<String, Object> TallySheetNote(Map<String, Object> paramMap) {
+		Map<String, Object> resultMap = new HashMap<String, Object>();
+		resultMap = operateMapper.TallySheetNote(paramMap);
+		return resultMap;
+	}
 	// 급식사업부 -> 운영관리 -> 집계표(본월) 저장
 	public int TallyNowMonthSave (Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -41,6 +47,15 @@ public class OperateService {
 	public int TallyBeforeMonthSave (Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallyBeforeMonthSave(paramMap);
+		return iResult;
+	}
+	// 급식사업부 -> 운영관리 -> 집계표 메모 저장
+	public int TallySheetNoteSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.TallySheetNoteSave(paramMap);
+		if (iResult == 0) {
+			iResult = operateMapper.TallySheetNoteInitSave(paramMap);
+		}
 		return iResult;
 	}
 	// 급식사업부 -> 운영관리 -> 기물리스트 저장

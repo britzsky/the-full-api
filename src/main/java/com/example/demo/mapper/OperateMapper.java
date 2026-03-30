@@ -9,11 +9,14 @@ import org.apache.ibatis.annotations.Mapper;
 public interface OperateMapper {
 	
 	List<Map<String, Object>> TallySheetList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 집계표 조회
+	Map<String, Object> TallySheetNote(Map<String, Object> paramMap);							// 급식사업부 -> 운영관리 -> 집계표 메모 조회
 	
 	String NowDateKey();
 	
 	int TallyNowMonthSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영관리 -> 본월 집계표 저장
 	int TallyBeforeMonthSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영관리 -> 이월 집계표 저장
+	int TallySheetNoteSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영관리 -> 집계표 메모 저장(기존 row)
+	int TallySheetNoteInitSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 집계표 메모 저장(row 생성)
 	int PropertiesSave(Map<String, Object> paramMap);											// 급식사업부 -> 운영관리 -> 기물리스트 저장
 	List<Map<String, Object>> PropertiesList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 기물리스트 조회
 	List<Map<String, Object>> HygieneList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 위생관리 조회

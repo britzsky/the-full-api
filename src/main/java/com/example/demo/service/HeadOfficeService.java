@@ -53,12 +53,12 @@ public class HeadOfficeService {
 		return headOfficeMapper.ProfitLossTableList(paramMap);
 	}
 	// 본사 -> 관리표 -> 손익표 엑셀다운
-	public List<Map<String, Object>> ExcelDaownProfitLossTableList(Map<String, Object> paramMap) {
-		return headOfficeMapper.ExcelDaownProfitLossTableList(paramMap);
+	public List<Map<String, Object>> ExcelDownProfitLossTableList(Map<String, Object> paramMap) {
+		return headOfficeMapper.ExcelDownProfitLossTableList(paramMap);
 	}
 	// 본사 -> 관리표 -> 손익표 엑셀다운
-	public List<Map<String, Object>> ExcelDaownMonthProfitLossTableList(Map<String, Object> paramMap) {
-		return headOfficeMapper.ExcelDaownMonthProfitLossTableList(paramMap);
+	public List<Map<String, Object>> ExcelDownMonthProfitLossTableList(Map<String, Object> paramMap) {
+		return headOfficeMapper.ExcelDownMonthProfitLossTableList(paramMap);
 	}
 	// 본사 -> 관리표 -> 손익표 합계 및 비율 저장
 	public void ProfitLossTotalSave(Map<String, Object> paramMap) {
@@ -133,6 +133,114 @@ public class HeadOfficeService {
 	public int HeadOfficePurchaseRequestSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.HeadOfficePurchaseRequestSave(paramMap);
 	};
+
+	// 본사 -> 전자결재 관리 -> 결재 문서 메인 저장
+	public int ElectronicPaymentSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentSave(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 문서번호 기준 품목 초기화
+	public int HeadOfficePurchaseRequestDeleteByPaymentId(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficePurchaseRequestDeleteByPaymentId(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 품목 일괄 저장(배치)
+	public int HeadOfficePurchaseRequestBulkSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficePurchaseRequestBulkSave(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 문서번호 기준 기안서 본문 초기화
+	public int HeadOfficeDraftDeleteByPaymentId(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficeDraftDeleteByPaymentId(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 기안서 본문 저장
+	public int HeadOfficeDraftSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficeDraftSave(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 문서번호 기준 지출결의서 본문 초기화
+	public int HeadOfficePaymentDocDeleteByPaymentId(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficePaymentDocDeleteByPaymentId(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 지출결의서 본문 저장
+	public int HeadOfficePaymentDocSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficePaymentDocSave(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 첨부 이미지 조회
+	public List<Map<String, Object>> ElectronicPaymentFileList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.ElectronicPaymentFileList(paramMap);
+		return resultList;
+	}
+
+	// 본사 -> 전자결재 관리 -> 첨부 이미지 삭제
+	public int ElectronicPaymentFileDelete(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentFileDelete(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 첨부 이미지 순번 최대값+1 반환
+	public int GetNextElectronicPaymentImageOrder(String paymentId) {
+		Map<String, Object> paramMap = new java.util.HashMap<>();
+		paramMap.put("payment_id", paymentId);
+		Integer maxOrder = headOfficeMapper.GetMaxElectronicPaymentImageOrder(paramMap);
+		return maxOrder == null ? 1 : maxOrder + 1;
+	}
+
+	// 본사 -> 전자결재 관리 -> 첨부 이미지 저장
+	public void SaveElectronicPaymentFile(Map<String, Object> paramMap) {
+		headOfficeMapper.SaveElectronicPaymentFile(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 내 문서/결재대상 목록 조회
+	public List<Map<String, Object>> ElectronicPaymentManageList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.ElectronicPaymentManageList(paramMap);
+		return resultList;
+	}
+
+	// 본사 -> 전자결재 관리 -> 문서 메인 조회
+	public Map<String, Object> ElectronicPaymentManageMain(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentManageMain(paramMap);
+	}
+
+	// 본사 -> 전자결재 관리 -> 문서 품목 조회
+	public List<Map<String, Object>> ElectronicPaymentManageItems(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.ElectronicPaymentManageItems(paramMap);
+		return resultList;
+	}
+
+	// 본사 -> 전자결재 관리 -> 결재/반려 저장(팀장/대표/결재자 순으로 시도)
+	public int ElectronicPaymentManageSignSave(Map<String, Object> paramMap) {
+		int iResult = headOfficeMapper.ElectronicPaymentManageTmSignSave(paramMap);
+		if (iResult > 0) return iResult;
+
+		iResult = headOfficeMapper.ElectronicPaymentManageCeoSignSave(paramMap);
+		if (iResult > 0) return iResult;
+
+		iResult = headOfficeMapper.ElectronicPaymentManagePayerSignSave(paramMap);
+		return iResult;
+	}
+
+	// 본사 -> 전자결재 관리 -> 소모품 구매여부 저장
+	public int ElectronicPaymentItemBuyYnSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentItemBuyYnSave(paramMap);
+	}
+
+	// 본사 -> 전자결재 알림 목록 조회
+	public List<Map<String, Object>> ElectronicPaymentNotificationList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = headOfficeMapper.ElectronicPaymentNotificationList(paramMap);
+		return resultList;
+	}
+
+	// 본사 -> 전자결재 알림 읽음 처리
+	public int ElectronicPaymentNotificationReadSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentNotificationReadSave(paramMap);
+	}
 	
 	// 본사 -> 전자결재 관리 -> 부서목록 조회
 	public List<Map<String, Object>> HeadOfficeDepartmentList (Map<String, Object> paramMap) {

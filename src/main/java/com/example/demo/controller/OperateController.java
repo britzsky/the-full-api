@@ -73,6 +73,28 @@ public class OperateController {
     	
     	return new Gson().toJson(resultList);
     }
+
+	/*
+	 * part		: 운영
+	 * method 	: TallySheetNote
+	 * comment 	: 급식사업부 -> 운영관리 -> 집계표 메모 조회
+	 */
+	@GetMapping("/Operate/TallySheetNote")
+	public String TallySheetNote(@RequestParam Map<String, Object> paramMap) {
+		int digits = 2;
+		String monthString = String.valueOf(paramMap.get("month"));
+		int monthValue = Integer.parseInt(monthString);
+		String formattedNumber = String.format("%0" + digits + "d", monthValue);
+
+		paramMap.put("month", formattedNumber);
+
+		Map<String, Object> resultMap = operateService.TallySheetNote(paramMap);
+		if (resultMap == null) {
+			resultMap = new HashMap<String, Object>();
+			resultMap.put("note", "");
+		}
+		return new Gson().toJson(resultMap);
+	}
     
     /*
      * method 	: NowDateKey
@@ -125,6 +147,36 @@ public class OperateController {
     	
     	return obj.toString();
     }
+
+	/*
+	 * part		: 운영
+	 * method 	: TallySheetNoteSave
+	 * comment 	: 급식사업부 -> 운영관리 -> 집계표 메모 저장
+	 */
+	@PostMapping("Operate/TallySheetNoteSave")
+	private String TallySheetNoteSave(@RequestBody Map<String, Object> paramMap) {
+		int digits = 2;
+		String monthString = String.valueOf(paramMap.get("month"));
+		int monthValue = Integer.parseInt(monthString);
+		String formattedNumber = String.format("%0" + digits + "d", monthValue);
+		paramMap.put("month", formattedNumber);
+
+		Object noteValue = paramMap.get("note");
+		paramMap.put("note", noteValue == null ? "" : noteValue.toString());
+
+		int iResult = operateService.TallySheetNoteSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
     
     /*
      * part		: 운영

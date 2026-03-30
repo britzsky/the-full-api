@@ -741,7 +741,7 @@
 		    </choose>
     </select>
     
-    <select id="ExcelDaownMonthProfitLossTableList" parameterType="map" resultType="HashMap">
+    <select id="ExcelDownMonthProfitLossTableList" parameterType="map" resultType="HashMap">
     	<choose>
 	        <when test="account_id == 'ALL' and month == ''">
 	        	SELECT
@@ -873,6 +873,7 @@
 				        
 				        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
 				        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
+				         SUM(IFNULL(living_cost2, 0)) + SUM(IFNULL(basic_cost2, 0)) + SUM(IFNULL(employ_cost2, 0)) + 
 				         SUM(IFNULL(daycare_cost, 0)) + SUM(IFNULL(daycare_emp_cost, 0)) + SUM(IFNULL(payback_price, 0)) + SUM(IFNULL(integrity_cost, 0))) AS sales_total,
 				        
 				        (SUM(IFNULL(food_process, 0)) + SUM(IFNULL(dishwasher, 0)) + SUM(IFNULL(cesco, 0)) + 
@@ -994,7 +995,7 @@
 		</choose>
 	</select>
     
-    <select id="ExcelDaownProfitLossTableList" parameterType="map" resultType="HashMap">
+    <select id="ExcelDownProfitLossTableList" parameterType="map" resultType="HashMap">
 		SELECT
 		    T.account_id,
                      T.account_name,
@@ -1124,6 +1125,7 @@
 		        
 		        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
 		        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
+		         SUM(IFNULL(living_cost2, 0)) + SUM(IFNULL(basic_cost2, 0)) + SUM(IFNULL(employ_cost2, 0)) + 
 		         SUM(IFNULL(daycare_cost, 0)) + SUM(IFNULL(daycare_emp_cost, 0)) + SUM(IFNULL(payback_price, 0)) + SUM(IFNULL(integrity_cost, 0))) AS sales_total,
 		        
 		        (SUM(IFNULL(food_process, 0)) + SUM(IFNULL(dishwasher, 0)) + SUM(IFNULL(cesco, 0)) + 
@@ -1296,14 +1298,17 @@
     </select>
     
     <select id="HeadOfficeElectronicPaymentTypeList" parameterType="map" resultType="hashmap">
-    	SELECT doc_type, doc_name, position
+    	SELECT doc_type,
+			   doc_name,
+			   position
 		FROM tb_electronic_payment_type
 		WHERE del_yn = 'N'
+		ORDER BY position ASC, doc_type ASC
     </select>
     
     <select id="HeadOfficeElectronicPaymentList" parameterType="map" resultType="hashmap">
     	SELECT payment_id, 
-    		   DATE_FORMAT(draft_dt, '%Y-%m-%d') AS draft_dt,
+    		   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
     		   doc_type,
     		   user_id,
     		   charge_sign,
@@ -1315,20 +1320,23 @@
     		   payer_user,
     		   ceo_user,
     		   department,
-    		   DATE_FORMAT(reg_dt, '%Y-%m-%d') AS reg_dt
+    		   DATE_FORMAT(reg_dt, '%Y-%m-%d %H:%i:%s') AS reg_dt
 		FROM tb_headoffice_electronic_payment
 		WHERE del_yn = 'N'
     </select>
 
 	<insert id="HeadOfficeElectronicPaymentSave">
         INSERT INTO tb_headoffice_electronic_payment
-    
+
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        payment_id,
 	        draft_dt,
+	        start_dt,
 	        doc_type,
 	        department,
 	        status,
+	        retention_dt,
+	        access_level,
 	        user_id,
 	        charge_sign,
 	        tm_user,
@@ -1340,15 +1348,26 @@
 	        reg_dt,
 	        reg_user_id
 	    </trim>
-	    
+
 	    VALUES
-	    
+
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	    	#{payment_id},
-	    	DATE_FORMAT(#{draft_dt}, '%Y-%m-%d'),
+	    	COALESCE(
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	    	COALESCE(
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
 	        #{doc_type},
 	        #{department},
 	        #{status},
+	        #{retention_dt},
+	        #{access_level},
 	        #{user_id},
 	        #{charge_sign},
 	        #{tm_user},
@@ -1357,16 +1376,27 @@
 	        #{payer_sign},
 	        #{ceo_user},
 	        #{ceo_sign},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        NOW(),
 	        #{user_id}
 	    </trim>
-	    
+
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
-	    	draft_dt = DATE_FORMAT(#{draft_dt}, '%Y-%m-%d'),
+	    	draft_dt = COALESCE(
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	    	start_dt = COALESCE(
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
 	        doc_type = #{doc_type},
 	        department = #{department},
 	        status = #{status},
+	        retention_dt = #{retention_dt},
+	        access_level = #{access_level},
 	        user_id= #{user_id},
 	        charge_sign = #{charge_sign},
 	        tm_user = #{tm_user},
@@ -1377,6 +1407,769 @@
 	        ceo_sign = #{ceo_sign}
 	    </trim>
     </insert>
+
+	<insert id="ElectronicPaymentSave" parameterType="map">
+        INSERT INTO tb_headoffice_electronic_payment
+	    (
+	        payment_id,
+	        draft_dt,
+	        start_dt,
+	        doc_type,
+	        department,
+	        status,
+	        retention_dt,
+	        access_level,
+	        user_id,
+	        charge_sign,
+	        tm_user,
+	        tm_sign,
+	        payer_user,
+	        payer_sign,
+	        ceo_user,
+	        ceo_sign,
+	        reg_dt,
+	        reg_user_id
+	    )
+	    VALUES
+	    (
+	    	#{payment_id},
+	    	COALESCE(
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	    	COALESCE(
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	        #{doc_type},
+	        #{department},
+	        #{status},
+	        #{retention_dt},
+	        #{access_level},
+	        #{user_id},
+	        #{charge_sign},
+	        #{tm_user},
+	        #{tm_sign},
+	        #{payer_user},
+	        #{payer_sign},
+	        #{ceo_user},
+	        #{ceo_sign},
+	        NOW(),
+	        #{reg_user_id}
+	    )
+	    ON DUPLICATE KEY UPDATE
+	    	draft_dt = COALESCE(
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	    	start_dt = COALESCE(
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{start_dt}, '%Y-%m-%d %H:%i'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i:%s'),
+	    		STR_TO_DATE(#{draft_dt}, '%Y-%m-%d %H:%i')
+	    	),
+	        doc_type = #{doc_type},
+	        department = #{department},
+	        status = #{status},
+	        retention_dt = #{retention_dt},
+	        access_level = #{access_level},
+	        user_id = #{user_id},
+	        charge_sign = #{charge_sign},
+	        tm_user = #{tm_user},
+	        tm_sign = #{tm_sign},
+	        payer_user = #{payer_user},
+	        payer_sign = #{payer_sign},
+	        ceo_user = #{ceo_user},
+	        ceo_sign = #{ceo_sign},
+	        reg_user_id = #{reg_user_id}
+    </insert>
+
+	<select id="ElectronicPaymentManageList" parameterType="map" resultType="hashmap">
+		<!-- 소모품 전체조회 예외 사용자(필요 시 변경): iy1 -->
+		SELECT ep.payment_id,
+			   DATE_FORMAT(ep.draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+			   DATE_FORMAT(COALESCE(ep.start_dt, ep.draft_dt), '%Y-%m-%d %H:%i:%s') AS start_dt,
+			   ep.doc_type,
+			   IFNULL(ept.position, -1) AS position,
+			   ep.department,
+			   ep.status,
+			   ep.retention_dt,
+			   ep.access_level,
+			   ep.user_id,
+			   ep.reg_user_id,
+			   ep.charge_sign,
+			   ep.tm_user,
+			   ep.tm_sign,
+			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
+			   ep.payer_user,
+			   ep.payer_sign,
+			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
+			   ep.ceo_user,
+			   ep.ceo_sign,
+			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt,
+			   CASE
+			   	 WHEN IFNULL(ep.tm_sign, '') = '3' OR IFNULL(ep.payer_sign, '') = '3' OR IFNULL(ep.ceo_sign, '') = '3'
+			   	 	THEN '반려'
+			   	 WHEN (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
+			   	  AND (IFNULL(ep.payer_user, '') = '' OR IFNULL(ep.payer_sign, '') = '4')
+			   	  AND (IFNULL(ep.ceo_user, '') = '' OR IFNULL(ep.ceo_sign, '') = '4')
+			   	 	THEN '승인완료'
+			   	 WHEN IFNULL(ep.tm_user, '') != ''
+			   	  AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			   	 	THEN CASE WHEN IFNULL(ep.tm_sign, '') = '2' THEN '검토중(팀장)' ELSE '결재대기(팀장)' END
+			   	 WHEN IFNULL(ep.payer_user, '') != ''
+			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
+			   	  AND IFNULL(ep.payer_sign, '') NOT IN ('3', '4')
+			   	 	THEN CASE WHEN IFNULL(ep.payer_sign, '') = '2' THEN '검토중(결재자)' ELSE '결재대기(결재자)' END
+			   	 WHEN IFNULL(ep.ceo_user, '') != ''
+			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
+			   	  AND (IFNULL(ep.payer_user, '') = '' OR IFNULL(ep.payer_sign, '') = '4')
+			   	  AND IFNULL(ep.ceo_sign, '') NOT IN ('3', '4')
+			   	 	THEN CASE WHEN IFNULL(ep.ceo_sign, '') = '2' THEN '검토중(대표)' ELSE '결재대기(대표)' END
+			   	 ELSE '결재대기(팀장)'
+			   END AS progress_status_text,
+			   CASE
+			   	 WHEN ep.reg_user_id = #{user_id} THEN 'reg'
+			   	 WHEN ep.tm_user = #{user_id} THEN 'tm'
+			   	 WHEN ep.ceo_user = #{user_id} THEN 'ceo'
+			   	 WHEN ep.payer_user = #{user_id} THEN 'payer'
+			   	 ELSE ''
+			   END AS viewer_role,
+			   CASE
+			   	 WHEN ep.tm_user = #{user_id}
+			   	  AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			   	 	THEN 'Y'
+			   	 WHEN ep.payer_user = #{user_id}
+			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
+			   	  AND IFNULL(ep.payer_sign, '') NOT IN ('3', '4')
+			   	 	THEN 'Y'
+			   	 WHEN ep.ceo_user = #{user_id}
+			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
+			   	  AND (IFNULL(ep.payer_user, '') = '' OR IFNULL(ep.payer_sign, '') = '4')
+			   	  AND IFNULL(ep.ceo_sign, '') NOT IN ('3', '4')
+			   	 	THEN 'Y'
+			   	 ELSE 'N'
+			   END AS can_action
+		FROM tb_headoffice_electronic_payment ep
+		LEFT JOIN tb_electronic_payment_type ept
+		  ON ept.doc_type = ep.doc_type
+		 AND IFNULL(ept.del_yn, 'N') = 'N'
+		<choose>
+			<when test="user_id != null and user_id != ''">
+				WHERE EXISTS (
+					SELECT 1
+					FROM tb_user lu
+					WHERE lu.user_id = #{user_id}
+					  AND IFNULL(lu.del_yn, 'N') = 'N'
+					  AND (
+					  		lu.position = 0
+					  		OR ep.reg_user_id = #{user_id}
+					  		OR ep.tm_user = #{user_id}
+					  		OR ep.ceo_user = #{user_id}
+					  		OR ep.payer_user = #{user_id}
+					  		OR (lu.position = 1 AND lu.department = ep.department)
+					  		OR (
+					  			#{user_id} = 'iy1'
+					  			AND EXISTS (
+					  				SELECT 1
+					  				FROM tb_headoffice_purchase_request prx
+					  				WHERE prx.payment_id = ep.payment_id
+					  			)
+					  		)
+					  	  )
+				)
+			</when>
+			<otherwise>
+				WHERE 1 = 0
+			</otherwise>
+		</choose>
+		ORDER BY ep.draft_dt DESC, ep.payment_id DESC
+	</select>
+
+	<select id="ElectronicPaymentManageMain" parameterType="map" resultType="hashmap">
+		<!-- 소모품 전체조회 예외 사용자(필요 시 변경): iy1 -->
+		SELECT ep.payment_id,
+			   DATE_FORMAT(ep.draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+			   DATE_FORMAT(COALESCE(ep.start_dt, ep.draft_dt), '%Y-%m-%d %H:%i:%s') AS start_dt,
+			   ep.doc_type,
+			   IFNULL(ept.position, -1) AS position,
+			   ep.department,
+			   ep.status,
+			   ep.retention_dt,
+			   ep.access_level,
+			   ep.user_id,
+			   ep.reg_user_id,
+			   ep.charge_sign,
+			   ep.tm_user,
+			   ep.tm_sign,
+			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
+			   ep.payer_user,
+			   ep.payer_sign,
+			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
+			   ep.ceo_user,
+			   ep.ceo_sign,
+			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt
+		FROM tb_headoffice_electronic_payment ep
+		LEFT JOIN tb_electronic_payment_type ept
+		  ON ept.doc_type = ep.doc_type
+		 AND IFNULL(ept.del_yn, 'N') = 'N'
+		WHERE ep.payment_id = #{payment_id}
+		  <choose>
+		  	<when test="user_id != null and user_id != ''">
+		  		AND EXISTS (
+		  			SELECT 1
+		  			FROM tb_user lu
+		  			WHERE lu.user_id = #{user_id}
+		  			  AND IFNULL(lu.del_yn, 'N') = 'N'
+		  			  AND (
+		  			  		lu.position = 0
+		  			  		OR ep.reg_user_id = #{user_id}
+		  			  		OR ep.tm_user = #{user_id}
+		  			  		OR ep.ceo_user = #{user_id}
+		  			  		OR ep.payer_user = #{user_id}
+		  			  		OR (lu.position = 1 AND lu.department = ep.department)
+		  			  		OR (
+		  			  			#{user_id} = 'iy1'
+		  			  			AND EXISTS (
+		  			  				SELECT 1
+		  			  				FROM tb_headoffice_purchase_request prx
+		  			  				WHERE prx.payment_id = ep.payment_id
+		  			  			)
+		  			  		)
+		  			  	  )
+		  		)
+		  	</when>
+		  	<otherwise>
+		  		AND 1 = 0
+		  	</otherwise>
+		  </choose>
+		LIMIT 1
+	</select>
+
+	<select id="ElectronicPaymentManageItems" parameterType="map" resultType="hashmap">
+		<!-- 소모품 전체조회 예외 사용자(필요 시 변경): iy1 -->
+		SELECT R.idx,
+			   R.title,
+			   R.place,
+			   R.item_name,
+			   R.qty,
+			   R.price,
+			   R.use_note,
+			   R.use_name,
+			   R.link,
+			   R.note,
+			   R.buy_yn,
+			   R.payment_note,
+			   R.content,
+			   R.amount,
+			   R.tax,
+			   R.total,
+			   R.account_number,
+			   R.biz_no,
+			   R.account_name,
+			   R.payment_type,
+			   R.payment_type_detail
+		FROM (
+			<!-- 소모품 구매 품의서: 기존 품목 테이블 조회 -->
+			SELECT pr.idx,
+				   '' AS title,
+				   '' AS place,
+				   pr.item_name,
+				   pr.qty,
+				   pr.price,
+				   pr.use_note,
+				   pr.use_name,
+				   pr.link,
+				   pr.note,
+				   IFNULL(pr.buy_yn, 'N') AS buy_yn,
+				   pr.payment_note,
+				   '' AS content,
+				   NULL AS amount,
+				   NULL AS tax,
+				   NULL AS total,
+				   NULL AS account_number,
+				   NULL AS biz_no,
+				   NULL AS account_name,
+				   NULL AS payment_type,
+				   NULL AS payment_type_detail
+			FROM tb_headoffice_purchase_request pr
+			JOIN tb_headoffice_electronic_payment ep
+			  ON ep.payment_id = pr.payment_id
+			WHERE pr.payment_id = #{payment_id}
+
+			UNION ALL
+
+			<!-- 기안서: 단건 본문 테이블을 목록 포맷으로 매핑 -->
+			SELECT IFNULL(d.idx, 1) AS idx,
+				   d.title AS title,
+				   '' AS place,
+				   d.title AS item_name,
+				   NULL AS qty,
+				   NULL AS price,
+				   d.details AS use_note,
+				   '' AS use_name,
+				   '' AS link,
+				   d.note AS note,
+				   '' AS buy_yn,
+				   '' AS payment_note,
+				   d.details AS content,
+				   NULL AS amount,
+				   NULL AS tax,
+				   NULL AS total,
+				   NULL AS account_number,
+				   NULL AS biz_no,
+				   NULL AS account_name,
+				   NULL AS payment_type,
+				   NULL AS payment_type_detail
+			FROM tb_headoffice_draft d
+			JOIN tb_headoffice_electronic_payment ep
+			  ON ep.payment_id = d.payment_id
+			WHERE d.payment_id = #{payment_id}
+
+			UNION ALL
+
+			<!-- 지출결의서: 전용 컬럼 매핑 -->
+			SELECT IFNULL(pd.idx, 1) AS idx,
+				   pd.title AS title,
+				   pd.place AS place,
+				   pd.item_name AS item_name,
+				   pd.qty AS qty,
+				   pd.price AS price,
+				   pd.use_note AS use_note,
+				   pd.use_name AS use_name,
+				   '' AS link,
+				   '' AS note,
+				   '' AS buy_yn,
+				   '' AS payment_note,
+				   pd.content AS content,
+				   pd.amount AS amount,
+				   pd.tax AS tax,
+				   pd.total AS total,
+				   pd.account_number AS account_number,
+				   pd.biz_no AS biz_no,
+				   pd.account_name AS account_name,
+				   pd.payment_type AS payment_type,
+				   pd.payment_type_detail AS payment_type_detail
+			FROM tb_headoffice_payment_doc pd
+			JOIN tb_headoffice_electronic_payment ep
+			  ON ep.payment_id = pd.payment_id
+			WHERE pd.payment_id = #{payment_id}
+		) R
+		WHERE 1 = 1
+		  <choose>
+		  	<when test="user_id != null and user_id != ''">
+		  		AND EXISTS (
+		  			SELECT 1
+		  			FROM tb_headoffice_electronic_payment ep
+		  			JOIN tb_user lu
+		  			  ON lu.user_id = #{user_id}
+		  			 AND IFNULL(lu.del_yn, 'N') = 'N'
+		  			WHERE ep.payment_id = #{payment_id}
+		  			  AND (
+		  			  	lu.position = 0
+		  			  	OR ep.reg_user_id = #{user_id}
+		  			  	OR ep.tm_user = #{user_id}
+		  			  	OR ep.ceo_user = #{user_id}
+		  			  	OR ep.payer_user = #{user_id}
+		  			  	OR (lu.position = 1 AND lu.department = ep.department)
+		  			  	OR (
+		  			  		#{user_id} = 'iy1'
+		  			  		AND EXISTS (
+		  			  			SELECT 1
+		  			  			FROM tb_headoffice_purchase_request prx
+		  			  			WHERE prx.payment_id = ep.payment_id
+		  			  		)
+		  			  	)
+		  			  )
+		  		)
+		  	</when>
+		  	<otherwise>
+		  		AND 1 = 0
+		  	</otherwise>
+		  </choose>
+		ORDER BY R.idx ASC
+	</select>
+
+	<update id="ElectronicPaymentManageTmSignSave" parameterType="map">
+		UPDATE tb_headoffice_electronic_payment
+		SET tm_sign = #{action_status},
+			tm_dt = NOW(),
+			reg_read_dt = NULL,
+			status = CASE
+					   WHEN #{action_status} = '3'
+					     OR IFNULL(ceo_sign, '') = '3'
+					     OR IFNULL(payer_sign, '') = '3'
+					     THEN 3
+					   WHEN #{action_status} = '4'
+					     AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
+					     AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
+					     THEN 4
+					   WHEN #{action_status} = '4'
+					     OR IFNULL(ceo_sign, '') = '4'
+					     OR IFNULL(payer_sign, '') = '4'
+					     THEN 2
+					   ELSE 1
+					 END
+		WHERE payment_id = #{payment_id}
+		  AND tm_user = #{user_id}
+		  AND IFNULL(tm_sign, '') NOT IN ('3', '4')
+	</update>
+
+	<update id="ElectronicPaymentManageCeoSignSave" parameterType="map">
+		UPDATE tb_headoffice_electronic_payment
+		SET ceo_sign = #{action_status},
+			ceo_dt = NOW(),
+			reg_read_dt = NULL,
+			tm_read_dt = NULL,
+			payer_read_dt = NULL,
+			status = CASE
+					   WHEN IFNULL(tm_sign, '') = '3'
+					     OR #{action_status} = '3'
+					     OR IFNULL(payer_sign, '') = '3'
+					     THEN 3
+					   WHEN (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+					     AND (IFNULL(ceo_user, '') = '' OR #{action_status} = '4')
+					     AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
+					     THEN 4
+					   WHEN IFNULL(tm_sign, '') = '4'
+					     OR #{action_status} = '4'
+					     OR IFNULL(payer_sign, '') = '4'
+					     THEN 2
+					   ELSE 1
+					 END
+		WHERE payment_id = #{payment_id}
+		  AND ceo_user = #{user_id}
+		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+		  AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
+		  AND IFNULL(ceo_sign, '') NOT IN ('3', '4')
+	</update>
+
+	<update id="ElectronicPaymentManagePayerSignSave" parameterType="map">
+		UPDATE tb_headoffice_electronic_payment
+		SET payer_sign = #{action_status},
+			payer_dt = NOW(),
+			reg_read_dt = NULL,
+			tm_read_dt = NULL,
+			status = CASE
+					   WHEN IFNULL(tm_sign, '') = '3'
+					     OR IFNULL(ceo_sign, '') = '3'
+					     OR #{action_status} = '3'
+					     THEN 3
+					   WHEN (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+					     AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
+					     AND (IFNULL(payer_user, '') = '' OR #{action_status} = '4')
+					     THEN 4
+					   WHEN IFNULL(tm_sign, '') = '4'
+					     OR IFNULL(ceo_sign, '') = '4'
+					     OR #{action_status} = '4'
+					     THEN 2
+					   ELSE 1
+					 END
+		WHERE payment_id = #{payment_id}
+		  AND payer_user = #{user_id}
+		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+		  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
+	</update>
+
+	<update id="ElectronicPaymentItemBuyYnSave" parameterType="map">
+		UPDATE tb_headoffice_purchase_request pr
+		JOIN tb_headoffice_electronic_payment ep
+		  ON ep.payment_id = pr.payment_id
+		SET pr.buy_yn = #{buy_yn}
+		WHERE pr.payment_id = #{payment_id}
+		  AND pr.idx = #{idx}
+		  AND ep.payer_user = #{user_id}
+		  AND IFNULL(ep.payer_sign, '') != '4'
+	</update>
+
+	<select id="ElectronicPaymentNotificationList" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM (
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '결재요청' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 팀장 결재가 필요합니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE tm_user = #{user_id}
+			  AND IFNULL(tm_user, '') != ''
+			  AND IFNULL(tm_sign, '') NOT IN ('3', '4')
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '결재요청' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 결재자 결재가 필요합니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE payer_user = #{user_id}
+			  AND IFNULL(payer_user, '') != ''
+			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+			  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '결재요청' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 대표 결재가 필요합니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE ceo_user = #{user_id}
+			  AND IFNULL(ceo_user, '') != ''
+			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+			  AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
+			  AND IFNULL(ceo_sign, '') NOT IN ('3', '4')
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '승인' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 결재가 승인되었습니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE reg_user_id = #{user_id}
+			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+			  AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
+			  AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
+			  AND reg_read_dt IS NULL
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '반려' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 결재가 반려되었습니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE reg_user_id = #{user_id}
+			  AND (
+			  		IFNULL(tm_sign, '') = '3'
+			  		OR IFNULL(ceo_sign, '') = '3'
+			  		OR IFNULL(payer_sign, '') = '3'
+			  	  )
+			  AND reg_read_dt IS NULL
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '반려' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 결재가 반려되었습니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE tm_user = #{user_id}
+			  AND IFNULL(tm_user, '') != ''
+			  AND (
+			  		IFNULL(ceo_sign, '') = '3'
+			  		OR IFNULL(payer_sign, '') = '3'
+			  	  )
+			  AND tm_read_dt IS NULL
+
+			UNION
+
+			SELECT payment_id,
+				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+				   '반려' AS notify_type,
+				   '전자결재 알림' AS notify_title,
+				   CONCAT('[', payment_id, '] 결재가 반려되었습니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment
+			WHERE payer_user = #{user_id}
+			  AND IFNULL(payer_user, '') != ''
+			  AND IFNULL(ceo_sign, '') = '3'
+			  AND payer_read_dt IS NULL
+		) AS N
+		ORDER BY N.draft_dt DESC, N.payment_id DESC
+	</select>
+
+	<update id="ElectronicPaymentNotificationReadSave" parameterType="map">
+		UPDATE tb_headoffice_electronic_payment
+		SET reg_read_dt = CASE
+							WHEN reg_user_id = #{user_id}
+							 AND #{notify_type} IN ('승인', '반려')
+							  THEN NOW()
+							ELSE reg_read_dt
+						  END,
+			tm_read_dt = CASE
+						   WHEN tm_user = #{user_id}
+						    AND #{notify_type} = '반려'
+						     THEN NOW()
+						   ELSE tm_read_dt
+						 END,
+			payer_read_dt = CASE
+							  WHEN payer_user = #{user_id}
+							   AND #{notify_type} = '반려'
+							    THEN NOW()
+							  ELSE payer_read_dt
+							END
+		WHERE payment_id = #{payment_id}
+		  AND (
+		  		(reg_user_id = #{user_id} AND #{notify_type} IN ('승인', '반려'))
+		  		OR (tm_user = #{user_id} AND #{notify_type} = '반려')
+		  		OR (payer_user = #{user_id} AND #{notify_type} = '반려')
+		  	  )
+	</update>
+
+	<delete id="HeadOfficePurchaseRequestDeleteByPaymentId" parameterType="map">
+		DELETE FROM tb_headoffice_purchase_request
+		WHERE payment_id = #{payment_id}
+	</delete>
+
+	<delete id="HeadOfficeDraftDeleteByPaymentId" parameterType="map">
+		<!-- 기안서 본문 초기화 -->
+		DELETE FROM tb_headoffice_draft
+		WHERE payment_id = #{payment_id}
+	</delete>
+
+	<insert id="HeadOfficeDraftSave" parameterType="map">
+		<!-- 기안서 본문 저장 -->
+		INSERT INTO tb_headoffice_draft
+		(
+			payment_id,
+			title,
+			details,
+			note
+		)
+		VALUES
+		(
+			#{payment_id},
+			#{title},
+			#{details},
+			#{note}
+		)
+		ON DUPLICATE KEY UPDATE
+			title = #{title},
+			details = #{details},
+			note = #{note}
+	</insert>
+
+	<delete id="HeadOfficePaymentDocDeleteByPaymentId" parameterType="map">
+		<!-- 지출결의서 본문 초기화 -->
+		DELETE FROM tb_headoffice_payment_doc
+		WHERE payment_id = #{payment_id}
+	</delete>
+
+	<insert id="HeadOfficePaymentDocSave" parameterType="map">
+		<!-- 지출결의서 본문 저장 -->
+		INSERT INTO tb_headoffice_payment_doc
+		(
+			payment_id,
+			title,
+			place,
+			use_note,
+			use_name,
+			total,
+			item_name,
+			content,
+			qty,
+			price,
+			amount,
+			tax,
+			payment_type,
+			payment_type_detail,
+			account_number,
+			biz_no,
+			account_name
+		)
+		VALUES
+		(
+			#{payment_id},
+			#{title},
+			#{place},
+			#{use_note},
+			#{use_name},
+			#{total},
+			#{item_name},
+			#{content},
+			#{qty},
+			#{price},
+			#{amount},
+			#{tax},
+			#{payment_type},
+			#{payment_type_detail},
+			#{account_number},
+			#{biz_no},
+			#{account_name}
+		)
+	</insert>
+
+	<select id="ElectronicPaymentFileList" parameterType="map" resultType="hashmap">
+		<!-- 지출결의서 첨부 이미지 조회 -->
+		SELECT payment_id,
+			   image_path,
+			   image_order,
+			   image_name
+		FROM tb_electronic_payment_file_management
+		WHERE payment_id = #{payment_id}
+		  <choose>
+		  	<when test="user_id != null and user_id != ''">
+		  		AND EXISTS (
+		  			SELECT 1
+		  			FROM tb_headoffice_electronic_payment ep
+		  			JOIN tb_user lu
+		  			  ON lu.user_id = #{user_id}
+		  			 AND IFNULL(lu.del_yn, 'N') = 'N'
+		  			WHERE ep.payment_id = #{payment_id}
+		  			  AND (
+		  			  	lu.position = 0
+		  			  	OR ep.reg_user_id = #{user_id}
+		  			  	OR ep.tm_user = #{user_id}
+		  			  	OR ep.ceo_user = #{user_id}
+		  			  	OR ep.payer_user = #{user_id}
+		  			  	OR (lu.position = 1 AND lu.department = ep.department)
+		  			  	OR (
+		  			  		#{user_id} = 'iy1'
+		  			  		AND EXISTS (
+		  			  			SELECT 1
+		  			  			FROM tb_headoffice_purchase_request prx
+		  			  			WHERE prx.payment_id = ep.payment_id
+		  			  		)
+		  			  	)
+		  			  )
+		  		)
+		  	</when>
+		  	<otherwise>
+		  		AND 1 = 0
+		  	</otherwise>
+		  </choose>
+		ORDER BY image_order ASC
+	</select>
+
+	<delete id="ElectronicPaymentFileDelete" parameterType="map">
+		<!-- 지출결의서 첨부 이미지 삭제 -->
+		DELETE FROM tb_electronic_payment_file_management
+		WHERE payment_id = #{payment_id}
+		  AND image_order = #{image_order}
+	</delete>
+
+	<select id="GetMaxElectronicPaymentImageOrder" parameterType="map" resultType="int">
+		<!-- 지출결의서 첨부 이미지 최대 순번 조회 -->
+		SELECT MAX(image_order)
+		FROM tb_electronic_payment_file_management
+		WHERE payment_id = #{payment_id}
+	</select>
+
+	<insert id="SaveElectronicPaymentFile" parameterType="map">
+		<!-- 지출결의서 첨부 이미지 저장 -->
+		INSERT INTO tb_electronic_payment_file_management
+		(
+			payment_id,
+			image_order,
+			image_path,
+			image_name
+		)
+		VALUES
+		(
+			#{payment_id},
+			#{image_order},
+			#{image_path},
+			#{image_name}
+		)
+	</insert>
     
     <insert id="HeadOfficePurchaseRequestSave">
         INSERT INTO tb_headoffice_purchase_request
@@ -1388,8 +2181,10 @@
 	        qty,
 	        price,
 	        use_note,
+	        use_name,
 	        link,
 	        note,
+	        buy_yn,
 	        payment_note
 	    </trim>
 	    
@@ -1402,8 +2197,10 @@
 	        #{qty},
 	        #{price},
 	        #{use_note},
+	        #{use_name},
 	        #{link},
 	        #{note},
+	        #{buy_yn},
 	        #{payment_note}
 	    </trim>
 	    
@@ -1414,11 +2211,44 @@
 	        qty = #{qty},
 	        price = #{price},
 	        use_note = #{use_note},
+	        use_name = #{use_name},
 	        link = #{link},
 	        note = #{note},
+	        buy_yn = #{buy_yn},
 	        payment_note = #{payment_note}
 	    </trim>
     </insert>
+
+	<insert id="HeadOfficePurchaseRequestBulkSave" parameterType="map">
+		INSERT INTO tb_headoffice_purchase_request
+		(
+			payment_id,
+			item_name,
+			qty,
+			price,
+			use_note,
+			use_name,
+			link,
+			note,
+			buy_yn,
+			payment_note
+		)
+		VALUES
+		<foreach collection="items" item="item" separator=",">
+			(
+				#{item.payment_id},
+				#{item.item_name},
+				#{item.qty},
+				#{item.price},
+				#{item.use_note},
+				#{item.use_name},
+				#{item.link},
+				#{item.note},
+				#{item.buy_yn},
+				#{item.payment_note}
+			)
+		</foreach>
+	</insert>
     
     <select id="HeadOfficeDepartmentList" resultType="hashmap">
 		SELECT department, 
@@ -1448,3 +2278,4 @@
 		ORDER BY position ASC
 	</select>
 </mapper>
+
