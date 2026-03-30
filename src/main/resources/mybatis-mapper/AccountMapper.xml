@@ -373,7 +373,7 @@
 		    AND T.record_month = #{month}
 		WHERE T2.account_id = #{account_id}
 		AND IFNULL(T2.display_yn,'Y') = 'Y'
-		AND T.type not in (6)
+		AND IFNULL(T.type, '') != 6
 		UNION ALL
 		-- 아래는 직원파출.
 		SELECT 'nor' as gubun,
