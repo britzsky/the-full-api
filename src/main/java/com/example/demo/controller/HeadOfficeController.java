@@ -1,6 +1,8 @@
 package com.example.demo.controller;
 
 import java.io.File;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,6 +18,10 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -153,7 +159,7 @@ public class HeadOfficeController {
 	
 	/* 
 	 * part		: 본사
-     * method 	: WeekMenuList
+     * method 	: PeopleCountingList
      * comment 	: 본사 -> 관리표 -> 인원증감 조회
      */
 	@GetMapping("HeadOffice/PeopleCountingList")
@@ -309,17 +315,11 @@ public class HeadOfficeController {
 		int iResult = 0;
 
 		if (!main.isEmpty()) {
-			// 결재문서 키가 비어있으면 요청번호를 결재문서 키로 사용
-			Object paymentId = main.get("payment_id");
-			if (paymentId == null || String.valueOf(paymentId).trim().isEmpty()) {
-				main.put("payment_id", String.valueOf(main.getOrDefault("request_no", "")).trim());
-			}
-
-			// 프론트에서 상태코드가 없을 수 있어 기본값/대체값으로 정규화
+			// 전자결재 메인 테이블 결재 상태값을 저장 형식에 맞게 정규화한다.
 			main.put("charge_sign", normalizeStatusText(main.get("charge_sign"), "4"));
-			main.put("tm_sign", normalizeStatusText(main.get("tm_sign"), main.get("tm_status")));
-			main.put("payer_sign", normalizeStatusText(main.get("payer_sign"), main.get("payer_status")));
-			main.put("ceo_sign", normalizeStatusText(main.get("ceo_sign"), main.get("ceo_status")));
+			main.put("tm_sign", normalizeStatusText(main.get("tm_sign"), ""));
+			main.put("payer_sign", normalizeStatusText(main.get("payer_sign"), ""));
+			main.put("ceo_sign", normalizeStatusText(main.get("ceo_sign"), ""));
 
 			// 작성자(user_id)와 등록자(reg_user_id)는 항상 동일하게 저장
 			String writerUserId = String.valueOf(main.getOrDefault("user_id", "")).trim();
@@ -351,7 +351,6 @@ public class HeadOfficeController {
 
 			// 2) 본문 저장
 			String paymentIdText = String.valueOf(main.getOrDefault("payment_id", "")).trim();
-			String paymentNote = String.valueOf(main.getOrDefault("payment_note", "")).trim();
 			boolean isDraftDoc = DOC_KIND_DRAFT.equals(docKind);
 			boolean isExpenseDoc = DOC_KIND_PAYMENT.equals(docKind);
 
@@ -394,13 +393,13 @@ public class HeadOfficeController {
 						String itemName = String.valueOf(item.getOrDefault("item_name", "")).trim();
 						if (itemName.isEmpty()) continue;
 
-						Map<String, Object> row = new HashMap<>(item);
-						row.remove("idx"); // idx는 AI PK이므로 전달값 제거
-						row.put("payment_id", paymentIdText);
-						row.put("payment_note", paymentNote);
-						row.put("use_name", asText(item.get("use_name")));
-						row.put("buy_yn", normalizeYn(item.get("buy_yn")));
-						rowsToSave.add(row);
+					Map<String, Object> row = new HashMap<>(item);
+					row.remove("idx"); // idx는 AI PK이므로 전달값 제거
+					row.put("payment_id", paymentIdText);
+					row.put("payment_note", asText(item.get("payment_note")));
+					row.put("use_name", asText(item.get("use_name")));
+					row.put("buy_yn", normalizeYn(item.get("buy_yn")));
+					rowsToSave.add(row);
 					}
 
 					// 품목은 개별 insert 대신 배치 insert 1회로 저장해 DB 왕복을 줄인다.
@@ -475,6 +474,61 @@ public class HeadOfficeController {
 		@RequestParam("files") MultipartFile[] files
 	) {
 		return uploadHeadOfficeDocumentFiles(paymentId, files);
+	}
+
+	/* 
+	 * part		: 본사
+     * method 	: ElectronicPaymentDocumentFileView
+     * comment 	: 본사 -> 전자결재 관리 -> 결재문서 첨부파일 미리보기/다운로드용 파일 스트림 조회
+     */
+	@GetMapping("HeadOffice/ElectronicPaymentDocumentFileView")
+	public ResponseEntity<?> ElectronicPaymentDocumentFileView(@RequestParam Map<String, Object> paramMap) {
+		try {
+			String paymentIdText = asText(paramMap.get("payment_id"));
+			String imageOrderText = asText(paramMap.get("image_order"));
+			String userIdText = asText(paramMap.get("user_id"));
+			if (paymentIdText.isEmpty() || imageOrderText.isEmpty() || userIdText.isEmpty()) {
+				return ResponseEntity.badRequest().build();
+			}
+
+			Map<String, Object> fileListParam = new HashMap<>();
+			fileListParam.put("payment_id", paymentIdText);
+			fileListParam.put("user_id", userIdText);
+			List<Map<String, Object>> fileList = headOfficeService.ElectronicPaymentFileList(fileListParam);
+			Map<String, Object> matchedFile = null;
+			for (Map<String, Object> fileRow : fileList) {
+				if (parseIntOrZero(fileRow.get("image_order")) == parseIntOrZero(imageOrderText)) {
+					matchedFile = fileRow;
+					break;
+				}
+			}
+			if (matchedFile == null) {
+				return ResponseEntity.notFound().build();
+			}
+
+			String imagePathText = asText(matchedFile.get("image_path"));
+			Path filePath = resolveElectronicPaymentStoredFilePath(imagePathText);
+			if (filePath == null || !Files.exists(filePath)) {
+				return ResponseEntity.notFound().build();
+			}
+
+			Resource resource = new UrlResource(filePath.toUri());
+			if (!resource.exists()) {
+				return ResponseEntity.notFound().build();
+			}
+
+			String detectedContentType = Files.probeContentType(filePath);
+			MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+			if (detectedContentType != null && !detectedContentType.trim().isEmpty()) {
+				mediaType = MediaType.parseMediaType(detectedContentType);
+			}
+
+			return ResponseEntity.ok()
+				.contentType(mediaType)
+				.body(resource);
+		} catch (Exception e) {
+			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
+		}
 	}
 
 	/* 
@@ -573,7 +627,7 @@ public class HeadOfficeController {
 
 	/* 
 	 * part		: 본사
-     * method 	: ProfitLossTableSave
+     * method 	: HeadOfficePurchaseRequestSave
      * comment 	: 본사 -> 전자결재 관리 -> 소모품 구매 품의서 저장
      */
 	@PostMapping("HeadOffice/HeadOfficePurchaseRequestSave")
@@ -623,7 +677,7 @@ public class HeadOfficeController {
 	
 	/* 
 	 * part		: 본사
-     * method 	: HeadOfficeDepartmentList
+     * method 	: HeadOfficeCompanyUserTree
      * comment 	: 본사 -> 전자결재 관리 -> 부서목록 조회
      */
 	@GetMapping("HeadOffice/HeadOfficeCompanyUserTree")
@@ -650,7 +704,7 @@ public class HeadOfficeController {
 
 	/* 
 	 * part		: 본사
-     * method 	: HeadOfficeDepartmentList
+     * method 	: HeadOfficeUserListByDepartment
      * comment 	: 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
      */
 	@GetMapping("HeadOffice/HeadOfficeUserListByDepartment")
@@ -660,6 +714,11 @@ public class HeadOfficeController {
 		return new Gson().toJson(resultList);
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: getMainPayload
+     * comment 	: 본사 -> 전자결재 관리 -> 요청 payload에서 메인 데이터 추출
+     */
 	@SuppressWarnings("unchecked")
 	private Map<String, Object> getMainPayload(Map<String, Object> payload) {
 		// payload.main 우선 사용, 없으면 payload 전체를 main으로 해석
@@ -673,6 +732,11 @@ public class HeadOfficeController {
 		return new HashMap<>(payload);
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: getItemPayloadList
+     * comment 	: 본사 -> 전자결재 관리 -> 요청 payload에서 품목 목록 추출
+     */
 	@SuppressWarnings("unchecked")
 	private List<Map<String, Object>> getItemPayloadList(Map<String, Object> payload) {
 		if (payload == null) return new ArrayList<>();
@@ -689,6 +753,11 @@ public class HeadOfficeController {
 		return result;
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: buildDraftPayload
+     * comment 	: 본사 -> 전자결재 관리 -> 기안서 본문 저장 파라미터 생성
+     */
 	private Map<String, Object> buildDraftPayload(
 		List<Map<String, Object>> itemList,
 		Map<String, Object> main,
@@ -706,8 +775,10 @@ public class HeadOfficeController {
 		for (Map<String, Object> item : itemList) {
 			if (item == null) continue;
 
-			String title = asText(item.get("item_name"));
-			String details = asText(item.get("use_note"));
+			String title = asText(item.get("title"));
+			if (title.isEmpty()) title = asText(item.get("item_name"));
+			String details = asText(item.get("details"));
+			if (details.isEmpty()) details = asText(item.get("use_note"));
 			String note = asText(item.get("note"));
 			if (title.isEmpty() && details.isEmpty() && note.isEmpty()) continue;
 
@@ -720,6 +791,11 @@ public class HeadOfficeController {
 		return draft;
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: buildPaymentDocRows
+     * comment 	: 본사 -> 전자결재 관리 -> 지출결의서 상세 행 파라미터 목록 생성
+     */
 	@SuppressWarnings("unchecked")
 	private List<Map<String, Object>> buildPaymentDocRows(
 		List<Map<String, Object>> itemList,
@@ -741,26 +817,22 @@ public class HeadOfficeController {
 			if (title.isEmpty()) title = asText(item.get("item_name"));
 
 			String place = asText(item.get("place"));
-			if (place.isEmpty()) place = asText(item.get("site_name"));
 
 			// use_note: 결제업체명, use_name: 용도
 			String useNote = asText(item.get("use_note"));
-			if (useNote.isEmpty()) useNote = asText(item.get("account_name"));
-			if (useNote.isEmpty()) useNote = asText(item.get("note"));
 
 			String useName = asText(item.get("use_name"));
-			if (useName.isEmpty()) useName = asText(item.get("item_name"));
 
 			String content = asText(item.get("content"));
-			if (content.isEmpty()) content = asText(item.get("payment_note"));
 
 			String accountNumber = asText(item.get("account_number"));
 			String bizNo = asText(item.get("biz_no"));
 			// account_name 컬럼은 예금주 용도로 저장
 			String accountName = asText(item.get("account_name"));
-			if (accountName.isEmpty()) accountName = asText(item.get("depositor_name"));
-			int paymentType = resolvePaymentTypeCode(item.get("payment_type"), item.get("payment_method"));
-			String paymentTypeDetail = resolvePaymentTypeDetail(item, paymentType);
+			String requestDt = asText(item.get("request_dt"));
+			if (requestDt.isEmpty()) requestDt = asText(main.get("start_dt"));
+			int paymentType = resolvePaymentTypeCode(item.get("payment_type"));
+			String paymentTypeDetail = resolvePaymentTypeDetail(item);
 
 			int qty = parseIntOrZero(item.get("qty"));
 			if (qty <= 0) qty = 1;
@@ -807,6 +879,7 @@ public class HeadOfficeController {
 							rowTotal,
 							paymentType,
 							paymentTypeDetail,
+							requestDt,
 							accountNumber,
 							bizNo,
 							accountName
@@ -840,12 +913,13 @@ public class HeadOfficeController {
 					price,
 					amount,
 					tax,
-					rowTotal,
-					paymentType,
-					paymentTypeDetail,
-					accountNumber,
-					bizNo,
-					accountName
+						rowTotal,
+						paymentType,
+						paymentTypeDetail,
+						requestDt,
+						accountNumber,
+						bizNo,
+						accountName
 				)
 			);
 		}
@@ -865,6 +939,11 @@ public class HeadOfficeController {
 		return rows;
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: createPaymentDocRow
+     * comment 	: 본사 -> 전자결재 관리 -> 지출결의서 상세 1건 파라미터 생성
+     */
 	private Map<String, Object> createPaymentDocRow(
 		String paymentIdText,
 		String title,
@@ -880,6 +959,7 @@ public class HeadOfficeController {
 		int total,
 		int paymentType,
 		String paymentTypeDetail,
+		String requestDt,
 		String accountNumber,
 		String bizNo,
 		String accountName
@@ -899,6 +979,7 @@ public class HeadOfficeController {
 		row.put("total", total);
 		row.put("payment_type", paymentType > 0 ? paymentType : null);
 		row.put("payment_type_detail", paymentTypeDetail);
+		row.put("request_dt", requestDt);
 		row.put("account_number", accountNumber);
 		row.put("biz_no", bizNo);
 		row.put("account_name", accountName);
@@ -907,6 +988,11 @@ public class HeadOfficeController {
 
 	// 전자결재 타입 테이블(tb_electronic_payment_type) 기준으로
 	// doc_type -> 문서종류(draft/expendable/payment) 매핑을 구성한다.
+	/* 
+	 * part		: 본사
+     * method 	: buildDocKindByTypeMap
+     * comment 	: 본사 -> 전자결재 관리 -> 문서 타입별 문서종류 매핑 생성
+     */
 	private Map<String, String> buildDocKindByTypeMap() {
 		Map<String, String> result = new HashMap<>();
 
@@ -927,6 +1013,11 @@ public class HeadOfficeController {
 
 	// 요청으로 전달된 doc_type 코드가 어떤 문서종류인지 판정한다.
 	// - 기준 데이터: tb_electronic_payment_type.doc_type/doc_name
+	/* 
+	 * part		: 본사
+     * method 	: resolveDocKind
+     * comment 	: 본사 -> 전자결재 관리 -> doc_type으로 문서종류 판정
+     */
 	private String resolveDocKind(String docType, Map<String, String> docKindByType) {
 		String key = asText(docType).toUpperCase();
 		if (key.isEmpty()) return "";
@@ -935,6 +1026,11 @@ public class HeadOfficeController {
 	}
 
 	// doc_name 문자열을 내부 문서종류 키로 변환한다.
+	/* 
+	 * part		: 본사
+     * method 	: detectDocKindByName
+     * comment 	: 본사 -> 전자결재 관리 -> 문서명으로 내부 문서종류 키 판정
+     */
 	private String detectDocKindByName(String docName) {
 		String key = asText(docName).replaceAll("\\s+", "");
 		if (key.contains("소모품") && key.contains("품의서")) return DOC_KIND_EXPENDABLE;
@@ -944,6 +1040,11 @@ public class HeadOfficeController {
 	}
 
 	// 문서 공통 첨부 파일 저장 로직
+	/* 
+	 * part		: 본사
+     * method 	: uploadHeadOfficeDocumentFiles
+     * comment 	: 본사 -> 전자결재 관리 -> 문서 공통 첨부 파일 업로드 및 메타 저장
+     */
 	private String uploadHeadOfficeDocumentFiles(String paymentId, MultipartFile[] files) {
 		JsonObject obj = new JsonObject();
 
@@ -1025,6 +1126,11 @@ public class HeadOfficeController {
 	}
 
 	// 문서 공통 첨부 이미지 삭제 로직
+	/* 
+	 * part		: 본사
+     * method 	: deleteHeadOfficeDocumentFile
+     * comment 	: 본사 -> 전자결재 관리 -> 문서 공통 첨부 파일 및 메타 삭제
+     */
 	private String deleteHeadOfficeDocumentFile(Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 
@@ -1063,11 +1169,65 @@ public class HeadOfficeController {
 		return obj.toString();
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: resolveElectronicPaymentDirPath
+     * comment 	: 본사 -> 전자결재 관리 -> 결재문서 첨부 저장 경로 생성
+     */
 	private Path resolveElectronicPaymentDirPath(String paymentIdText) {
 		String staticPath = new File(uploadDir).getAbsolutePath();
 		return Paths.get(staticPath, "electronic_payment", paymentIdText).normalize();
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: resolveElectronicPaymentStoredFilePath
+     * comment 	: 본사 -> 전자결재 관리 -> DB image_path를 실제 저장 파일 경로로 변환
+     */
+	private Path resolveElectronicPaymentStoredFilePath(String imagePathText) {
+		String normalizedPath = decodeUriPathRepeatedly(imagePathText).replace("\\", "/");
+		String relativePath = normalizedPath;
+		if (relativePath.startsWith("/")) {
+			relativePath = relativePath.substring(1);
+		}
+		if (relativePath.startsWith("image/")) {
+			relativePath = relativePath.substring("image/".length());
+		}
+
+		Path basePath = Paths.get(new File(uploadDir).getAbsolutePath()).normalize();
+		Path filePath = basePath.resolve(relativePath).normalize();
+		if (!filePath.startsWith(basePath)) {
+			return null;
+		}
+		return filePath;
+	}
+
+	/* 
+	 * part		: 본사
+     * method 	: decodeUriPathRepeatedly
+     * comment 	: 본사 -> 전자결재 관리 -> 인코딩된 DB 경로를 최대 3회까지 복원
+     */
+	private String decodeUriPathRepeatedly(String value) {
+		String current = asText(value);
+		if (current.isEmpty()) return "";
+
+		for (int i = 0; i < 3; i++) {
+			try {
+				String next = URLDecoder.decode(current, StandardCharsets.UTF_8);
+				if (next.equals(current)) break;
+				current = next;
+			} catch (Exception e) {
+				break;
+			}
+		}
+		return current;
+	}
+
+	/* 
+	 * part		: 본사
+     * method 	: extractFileExtensionLower
+     * comment 	: 본사 -> 전자결재 관리 -> 파일 확장자 소문자 추출
+     */
 	private String extractFileExtensionLower(String fileName) {
 		String safeName = asText(fileName);
 		int dotIndex = safeName.lastIndexOf(".");
@@ -1075,16 +1235,31 @@ public class HeadOfficeController {
 		return safeName.substring(dotIndex + 1).toLowerCase(Locale.ROOT);
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: isSupportedHeadOfficeDocumentExtension
+     * comment 	: 본사 -> 전자결재 관리 -> 첨부 허용 확장자 여부 확인
+     */
 	private boolean isSupportedHeadOfficeDocumentExtension(String extension) {
 		String ext = asText(extension).toLowerCase(Locale.ROOT);
 		if (ext.isEmpty()) return false;
 		return HEADOFFICE_DOCUMENT_ALLOWED_EXTENSIONS.contains(ext);
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: asText
+     * comment 	: 본사 -> 전자결재 관리 -> 객체 값을 공백 제거 문자열로 변환
+     */
 	private String asText(Object value) {
 		return value == null ? "" : String.valueOf(value).trim();
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: parseIntOrZero
+     * comment 	: 본사 -> 전자결재 관리 -> 숫자값 파싱 실패 시 0으로 변환
+     */
 	private int parseIntOrZero(Object value) {
 		String raw = asText(value).replace(",", "");
 		if (raw.isEmpty()) return 0;
@@ -1095,47 +1270,42 @@ public class HeadOfficeController {
 		}
 	}
 
-	// 지급구분 문자열(cash/card/transfer/auto/other)을 DB 코드(1~5)로 변환
-	private int toPaymentTypeCodeByMethod(String methodText) {
-		String method = asText(methodText).toLowerCase(Locale.ROOT);
-		if ("cash".equals(method)) return 1;
-		if ("card".equals(method)) return 2;
-		if ("transfer".equals(method)) return 3;
-		if ("auto".equals(method)) return 4;
-		if ("other".equals(method)) return 5;
+	// item payload에서 payment_type 값을 읽어 최종 지급구분 코드로 정규화
+	/* 
+	 * part		: 본사
+     * method 	: resolvePaymentTypeCode
+     * comment 	: 본사 -> 전자결재 관리 -> 지급구분 코드 정규화
+     */
+	private int resolvePaymentTypeCode(Object paymentTypeObj) {
+		int paymentType = parseIntOrZero(paymentTypeObj);
+		if (paymentType >= 1 && paymentType <= 5) return paymentType;
 		return 0;
 	}
 
-	// item payload에서 payment_type/payment_method를 읽어 최종 지급구분 코드로 정규화
-	private int resolvePaymentTypeCode(Object paymentTypeObj, Object paymentMethodObj) {
-		int paymentType = parseIntOrZero(paymentTypeObj);
-		if (paymentType >= 1 && paymentType <= 5) return paymentType;
-		return toPaymentTypeCodeByMethod(asText(paymentMethodObj));
-	}
-
 	// item payload에서 지급구분 상세값을 읽는다.
-	// - 신규 컬럼(payment_type_detail) 우선
-	// - 구버전 payload(payment_method별 상세 필드) fallback 지원
-	private String resolvePaymentTypeDetail(Map<String, Object> item, int paymentType) {
-		String explicitDetail = asText(item.get("payment_type_detail"));
-		if (!explicitDetail.isEmpty()) return explicitDetail;
-
-		if (paymentType == 1) return asText(item.get("cash_receipt_text"));
-		if (paymentType == 2) {
-			String cardTail = asText(item.get("card_tail")).replaceAll("[^\\d]", "");
-			if (cardTail.length() > 4) cardTail = cardTail.substring(cardTail.length() - 4);
-			return cardTail;
-		}
-		if (paymentType == 3) return asText(item.get("transfer_receipt_text"));
-		if (paymentType == 4) return asText(item.get("auto_text"));
-		if (paymentType == 5) return asText(item.get("other_text"));
-		return "";
+	/* 
+	 * part		: 본사
+     * method 	: resolvePaymentTypeDetail
+     * comment 	: 본사 -> 전자결재 관리 -> 지급구분 상세값 정규화
+     */
+	private String resolvePaymentTypeDetail(Map<String, Object> item) {
+		return asText(item.get("payment_type_detail"));
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: normalizeYn
+     * comment 	: 본사 -> 전자결재 관리 -> Y/N 값 정규화
+     */
 	private String normalizeYn(Object value) {
 		return "Y".equals(asText(value).toUpperCase()) ? "Y" : "N";
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: normalizeStatusText
+     * comment 	: 본사 -> 전자결재 관리 -> 결재 상태값 우선순위 정규화
+     */
 	private String normalizeStatusText(Object currentValue, Object fallbackValue) {
 		// 현재값 우선, 없으면 대체값 사용
 		if (!isBlank(currentValue)) return String.valueOf(currentValue).trim();
@@ -1143,6 +1313,11 @@ public class HeadOfficeController {
 		return "";
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: resolveDocumentStatus
+     * comment 	: 본사 -> 전자결재 관리 -> 결재자 상태를 기준으로 문서 상태 계산
+     */
 	private int resolveDocumentStatus(Map<String, Object> main) {
 		// 상태 규칙
 		// 1: 아무도 결재 안함
@@ -1173,6 +1348,11 @@ public class HeadOfficeController {
 		return 1;
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: parseStatus
+     * comment 	: 본사 -> 전자결재 관리 -> 상태 코드를 숫자로 파싱
+     */
 	private int parseStatus(Object statusObj) {
 		// 숫자형 상태코드 파싱 실패 시 0 처리
 		if (isBlank(statusObj)) return 0;
@@ -1184,6 +1364,11 @@ public class HeadOfficeController {
 		}
 	}
 
+	/* 
+	 * part		: 본사
+     * method 	: isBlank
+     * comment 	: 본사 -> 전자결재 관리 -> 값의 공백 여부 확인
+     */
 	private boolean isBlank(Object value) {
 		return value == null || String.valueOf(value).trim().isEmpty();
 	}

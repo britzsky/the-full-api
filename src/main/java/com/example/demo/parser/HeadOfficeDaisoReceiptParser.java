@@ -166,11 +166,12 @@ public class HeadOfficeDaisoReceiptParser extends BaseReceiptParser {
             fallback.taxFlag = taxFlag;
             parsedItems = List.of(fallback);
         }
-        r.items = parsedItems;
+        // 다이소 전표 상세는 첫 상품명을 대표명으로 사용하고 1행만 저장한다.
+        r.items = collapseItemsToSingleRow(parsedItems, total, taxFlag);
 
         // 요약영역 인식 실패 시, 품목 금액 합계로 총액을 보정한다.
         if (r.totals.total == null) {
-            Integer itemSum = sumItemAmounts(parsedItems);
+            Integer itemSum = sumItemAmounts(r.items);
             if (itemSum != null && itemSum > 0) {
                 r.totals.total = itemSum;
                 r.payment.approvalAmt = String.valueOf(itemSum);
@@ -255,6 +256,48 @@ public class HeadOfficeDaisoReceiptParser extends BaseReceiptParser {
         }
 
         return out;
+    }
+
+    // 여러 품목으로 파싱되더라도 상세 저장은 대표 품목 1행만 남긴다.
+    private List<Item> collapseItemsToSingleRow(List<Item> items, Integer total, String taxFlag) {
+        String firstName = null;
+        Integer fallbackAmount = null;
+        int itemCount = 0;
+
+        if (items != null) {
+            for (Item item : items) {
+                if (item == null) continue;
+                if (!notEmpty(firstName) && notEmpty(item.name)) {
+                    firstName = item.name;
+                }
+                if (!notEmpty(item.name) && item.amount == null && item.unitPrice == null) {
+                    continue;
+                }
+                itemCount++;
+                if (fallbackAmount == null) {
+                    fallbackAmount = firstNonNullInt(item.amount, item.unitPrice);
+                }
+            }
+        }
+
+        Integer mergedAmount = firstNonNullInt(total, sumItemAmounts(items), fallbackAmount);
+
+        Item merged = new Item();
+        merged.name = buildSummaryItemName(firstName, itemCount);
+        merged.qty = 1;
+        merged.amount = mergedAmount;
+        merged.unitPrice = mergedAmount;
+        merged.taxFlag = taxFlag;
+        return List.of(merged);
+    }
+
+    // 첫 상품 외에 추가 품목이 있으면 대표 상품명 뒤에 "외"를 붙인다.
+    private String buildSummaryItemName(String firstName, int itemCount) {
+        String name = firstNonNull(cleanItemName(firstName), "상품");
+        if (itemCount > 1 && !name.endsWith("외")) {
+            return name + " 외";
+        }
+        return name;
     }
 
     private Item parseInlineItemLine(String line, Pattern itemInline, String taxFlag) {

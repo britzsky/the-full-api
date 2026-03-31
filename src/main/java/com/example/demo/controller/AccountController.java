@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -21,6 +23,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,6 +31,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
@@ -74,6 +79,38 @@ public class AccountController {
 		resultList = accountService.AccountList(paramMap);
 
 		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계/현장/운영
+	 * method : AccountStoredFileView
+	 * comment : 집계표/매입마감/거래처 등록 첨부파일 미리보기용 파일 스트림 조회
+	 */
+	@GetMapping("/Account/AccountStoredFileView")
+	public ResponseEntity<?> AccountStoredFileView(@RequestParam("file_path") String filePathText) {
+		try {
+			Path filePath = resolveStoredFilePath(filePathText);
+			if (filePath == null || !Files.exists(filePath)) {
+				return ResponseEntity.notFound().build();
+			}
+
+			Resource resource = new UrlResource(filePath.toUri());
+			if (!resource.exists()) {
+				return ResponseEntity.notFound().build();
+			}
+
+			String detectedContentType = Files.probeContentType(filePath);
+			MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+			if (detectedContentType != null && !detectedContentType.trim().isEmpty()) {
+				mediaType = MediaType.parseMediaType(detectedContentType);
+			}
+
+			return ResponseEntity.ok()
+					.contentType(mediaType)
+					.body(resource);
+		} catch (Exception e) {
+			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
+		}
 	}
 
 	/*
@@ -817,6 +854,50 @@ public class AccountController {
 
 		// 브라우저 접근용 경로 반환
 		return "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+	}
+
+	/*
+	 * part : 회계/현장/운영
+	 * method : resolveStoredFilePath
+	 * comment : DB image_path/receipt_image 경로를 실제 저장 파일 경로로 변환
+	 */
+	private Path resolveStoredFilePath(String imagePathText) {
+		String normalizedPath = decodeUriPathRepeatedly(imagePathText).replace("\\", "/");
+		String relativePath = normalizedPath;
+		if (relativePath.startsWith("/")) {
+			relativePath = relativePath.substring(1);
+		}
+		if (relativePath.startsWith("image/")) {
+			relativePath = relativePath.substring("image/".length());
+		}
+
+		Path basePath = Paths.get(new File(uploadDir).getAbsolutePath()).normalize();
+		Path filePath = basePath.resolve(relativePath).normalize();
+		if (!filePath.startsWith(basePath)) {
+			return null;
+		}
+		return filePath;
+	}
+
+	/*
+	 * part : 회계/현장/운영
+	 * method : decodeUriPathRepeatedly
+	 * comment : 인코딩된 DB 경로를 최대 3회까지 복원
+	 */
+	private String decodeUriPathRepeatedly(String value) {
+		String current = value == null ? "" : String.valueOf(value).trim();
+		if (current.isEmpty()) return "";
+
+		for (int i = 0; i < 3; i++) {
+			try {
+				String next = URLDecoder.decode(current, StandardCharsets.UTF_8);
+				if (next.equals(current)) break;
+				current = next;
+			} catch (Exception e) {
+				break;
+			}
+		}
+		return current;
 	}
 
 	/*

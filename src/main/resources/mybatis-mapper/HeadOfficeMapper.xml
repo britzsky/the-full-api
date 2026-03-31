@@ -1298,12 +1298,17 @@
     </select>
     
     <select id="HeadOfficeElectronicPaymentTypeList" parameterType="map" resultType="hashmap">
-    	SELECT doc_type,
+    	<!-- 전자결재 타입 테이블의 원본 타입코드와 결재선 기준 컬럼을 그대로 내려준다. -->
+    	SELECT doc_id,
+			   doc_type,
+			   large_type,
+			   middle_type,
+			   small_type,
 			   doc_name,
-			   position
+			   approval_position
 		FROM tb_electronic_payment_type
 		WHERE del_yn = 'N'
-		ORDER BY position ASC, doc_type ASC
+		ORDER BY large_type ASC, middle_type ASC, small_type ASC, doc_type ASC
     </select>
     
     <select id="HeadOfficeElectronicPaymentList" parameterType="map" resultType="hashmap">
@@ -1492,7 +1497,7 @@
 			   DATE_FORMAT(ep.draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
 			   DATE_FORMAT(COALESCE(ep.start_dt, ep.draft_dt), '%Y-%m-%d %H:%i:%s') AS start_dt,
 			   ep.doc_type,
-			   IFNULL(ept.position, -1) AS position,
+			   IFNULL(ept.approval_position, -1) AS approval_position,
 			   ep.department,
 			   ep.status,
 			   ep.retention_dt,
@@ -1554,7 +1559,7 @@
 			   END AS can_action
 		FROM tb_headoffice_electronic_payment ep
 		LEFT JOIN tb_electronic_payment_type ept
-		  ON ept.doc_type = ep.doc_type
+		  ON CAST(ept.doc_type AS CHAR) = CAST(ep.doc_type AS CHAR)
 		 AND IFNULL(ept.del_yn, 'N') = 'N'
 		<choose>
 			<when test="user_id != null and user_id != ''">
@@ -1594,7 +1599,7 @@
 			   DATE_FORMAT(ep.draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
 			   DATE_FORMAT(COALESCE(ep.start_dt, ep.draft_dt), '%Y-%m-%d %H:%i:%s') AS start_dt,
 			   ep.doc_type,
-			   IFNULL(ept.position, -1) AS position,
+			   IFNULL(ept.approval_position, -1) AS approval_position,
 			   ep.department,
 			   ep.status,
 			   ep.retention_dt,
@@ -1613,7 +1618,7 @@
 			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt
 		FROM tb_headoffice_electronic_payment ep
 		LEFT JOIN tb_electronic_payment_type ept
-		  ON ept.doc_type = ep.doc_type
+		  ON CAST(ept.doc_type AS CHAR) = CAST(ep.doc_type AS CHAR)
 		 AND IFNULL(ept.del_yn, 'N') = 'N'
 		WHERE ep.payment_id = #{payment_id}
 		  <choose>
@@ -1670,7 +1675,8 @@
 			   R.biz_no,
 			   R.account_name,
 			   R.payment_type,
-			   R.payment_type_detail
+			   R.payment_type_detail,
+			   R.request_dt
 		FROM (
 			<!-- 소모품 구매 품의서: 기존 품목 테이블 조회 -->
 			SELECT pr.idx,
@@ -1693,7 +1699,8 @@
 				   NULL AS biz_no,
 				   NULL AS account_name,
 				   NULL AS payment_type,
-				   NULL AS payment_type_detail
+				   NULL AS payment_type_detail,
+				   NULL AS request_dt
 			FROM tb_headoffice_purchase_request pr
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = pr.payment_id
@@ -1722,7 +1729,8 @@
 				   NULL AS biz_no,
 				   NULL AS account_name,
 				   NULL AS payment_type,
-				   NULL AS payment_type_detail
+				   NULL AS payment_type_detail,
+				   NULL AS request_dt
 			FROM tb_headoffice_draft d
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = d.payment_id
@@ -1751,7 +1759,8 @@
 				   pd.biz_no AS biz_no,
 				   pd.account_name AS account_name,
 				   pd.payment_type AS payment_type,
-				   pd.payment_type_detail AS payment_type_detail
+				   pd.payment_type_detail AS payment_type_detail,
+				   DATE_FORMAT(pd.request_dt, '%Y-%m-%d %H:%i:%s') AS request_dt
 			FROM tb_headoffice_payment_doc pd
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = pd.payment_id
@@ -2071,6 +2080,7 @@
 			tax,
 			payment_type,
 			payment_type_detail,
+			request_dt,
 			account_number,
 			biz_no,
 			account_name
@@ -2091,6 +2101,11 @@
 			#{tax},
 			#{payment_type},
 			#{payment_type_detail},
+			COALESCE(
+				STR_TO_DATE(#{request_dt}, '%Y-%m-%d %H:%i:%s'),
+				STR_TO_DATE(#{request_dt}, '%Y-%m-%d %H:%i'),
+				STR_TO_DATE(#{request_dt}, '%Y-%m-%d')
+			),
 			#{account_number},
 			#{biz_no},
 			#{account_name}
