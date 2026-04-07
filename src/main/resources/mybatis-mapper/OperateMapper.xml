@@ -151,6 +151,8 @@
 	        purchase_price,
 	        item_img,
 	        receipt_img,
+	        receipt_img2,
+	        receipt_img3,
 	        note,
 	        del_yn,
 	        DATE_FORMAT(purchase_dt, '%Y-%m-%d') as purchase_dt,
@@ -176,6 +178,8 @@
 	        purchase_price,
 	        item_img,
 	        receipt_img,
+	        receipt_img2,
+	        receipt_img3,
 	        note,
 	        del_yn,
 	        <if test="purchase_dt != null and purchase_dt != ''">purchase_dt,</if>
@@ -197,6 +201,8 @@
 	        #{purchase_price, jdbcType=INTEGER},
 	        #{item_img},
 	        #{receipt_img},
+	        #{receipt_img2},
+	        #{receipt_img3},
 	        #{note},
 	        #{del_yn},
 	        <if test="purchase_dt != null and purchase_dt != ''">DATE_FORMAT(#{purchase_dt}, '%Y-%m-%d'),</if>
@@ -236,6 +242,12 @@
 	        </if>
 	        <if test="receipt_img != null">
 	            receipt_img=#{receipt_img},
+	        </if>
+	        <if test="receipt_img2 != null">
+	            receipt_img2=#{receipt_img2},
+	        </if>
+	        <if test="receipt_img3 != null">
+	            receipt_img3=#{receipt_img3},
 	        </if>
 	        <if test="note != null">
 	            note=#{note},
@@ -892,7 +904,8 @@
  		ORDER BY T.account_id, T.position_type
  	-->	
  	
- 		(
+ 		SELECT am.*
+ 		FROM (
 		  SELECT
 		    T.member_id,
 		    T.account_id,
@@ -912,7 +925,6 @@
 			T.del_note,
 			T.rct_notice,
 			T.note,
-			T.position_type,
 			T.address,
 			T.rrn,
 			T.account_number,
@@ -970,9 +982,7 @@
 					</if>
 				</otherwise>
 			</choose>
-		)
 		UNION ALL
-		(
 		  SELECT
 		    M.member_id,
 		    M.account_id,
@@ -992,7 +1002,6 @@
 			A.del_note,
 			A.rct_notice,
 			A.note,
-			A.position_type,
 			A.address,
 			A.rrn,
 			A.account_number,
@@ -1052,8 +1061,8 @@
 					</if>
 				</otherwise>
 			</choose>
-		)
-		ORDER BY account_id;
+		) am
+		ORDER BY am.account_id, am.position_type, am.name;
 	</select>
 	
 	   <!-- 
@@ -1062,7 +1071,8 @@
       - 엑셀 버튼에서만 별도 호출
    -->
 	<select id="AccountMemberAllListExcel" parameterType="map" resultType="map">
-	   (
+	   SELECT am.*
+	   FROM (
 	     SELECT
 	       T.member_id,
 	       T.account_id,
@@ -1082,7 +1092,6 @@
 	      T.del_note,
 	      T.rct_notice,
 	      T.note,
-	      T.position_type,
 	      T.address,
 	      T.rrn,
 	      T.account_number,
@@ -1106,9 +1115,7 @@
 	     <if test='del_yn != null and del_yn != ""'>
 	        AND T.del_yn = #{del_yn}
 	     </if>
-	   )
 	   UNION ALL
-	   (
 	     SELECT
 	       A.member_id,
 	       A.account_id,
@@ -1132,7 +1139,6 @@
 	      A.del_note,
 	      A.rct_notice,
 	      A.note,
-	      A.position_type,
 	      A.address,
 	      A.rrn,
 	      A.account_number,
@@ -1155,8 +1161,8 @@
 	     <if test='del_yn != null and del_yn != ""'>
 	        AND A.del_yn = #{del_yn}
 	     </if>
-	   )
-	   ORDER BY account_id;
+	   ) am
+	   ORDER BY am.account_id, am.position_type, am.name;
 	</select>
 	
 	<insert id="AccountMembersSave" parameterType="map">
