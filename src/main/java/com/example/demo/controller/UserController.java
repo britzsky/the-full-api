@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,14 +19,104 @@ import com.example.demo.service.UserService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 public class UserController {
 
 	private final UserService userService;
+	private final String internalApiSecret;
 
 	@Autowired
-	public UserController(UserService userService, WebConfig webConfig) {
+	public UserController(
+			UserService userService,
+			WebConfig webConfig,
+			@Value("${internal.api.secret:}") String internalApiSecret) {
 		this.userService = userService;
+		this.internalApiSecret = internalApiSecret == null ? "" : internalApiSecret.trim();
+	}
+
+	// 내부 연동용 user_id 문자열 정규화
+	private String normalizeText(Object value) {
+		return value == null ? "" : String.valueOf(value).trim();
+	}
+
+	// 내부 연동용 user_id 형식 검증(영문/숫자/._- 만 허용)
+	private boolean isValidInternalUserId(String userId) {
+		return userId.matches("^[A-Za-z0-9._-]{1,40}$");
+	}
+
+	// 내부 API 호출 허용 여부 확인(로컬 호출 또는 공유 시크릿)
+	private boolean hasInternalApiAccess(HttpServletRequest request) {
+		String remoteAddr = normalizeText(request.getRemoteAddr());
+		if ("127.0.0.1".equals(remoteAddr) || "::1".equals(remoteAddr) || "0:0:0:0:0:0:0:1".equals(remoteAddr)) {
+			return true;
+		}
+
+		String requestSecret = normalizeText(request.getHeader("X-THEFULL-INTERNAL-SECRET"));
+		return !internalApiSecret.isEmpty() && internalApiSecret.equals(requestSecret);
+	}
+
+	// 사용자 조회 결과 첫 행 반환
+	private Map<String, Object> getFirstUserInfo(String userId) {
+		Map<String, Object> paramMap = new HashMap<>();
+		paramMap.put("user_id", userId);
+		List<Map<String, Object>> resultList = userService.SelectUserInfo(paramMap);
+		return resultList == null || resultList.isEmpty() ? null : resultList.get(0);
+	}
+
+	// 내부 API 공통 접근 차단 응답
+	private ResponseEntity<Map<String, Object>> forbiddenInternalApi() {
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("error", "내부 연동 전용 API입니다.");
+		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(payload);
+	}
+
+	// 내부 API: 문의관리 접근 확인용 사용자 존재 여부 조회
+	@GetMapping("/Internal/User/Exists")
+	public ResponseEntity<Map<String, Object>> SelectInternalUserExists(
+			@RequestParam("user_id") String userId,
+			HttpServletRequest request) {
+		if (!hasInternalApiAccess(request)) {
+			return forbiddenInternalApi();
+		}
+
+		String normalizedUserId = normalizeText(userId);
+		if (normalizedUserId.isEmpty() || !isValidInternalUserId(normalizedUserId)) {
+			return ResponseEntity.badRequest().body(Map.of("error", "user_id가 올바르지 않습니다."));
+		}
+
+		Map<String, Object> userInfo = getFirstUserInfo(normalizedUserId);
+		if (userInfo == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "사용자 정보를 찾을 수 없습니다."));
+		}
+
+		return ResponseEntity.ok(Map.of("user_id", normalizeText(userInfo.get("user_id"))));
+	}
+
+	// 내부 API: 답변 메일 발송용 사용자 계정 조회
+	@GetMapping("/Internal/User/MailAuth")
+	public ResponseEntity<Map<String, Object>> SelectInternalUserMailAuth(
+			@RequestParam("user_id") String userId,
+			HttpServletRequest request) {
+		if (!hasInternalApiAccess(request)) {
+			return forbiddenInternalApi();
+		}
+
+		String normalizedUserId = normalizeText(userId);
+		if (normalizedUserId.isEmpty() || !isValidInternalUserId(normalizedUserId)) {
+			return ResponseEntity.badRequest().body(Map.of("error", "user_id가 올바르지 않습니다."));
+		}
+
+		Map<String, Object> userInfo = getFirstUserInfo(normalizedUserId);
+		if (userInfo == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "사용자 정보를 찾을 수 없습니다."));
+		}
+
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("user_id", normalizeText(userInfo.get("user_id")));
+		payload.put("password", normalizeText(userInfo.get("password")));
+		return ResponseEntity.ok(payload);
 	}
 
 	/*
@@ -80,6 +173,7 @@ public class UserController {
 		obj.addProperty("department", String.valueOf(resultMap.get("department")));
 		obj.addProperty("account_id", String.valueOf(resultMap.get("account_id")));
 		obj.addProperty("user_name", String.valueOf(resultMap.get("user_name")));
+		obj.addProperty("web_position", normalizeText(resultMap.get("web_position")).toUpperCase());
 
 		obj.addProperty("code", statusCode);
 
@@ -301,6 +395,16 @@ public class UserController {
 	@GetMapping("/User/ContractEndAccountList")
 	public String ContractEndAccountList() {
 		List<Map<String, Object>> resultList = userService.ContractEndAccountList();
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * 메서드 : BirthdayMemberList
+	 * 설명 : 이달 생일자 목록 조회
+	 */
+	@GetMapping("/User/BirthdayMemberList")
+	public String BirthdayMemberList() {
+		List<Map<String, Object>> resultList = userService.BirthdayMemberList();
 		return new Gson().toJson(resultList);
 	}
 }

@@ -1,0 +1,56 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.WebMapper">
+
+    <!-- webmapper: 웹 문의 목록 조회 -->
+    <select id="selectContactInquiryPendingList" parameterType="map" resultType="hashmap">
+        SELECT
+            id,
+            title,
+            business_name,
+            manager_name,
+            email,
+            phone_number,
+            answer_yn,
+            user_id
+        FROM the_full_web.tb_inquiry
+        WHERE IFNULL(del_yn, 'N') = 'N'
+        <if test="answer_yn != null and answer_yn != ''">
+          AND UPPER(IFNULL(TRIM(answer_yn), 'N')) = UPPER(#{answer_yn})
+        </if>
+        <if test="user_id != null and user_id != ''">
+          AND (
+            IFNULL(TRIM(user_id), '') = ''
+            OR UPPER(TRIM(user_id)) = UPPER(TRIM(#{user_id}))
+          )
+        </if>
+        ORDER BY
+            CASE
+                WHEN UPPER(IFNULL(TRIM(answer_yn), 'N')) = 'N' THEN 0
+                ELSE 1
+            END,
+            id DESC
+    </select>
+
+    <!-- webmapper: ERP 웹훅 라우팅 대상자 조회 -->
+    <select id="selectActiveUsersForErpRouting" resultType="hashmap">
+        SELECT DISTINCT
+            u.user_id,
+            u.user_name,
+            u.department,
+            am.position_type
+        FROM tb_user u
+        LEFT JOIN tb_account_members am
+            ON am.user_id = u.user_id
+            AND IFNULL(am.del_yn, 'N') = 'N'
+            AND am.position_type IS NOT NULL
+        WHERE IFNULL(u.user_id, '') != ''
+            AND IFNULL(u.del_yn, 'N') = 'N'
+            AND IFNULL(u.use_yn, 'Y') = 'Y'
+        ORDER BY u.user_id, am.position_type
+    </select>
+
+</mapper>
+

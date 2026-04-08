@@ -24,5 +24,6 @@ public interface UserMapper {
 	List<Map<String, Object>> UserMemberList(Map<String, Object> paramMap);
 	List<Map<String, Object>> UserManageList(Map<String, Object> paramMap);
 	List<Map<String, Object>> ContractEndAccountList();
+	List<Map<String, Object>> BirthdayMemberList();
 
 }

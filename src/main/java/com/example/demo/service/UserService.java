@@ -131,4 +131,9 @@ public class UserService {
 	public List<Map<String, Object>> ContractEndAccountList() {
 		return userMapper.ContractEndAccountList();
 	}
+
+	// 이달 생일자 목록 조회
+	public List<Map<String, Object>> BirthdayMemberList() {
+		return userMapper.BirthdayMemberList();
+	}
 }

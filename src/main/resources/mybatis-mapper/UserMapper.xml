@@ -367,4 +367,32 @@
             AND a.del_yn = 'N'
     </select>
 
+    <select id="BirthdayMemberList" resultType="hashmap">
+        SELECT
+            am.member_id,
+            am.account_id,
+            a.account_name,
+            am.name,
+            CONCAT(SUBSTRING(am.birthday_rrn, 3, 2), '-', SUBSTRING(am.birthday_rrn, 5, 2)) AS birthday
+        FROM (
+            SELECT
+                member_id,
+                account_id,
+                name,
+                LEFT(REPLACE(REPLACE(IFNULL(rrn, ''), '-', ''), ' ', ''), 6) AS birthday_rrn,
+                IFNULL(del_yn, 'N') AS del_yn
+            FROM tb_account_members
+        ) am
+        JOIN tb_account a
+            ON a.account_id = am.account_id
+        WHERE am.del_yn = 'N'
+            AND IFNULL(a.del_yn, 'N') = 'N'
+            AND am.birthday_rrn REGEXP '^[0-9]{6}$'
+            AND SUBSTRING(am.birthday_rrn, 3, 2) = DATE_FORMAT(CURDATE(), '%m')
+        ORDER BY
+            STR_TO_DATE(CONCAT('2000', SUBSTRING(am.birthday_rrn, 3, 4)), '%Y%m%d'),
+            a.account_name,
+            am.name
+    </select>
+
 </mapper>
