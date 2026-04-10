@@ -361,15 +361,10 @@ public class MartReceiptParser extends BaseReceiptParser {
             if (base.amount == null && base.unitPrice != null && base.qty != null)
                 base.amount = base.unitPrice * base.qty;
 
-            items.add(base);
-        }
-
-        // 남은 상품 처리
-        for (int i = count; i < names.size(); i++) {
-            Item it = new Item();
-            it.name = names.get(i);
-            it.taxFlag = "과세";
-            items.add(it);
+            // 상품명과 매칭되더라도 금액이 확인된 항목만 상세로 반영
+            if (base.amount != null && base.amount > 0) {
+                items.add(base);
+            }
         }
 
         // 4️⃣ 디버그 출력
