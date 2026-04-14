@@ -113,14 +113,18 @@ public class OcrController_develop {
             @RequestParam(value = "account_id", required = false) String account_id,
             @RequestParam(value = "cell_day", required = false) String cell_day,
             @RequestParam(value = "cell_date", required = false) String cell_date,
+            @RequestParam(value = "saleDate", required = false) String saleDate,
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "total", required = false) int total,
+            @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
             @RequestParam(value = "use_name", required = false) String use_name) {
 
         // 파일 저장
         File tempFile = saveFile(file);
+
+        // saleDate: cell_date 우선, 없으면 saleDate 파라미터 사용
+        String resolvedSaleDate = (cell_date != null && !cell_date.trim().isEmpty()) ? cell_date : saleDate;
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
@@ -129,8 +133,8 @@ public class OcrController_develop {
         purchase.put("user_id", user_id);
         purchase.put("saveType", saveType);
         purchase.put("cell_day", cell_day);
-        purchase.put("saleDate", cell_date);
-        purchase.put("payment_dt", cell_date);
+        purchase.put("saleDate", resolvedSaleDate);
+        purchase.put("payment_dt", resolvedSaleDate);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
         purchase.put("use_name", use_name);

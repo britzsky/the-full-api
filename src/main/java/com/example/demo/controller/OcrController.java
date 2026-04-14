@@ -113,13 +113,17 @@ public class OcrController {
             @RequestParam(value = "account_id", required = false) String account_id,
             @RequestParam(value = "cell_day", required = false) String cell_day,
             @RequestParam(value = "cell_date", required = false) String cell_date,
+            @RequestParam(value = "saleDate", required = false) String saleDate,
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
-            @RequestParam(value = "total", required = false) int total) {
+            @RequestParam(value = "total", required = false, defaultValue = "0") Integer total) {
 
         // 파일 저장
         File tempFile = saveFile(file);
+
+        // saleDate: cell_date 우선, 없으면 saleDate 파라미터 사용
+        String resolvedSaleDate = (cell_date != null && !cell_date.trim().isEmpty()) ? cell_date : saleDate;
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
@@ -128,8 +132,8 @@ public class OcrController {
         purchase.put("user_id", user_id);
         purchase.put("saveType", saveType);
         purchase.put("cell_day", cell_day);
-        purchase.put("saleDate", cell_date);
-        purchase.put("payment_dt", cell_date);
+        purchase.put("saleDate", resolvedSaleDate);
+        purchase.put("payment_dt", resolvedSaleDate);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
 
@@ -220,9 +224,14 @@ public class OcrController {
             String yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
             String monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
 
-            purchase.put("sale_id", saleId);
-//            purchase.put("saleDate", date);
-//            purchase.put("payment_dt", date);
+            // 재업로드 시 기존 sale_id 유지, 없을 때만 새로 생성
+            Object existingSaleIdObj = purchase.get("sale_id");
+            String finalSaleId = (existingSaleIdObj != null && !String.valueOf(existingSaleIdObj).trim().isEmpty())
+                    ? String.valueOf(existingSaleIdObj).trim()
+                    : saleId;
+            purchase.put("sale_id", finalSaleId);
+            purchase.put("saleDate", receiptDate);
+            purchase.put("payment_dt", receiptDate);
 
             if (result.totals.total == 0 || result.totals.total == null) {
                 purchase.put("total", total); // total 세팅.
@@ -314,7 +323,7 @@ public class OcrController {
             if (result.items != null) {
                 for (Item r : result.items) {
                     Map<String, Object> detailMap = new HashMap<>();
-                    detailMap.put("sale_id", saleId);
+                    detailMap.put("sale_id", finalSaleId);
                     detailMap.put("name", r.name);
                     detailMap.put("qty", r.qty);
                     detailMap.put("amount", r.amount);
@@ -325,8 +334,21 @@ public class OcrController {
                 }
             }
 
-            // 이미지 저장 + purchase.receipt_image
-            attachReceiptImage(purchase, file, saleId);
+            // 재업로드 시: DB에서 기존 receipt_image 경로 조회해서 삭제 대상으로 세팅
+            if (purchase.get("receipt_image") == null || String.valueOf(purchase.get("receipt_image")).trim().isEmpty()) {
+                try {
+                    Map<String, Object> imgParam = new HashMap<>();
+                    imgParam.put("sale_id", finalSaleId);
+                    imgParam.put("account_id", account_id);
+                    String existingImg = accountService.AccountPurchaseReceiptImageBySaleId(imgParam);
+                    if (existingImg != null && !existingImg.trim().isEmpty()) {
+                        purchase.put("receipt_image", existingImg);
+                    }
+                } catch (Exception ignore) {}
+            }
+
+            // 이미지 저장 + purchase.receipt_image (기존 파일 삭제 후 새 파일 저장)
+            attachReceiptImage(purchase, file, finalSaleId);
 
             // tally 저장값
             String day = "day_" + cell_day;
@@ -363,18 +385,29 @@ public class OcrController {
     // =========================
     private Map<String, Object> saveWithRequestParamsOnly(Map<String, Object> purchase, MultipartFile file)
             throws Exception {
-        // sale_id는 이 케이스에서도 필요할 가능성이 높아서 생성
+        // 재업로드 시 기존 sale_id 유지, 없을 때만 새로 생성
         LocalDateTime now = LocalDateTime.now();
         String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-        purchase.put("sale_id", saleId);
+        Object existingSaleId = purchase.get("sale_id");
+        if (existingSaleId == null || String.valueOf(existingSaleId).trim().isEmpty()) {
+            purchase.put("sale_id", saleId);
+        } else {
+            saleId = String.valueOf(existingSaleId).trim();
+        }
 
-        // cell_date 기반으로 저장할 연월 세팅(없으면 현재)
+        // saleDate: resolvedSaleDate(=cell_date or saleDate param) 우선, 없으면 현재
         LocalDate baseDate;
-        String cellDate = (String) purchase.get("cell_date");
+        String saleDateVal = purchase.get("saleDate") != null ? String.valueOf(purchase.get("saleDate")).trim() : "";
+        String cellDate = purchase.get("cell_date") != null ? String.valueOf(purchase.get("cell_date")).trim() : "";
+        String dateStr = !saleDateVal.isEmpty() ? saleDateVal : (!cellDate.isEmpty() ? cellDate : "");
         try {
-            baseDate = (cellDate != null && !cellDate.isBlank()) ? LocalDate.parse(cellDate) : LocalDate.now();
+            baseDate = !dateStr.isEmpty() ? DateUtils.parseFlexibleDate(dateStr) : LocalDate.now();
         } catch (Exception ignore) {
             baseDate = LocalDate.now();
+        }
+        // saleDate가 없으면 baseDate로 세팅
+        if (saleDateVal.isEmpty()) {
+            purchase.put("saleDate", baseDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
         }
         purchase.put("count_year", baseDate.format(DateTimeFormatter.ofPattern("yyyy")));
         purchase.put("count_month", baseDate.format(DateTimeFormatter.ofPattern("MM")));
@@ -409,7 +442,7 @@ public class OcrController {
         return purchase;
     }
 
-    // ✅ fallback용 이미지 저장 로직 분리
+    // ✅ 이미지 저장 로직: 재업로드 시 기존 파일 삭제 후 새 파일 저장
     private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
         String staticPath = new File(uploadDir).getAbsolutePath();
         String basePath = staticPath + "/" + "receipt/" + saleId + "/";
@@ -421,8 +454,15 @@ public class OcrController {
         Path filePath = dirPath.resolve(uniqueFileName);
 
         file.transferTo(filePath.toFile());
-        String resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
-        purchase.put("receipt_image", resultPath);
+        String newPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+
+        // 기존 파일 삭제 (service의 deleteReplacedReceiptImage 활용)
+        Object existingImageObj = purchase.get("receipt_image");
+        if (existingImageObj != null && !String.valueOf(existingImageObj).trim().isEmpty()) {
+            accountService.DeleteOldReceiptImage(String.valueOf(existingImageObj).trim(), newPath);
+        }
+
+        purchase.put("receipt_image", newPath);
     }
 
     private int safeInt(Object v) {

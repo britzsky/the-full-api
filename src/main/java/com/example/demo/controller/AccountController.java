@@ -684,6 +684,10 @@ public class AccountController {
 		List<Map<String, Object>> managerData = (List<Map<String, Object>>) payload.get("managerData");
 		List<Map<String, Object>> eventData = (List<Map<String, Object>>) payload.get("eventData");
 
+		if (formData != null) {
+			payloadMap.putAll(formData);
+		}
+		
 		if (etcData != null) {
 			for (Map<String, Object> row : etcData) {
 				if (row != null)
@@ -1784,6 +1788,20 @@ public class AccountController {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 
 		resultList = accountService.AccountPurchaseTallyList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyForTallyTab
+	 * comment : 회계 -> 매입집계(TallyTab) 조회
+	 */
+	@GetMapping("Account/AccountPurchaseTallyForTallyTab")
+	public String AccountPurchaseTallyForTallyTab(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPurchaseTallyForTallyTab(paramMap);
 
 		return new Gson().toJson(resultList);
 	}

@@ -63,8 +63,11 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
+	int AccountPurchaseHistorySave(Map<String, Object> paramMap);										// 회계 -> 매입마감 변경이력 저장
+	Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap);				// 회계 -> 매입마감 sale_id 기준 total/saleDate 조회
 	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap);							// 현장 -> 매입집계 영수증 경로 조회
 	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회
+	List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap); 			// 회계 -> 매입집계(TallyTab) 조회
 	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입집계 조회
 	List<Map<String, Object>> AccountPurchaseDetailList_tmp(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입집계(임시) 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); 				// 회계 -> 본사 법인카드 목록 조회

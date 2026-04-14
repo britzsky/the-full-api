@@ -110,9 +110,9 @@ public class OcrControllerV3 {
     @PostMapping("/receipt-scanV3")
     public ResponseEntity<?> scanReceipt(
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "total", required = false) int total,
-            @RequestParam(value = "type", required = false) int type,
-            @RequestParam(value = "card_idx", required = false) int idx,
+            @RequestParam(value = "total", required = false) Integer total,
+            @RequestParam(value = "type", required = false) Integer type,
+            @RequestParam(value = "card_idx", required = false) Integer idx,
             @RequestParam(value = "account_id", required = false) String account_id,
             @RequestParam(value = "sale_id", required = false) String sale_id,
             @RequestParam(value = "receipt_type", required = false) String receipt_type,
@@ -127,9 +127,9 @@ public class OcrControllerV3 {
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
-        purchase.put("total", total);
-        purchase.put("type", type);
-        purchase.put("idx", idx);
+        purchase.put("total", total != null ? total : 0);
+        purchase.put("type", type);  // null이면 그대로 null (프론트에서 보낸 값 유지)
+        purchase.put("idx", idx != null ? idx : 0);
         purchase.put("account_id", account_id);
         purchase.put("sale_id", sale_id);
         purchase.put("receipt_type", receipt_type);

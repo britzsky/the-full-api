@@ -2021,13 +2021,35 @@
 	    </trim>
 	</insert>
 	
+	<insert id="AccountPurchaseHistorySave" parameterType="map">
+		INSERT INTO tb_account_purchase_tally_history
+		(account_id, sale_id, saleDate, total, reg_dt, user_id)
+		VALUES
+		(
+			#{account_id},
+			#{sale_id},
+			DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
+			#{total},
+			DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),
+			#{user_id}
+		)
+	</insert>
+
+	<select id="AccountPurchaseTallyTotalBySaleId" parameterType="map" resultType="hashmap">
+		SELECT account_id, sale_id, DATE_FORMAT(saleDate, '%Y-%m-%d') AS saleDate, total
+		FROM tb_account_purchase_tally
+		WHERE sale_id = #{sale_id}
+		LIMIT 1
+	</select>
+
 	<select id="AccountPurchaseTallyList" parameterType="map" resultType="hashmap">
-		SELECT a.account_id, 
-			   a.account_name, 
-		       amv.type, 
-		       apt.use_name, 
-		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate, 
-		       ifnull(apt.total, 0) as total, 
+		SELECT apt.account_id,
+			   a.account_name,
+		       apt.type,
+		       am.name AS type_name,
+		       apt.use_name,
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate,
+		       ifnull(apt.total, 0) as total,
 		       ifnull(apt.vat, 0) as vat,
 		       ifnull(apt.taxFree, 0) as taxFree,
 		       ifnull(apt.tax, 0) as tax,
@@ -2036,31 +2058,98 @@
 		       apt.payType,
 		       apt.cardNo,
 		       apt.cardBrand,
+		       DATE_FORMAT(apt.reg_dt, '%Y-%m-%d') as reg_dt,
+		       apt.receipt_type,
 		       apt.receipt_image,
 		       apt.note,
 		       apt.bizNo,
 		       am.ceo_name,
 		       apt.sale_id
-		FROM tb_account a
-		JOIN tb_account_mapping_v2 amv
-		ON amv.account_id = a.account_id
-		JOIN tb_account_mapping am
-		ON am.type = amv.type
-		LEFT OUTER JOIN tb_account_purchase_tally apt
-		ON apt.account_id = a.account_id
-		AND apt.type = amv.type
-		WHERE a.account_id = #{account_id}
-		AND apt.type = #{type}
-		<if test="payType == 1">
+		FROM tb_account_purchase_tally apt
+		JOIN tb_account a
+			ON a.account_id = apt.account_id
+		LEFT JOIN tb_account_mapping am
+			ON am.type = apt.type
+		WHERE 1=1
+		<if test="account_id != null and account_id != '' and account_id != '0'">
+			AND apt.account_id = #{account_id}
+		</if>
+		<if test="type != null and type != '' and type != '0'">
+			AND apt.type = #{type}
+		</if>
+		<if test="payType != null and payType.toString() == '1'">
 	        AND apt.totalCash != 0
         </if>
-        <if test="payType == 2">
+        <if test="payType != null and payType.toString() == '2'">
 	        AND apt.totalCard != 0
         </if>
-        AND apt.saleDate BETWEEN DATE_FORMAT(#{fromDate}, '%Y-%m-%d') AND DATE_FORMAT(#{toDate}, '%Y-%m-%d')
+        <if test="year != null and year != '' and year != '0'">
+	        AND YEAR(apt.saleDate) = CAST(#{year} AS UNSIGNED)
+        </if>
+        <if test="month != null and month != '' and month != '0'">
+	        AND MONTH(apt.saleDate) = CAST(#{month} AS UNSIGNED)
+        </if>
         ORDER BY apt.saleDate ASC, apt.sale_id ASC
 	</select>
-	
+
+	<!-- 매입집계(TallyTab) 전용: detail의 itemType/taxType 기준으로 소모품/식재료 금액 집계 -->
+	<!-- account_id/year/month 전부 선택 조건 - 전체 조회 가능 -->
+	<select id="AccountPurchaseTallyForTallyTab" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id,
+		       a.account_name,
+		       apt.type,
+		       am.name AS type_name,
+		       apt.use_name,
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate,
+		       apt.sale_id,
+		       DATE_FORMAT(apt.reg_dt, '%Y-%m-%d') as reg_dt,
+		       apt.note,
+		       apt.bizNo,
+		       am.ceo_name,
+		       /* detail이 없는 경우(type 1~4 집계표 직접입력) apt.total을 food_total fallback으로 사용 */
+		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
+		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.vat    ELSE 0 END), 0) AS expen_vat,
+		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
+		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount
+		                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '3' THEN aptd.amount
+		                       ELSE 0 END), 0) AS expen_total,
+		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
+		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat    ELSE 0 END), 0) AS food_vat,
+		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
+		       /* detail이 없으면(직접입력) food_total = apt.total, detail이 있으면 detail 합계 사용 */
+		       CASE
+		         WHEN COUNT(aptd.item_id) = 0 THEN IFNULL(apt.total, 0)
+		         ELSE IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		                              WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
+		                              WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
+		                              ELSE 0 END), 0)
+		       END AS food_total
+		FROM tb_account_purchase_tally apt
+		JOIN tb_account a
+			ON a.account_id = apt.account_id
+		LEFT JOIN tb_account_mapping am
+			ON am.type = apt.type
+		LEFT JOIN tb_account_purchase_tally_detail aptd
+			ON aptd.sale_id = apt.sale_id
+		WHERE 1=1
+		<if test="account_id != null and account_id != '' and account_id != '0'">
+			AND apt.account_id = #{account_id}
+		</if>
+		<if test="type != null and type != '' and type != '0'">
+			AND apt.type = #{type}
+		</if>
+		<if test="year != null and year != '' and year != '0'">
+			AND YEAR(apt.saleDate) = CAST(#{year} AS UNSIGNED)
+		</if>
+		<if test="month != null and month != '' and month != '0'">
+			AND MONTH(apt.saleDate) = CAST(#{month} AS UNSIGNED)
+		</if>
+		GROUP BY apt.sale_id, apt.account_id, a.account_name, apt.type, am.name, apt.use_name,
+		         apt.saleDate, apt.reg_dt, apt.note, apt.bizNo, am.ceo_name, apt.total
+		ORDER BY apt.saleDate ASC, apt.account_id ASC, apt.sale_id ASC
+	</select>
+
 	<select id="AccountPurchaseDetailList" parameterType="map" resultType="hashmap">
 		SELECT apt.account_id, 
 			   aptd.sale_id,
@@ -2884,12 +2973,26 @@
 	<select id="AccountPurchaseTallyV2List" parameterType="map" resultType="map">
 		SELECT account_id, sale_id, type, DATE_FORMAT(saleDate, '%Y-%m') as saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note
 		FROM tb_account_purchase_tally_v2
-		WHERE DATE_FORMAT(saleDate, '%Y-%m') = #{saleDate}
-		AND account_id = #{account_id}
-		<if test="type != null and type != ''">
+		WHERE del_yn = 'N'
+		<!-- 거래처 조건 -->
+		<if test="account_id != null and account_id != ''">
+			AND account_id = #{account_id}
+		</if>
+		<!-- 타입 조건: 값이 있고 "0"(전체)이 아닐 때만 적용 -->
+		<if test="type != null and type != '' and type.toString() != '0'">
 			AND type = #{type}
 		</if>
-		AND del_yn = 'N'
+		<!-- 연월 조건: saleDate(YYYY-MM) 우선, 없으면 fromDate~toDate 범위로 조회 -->
+		<choose>
+			<when test="saleDate != null and saleDate != ''">
+				AND DATE_FORMAT(saleDate, '%Y-%m') = #{saleDate}
+			</when>
+			<when test="fromDate != null and fromDate != '' and toDate != null and toDate != ''">
+				AND saleDate BETWEEN STR_TO_DATE(CONCAT(#{fromDate}, '-01'), '%Y-%m-%d')
+				                 AND LAST_DAY(STR_TO_DATE(CONCAT(#{toDate}, '-01'), '%Y-%m-%d'))
+			</when>
+		</choose>
+		ORDER BY saleDate ASC, account_id ASC, type ASC
 	</select>
 	
 	<insert id="AccountPurchaseTallyV2Save" parameterType="map">

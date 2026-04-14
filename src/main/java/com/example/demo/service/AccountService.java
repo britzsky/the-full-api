@@ -178,6 +178,16 @@ public class AccountService {
 		deletePhysicalReceiptImage(oldPath);
 	}
 
+	// 회계 -> OCR 컨트롤러에서 호출: 기존 영수증 경로 조회 (public)
+	public String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap) {
+		return findAccountPurchaseReceiptImage(paramMap);
+	}
+
+	// 회계 -> OCR 컨트롤러에서 호출: 기존 파일 삭제 (public)
+	public void DeleteOldReceiptImage(String oldPath, String newPath) {
+		deleteReplacedReceiptImage(oldPath, newPath);
+	}
+
 	// 회계 -> 매입집계 기존 영수증 경로 조회
 	private String findAccountPurchaseReceiptImage(Map<String, Object> paramMap) {
 		String saleId = asText(paramMap.get("sale_id"));
@@ -699,6 +709,7 @@ public class AccountService {
 		iResult = accountMapper.AccountPurchaseSave(paramMap);
 		if (iResult > 0) {
 			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"));
+			try { accountMapper.AccountPurchaseHistorySave(paramMap); } catch (Exception ignored) {}
 		}
 		return iResult;
 	}
@@ -707,6 +718,21 @@ public class AccountService {
 	public int AccountPurchaseDetailSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = accountMapper.AccountPurchaseDetailSave(paramMap);
+		if (iResult > 0) {
+			try {
+				// detail paramMap에 total/saleDate가 없을 수 있으므로 DB에서 조회해 보완
+				Map<String, Object> historyParam = new java.util.HashMap<>(paramMap);
+				if (historyParam.get("total") == null || historyParam.get("saleDate") == null) {
+					Map<String, Object> master = accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
+					if (master != null) {
+						if (historyParam.get("total") == null) historyParam.put("total", master.get("total"));
+						if (historyParam.get("saleDate") == null) historyParam.put("saleDate", master.get("saleDate"));
+						if (historyParam.get("account_id") == null) historyParam.put("account_id", master.get("account_id"));
+					}
+				}
+				accountMapper.AccountPurchaseHistorySave(historyParam);
+			} catch (Exception ignored) {}
+		}
 		return iResult;
 	}
 
@@ -714,6 +740,13 @@ public class AccountService {
 	public List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.AccountPurchaseTallyList(paramMap);
+		return resultList;
+	}
+
+	// 회계 -> 매입집계(TallyTab) 조회
+	public List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPurchaseTallyForTallyTab(paramMap);
 		return resultList;
 	}
 
@@ -923,6 +956,14 @@ public class AccountService {
 	public int TallySheetPaymentSave(Map<String, Object> paramMap) {
 
 		int result = 0;
+
+		// saleDate가 없으면 프로시저가 실패하므로 조기 리턴
+		Object saleDateObj = paramMap.get("saleDate");
+		String saleDate = saleDateObj != null ? String.valueOf(saleDateObj).trim() : "";
+		if (saleDate.isEmpty() || "null".equalsIgnoreCase(saleDate)) {
+			System.err.println("[TallySheetPaymentSave] saleDate가 없어 스킵: " + paramMap.get("sale_id"));
+			return 0;
+		}
 
 		paramMap.put("result", 0); // OUT 값 초기화
 		accountMapper.TallySheetPaymentSave(paramMap);
