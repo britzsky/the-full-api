@@ -117,6 +117,7 @@ public class OcrController {
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
+            @RequestParam(value = "sale_id", required = false) String sale_id,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total) {
 
         // 파일 저장
@@ -136,6 +137,10 @@ public class OcrController {
         purchase.put("payment_dt", resolvedSaleDate);
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
+        // 기존 행 재업로드 시 sale_id 유지
+        if (sale_id != null && !sale_id.trim().isEmpty()) {
+            purchase.put("sale_id", sale_id.trim());
+        }
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -229,6 +234,7 @@ public class OcrController {
             String finalSaleId = (existingSaleIdObj != null && !String.valueOf(existingSaleIdObj).trim().isEmpty())
                     ? String.valueOf(existingSaleIdObj).trim()
                     : saleId;
+            System.out.println("[receipt-scan] received sale_id=" + existingSaleIdObj + " → finalSaleId=" + finalSaleId);
             purchase.put("sale_id", finalSaleId);
             purchase.put("saleDate", receiptDate);
             purchase.put("payment_dt", receiptDate);
@@ -329,7 +335,7 @@ public class OcrController {
                     detailMap.put("amount", r.amount);
                     detailMap.put("unitPrice", r.unitPrice);
                     detailMap.put("taxType", taxify(r.taxFlag));
-                    detailMap.put("itemType", classify(r.name));
+                    detailMap.put("itemType", classify(r.name, receiptType));
                     detailList.add(detailMap);
                 }
             }
@@ -359,14 +365,26 @@ public class OcrController {
 
             int iResult = 0;
             iResult += accountService.AccountPurchaseSave(purchase);
-            iResult += accountService.TallySheetPaymentSave(purchase);
+
+            // TallySheetPaymentSave 실패해도 이미 purchase 저장은 완료 — 예외가 catch로 빠지지 않게 처리
+            try {
+                accountService.TallySheetPaymentSave(purchase);
+            } catch (Exception tallyEx) {
+                System.err.println("[receipt-scan] TallySheetPaymentSave 실패 (무시): " + tallyEx.getMessage());
+            }
+
             for (Map<String, Object> m : detailList) {
-                iResult += accountService.AccountPurchaseDetailSave(m);
+                try {
+                    accountService.AccountPurchaseDetailSave(m);
+                } catch (Exception detailEx) {
+                    System.err.println("[receipt-scan] AccountPurchaseDetailSave 실패 (무시): " + detailEx.getMessage());
+                }
             }
 
             return ResponseEntity.ok(purchase);
 
         } catch (Exception e) {
+            System.err.println("[receipt-scan] 예외 발생, fallback 저장: " + e.getMessage());
             try {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
             } catch (Exception e1) {
@@ -502,14 +520,18 @@ public class OcrController {
      * @return
      */
     public static int classify(String itemName) {
+        return classify(itemName, null);
+    }
+
+    public static int classify(String itemName, String receiptType) {
         if (itemName == null || itemName.isEmpty()) {
-            return 3;
+            return defaultByReceiptType(receiptType);
         }
 
         // 1) 예외 케이스부터 검사
         for (String ex : FOOD_EXCEPTIONS) {
             if (itemName.contains(ex)) {
-                return 3;
+                return defaultByReceiptType(receiptType);
             }
         }
 
@@ -527,8 +549,19 @@ public class OcrController {
             }
         }
 
-        // 4) 해당 없으면 기타
-        return 3;
+        // 4) 마트/편의점은 식재료로 기본 분류, 나머지는 기타
+        return defaultByReceiptType(receiptType);
+    }
+
+    private static int defaultByReceiptType(String receiptType) {
+        if (receiptType == null) return 3;
+        switch (receiptType) {
+            case "MART_ITEMIZED":
+            case "CONVENIENCE":
+                return 1; // 마트/편의점 → 식재료
+            default:
+                return 3; // 기타
+        }
     }
 
     /**

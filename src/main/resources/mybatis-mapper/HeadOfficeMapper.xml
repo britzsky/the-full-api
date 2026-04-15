@@ -283,7 +283,7 @@
 		    #{indirect_total_ratio},
 		    #{business_profit},
 		    #{business_profit_ratio},
-		    NOW(),
+		    CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 		    #{event_cost},
 		    #{event_ratio},
 		    #{not_budget_cost},
@@ -466,7 +466,7 @@
 		    <if test="business_profit_ratio != null">
 		        business_profit_ratio = #{business_profit_ratio},
 		    </if>
-		    update_dt = NOW(),
+		    update_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 		    <if test="event_cost != null">
 		        event_cost = #{event_cost},
 		    </if>
@@ -1381,7 +1381,7 @@
 	        #{payer_sign},
 	        #{ceo_user},
 	        #{ceo_sign},
-	        NOW(),
+	        CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 	        #{user_id}
 	    </trim>
 
@@ -1461,7 +1461,7 @@
 	        #{payer_sign},
 	        #{ceo_user},
 	        #{ceo_sign},
-	        NOW(),
+	        CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 	        #{reg_user_id}
 	    )
 	    ON DUPLICATE KEY UPDATE
@@ -1804,7 +1804,7 @@
 	<update id="ElectronicPaymentManageTmSignSave" parameterType="map">
 		UPDATE tb_headoffice_electronic_payment
 		SET tm_sign = #{action_status},
-			tm_dt = NOW(),
+			tm_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			reg_read_dt = NULL,
 			status = CASE
 					   WHEN #{action_status} = '3'
@@ -1829,7 +1829,7 @@
 	<update id="ElectronicPaymentManageCeoSignSave" parameterType="map">
 		UPDATE tb_headoffice_electronic_payment
 		SET ceo_sign = #{action_status},
-			ceo_dt = NOW(),
+			ceo_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			reg_read_dt = NULL,
 			tm_read_dt = NULL,
 			payer_read_dt = NULL,
@@ -1858,7 +1858,7 @@
 	<update id="ElectronicPaymentManagePayerSignSave" parameterType="map">
 		UPDATE tb_headoffice_electronic_payment
 		SET payer_sign = #{action_status},
-			payer_dt = NOW(),
+			payer_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			reg_read_dt = NULL,
 			tm_read_dt = NULL,
 			status = CASE
@@ -2000,19 +2000,19 @@
 		SET reg_read_dt = CASE
 							WHEN reg_user_id = #{user_id}
 							 AND #{notify_type} IN ('승인', '반려')
-							  THEN NOW()
+							  THEN CONVERT_TZ(NOW(), '+00:00', '+09:00')
 							ELSE reg_read_dt
 						  END,
 			tm_read_dt = CASE
 						   WHEN tm_user = #{user_id}
 						    AND #{notify_type} = '반려'
-						     THEN NOW()
+						     THEN CONVERT_TZ(NOW(), '+00:00', '+09:00')
 						   ELSE tm_read_dt
 						 END,
 			payer_read_dt = CASE
 							  WHEN payer_user = #{user_id}
 							   AND #{notify_type} = '반려'
-							    THEN NOW()
+							    THEN CONVERT_TZ(NOW(), '+00:00', '+09:00')
 							  ELSE payer_read_dt
 							END
 		WHERE payment_id = #{payment_id}

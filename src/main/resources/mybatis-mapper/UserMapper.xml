@@ -105,7 +105,7 @@
     <update id="UpdateUserDelYn" parameterType="map">
         UPDATE tb_user
         SET del_yn = #{del_yn},
-            del_dt = CASE WHEN #{del_yn} = 'Y' THEN NOW() ELSE NULL END
+            del_dt = CASE WHEN #{del_yn} = 'Y' THEN CONVERT_TZ(NOW(), '+00:00', '+09:00') ELSE NULL END
         WHERE user_id = #{user_id}
     </update>
 
@@ -126,7 +126,7 @@
             #{user_name},
             #{password},
             #{user_type},
-            DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
             DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
             #{account_id},
             #{position},
@@ -138,7 +138,7 @@
             user_name = #{user_name},
             password = #{password},
             user_type = #{user_type},
-            reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            reg_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
             join_dt = DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
             account_id = #{account_id},
             position = #{position},
@@ -205,7 +205,7 @@
             #{address},
             #{phone},
             #{note},
-            DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
             #{user_id}
         )
         ON DUPLICATE KEY UPDATE
@@ -225,7 +225,7 @@
             address = #{address},
             phone = #{phone},
             note = #{note},
-            update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+            update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
             user_id = #{user_id}
         </trim>
     </insert>
@@ -361,8 +361,8 @@
         JOIN tb_account a
             ON a.account_id = ai.account_id
         <![CDATA[
-            WHERE ai.contract_end > NOW()
-                AND ai.contract_end < DATE_ADD(NOW(), INTERVAL 3 MONTH)
+            WHERE ai.contract_end > CONVERT_TZ(NOW(), '+00:00', '+09:00')
+                AND ai.contract_end < DATE_ADD(CONVERT_TZ(NOW(), '+00:00', '+09:00'), INTERVAL 3 MONTH)
         ]]>
             AND a.del_yn = 'N'
     </select>

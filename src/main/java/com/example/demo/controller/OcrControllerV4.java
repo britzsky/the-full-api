@@ -328,7 +328,7 @@ public class OcrControllerV4 {
                 detailMap.put("amount", r.amount);
                 detailMap.put("unitPrice", r.unitPrice);
                 detailMap.put("taxType", taxify(r.taxFlag));
-                detailMap.put("itemType", classify(r.name));
+                detailMap.put("itemType", classify(r.name, receiptType));
 
                 detailList.add(detailMap);
             }
@@ -500,14 +500,18 @@ public class OcrControllerV4 {
      * @return
      */
     public static int classify(String itemName) {
+        return classify(itemName, null);
+    }
+
+    public static int classify(String itemName, String receiptType) {
         if (itemName == null || itemName.isEmpty()) {
-            return 3;
+            return defaultByReceiptType(receiptType);
         }
 
         // 1) 예외 케이스부터 검사
         for (String ex : FOOD_EXCEPTIONS) {
             if (itemName.contains(ex)) {
-                return 3;
+                return defaultByReceiptType(receiptType);
             }
         }
 
@@ -525,8 +529,19 @@ public class OcrControllerV4 {
             }
         }
 
-        // 4) 해당 없으면 기타
-        return 3;
+        // 4) 마트/편의점은 식재료로 기본 분류, 나머지는 기타
+        return defaultByReceiptType(receiptType);
+    }
+
+    private static int defaultByReceiptType(String receiptType) {
+        if (receiptType == null) return 3;
+        switch (receiptType) {
+            case "MART_ITEMIZED":
+            case "CONVENIENCE":
+                return 1; // 마트/편의점 → 식재료
+            default:
+                return 3; // 기타
+        }
     }
 
     /**

@@ -140,7 +140,7 @@
 		INSERT INTO tb_account_util_member_mapping
 		(idx, member_id, account_id, del_yn, reg_dt, user_id)
 		VALUES
-		(#{idx}, #{member_id}, #{account_id}, 'N', DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+		(#{idx}, #{member_id}, #{account_id}, 'N', DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id})
 		ON DUPLICATE KEY UPDATE
 		member_id = #{member_id},
 		account_id = #{account_id},
@@ -299,7 +299,7 @@
 	        reg_dt
 	    )
 	    VALUES (
-	        COALESCE(#{account_id}, DATE_FORMAT(NOW(), '%Y%m%d%H%i%s')),
+	        COALESCE(#{account_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y%m%d%H%i%s')),
 	        <if test="account_name != null and account_name != ''">#{account_name},</if>
 	        <if test="account_address != null and account_address != ''">#{account_address},</if>
 	        <if test="account_address_detail != null and account_address_detail != ''">#{account_address_detail},</if>
@@ -309,10 +309,10 @@
 	        <if test="account_type != null and account_type != ''">#{account_type},</if>
 	        <if test="meal_type != null and meal_type != ''">#{meal_type},</if>
 	        <if test="del_yn != null and del_yn != ''">#{del_yn},</if>
-	        DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s')
 	    )
 	    ON DUPLICATE KEY UPDATE
-	        reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s')
+	        reg_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s')
 	        <if test="account_name != null and account_name != ''">, account_name = #{account_name}</if>
 	        <if test="account_address != null and account_address != ''">, account_address = #{account_address}</if>
 	        <if test="account_address_detail != null and account_address_detail != ''">, account_address_detail = #{account_address_detail}</if>
@@ -322,7 +322,7 @@
 	        <if test="account_type != null and account_type != ''">, account_type = #{account_type}</if>
 	        <if test="meal_type != null and meal_type != ''">, meal_type = #{meal_type}</if>
 	        <if test="del_yn != null and del_yn != ''">, del_yn = #{del_yn}</if>
-	        <if test='del_yn == "Y"'>, del_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')</if>
+	        <if test='del_yn == "Y"'>, del_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</if>
 	</insert>
 	
 	<select id="AccountRecordSheetList" parameterType="map" resultType="hashmap">
@@ -1492,12 +1492,12 @@
 	        CONCAT(
 		      DATE_FORMAT(#{input_dt}, '%Y-%m-%d'),
 		      ' ',
-		      DATE_FORMAT(NOW(), '%H:%i:%s')),
+		      DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%H:%i:%s')),
 	        <if test="balance_dt != null and balance_dt != ''">
 	        CONCAT(
 		      DATE_FORMAT(#{balance_dt}, '%Y-%m-%d'),
 		      ' ',
-		      DATE_FORMAT(NOW(), '%H:%i:%s')),
+		      DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%H:%i:%s')),
 	        </if>
 	        #{difference_price},
 	        #{input_price},
@@ -1934,7 +1934,7 @@
 	        #{use_name},
 	        #{cashReceiptType},
 	        #{user_id},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{receipt_type}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
@@ -1957,7 +1957,7 @@
 	        use_name = #{use_name},
 	        cashReceiptType = #{cashReceiptType},
 	        mod_id = #{user_id},
-	        mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        receipt_type = #{receipt_type}
 	    </trim>
 	</insert>
@@ -2003,7 +2003,7 @@
 	        #{itemType},
 	        #{note},
 	        #{user_id},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d')
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -2017,7 +2017,7 @@
 	        itemType=#{itemType},
 	        note=#{note},
 	        mod_id=#{user_id},
-	        mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d')
+	        mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
 	</insert>
 	
@@ -2030,7 +2030,7 @@
 			#{sale_id},
 			DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
 			#{total},
-			DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),
+			DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s'),
 			#{user_id}
 		)
 	</insert>
@@ -2092,62 +2092,207 @@
         ORDER BY apt.saleDate ASC, apt.sale_id ASC
 	</select>
 
-	<!-- 매입집계(TallyTab) 전용: detail의 itemType/taxType 기준으로 소모품/식재료 금액 집계 -->
-	<!-- account_id/year/month 전부 선택 조건 - 전체 조회 가능 -->
+	<!-- 매입집계(TallyTab) 전용: 사업장+구매처(타입)+연월 기준으로 상세를 합산 -->
+	<!-- account_id/type/year/month 전부 선택 조건 - 전체 조회 가능 -->
 	<select id="AccountPurchaseTallyForTallyTab" parameterType="map" resultType="hashmap">
-		SELECT apt.account_id,
+		SELECT src.account_id,
 		       a.account_name,
-		       apt.type,
-		       am.name AS type_name,
-		       apt.use_name,
-		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate,
-		       apt.sale_id,
-		       DATE_FORMAT(apt.reg_dt, '%Y-%m-%d') as reg_dt,
-		       apt.note,
-		       apt.bizNo,
-		       am.ceo_name,
-		       /* detail이 없는 경우(type 1~4 집계표 직접입력) apt.total을 food_total fallback으로 사용 */
-		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
-		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.vat    ELSE 0 END), 0) AS expen_vat,
-		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
-		       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
-		                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount
-		                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '3' THEN aptd.amount
-		                       ELSE 0 END), 0) AS expen_total,
-		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
-		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat    ELSE 0 END), 0) AS food_vat,
-		       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
-		       /* detail이 없으면(직접입력) food_total = apt.total, detail이 있으면 detail 합계 사용 */
-		       CASE
-		         WHEN COUNT(aptd.item_id) = 0 THEN IFNULL(apt.total, 0)
-		         ELSE IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
-		                              WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
-		                              WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
-		                              ELSE 0 END), 0)
-		       END AS food_total
-		FROM tb_account_purchase_tally apt
-		JOIN tb_account a
-			ON a.account_id = apt.account_id
-		LEFT JOIN tb_account_mapping am
-			ON am.type = apt.type
-		LEFT JOIN tb_account_purchase_tally_detail aptd
-			ON aptd.sale_id = apt.sale_id
-		WHERE 1=1
-		<if test="account_id != null and account_id != '' and account_id != '0'">
-			AND apt.account_id = #{account_id}
-		</if>
-		<if test="type != null and type != '' and type != '0'">
-			AND apt.type = #{type}
-		</if>
-		<if test="year != null and year != '' and year != '0'">
-			AND YEAR(apt.saleDate) = CAST(#{year} AS UNSIGNED)
-		</if>
-		<if test="month != null and month != '' and month != '0'">
-			AND MONTH(apt.saleDate) = CAST(#{month} AS UNSIGNED)
-		</if>
-		GROUP BY apt.sale_id, apt.account_id, a.account_name, apt.type, am.name, apt.use_name,
-		         apt.saleDate, apt.reg_dt, apt.note, apt.bizNo, am.ceo_name, apt.total
-		ORDER BY apt.saleDate ASC, apt.account_id ASC, apt.sale_id ASC
+		       src.type,
+		       IFNULL(am.name, '') AS type_name,
+		       '' AS use_name,
+		       src.saleDate,
+		       '' AS sale_id,
+		       DATE_FORMAT(MAX(src.reg_dt), '%Y-%m-%d') AS reg_dt,
+		       '' AS note,
+		       MAX(src.bizNo) AS bizNo,
+		       IFNULL(am.ceo_name, '') AS ceo_name,
+		       IFNULL(SUM(src.expen_tax), 0) AS expen_tax,
+		       IFNULL(SUM(src.expen_vat), 0) AS expen_vat,
+		       IFNULL(SUM(src.expen_taxFree), 0) AS expen_taxFree,
+		       IFNULL(SUM(src.expen_total), 0) AS expen_total,
+		       IFNULL(SUM(src.food_tax), 0) AS food_tax,
+		       IFNULL(SUM(src.food_vat), 0) AS food_vat,
+		       IFNULL(SUM(src.food_taxFree), 0) AS food_taxFree,
+		       IFNULL(SUM(src.food_total), 0) AS food_total
+		FROM (
+			/* 일반 타입: 기존 매입전표(1002/1003 제외) */
+			SELECT apt.account_id,
+			       apt.type,
+			       DATE_FORMAT(apt.saleDate, '%Y-%m') AS saleDate,
+			       apt.reg_dt,
+			       apt.bizNo,
+			       IFNULL(ds.expen_tax, 0) AS expen_tax,
+			       IFNULL(ds.expen_vat, 0) AS expen_vat,
+			       IFNULL(ds.expen_taxFree, 0) AS expen_taxFree,
+			       CASE
+			         WHEN IFNULL(ds.detail_count, 0) = 0 THEN 0
+			         ELSE IFNULL(ds.expen_total, 0)
+			       END AS expen_total,
+			       IFNULL(ds.food_tax, 0) AS food_tax,
+			       IFNULL(ds.food_vat, 0) AS food_vat,
+			       IFNULL(ds.food_taxFree, 0) AS food_taxFree,
+			       CASE
+			         WHEN IFNULL(ds.detail_count, 0) = 0 THEN IFNULL(apt.total, 0)
+			         ELSE IFNULL(ds.food_total, 0)
+			       END AS food_total
+			FROM tb_account_purchase_tally apt
+			LEFT JOIN (
+				SELECT apt2.sale_id,
+				       COUNT(aptd.item_id) AS detail_count,
+				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
+				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS expen_vat,
+				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
+				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+				                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount
+				                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '3' THEN aptd.amount
+				                       ELSE 0 END), 0) AS expen_total,
+				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
+				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS food_vat,
+				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
+				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+				                       WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
+				                       WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
+				                       ELSE 0 END), 0) AS food_total
+				FROM tb_account_purchase_tally apt2
+				JOIN tb_account_purchase_tally_detail aptd
+					ON aptd.sale_id = apt2.sale_id
+				WHERE apt2.type NOT IN (1002, 1003)
+				<if test="account_id != null and account_id != '' and account_id != '0'">
+					AND apt2.account_id = #{account_id}
+				</if>
+				<if test="type != null and type != '' and type != '0'">
+					AND apt2.type = #{type}
+				</if>
+				<if test="year != null and year != '' and year != '0'">
+					AND YEAR(apt2.saleDate) = #{year}
+				</if>
+				<if test="month != null and month != '' and month != '0'">
+					AND MONTH(apt2.saleDate) = #{month}
+				</if>
+				GROUP BY apt2.sale_id
+			) ds
+				ON ds.sale_id = apt.sale_id
+			WHERE apt.type NOT IN (1002, 1003)
+			<if test="account_id != null and account_id != '' and account_id != '0'">
+				AND apt.account_id = #{account_id}
+			</if>
+			<if test="type != null and type != '' and type != '0'">
+				AND apt.type = #{type}
+			</if>
+			<if test="year != null and year != '' and year != '0'">
+				AND YEAR(apt.saleDate) = #{year}
+			</if>
+			<if test="month != null and month != '' and month != '0'">
+				AND MONTH(apt.saleDate) = #{month}
+			</if>
+
+			<if test="type == null or type == '' or type == '0' or type == '1002' or type == '1003'">
+				UNION ALL
+
+				/* 1002/1003: 본사 법인카드 결제 상세 기준 집계 */
+				SELECT hcp.account_id,
+				       hds.effective_type AS type,
+				       DATE_FORMAT(hcp.payment_dt, '%Y-%m') AS saleDate,
+				       hcp.reg_dt,
+				       hcp.bizNo,
+				       IFNULL(hds.expen_tax, 0) AS expen_tax,
+				       IFNULL(hds.expen_vat, 0) AS expen_vat,
+				       IFNULL(hds.expen_taxFree, 0) AS expen_taxFree,
+				       CASE
+				         WHEN IFNULL(hds.detail_count, 0) = 0
+				              AND hds.effective_type = 1002
+				           THEN IFNULL(hcp.total, 0)
+				         WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
+				         ELSE IFNULL(hds.expen_total, 0)
+				       END AS expen_total,
+				       IFNULL(hds.food_tax, 0) AS food_tax,
+				       IFNULL(hds.food_vat, 0) AS food_vat,
+				       IFNULL(hds.food_taxFree, 0) AS food_taxFree,
+				       CASE
+				         WHEN IFNULL(hds.detail_count, 0) = 0
+				              AND hds.effective_type = 1003
+				           THEN IFNULL(hcp.total, 0)
+				         WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
+				         ELSE IFNULL(hds.food_total, 0)
+				       END AS food_total
+				FROM tb_headoffice_corporate_card_payment_list hcp
+				LEFT JOIN (
+					SELECT hcp2.sale_id,
+					       CASE
+					         WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
+					         WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
+					         ELSE 1002
+					       END AS effective_type,
+					       COUNT(hcpd.idx) AS detail_count,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 1
+					                       THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
+					                       ELSE 0 END), 0) AS expen_tax,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 1
+					                       THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
+					                       ELSE 0 END), 0) AS expen_vat,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 2
+					                       THEN IFNULL(hcpd.amount, 0)
+					                       ELSE 0 END), 0) AS expen_taxFree,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
+					                       THEN IFNULL(hcpd.amount, 0)
+					                       ELSE 0 END), 0) AS expen_total,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
+					                       THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
+					                       ELSE 0 END), 0) AS food_tax,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
+					                       THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
+					                       ELSE 0 END), 0) AS food_vat,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 2
+					                       THEN IFNULL(hcpd.amount, 0)
+					                       ELSE 0 END), 0) AS food_taxFree,
+					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
+					                       THEN IFNULL(hcpd.amount, 0)
+					                       ELSE 0 END), 0) AS food_total
+					FROM tb_headoffice_corporate_card_payment_list hcp2
+					LEFT JOIN tb_headoffice_corporate_card_payment_detail_list hcpd
+						ON hcpd.sale_id = hcp2.sale_id
+					WHERE 1=1
+					<if test="account_id != null and account_id != '' and account_id != '0'">
+						AND hcp2.account_id = #{account_id}
+					</if>
+					<if test="year != null and year != '' and year != '0'">
+						AND YEAR(hcp2.payment_dt) = #{year}
+					</if>
+					<if test="month != null and month != '' and month != '0'">
+						AND MONTH(hcp2.payment_dt) = #{month}
+					</if>
+					GROUP BY hcp2.sale_id,
+					         CASE
+					           WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
+					           WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
+					           ELSE 1002
+					         END
+				) hds
+					ON hds.sale_id = hcp.sale_id
+				WHERE 1=1
+				<if test="account_id != null and account_id != '' and account_id != '0'">
+					AND hcp.account_id = #{account_id}
+				</if>
+				<if test="year != null and year != '' and year != '0'">
+					AND YEAR(hcp.payment_dt) = #{year}
+				</if>
+				<if test="month != null and month != '' and month != '0'">
+					AND MONTH(hcp.payment_dt) = #{month}
+				</if>
+				AND hds.effective_type IN (1002, 1003)
+				<if test="type != null and type != '' and type != '0'">
+					AND hds.effective_type = #{type}
+				</if>
+			</if>
+		) src
+		JOIN tb_account a ON a.account_id = src.account_id
+		LEFT JOIN (
+			SELECT type, MAX(name) AS name, MAX(ceo_name) AS ceo_name
+			FROM tb_account_mapping
+			GROUP BY type
+		) am ON am.type = src.type
+		GROUP BY src.account_id, a.account_name, src.type, am.name, am.ceo_name, src.saleDate
+		ORDER BY src.saleDate ASC, src.account_id ASC, src.type ASC
 	</select>
 
 	<select id="AccountPurchaseDetailList" parameterType="map" resultType="hashmap">
@@ -2235,7 +2380,7 @@
 		ON apt.account_id = a.account_id
 		AND apt.type = amv.type
 		WHERE a.account_id = #{account_id}
-		AND apt.type in (1008, 1)
+		AND apt.type = 1008
 		<if test="payType == 1">
 	        AND apt.totalCash != 0
         </if>
@@ -2349,7 +2494,7 @@
 	        #{idx},
 	        #{card_brand},
 	        #{card_no},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{del_yn},
 	    </trim>
@@ -2358,7 +2503,7 @@
 	        idx=#{idx},
 	        card_brand=#{card_brand},
 	        card_no=#{card_no},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id=#{user_id},
 	        del_yn=#{del_yn},
 	    </trim>
@@ -2402,7 +2547,7 @@
 	        #{cardBrand},
 	        #{receipt_image},
 	        #{note},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{receipt_type},
 	        #{idx}
@@ -2423,7 +2568,7 @@
 	        cardBrand=#{cardBrand},
 	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
 	        note=#{note},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id=#{user_id},
 	        receipt_type=#{receipt_type},
 	        idx=#{idx}
@@ -2523,7 +2668,7 @@
 	        #{account_id},
 	        #{card_brand},
 	        #{card_no},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{del_yn},
 	    </trim>
@@ -2533,7 +2678,7 @@
 	        account_id=#{account_id},
 	        card_brand=#{card_brand},
 	        card_no=#{card_no},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id=#{user_id},
 	        del_yn=#{del_yn},
 	    </trim>
@@ -2577,7 +2722,7 @@
 	        #{cardBrand},
 	        #{receipt_image},
 	        #{note},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{receipt_type},
 	        #{idx}
@@ -2598,7 +2743,7 @@
 	        cardBrand=#{cardBrand},
 	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
 	        note=#{note},
-	        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id=#{user_id},
 	        receipt_type=#{receipt_type},
 	        idx=#{idx}
@@ -2694,7 +2839,7 @@
 			<when test='del_yn != null and del_yn.toString() == "Y"'>
 				UPDATE tb_account_member_dispatch_mapping
 				SET del_yn = 'Y',
-					reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+					reg_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 					user_id = #{user_id}
 				WHERE idx = #{idx}
 			</when>
@@ -2707,7 +2852,7 @@
 					record_month = #{record_month},
 					record_date = #{record_date},
 					del_yn = 'N',
-					reg_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+					reg_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 					user_id = #{user_id}
 				WHERE idx = #{idx}
 			</when>
@@ -2733,7 +2878,7 @@
 			        #{record_month},
 			        #{record_date},
 			        'N',
-			        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+			        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 			        #{user_id}
 			    </trim>
 			    ON DUPLICATE KEY UPDATE
@@ -2745,7 +2890,7 @@
 			        record_month=#{record_month},
 			        record_date=#{record_date},
 			        del_yn='N',
-			        reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+			        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 			        user_id=#{user_id}
 			    </trim>
 			</otherwise>
@@ -2999,7 +3144,7 @@
 		INSERT INTO tb_account_purchase_tally_v2
 		(account_id, sale_id, type, saleDate, expen_tax, expen_vat, expen_taxFree, expen_total, food_tax, food_vat, food_taxFree, food_total, note, user_id, reg_dt, del_yn)
 		VALUES
-		(#{account_id}, #{sale_id}, #{type}, STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'), #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), 'N')
+		(#{account_id}, #{sale_id}, #{type}, STR_TO_DATE(CONCAT(#{saleDate}, '-01'), '%Y-%m-%d'), #{expen_tax}, #{expen_vat}, #{expen_taxFree}, #{expen_total}, #{food_tax}, #{food_vat}, #{food_taxFree}, #{food_total}, #{note}, #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), 'N')
 		ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        type=#{type},
@@ -3013,7 +3158,7 @@
 	        food_taxFree=#{food_taxFree},
 	        food_total=#{food_total},
 	        note=#{note},
-	        mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        mod_id=#{user_id},
 	        del_yn='N'
 	    </trim>
@@ -3036,7 +3181,7 @@
 	
 	<delete id="AccountPurchaseTallyV2Delete" parameterType="map">
 		UPDATE tb_account_purchase_tally_v2 SET del_yn = 'Y',
-		mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+		mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 		mod_id=#{user_id}
 		WHERE sale_id = #{sale_id}
 	</delete>

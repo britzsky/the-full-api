@@ -1490,7 +1490,7 @@ public class AccountController {
 		int iResult = 0;
 
 		for (Map<String, Object> paramMap : paramList) {
-			System.out.println(paramMap.get("payType"));
+			System.out.println("[AccountPurchaseSave] sale_id=" + paramMap.get("sale_id") + " saleDate=" + paramMap.get("saleDate"));
 			iResult += accountService.AccountPurchaseSave(paramMap);
 			// 여러 타입의 날짜형식을 매핑.
 			LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());

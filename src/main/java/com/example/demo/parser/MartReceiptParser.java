@@ -72,6 +72,11 @@ public class MartReceiptParser extends BaseReceiptParser {
             r.items.addAll(parseLooseFallbackItems(lines));
         }
 
+        // 상품 최대 2개만 저장
+        if (r.items.size() > 2) {
+            r.items = new ArrayList<>(r.items.subList(0, 2));
+        }
+
         // 7️⃣ 합계/결제/고객 정보
         String combinedTotals = String.join(" ", totalSection) + " " + String.join(" ", footerSection);
         fillTotalsAndPayment(combinedTotals, r);
@@ -205,8 +210,13 @@ public class MartReceiptParser extends BaseReceiptParser {
                 nameLine = nameLine.replaceFirst("^\\d{1,3}\\s+", "").trim();
             if (!nameLine.matches("^[가-힣A-Za-z(].*")) continue;
 
+            // 상품명: 숫자·특수문자만이면 건너뜀, 최대 30자 제한
+            String cleanName = nameLine.replaceAll("(\\d{1,3}(?:,\\d{3})*)\\s+\\d{1,2}\\s+(\\d{1,3}(?:,\\d{3})*)", "").trim();
+            if (cleanName.isEmpty() || cleanName.matches("^[0-9,. ]+$")) continue;
+            if (cleanName.length() > 30) cleanName = cleanName.substring(0, 30).trim();
+
             Item it = new Item();
-            it.name = nameLine;
+            it.name = cleanName;
             int j = i + 1;
             List<String> buf = new ArrayList<>();
 
@@ -259,8 +269,11 @@ public class MartReceiptParser extends BaseReceiptParser {
         for (String line : lines) {
             Matcher m = Pattern.compile("^(.*?)(\\d{1,3}(?:,\\d{3})*)\\s+(\\d{1,2})\\s+(\\d{1,3}(?:,\\d{3})*)").matcher(line);
             if (m.find()) {
+                String n = m.group(1).trim();
+                if (n.isEmpty() || n.matches("^[0-9,. ]+$")) continue;
+                if (n.length() > 30) n = n.substring(0, 30).trim();
                 Item it = new Item();
-                it.name = m.group(1).trim();
+                it.name = n;
                 it.unitPrice = toInt(m.group(2));
                 it.qty = toInt(m.group(3));
                 it.amount = toInt(m.group(4));
@@ -349,7 +362,10 @@ public class MartReceiptParser extends BaseReceiptParser {
         int count = Math.min(names.size(), parsed.size());
         for (int i = 0; i < count; i++) {
             Item base = parsed.get(i);
-            base.name = names.get(i);
+            String n = names.get(i);
+            if (n == null || n.isEmpty() || n.matches("^[0-9,. ]+$")) continue;
+            if (n.length() > 30) n = n.substring(0, 30).trim();
+            base.name = n;
 
             base.taxFlag = (lines.stream().anyMatch(l -> l.contains("#"))) ? "면세" : "과세";
 
@@ -385,8 +401,11 @@ public class MartReceiptParser extends BaseReceiptParser {
             String line = lines.get(i).trim();
             if (!startLine.matcher(line).find()) continue;
 
+            String twoLineName = line.replaceFirst("^\\d{1,3}\\s+", "").trim();
+            if (twoLineName.isEmpty() || twoLineName.matches("^[0-9,. ]+$")) continue;
+            if (twoLineName.length() > 30) twoLineName = twoLineName.substring(0, 30).trim();
             Item it = new Item();
-            it.name = line.replaceFirst("^\\d{1,3}\\s+", "").trim();
+            it.name = twoLineName;
             
             if (i + 1 < lines.size() && lines.get(i + 1).matches(".*(단가|수량|금액).*")) {
                 i++; // 헤더 줄 건너뛰기
@@ -537,9 +556,11 @@ public class MartReceiptParser extends BaseReceiptParser {
 
     private String normalizeName(String s) {
         if (s == null) return "";
-        return s.replaceAll("\\s+", " ")
+        String result = s.replaceAll("\\s+", " ")
                 .replaceAll("^\\d{8,14}$", "")
                 .trim();
+        if (result.length() > 30) result = result.substring(0, 30).trim();
+        return result;
     }
 
     private boolean shouldSkipName(String name) {

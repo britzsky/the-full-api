@@ -73,13 +73,13 @@
 		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31, user_id, mod_dt)
 		VALUES
 		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
-		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
 		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
 		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
 		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31},
-		user_id = #{user_id}, mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
+		user_id = #{user_id}, mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	</insert>
 	
 	<insert id="TallyBeforeMonthSave" parameterType="map">
@@ -87,13 +87,13 @@
 		(account_id, type, count_year, count_month, day_1, day_2, day_3, day_4, day_5, day_6, day_7, day_8, day_9, day_10, day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20, day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31, user_id, mod_dt)
 		VALUES
 		(#{account_id}, #{type}, #{count_year}, #{count_month}, #{day_1}, #{day_2}, #{day_3}, #{day_4}, #{day_5}, #{day_6}, #{day_7}, #{day_8}, #{day_9}, #{day_10}, #{day_11}, #{day_12}, #{day_13}
-		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		, #{day_14}, #{day_15}, #{day_16}, #{day_17}, #{day_18}, #{day_19}, #{day_20}, #{day_21}, #{day_22}, #{day_23}, #{day_24}, #{day_25}, #{day_26}, #{day_27}, #{day_28}, #{day_29}, #{day_30}, #{day_31}, #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 		account_id = #{account_id}, type = #{type}, count_year = #{count_year}, count_month = #{count_month}, 
 		day_1 = #{day_1}, day_2 = #{day_2}, day_3 = #{day_3}, day_4 = #{day_4}, day_5 = #{day_5}, day_6 = #{day_6}, day_7 = #{day_7}, day_8 = #{day_8}, day_9 = #{day_9}, day_10 = #{day_10}, 
 		day_11 = #{day_11}, day_12 = #{day_12}, day_13 = #{day_13}, day_14 = #{day_14}, day_15 = #{day_15}, day_16 = #{day_16}, day_17 = #{day_17}, day_18 = #{day_18}, day_19 = #{day_19}, day_20 = #{day_20}, 
 		day_21 = #{day_21}, day_22 = #{day_22}, day_23 = #{day_23}, day_24 = #{day_24}, day_25 = #{day_25}, day_26 = #{day_26}, day_27 = #{day_27}, day_28 = #{day_28}, day_29 = #{day_29}, day_30 = #{day_30}, day_31 = #{day_31},
-		user_id = #{user_id}, mod_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
+		user_id = #{user_id}, mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	</insert>
 
 	<update id="TallySheetNoteSave" parameterType="map">
@@ -134,7 +134,7 @@
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			#{note},
 			#{user_id},
-			DATE_FORMAT(NOW(), '%Y-%m-%d')
+			DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 		)
 		ON DUPLICATE KEY UPDATE
 			note = VALUES(note)
@@ -319,7 +319,7 @@
 	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
 	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
 	    	#{del_yn},
-	    	<if test='del_yn == "Y"'>DATE_FORMAT(NOW(), '%Y-%m-%d')</if>
+	    	<if test='del_yn == "Y"'>DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</if>
 	    </trim>
 	    
 	    ON DUPLICATE KEY UPDATE
@@ -355,7 +355,7 @@
 	            del_yn=#{del_yn},
 	        </if>
 	        <if test='del_yn == "Y"'>
-	        	del_dt=DATE_FORMAT(NOW(), '%Y-%m-%d')
+	        	del_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	        </if>
 	    </trim>
 	</insert>
@@ -573,14 +573,37 @@
 	</select>
 	
 	<select id="AccountMappingV2List" parameterType="map" resultType="hashmap">
-		SELECT amv.account_id,
-		amv.type,
-		am.name,
-		amv.del_yn
-		FROM tb_account_mapping am
-		JOIN tb_account_mapping_v2 amv
-		ON amv.type = am.type
-		WHERE amv.account_id = #{account_id}
+		SELECT R.account_id,
+		       R.type,
+		       R.name,
+		       R.del_yn
+		FROM (
+			SELECT amv.account_id,
+			       amv.type,
+			       IFNULL(am.name, amv.type) AS name,
+			       amv.del_yn
+			FROM tb_account_mapping_v2 amv
+			LEFT JOIN tb_account_mapping am
+				ON am.type = amv.type
+			WHERE amv.account_id = #{account_id}
+			  AND amv.del_yn = 'N'
+
+			UNION ALL
+
+			SELECT #{account_id} AS account_id,
+			       am.type,
+			       am.name,
+			       'N' AS del_yn
+			FROM tb_account_mapping am
+			WHERE am.type IN (1002, 1003)
+			  AND NOT EXISTS (
+				  SELECT 1
+				  FROM tb_account_mapping_v2 amv2
+				  WHERE amv2.account_id = #{account_id}
+				    AND amv2.type = am.type
+			  )
+		) R
+		ORDER BY R.type ASC
 	</select>
 	
 	<insert id="AccountMappingSave">
@@ -1278,7 +1301,7 @@
 	        #{headoffice_note},
 	        #{loss_major_insurances},
 	
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{id},
 	        #{bankbook},
@@ -1345,7 +1368,7 @@
 	        headoffice_note = #{headoffice_note},
 	        loss_major_insurances = #{loss_major_insurances},
 	
-	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id = #{user_id},
 	        id = #{id},
 	        bankbook = #{bankbook},
@@ -1448,7 +1471,7 @@
 	        #{id},
 	        #{bankbook},
 	        #{use_yn},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{cor_type}
 	    )
@@ -1480,7 +1503,7 @@
 	        employment_contract = #{employment_contract},
 	        id = #{id},
 	        bankbook = #{bankbook},
-	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        user_id = #{user_id},
 	        cor_type = #{cor_type}
 	</insert>
@@ -1883,7 +1906,7 @@
 	        #{day_use_ratio},
 	        #{existing_budget},
 	        #{diff_amount},
-	        DATE_FORMAT(NOW(), '%Y-%m-%d')
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    )
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1926,7 +1949,7 @@
 	        <if test="diff_amount != null">
 	            diff_amount = #{diff_amount},
 	        </if>
-	        update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
+	        update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
 	</insert>
 	
@@ -1977,13 +2000,17 @@
     		   oc.type,
     		   oc.del_yn,
     		   oc.update_dt,
-    		   oc.reg_dt,
+    		   DATE_FORMAT(oc.reg_dt, '%Y-%m-%d') as reg_dt,
     		   oc.user_id,
+    		   oc.account_id,
+    		   IFNULL(a.account_name, '') AS account_name,
     		   oc.reg_user_id,
     		   u.user_name
 			FROM tb_operate_calendar oc
 			JOIN tb_user u
 			ON u.user_id = oc.user_id 
+			LEFT JOIN tb_account a
+			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(oc.account_id AS CHAR))
 			WHERE DATE_FORMAT(oc.start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
 			AND DATE_FORMAT(oc.end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
 			AND oc.del_yn = 'N'
@@ -1997,8 +2024,10 @@
     		   oc.type,
     		   oc.del_yn,
     		   oc.update_dt,
-    		   oc.reg_dt,
+    		   DATE_FORMAT(oc.reg_dt, '%Y-%m-%d') as reg_dt,
     		   oc.user_id,
+    		   oc.account_id,
+    		   IFNULL(a.account_name, '') AS account_name,
     		   oc.reg_user_id,
     		   u.user_name,
     		   CASE WHEN u.position = 0 THEN 'CEO'
@@ -2010,6 +2039,8 @@
 			FROM tb_operate_calendar oc
 			JOIN tb_user u
 			ON u.user_id = oc.user_id 
+			LEFT JOIN tb_account a
+			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(oc.account_id AS CHAR))
 			WHERE DATE_FORMAT(oc.start_date, '%Y-%m-%d') = #{today}
     </select>
 	
@@ -2026,6 +2057,7 @@
 	        reg_dt,
 	        del_yn,
 	        user_id,
+	        account_id,
 	        reg_user_id
 	    </trim>
 	    
@@ -2038,9 +2070,10 @@
 	        #{content},
 	        #{type},
 	        DATE_FORMAT(now(), '%Y-%m-%d'),
-	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(now(), '%Y-%m-%d')),
 	        #{del_yn},
 	        #{user_id},
+	        #{account_id},
 	        #{reg_user_id}
 	    </trim>
 	    
@@ -2052,9 +2085,10 @@
 	        content=#{content},
 	        type=#{type},
 	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
-	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        reg_dt=IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
 	        del_yn=#{del_yn},
 	        user_id=#{user_id},
+	        account_id=#{account_id},
 	        reg_user_id=#{reg_user_id}
 	    </trim>
     </insert>
@@ -2116,7 +2150,7 @@
         INSERT INTO tb_account_record_standard_master_table
 		  (master_idx, account_id, mon, tue, wed, thu, fri, sat, sun, position_type, start_time, end_time, user_id, reg_dt, root_idx)
 		  VALUES
-		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{root_idx})
+		  (#{master_idx}, #{account_id}, #{mon}, #{tue}, #{wed}, #{thu}, #{fri}, #{sat}, #{sun}, #{position_type}, #{start_time}, #{end_time}, #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{root_idx})
 		ON DUPLICATE KEY UPDATE
 		  mon       	= VALUES(mon),
 	      tue 			= VALUES(tue),
@@ -2129,7 +2163,7 @@
 	      start_time	= VALUES(start_time),
 	      end_time		= VALUES(end_time),
 	      user_id     	= VALUES(user_id),
-	      mod_dt     	= DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	      mod_dt     	= DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	      root_idx		= VALUES(root_idx)
     </insert>
     
@@ -2152,7 +2186,7 @@
     	INSERT INTO tb_account_tally_sheet_point
     	(idx,count_year, count_month, count_date, account_id, type, gubun, reg_dt, user_id)
     	VALUES
-    	(#{idx},#{year},#{month},#{count_date},#{account_id},#{type},#{gubun},DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    	(#{idx},#{year},#{month},#{count_date},#{account_id},#{type},#{gubun},DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),#{user_id})
     	ON DUPLICATE KEY UPDATE
     	count_year=#{year},
     	count_month=#{month},
@@ -2160,7 +2194,7 @@
     	account_id=#{account_id},
     	type=#{type},
     	gubun=#{gubun},
-    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
     
@@ -2182,10 +2216,10 @@
     	INSERT INTO tb_account_tally_sheet_input_use
     		(idx, count_year, count_month, account_id, type, input_yn, reg_dt, user_id)
     	VALUES
-    		(#{idx},#{year},#{month},#{account_id},#{type},#{input_yn},DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),#{user_id})
+    		(#{idx},#{year},#{month},#{account_id},#{type},#{input_yn},DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s'),#{user_id})
     	ON DUPLICATE KEY UPDATE
 	    	input_yn=#{input_yn},
-	    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s'),
+	    	reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s'),
 	    	user_id=#{user_id}
     </insert>
     
@@ -2226,13 +2260,13 @@
     	INSERT INTO tb_account_root_master
     	(root_idx, sido_code, sigungu_code, emd_code, del_yn, reg_dt, user_id)
     	VALUES
-    	(#{root_idx},#{sido_code},#{sigungu_code},#{emd_code},'N',DATE_FORMAT(NOW(), '%Y-%m-%d'),#{user_id})
+    	(#{root_idx},#{sido_code},#{sigungu_code},#{emd_code},'N',DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),#{user_id})
     	ON DUPLICATE KEY UPDATE
     	sido_code=#{sido_code},
     	sigungu_code=#{sigungu_code},
     	emd_code=#{emd_code},
     	del_yn=#{del_yn},
-    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
     
@@ -2398,10 +2432,10 @@
     	INSERT INTO tb_account_field_root_mapping_table
     	(idx, root_idx, del_yn, reg_dt, user_id)
     	VALUES
-    	(#{idx}, #{root_idx}, 'N', DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+    	(#{idx}, #{root_idx}, 'N', DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id})
     	ON DUPLICATE KEY UPDATE
     	del_yn=#{del_yn},
-    	reg_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
     
@@ -2409,7 +2443,7 @@
     	INSERT INTO tb_account_field_person_master_table
     	(idx, name, salary, car_yn, note, status, manpower_type, reg_dt, user_id, mod_dt)
     	VALUES
-    	(#{idx}, #{name}, #{salary}, #{car_yn}, #{note}, #{status}, #{manpower_type}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id}, DATE_FORMAT(NOW(), '%Y-%m-%d'))
+    	(#{idx}, #{name}, #{salary}, #{car_yn}, #{note}, #{status}, #{manpower_type}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
     	ON DUPLICATE KEY UPDATE
     	name=#{name},
     	salary=#{salary},
@@ -2417,7 +2451,7 @@
     	note=#{note},
     	status=#{status},
     	manpower_type=#{manpower_type},
-    	mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
     
@@ -2473,11 +2507,11 @@
     	INSERT INTO tb_account_field_person_employment
     	(idx, member_id, account_id, record_year, record_month, record_date, use_yn, reg_dt, user_id)
     	VALUES
-    	(#{idx}, #{member_id}, #{account_id}, #{record_year}, #{record_month}, #{record_date}, #{use_yn}, DATE_FORMAT(NOW(), '%Y-%m-%d'), #{user_id})
+    	(#{idx}, #{member_id}, #{account_id}, #{record_year}, #{record_month}, #{record_date}, #{use_yn}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id})
     	ON DUPLICATE KEY UPDATE
     	record_date=#{record_date},
     	use_yn=#{use_yn},
-    	mod_dt=DATE_FORMAT(NOW(), '%Y-%m-%d'),
+    	mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
     </insert>
 </mapper>

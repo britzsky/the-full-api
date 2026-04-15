@@ -149,7 +149,7 @@
 	<insert id="CarSave" parameterType="map">
 		INSERT INTO tb_thefull_car_management(car_number,service_dt,car_name,service_note,service_amt,mileage,comment,exterior_note,user_id,update_dt)
 		VALUES
-		(#{car_number},DATE_FORMAT(#{service_dt}, '%Y-%m-%d'),#{car_name},#{service_note},#{service_amt},#{mileage},#{comment},#{exterior_note},#{user_id},DATE_FORMAT(NOW(), '%Y-%m-%d'))
+		(#{car_number},DATE_FORMAT(#{service_dt}, '%Y-%m-%d'),#{car_name},#{service_note},#{service_amt},#{mileage},#{comment},#{exterior_note},#{user_id},DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
 		ON DUPLICATE KEY UPDATE
 		car_number = VALUES(car_number),
 		service_dt = VALUES(service_dt),
@@ -160,7 +160,7 @@
 		comment = VALUES(comment),
 		exterior_note = VALUES(exterior_note),
 		user_id = #{user_id},
-		update_dt = DATE_FORMAT(NOW(), '%Y-%m-%d')
+		update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	</insert>
 	
 	<insert id="CarFileDelete" parameterType="map">
@@ -325,7 +325,7 @@
 	        #{account_id},
 	        #{event_name},
 	        DATE_FORMAT(#{event_dt}, '%Y-%m-%d'),
-	        DATE_FORMAT(NOW(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id}
 	    )
 	</insert>
@@ -334,7 +334,7 @@
 	    UPDATE tb_account_event_management
 	    SET event_name = #{event_name},
 	        event_dt = #{event_dt},
-	        update_dt = NOW(),
+	        update_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 	        user_id = #{user_id}
 	    WHERE event_id = #{event_id}
 	      AND account_id = #{account_id}
@@ -416,15 +416,19 @@
     		   bc.type,
     		   bc.del_yn,
     		   bc.update_dt,
-    		   bc.reg_dt,
+    		   DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') as reg_dt,
     		   bc.user_id,
     		   bc.reg_user_id,
+    		   bc.account_id,
+    		   IFNULL(a.account_name, '') AS account_name,
     		   u.user_name
 			FROM tb_business_calendar bc
 			JOIN tb_user u
 			ON u.user_id = bc.user_id 
-			WHERE DATE_FORMAT(start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
-			AND DATE_FORMAT(end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			LEFT JOIN tb_account a
+			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
+			WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			AND DATE_FORMAT(bc.end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
 			AND bc.del_yn = 'N'
     </select>
     
@@ -436,10 +440,12 @@
     		   bc.type,
     		   bc.del_yn,
     		   bc.update_dt,
-    		   bc.reg_dt,
+    		   DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') as reg_dt,
     		   bc.user_id,
     		   bc.reg_user_id,
-    		   u.user_name,
+    		   bc.account_id,
+    		   IFNULL(a.account_name, '') AS account_name,
+    		   u.user_name,    		   
     		   CASE WHEN u.position = 0 THEN 'CEO'
 			        WHEN u.position = 1 THEN '팀장'
 			        WHEN u.position = 2 THEN '파트장'
@@ -449,10 +455,12 @@
 			FROM tb_business_calendar bc
 			JOIN tb_user u
 			ON u.user_id = bc.user_id 
-			WHERE DATE_FORMAT(start_date, '%Y-%m-%d') = #{today}
+			LEFT JOIN tb_account a
+			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
+			WHERE DATE_FORMAT(bc.start_date, '%Y-%m-%d') = #{today}
     </select>
 	
-	<insert id="BusinessScheduleSave">
+	<insert id="BusinessScheduleSave" parameterType="map">
         INSERT INTO tb_business_calendar
     
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -465,6 +473,7 @@
 	        reg_dt,
 	        del_yn,
 	        user_id,
+	        account_id,
 	        reg_user_id
 	    </trim>
 	    
@@ -477,9 +486,10 @@
 	        #{content},
 	        #{type},
 	        DATE_FORMAT(now(), '%Y-%m-%d'),
-	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(now(), '%Y-%m-%d')),
 	        #{del_yn},
 	        #{user_id},
+	        #{account_id},
 	        #{reg_user_id}
 	    </trim>
 	    
@@ -491,9 +501,10 @@
 	        content=#{content},
 	        type=#{type},
 	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
-	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
+	        reg_dt=IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
 	        del_yn=#{del_yn},
 	        user_id=#{user_id},
+	        account_id=#{account_id},
 	        reg_user_id=#{reg_user_id}
 	    </trim>
     </insert>
