@@ -2113,183 +2113,330 @@
 		       IFNULL(SUM(src.food_tax), 0) AS food_tax,
 		       IFNULL(SUM(src.food_vat), 0) AS food_vat,
 		       IFNULL(SUM(src.food_taxFree), 0) AS food_taxFree,
-		       IFNULL(SUM(src.food_total), 0) AS food_total
+		       IFNULL(SUM(src.food_total), 0) AS food_total,
+		       IFNULL(SUM(src.scenic_tax), 0) AS scenic_tax,
+		       IFNULL(SUM(src.scenic_vat), 0) AS scenic_vat,
+		       IFNULL(SUM(src.scenic_taxFree), 0) AS scenic_taxFree,
+		       IFNULL(SUM(src.scenic_total), 0) AS scenic_total
 		FROM (
-			/* 일반 타입: 기존 매입전표(1002/1003 제외) */
-			SELECT apt.account_id,
-			       apt.type,
-			       DATE_FORMAT(apt.saleDate, '%Y-%m') AS saleDate,
-			       apt.reg_dt,
-			       apt.bizNo,
-			       IFNULL(ds.expen_tax, 0) AS expen_tax,
-			       IFNULL(ds.expen_vat, 0) AS expen_vat,
-			       IFNULL(ds.expen_taxFree, 0) AS expen_taxFree,
-			       CASE
-			         WHEN IFNULL(ds.detail_count, 0) = 0 THEN 0
-			         ELSE IFNULL(ds.expen_total, 0)
-			       END AS expen_total,
-			       IFNULL(ds.food_tax, 0) AS food_tax,
-			       IFNULL(ds.food_vat, 0) AS food_vat,
-			       IFNULL(ds.food_taxFree, 0) AS food_taxFree,
-			       CASE
-			         WHEN IFNULL(ds.detail_count, 0) = 0 THEN IFNULL(apt.total, 0)
-			         ELSE IFNULL(ds.food_total, 0)
-			       END AS food_total
-			FROM tb_account_purchase_tally apt
-			LEFT JOIN (
-				SELECT apt2.sale_id,
-				       COUNT(aptd.item_id) AS detail_count,
-				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
-				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS expen_vat,
-				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
-				       IFNULL(SUM(CASE WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
-				                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '2' THEN aptd.amount
-				                       WHEN aptd.itemType IN ('2','3') AND aptd.taxType = '3' THEN aptd.amount
-				                       ELSE 0 END), 0) AS expen_total,
-				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
-				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS food_vat,
-				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
-				       IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
-				                       WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
-				                       WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
-				                       ELSE 0 END), 0) AS food_total
-				FROM tb_account_purchase_tally apt2
-				JOIN tb_account_purchase_tally_detail aptd
-					ON aptd.sale_id = apt2.sale_id
-				WHERE apt2.type NOT IN (1002, 1003)
-				<if test="account_id != null and account_id != '' and account_id != '0'">
-					AND apt2.account_id = #{account_id}
-				</if>
-				<if test="type != null and type != '' and type != '0'">
-					AND apt2.type = #{type}
-				</if>
-				<if test="year != null and year != '' and year != '0'">
-					AND YEAR(apt2.saleDate) = #{year}
-				</if>
-				<if test="month != null and month != '' and month != '0'">
-					AND MONTH(apt2.saleDate) = #{month}
-				</if>
-				GROUP BY apt2.sale_id
-			) ds
-				ON ds.sale_id = apt.sale_id
-			WHERE apt.type NOT IN (1002, 1003)
-			<if test="account_id != null and account_id != '' and account_id != '0'">
-				AND apt.account_id = #{account_id}
-			</if>
-			<if test="type != null and type != '' and type != '0'">
-				AND apt.type = #{type}
-			</if>
-			<if test="year != null and year != '' and year != '0'">
-				AND YEAR(apt.saleDate) = #{year}
-			</if>
-			<if test="month != null and month != '' and month != '0'">
-				AND MONTH(apt.saleDate) = #{month}
-			</if>
-
-			<if test="type == null or type == '' or type == '0' or type == '1002' or type == '1003'">
-				UNION ALL
-
-				/* 1002/1003: 본사 법인카드 결제 상세 기준 집계 */
-				SELECT hcp.account_id,
-				       hds.effective_type AS type,
-				       DATE_FORMAT(hcp.payment_dt, '%Y-%m') AS saleDate,
-				       hcp.reg_dt,
-				       hcp.bizNo,
-				       IFNULL(hds.expen_tax, 0) AS expen_tax,
-				       IFNULL(hds.expen_vat, 0) AS expen_vat,
-				       IFNULL(hds.expen_taxFree, 0) AS expen_taxFree,
-				       CASE
-				         WHEN IFNULL(hds.detail_count, 0) = 0
-				              AND hds.effective_type = 1002
-				           THEN IFNULL(hcp.total, 0)
-				         WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
-				         ELSE IFNULL(hds.expen_total, 0)
-				       END AS expen_total,
-				       IFNULL(hds.food_tax, 0) AS food_tax,
-				       IFNULL(hds.food_vat, 0) AS food_vat,
-				       IFNULL(hds.food_taxFree, 0) AS food_taxFree,
-				       CASE
-				         WHEN IFNULL(hds.detail_count, 0) = 0
-				              AND hds.effective_type = 1003
-				           THEN IFNULL(hcp.total, 0)
-				         WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
-				         ELSE IFNULL(hds.food_total, 0)
-				       END AS food_total
-				FROM tb_headoffice_corporate_card_payment_list hcp
-				LEFT JOIN (
-					SELECT hcp2.sale_id,
-					       CASE
-					         WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
-					         WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
-					         ELSE 1002
-					       END AS effective_type,
-					       COUNT(hcpd.idx) AS detail_count,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 1
-					                       THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
-					                       ELSE 0 END), 0) AS expen_tax,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 1
-					                       THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
-					                       ELSE 0 END), 0) AS expen_vat,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) = 2
-					                       THEN IFNULL(hcpd.amount, 0)
-					                       ELSE 0 END), 0) AS expen_taxFree,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) IN (2, 3) AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
-					                       THEN IFNULL(hcpd.amount, 0)
-					                       ELSE 0 END), 0) AS expen_total,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
-					                       THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
-					                       ELSE 0 END), 0) AS food_tax,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
-					                       THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
-					                       ELSE 0 END), 0) AS food_vat,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 2
-					                       THEN IFNULL(hcpd.amount, 0)
-					                       ELSE 0 END), 0) AS food_taxFree,
-					       IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
-					                       THEN IFNULL(hcpd.amount, 0)
-					                       ELSE 0 END), 0) AS food_total
-					FROM tb_headoffice_corporate_card_payment_list hcp2
-					LEFT JOIN tb_headoffice_corporate_card_payment_detail_list hcpd
-						ON hcpd.sale_id = hcp2.sale_id
-					WHERE 1=1
-					<if test="account_id != null and account_id != '' and account_id != '0'">
-						AND hcp2.account_id = #{account_id}
-					</if>
-					<if test="year != null and year != '' and year != '0'">
-						AND YEAR(hcp2.payment_dt) = #{year}
-					</if>
-					<if test="month != null and month != '' and month != '0'">
-						AND MONTH(hcp2.payment_dt) = #{month}
-					</if>
-					GROUP BY hcp2.sale_id,
-					         CASE
-					           WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
-					           WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
-					           ELSE 1002
-					         END
-				) hds
-					ON hds.sale_id = hcp.sale_id
-				WHERE 1=1
-				<if test="account_id != null and account_id != '' and account_id != '0'">
-					AND hcp.account_id = #{account_id}
-				</if>
-				<if test="year != null and year != '' and year != '0'">
-					AND YEAR(hcp.payment_dt) = #{year}
-				</if>
-				<if test="month != null and month != '' and month != '0'">
-					AND MONTH(hcp.payment_dt) = #{month}
-				</if>
-				AND hds.effective_type IN (1002, 1003)
-				<if test="type != null and type != '' and type != '0'">
-					AND hds.effective_type = #{type}
-				</if>
-			</if>
+		    /* 일반 타입: 매입(1001/1002/1003 제외) */
+		    SELECT apt.account_id,
+		           apt.type,
+		           DATE_FORMAT(apt.saleDate, '%Y-%m') AS saleDate,
+		           apt.reg_dt,
+		           apt.bizNo,
+		           IFNULL(ds.expen_tax, 0) AS expen_tax,
+		           IFNULL(ds.expen_vat, 0) AS expen_vat,
+		           IFNULL(ds.expen_taxFree, 0) AS expen_taxFree,
+		           CASE
+		             WHEN IFNULL(ds.detail_count, 0) = 0 THEN 0
+		             ELSE IFNULL(ds.expen_total, 0)
+		           END AS expen_total,
+		           IFNULL(ds.food_tax, 0) AS food_tax,
+		           IFNULL(ds.food_vat, 0) AS food_vat,
+		           IFNULL(ds.food_taxFree, 0) AS food_taxFree,
+		           CASE
+		             WHEN IFNULL(ds.detail_count, 0) = 0 THEN IFNULL(apt.total, 0)
+		             ELSE IFNULL(ds.food_total, 0)
+		           END AS food_total,
+		           IFNULL(ds.scenic_tax, 0) AS scenic_tax,
+		           IFNULL(ds.scenic_vat, 0) AS scenic_vat,
+		           IFNULL(ds.scenic_taxFree, 0) AS scenic_taxFree,
+		           IFNULL(ds.scenic_total, 0) AS scenic_total
+		    FROM tb_account_purchase_tally apt
+		    LEFT JOIN (
+		        SELECT apt2.sale_id,
+		               COUNT(aptd.item_id) AS detail_count,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS expen_vat,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		                               WHEN aptd.itemType = '2' AND aptd.taxType = '2' THEN aptd.amount
+		                               WHEN aptd.itemType = '2' AND aptd.taxType = '3' THEN aptd.amount
+		                               ELSE 0 END), 0) AS expen_total,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS food_vat,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		                               WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
+		                               WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
+		                               ELSE 0 END), 0) AS food_total,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS scenic_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS scenic_vat,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS scenic_taxFree,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		                               WHEN aptd.itemType = '3' AND aptd.taxType = '2' THEN aptd.amount
+		                               WHEN aptd.itemType = '3' AND aptd.taxType = '3' THEN aptd.amount
+		                               ELSE 0 END), 0) AS scenic_total
+		        FROM tb_account_purchase_tally apt2
+		        JOIN tb_account_purchase_tally_detail aptd
+		            ON aptd.sale_id = apt2.sale_id
+		        WHERE apt2.type NOT IN (1000, 1002, 1003)
+		        <if test="account_id != null and account_id != '' and account_id != '0'">
+		            AND apt2.account_id = #{account_id}
+		        </if>
+		        <if test="type != null and type != '' and type != '0'">
+		            AND apt2.type = #{type}
+		        </if>
+		        <choose>
+		            <when test="month != null and month != '' and month != '0'">
+		                AND apt2.saleDate >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		                AND apt2.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		            </when>
+		            <otherwise>
+		                AND apt2.saleDate >= CONCAT(#{year}, '-01-01')
+		                AND apt2.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		            </otherwise>
+		        </choose>
+		        GROUP BY apt2.sale_id
+		    ) ds
+		        ON ds.sale_id = apt.sale_id
+		    WHERE apt.type NOT IN (1000, 1002, 1003)
+		    <if test="account_id != null and account_id != '' and account_id != '0'">
+		        AND apt.account_id = #{account_id}
+		    </if>
+		    <if test="type != null and type != '' and type != '0'">
+		        AND apt.type = #{type}
+		    </if>
+		    <choose>
+		        <when test="month != null and month != '' and month != '0'">
+		            AND apt.saleDate >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		            AND apt.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		        </when>
+		        <otherwise>
+		            AND apt.saleDate >= CONCAT(#{year}, '-01-01')
+		            AND apt.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		        </otherwise>
+		    </choose>
+		
+		    <if test="type == null or type == '' or type == '0' or type == '1002' or type == '1003'">
+		        UNION ALL
+		
+		        /* 1002/1003: 본사 법인카드 결제 상세 기준 집계 */
+		        SELECT hcp.account_id,
+		               hds.effective_type AS type,
+		               DATE_FORMAT(hcp.payment_dt, '%Y-%m') AS saleDate,
+		               hcp.reg_dt,
+		               hcp.bizNo,
+		               IFNULL(hds.expen_tax, 0) AS expen_tax,
+		               IFNULL(hds.expen_vat, 0) AS expen_vat,
+		               IFNULL(hds.expen_taxFree, 0) AS expen_taxFree,
+		               CASE
+		                 WHEN IFNULL(hds.detail_count, 0) = 0
+		                      AND hds.effective_type = 1002
+		                   THEN IFNULL(hcp.total, 0)
+		                 WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
+		                 ELSE IFNULL(hds.expen_total, 0)
+		               END AS expen_total,
+		               IFNULL(hds.food_tax, 0) AS food_tax,
+		               IFNULL(hds.food_vat, 0) AS food_vat,
+		               IFNULL(hds.food_taxFree, 0) AS food_taxFree,
+		               CASE
+		                 WHEN IFNULL(hds.detail_count, 0) = 0
+		                      AND hds.effective_type = 1003
+		                   THEN IFNULL(hcp.total, 0)
+		                 WHEN IFNULL(hds.detail_count, 0) = 0 THEN 0
+		                 ELSE IFNULL(hds.food_total, 0)
+		               END AS food_total,
+		               IFNULL(hds.scenic_tax, 0) AS scenic_tax,
+		               IFNULL(hds.scenic_vat, 0) AS scenic_vat,
+		               IFNULL(hds.scenic_taxFree, 0) AS scenic_taxFree,
+		               IFNULL(hds.scenic_total, 0) AS scenic_total
+		        FROM tb_headoffice_corporate_card_payment_list hcp
+		        LEFT JOIN (
+		            SELECT hcp2.sale_id,
+		                   CASE
+		                     WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
+		                     WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
+		                     ELSE 1002
+		                   END AS effective_type,
+		                   COUNT(hcpd.idx) AS detail_count,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 2 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS expen_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 2 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS expen_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 2 AND IFNULL(hcpd.taxType, 0) = 2
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS expen_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 2 AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS expen_total,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS food_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS food_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) = 2
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS food_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 1 AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS food_total,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 3 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(hcpd.amount, 0) - FLOOR(IFNULL(hcpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS scenic_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 3 AND IFNULL(hcpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(hcpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS scenic_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 3 AND IFNULL(hcpd.taxType, 0) = 2
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS scenic_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(hcpd.itemType, 0) = 3 AND IFNULL(hcpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(hcpd.amount, 0)
+		                                   ELSE 0 END), 0) AS scenic_total
+		            FROM tb_headoffice_corporate_card_payment_list hcp2
+		            LEFT JOIN tb_headoffice_corporate_card_payment_detail_list hcpd
+		                ON hcpd.sale_id = hcp2.sale_id
+		            WHERE 1=1
+		            <if test="account_id != null and account_id != '' and account_id != '0'">
+		                AND hcp2.account_id = #{account_id}
+		            </if>
+		            <choose>
+		                <when test="month != null and month != '' and month != '0'">
+		                    AND hcp2.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		                    AND hcp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		                </when>
+		                <otherwise>
+		                    AND hcp2.payment_dt >= CONCAT(#{year}, '-01-01')
+		                    AND hcp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		                </otherwise>
+		            </choose>
+		            GROUP BY hcp2.sale_id,
+		                     CASE
+		                       WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
+		                       WHEN IFNULL(hcpd.itemType, 0) = 1 THEN 1003
+		                       ELSE 1002
+		                     END
+		        ) hds
+		            ON hds.sale_id = hcp.sale_id
+		        WHERE 1=1
+		        <if test="account_id != null and account_id != '' and account_id != '0'">
+		            AND hcp.account_id = #{account_id}
+		        </if>
+		        <choose>
+		            <when test="month != null and month != '' and month != '0'">
+		                AND hcp.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		                AND hcp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		            </when>
+		            <otherwise>
+		                AND hcp.payment_dt >= CONCAT(#{year}, '-01-01')
+		                AND hcp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		            </otherwise>
+		        </choose>
+		        AND hds.effective_type IN (1002, 1003)
+		        <if test="type != null and type != '' and type != '0'">
+		            AND hds.effective_type = #{type}
+		        </if>
+		    </if>
+		
+		    <if test="type == null or type == '' or type == '0' or type == '1000'">
+		        UNION ALL
+		
+		        /* 1000: 현장 법인카드 결제 상세 기준 집계 */
+		        SELECT acp.account_id,
+		               1000 AS type,
+		               DATE_FORMAT(acp.payment_dt, '%Y-%m') AS saleDate,
+		               acp.reg_dt,
+		               acp.bizNo,
+		               IFNULL(ads.expen_tax, 0) AS expen_tax,
+		               IFNULL(ads.expen_vat, 0) AS expen_vat,
+		               IFNULL(ads.expen_taxFree, 0) AS expen_taxFree,
+		               CASE
+		                 WHEN IFNULL(ads.detail_count, 0) = 0 THEN IFNULL(acp.total, 0)
+		                 ELSE IFNULL(ads.expen_total, 0)
+		               END AS expen_total,
+		               IFNULL(ads.food_tax, 0) AS food_tax,
+		               IFNULL(ads.food_vat, 0) AS food_vat,
+		               IFNULL(ads.food_taxFree, 0) AS food_taxFree,
+		               IFNULL(ads.food_total, 0) AS food_total,
+		               IFNULL(ads.scenic_tax, 0) AS scenic_tax,
+		               IFNULL(ads.scenic_vat, 0) AS scenic_vat,
+		               IFNULL(ads.scenic_taxFree, 0) AS scenic_taxFree,
+		               IFNULL(ads.scenic_total, 0) AS scenic_total
+		        FROM tb_account_corporate_card_payment_list acp
+		        LEFT JOIN (
+		            SELECT acp2.sale_id,
+		                   COUNT(acpd.idx) AS detail_count,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 2 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(acpd.amount, 0) - FLOOR(IFNULL(acpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS expen_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 2 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(acpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS expen_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 2 AND IFNULL(acpd.taxType, 0) = 2
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS expen_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 2 AND IFNULL(acpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS expen_total,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 1 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(acpd.amount, 0) - FLOOR(IFNULL(acpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS food_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 1 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(acpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS food_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 1 AND IFNULL(acpd.taxType, 0) = 2
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS food_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 1 AND IFNULL(acpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS food_total,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 3 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN GREATEST(IFNULL(acpd.amount, 0) - FLOOR(IFNULL(acpd.amount, 0) / 11), 0)
+		                                   ELSE 0 END), 0) AS scenic_tax,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 3 AND IFNULL(acpd.taxType, 0) = 1
+		                                   THEN FLOOR(IFNULL(acpd.amount, 0) / 11)
+		                                   ELSE 0 END), 0) AS scenic_vat,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 3 AND IFNULL(acpd.taxType, 0) = 2
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS scenic_taxFree,
+		                   IFNULL(SUM(CASE WHEN IFNULL(acpd.itemType, 0) = 3 AND IFNULL(acpd.taxType, 0) IN (1, 2, 3)
+		                                   THEN IFNULL(acpd.amount, 0)
+		                                   ELSE 0 END), 0) AS scenic_total
+		            FROM tb_account_corporate_card_payment_list acp2
+		            LEFT JOIN tb_account_corporate_card_payment_detail_list acpd
+		                ON acpd.sale_id = acp2.sale_id
+		            WHERE 1=1
+		            <if test="account_id != null and account_id != '' and account_id != '0'">
+		                AND acp2.account_id = #{account_id}
+		            </if>
+		            <choose>
+		                <when test="month != null and month != '' and month != '0'">
+		                    AND acp2.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		                    AND acp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		                </when>
+		                <otherwise>
+		                    AND acp2.payment_dt >= CONCAT(#{year}, '-01-01')
+		                    AND acp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		                </otherwise>
+		            </choose>
+		            GROUP BY acp2.sale_id
+		        ) ads
+		            ON ads.sale_id = acp.sale_id
+		        WHERE 1=1
+		        <if test="account_id != null and account_id != '' and account_id != '0'">
+		            AND acp.account_id = #{account_id}
+		        </if>
+		        <choose>
+		            <when test="month != null and month != '' and month != '0'">
+		                AND acp.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
+		                AND acp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
+		            </when>
+		            <otherwise>
+		                AND acp.payment_dt >= CONCAT(#{year}, '-01-01')
+		                AND acp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
+		            </otherwise>
+		        </choose>
+		    </if>
 		) src
 		JOIN tb_account a ON a.account_id = src.account_id
 		LEFT JOIN (
-			SELECT type, MAX(name) AS name, MAX(ceo_name) AS ceo_name
-			FROM tb_account_mapping
-			GROUP BY type
+		    SELECT type, MAX(name) AS name, MAX(ceo_name) AS ceo_name
+		    FROM tb_account_mapping
+		    GROUP BY type
 		) am ON am.type = src.type
 		GROUP BY src.account_id, a.account_name, src.type, am.name, am.ceo_name, src.saleDate
 		ORDER BY src.saleDate ASC, src.account_id ASC, src.type ASC
@@ -2416,6 +2563,25 @@
 		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
 	</select>
 	
+	<select id="AccountPurchaseTallyBySaleDateAndType" parameterType="map" resultType="hashmap">
+		SELECT sale_id, total
+		FROM tb_account_purchase_tally
+		WHERE account_id = #{account_id}
+		AND type = #{type}
+		AND saleDate = DATE_FORMAT(#{saleDate}, '%Y-%m-%d')
+		LIMIT 1
+	</select>
+
+	<update id="AccountPurchaseTallyTotalUpdate" parameterType="map">
+		UPDATE tb_account_purchase_tally
+		SET total = #{total},
+		    tax = #{tax},
+		    totalCash = #{totalCash},
+		    mod_id = #{user_id},
+		    mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
+		WHERE sale_id = #{sale_id}
+	</update>
+
 	<select id="AccountPurchaseTallyPaymentList" parameterType="map" resultType="hashmap">
 		SELECT account_id, 
 			   sale_id,
@@ -2747,6 +2913,82 @@
 	        user_id=#{user_id},
 	        receipt_type=#{receipt_type},
 	        idx=#{idx}
+	    </trim>
+	</insert>
+
+	<insert id="AccountCorporateCardPaymentToPurchaseTallySave" parameterType="map">
+		INSERT INTO tb_account_purchase_tally
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        account_id,
+	        sale_id,
+	        type,
+	        saleDate,
+	        total,
+	        discount,
+	        vat,
+	        taxFree,
+	        tax,
+	        payType,
+	        totalCash,
+	        totalCard,
+	        cardNo,
+	        cardBrand,
+	        bizNo,
+	        receipt_image,
+	        note,
+	        use_name,
+	        cashReceiptType,
+	        user_id,
+	        reg_dt,
+	        receipt_type
+	    </trim>
+	    VALUES
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+	        #{account_id},
+	        #{sale_id},
+	        1000,
+	        DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        IFNULL(#{total}, 0),
+	        0,
+	        IFNULL(#{vat}, 0),
+	        IFNULL(#{taxFree}, 0),
+	        IFNULL(#{tax}, 0),
+	        2,
+	        0,
+	        IFNULL(NULLIF(#{totalCard}, ''), IFNULL(#{total}, 0)),
+	        #{cardNo},
+	        #{cardBrand},
+	        #{bizNo},
+	        #{receipt_image},
+	        #{note},
+	        #{use_name},
+	        3,
+	        #{user_id},
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
+	        #{receipt_type}
+	    </trim>
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	        type=1000,
+	        saleDate=DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
+	        total=IFNULL(#{total}, total),
+	        discount=0,
+	        vat=IFNULL(#{vat}, vat),
+	        taxFree=IFNULL(#{taxFree}, taxFree),
+	        tax=IFNULL(#{tax}, tax),
+	        payType=2,
+	        totalCash=0,
+	        totalCard=IFNULL(NULLIF(#{totalCard}, ''), IFNULL(#{total}, totalCard)),
+	        cardNo=IFNULL(NULLIF(#{cardNo}, ''), cardNo),
+	        cardBrand=IFNULL(NULLIF(#{cardBrand}, ''), cardBrand),
+	        bizNo=IFNULL(NULLIF(#{bizNo}, ''), bizNo),
+	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
+	        note=IFNULL(#{note}, note),
+	        use_name=IFNULL(NULLIF(#{use_name}, ''), use_name),
+	        cashReceiptType=3,
+	        mod_id=#{user_id},
+	        mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
+	        receipt_type=IFNULL(NULLIF(#{receipt_type}, ''), receipt_type)
 	    </trim>
 	</insert>
 

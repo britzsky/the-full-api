@@ -154,6 +154,13 @@ public class OperateService {
 
         return 1; // ✅ 전체 성공
     }
+
+    // ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
+    public void callProfitLossTotalSave(Map<String, Object> param) {
+        param.put("result", 0);
+        headOfficeMapper.ProfitLossTotalSave(param);
+    }
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 조회
 	public List<Map<String, Object>> AccountMembersFilesList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

@@ -751,6 +751,23 @@ public class AccountController {
 
 		iResult += accountService.AccountInfoSave(payloadMap);
 
+		// 마지막: 저장 성공 후 ProfitLossTotalSave 프로시저 호출 (현재 년/월 기준)
+		if (iResult > 0) {
+			String accountId = formData != null ? String.valueOf(formData.getOrDefault("account_id", "")) : "";
+			if (!accountId.isEmpty()) {
+				try {
+					LocalDate now = LocalDate.now();
+					Map<String, Object> profitParam = new HashMap<>();
+					profitParam.put("year",       now.getYear());
+					profitParam.put("month",      now.getMonthValue());
+					profitParam.put("account_id", accountId);
+					accountService.callProfitLossTotalSave(profitParam);
+				} catch (Exception e) {
+					System.err.println("[AccountInfoSave] ProfitLossTotalSave 실패: " + accountId + " / " + e.getMessage());
+				}
+			}
+		}
+
 		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
@@ -2217,6 +2234,8 @@ public class AccountController {
 
 				mainMap.put("year", year);
 				mainMap.put("month", month);
+
+				iResult += accountService.AccountCorporateCardPaymentToPurchaseTallySave(mainMap);
 
 				// 집계표도 다시 적용.
 				iResult += accountService.TallySheetCorporateCardPaymentSave(mainMap);

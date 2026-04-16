@@ -695,6 +695,12 @@ public class AccountService {
 		return 1; // ✅ 전체 성공
 	}
 
+	// ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
+	public void callProfitLossTotalSave(Map<String, Object> param) {
+		param.put("result", 0);
+		headOfficeMapper.ProfitLossTotalSave(param);
+	}
+
 	// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	public List<Map<String, Object>> AccountMappingList(String account_id) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -875,6 +881,19 @@ public class AccountService {
 		int iResult = 0;
 		iResult = accountMapper.AccountCorporateCardPaymentDetailLSave(paramMap);
 		return iResult;
+	}
+
+	// 회계 -> 현장 법인카드 결제내역을 매입집계(type=1000)로 동기화
+	public int AccountCorporateCardPaymentToPurchaseTallySave(Map<String, Object> paramMap) {
+		String saleId = paramMap.get("sale_id") == null ? "" : String.valueOf(paramMap.get("sale_id")).trim();
+		String accountId = paramMap.get("account_id") == null ? "" : String.valueOf(paramMap.get("account_id")).trim();
+		String paymentDt = paramMap.get("payment_dt") == null ? "" : String.valueOf(paramMap.get("payment_dt")).trim();
+
+		if (saleId.isEmpty() || accountId.isEmpty() || paymentDt.isEmpty() || "null".equalsIgnoreCase(paymentDt)) {
+			return 0;
+		}
+
+		return accountMapper.AccountCorporateCardPaymentToPurchaseTallySave(paramMap);
 	}
 
 	// 회계 -> 현장 법인카드 집계표 적용, 손익표, 예산도 함께 적용해야 함.
