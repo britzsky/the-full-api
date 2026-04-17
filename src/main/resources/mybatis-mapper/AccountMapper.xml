@@ -2178,16 +2178,12 @@
 		        <if test="type != null and type != '' and type != '0'">
 		            AND apt2.type = #{type}
 		        </if>
-		        <choose>
-		            <when test="month != null and month != '' and month != '0'">
-		                AND apt2.saleDate >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		                AND apt2.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		            </when>
-		            <otherwise>
-		                AND apt2.saleDate >= CONCAT(#{year}, '-01-01')
-		                AND apt2.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		            </otherwise>
-		        </choose>
+		        <if test="startDate != null and startDate != ''">
+		            AND apt2.saleDate >= #{startDate}
+		        </if>
+		        <if test="endDate != null and endDate != ''">
+		            AND apt2.saleDate <![CDATA[ < ]]> #{endDate}
+		        </if>
 		        GROUP BY apt2.sale_id
 		    ) ds
 		        ON ds.sale_id = apt.sale_id
@@ -2198,16 +2194,12 @@
 		    <if test="type != null and type != '' and type != '0'">
 		        AND apt.type = #{type}
 		    </if>
-		    <choose>
-		        <when test="month != null and month != '' and month != '0'">
-		            AND apt.saleDate >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		            AND apt.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		        </when>
-		        <otherwise>
-		            AND apt.saleDate >= CONCAT(#{year}, '-01-01')
-		            AND apt.saleDate <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		        </otherwise>
-		    </choose>
+		    <if test="startDate != null and startDate != ''">
+		        AND apt.saleDate >= #{startDate}
+		    </if>
+		    <if test="endDate != null and endDate != ''">
+		        AND apt.saleDate <![CDATA[ < ]]> #{endDate}
+		    </if>
 		
 		    <if test="type == null or type == '' or type == '0' or type == '1002' or type == '1003'">
 		        UNION ALL
@@ -2294,16 +2286,12 @@
 		            <if test="account_id != null and account_id != '' and account_id != '0'">
 		                AND hcp2.account_id = #{account_id}
 		            </if>
-		            <choose>
-		                <when test="month != null and month != '' and month != '0'">
-		                    AND hcp2.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		                    AND hcp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		                </when>
-		                <otherwise>
-		                    AND hcp2.payment_dt >= CONCAT(#{year}, '-01-01')
-		                    AND hcp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		                </otherwise>
-		            </choose>
+		            <if test="startDate != null and startDate != ''">
+		                AND hcp2.payment_dt >= #{startDate}
+		            </if>
+		            <if test="endDate != null and endDate != ''">
+		                AND hcp2.payment_dt <![CDATA[ < ]]> #{endDate}
+		            </if>
 		            GROUP BY hcp2.sale_id,
 		                     CASE
 		                       WHEN IFNULL(hcp2.receipt_type, 0) IN (1002, 1003) THEN hcp2.receipt_type
@@ -2316,16 +2304,12 @@
 		        <if test="account_id != null and account_id != '' and account_id != '0'">
 		            AND hcp.account_id = #{account_id}
 		        </if>
-		        <choose>
-		            <when test="month != null and month != '' and month != '0'">
-		                AND hcp.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		                AND hcp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		            </when>
-		            <otherwise>
-		                AND hcp.payment_dt >= CONCAT(#{year}, '-01-01')
-		                AND hcp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		            </otherwise>
-		        </choose>
+		        <if test="startDate != null and startDate != ''">
+		            AND hcp.payment_dt >= #{startDate}
+		        </if>
+		        <if test="endDate != null and endDate != ''">
+		            AND hcp.payment_dt <![CDATA[ < ]]> #{endDate}
+		        </if>
 		        AND hds.effective_type IN (1002, 1003)
 		        <if test="type != null and type != '' and type != '0'">
 		            AND hds.effective_type = #{type}
@@ -2403,16 +2387,12 @@
 		            <if test="account_id != null and account_id != '' and account_id != '0'">
 		                AND acp2.account_id = #{account_id}
 		            </if>
-		            <choose>
-		                <when test="month != null and month != '' and month != '0'">
-		                    AND acp2.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		                    AND acp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		                </when>
-		                <otherwise>
-		                    AND acp2.payment_dt >= CONCAT(#{year}, '-01-01')
-		                    AND acp2.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		                </otherwise>
-		            </choose>
+		            <if test="startDate != null and startDate != ''">
+		                AND acp2.payment_dt >= #{startDate}
+		            </if>
+		            <if test="endDate != null and endDate != ''">
+		                AND acp2.payment_dt <![CDATA[ < ]]> #{endDate}
+		            </if>
 		            GROUP BY acp2.sale_id
 		        ) ads
 		            ON ads.sale_id = acp.sale_id
@@ -2420,16 +2400,12 @@
 		        <if test="account_id != null and account_id != '' and account_id != '0'">
 		            AND acp.account_id = #{account_id}
 		        </if>
-		        <choose>
-		            <when test="month != null and month != '' and month != '0'">
-		                AND acp.payment_dt >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01')
-		                AND acp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), INTERVAL 1 MONTH)
-		            </when>
-		            <otherwise>
-		                AND acp.payment_dt >= CONCAT(#{year}, '-01-01')
-		                AND acp.payment_dt <![CDATA[ < ]]> DATE_ADD(CONCAT(#{year}, '-01-01'), INTERVAL 1 YEAR)
-		            </otherwise>
-		        </choose>
+		        <if test="startDate != null and startDate != ''">
+		            AND acp.payment_dt >= #{startDate}
+		        </if>
+		        <if test="endDate != null and endDate != ''">
+		            AND acp.payment_dt <![CDATA[ < ]]> #{endDate}
+		        </if>
 		    </if>
 		) src
 		JOIN tb_account a ON a.account_id = src.account_id

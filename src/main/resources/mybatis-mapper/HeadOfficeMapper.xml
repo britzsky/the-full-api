@@ -87,6 +87,7 @@
 	        reg_dt,
 	        del_yn,
 	        user_id,
+	        account_id,
 	    </trim>
 	    
 	    VALUES
@@ -101,6 +102,7 @@
 	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
 	        #{del_yn},
 	        #{user_id},
+	        #{account_id},
 	    </trim>
 	    
 	    ON DUPLICATE KEY UPDATE
@@ -114,6 +116,7 @@
 	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
 	        del_yn=#{del_yn},
 	        user_id=#{user_id},
+	        account_id=#{account_id},
 	    </trim>
     </insert>
     
@@ -124,13 +127,14 @@
     		   content,
     		   type,
     		   del_yn,
-    		   update_dt,
-    		   reg_dt,
-    		   user_id
-			FROM tb_week_menu 
-			WHERE DATE_FORMAT(menu_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
-			AND del_yn = 'N'
-			AND type != 1
+    		   DATE_FORMAT(update_dt, '%Y-%m-%d') as update_dt,
+    		   DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt,
+    		   user_id,
+    		   account_id
+		FROM tb_week_menu 
+		WHERE DATE_FORMAT(menu_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
+			  AND del_yn = 'N'
+			  AND type != 1
     </select>
     
     <select id="PeopleCountingList" parameterType="map" resultType="hashmap">
