@@ -2147,24 +2147,24 @@
 		    LEFT JOIN (
 		        SELECT apt2.sale_id,
 		               COUNT(aptd.item_id) AS detail_count,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS expen_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.tax ELSE 0 END), 0) AS expen_tax,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS expen_vat,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS expen_taxFree,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '2' AND aptd.taxType = '1' THEN aptd.amount
 		                               WHEN aptd.itemType = '2' AND aptd.taxType = '2' THEN aptd.amount
 		                               WHEN aptd.itemType = '2' AND aptd.taxType = '3' THEN aptd.amount
 		                               ELSE 0 END), 0) AS expen_total,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS food_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.tax ELSE 0 END), 0) AS food_tax,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS food_vat,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS food_taxFree,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '1' AND aptd.taxType = '1' THEN aptd.amount
 		                               WHEN aptd.itemType = '1' AND aptd.taxType = '2' THEN aptd.amount
 		                               WHEN aptd.itemType = '1' AND aptd.taxType = '3' THEN aptd.amount
 		                               ELSE 0 END), 0) AS food_total,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.amount ELSE 0 END), 0) AS scenic_tax,
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.tax ELSE 0 END), 0) AS scenic_tax,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.vat ELSE 0 END), 0) AS scenic_vat,
 		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '2' THEN aptd.amount ELSE 0 END), 0) AS scenic_taxFree,
-		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.amount + aptd.vat
+		               IFNULL(SUM(CASE WHEN aptd.itemType = '3' AND aptd.taxType = '1' THEN aptd.amount
 		                               WHEN aptd.itemType = '3' AND aptd.taxType = '2' THEN aptd.amount
 		                               WHEN aptd.itemType = '3' AND aptd.taxType = '3' THEN aptd.amount
 		                               ELSE 0 END), 0) AS scenic_total

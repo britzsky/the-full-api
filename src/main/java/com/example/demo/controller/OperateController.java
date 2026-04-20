@@ -218,7 +218,7 @@ public class OperateController {
                     Map<String, Object> updateParam = new HashMap<>();
                     updateParam.put("sale_id",  existing.get("sale_id"));
                     updateParam.put("total",    total);
-                    updateParam.put("tax",      total);
+                    updateParam.put("tax",      0);
                     updateParam.put("totalCash", total);
                     updateParam.put("user_id",  userId);
                     accountMapper.AccountPurchaseTallyTotalUpdate(updateParam);
@@ -234,7 +234,7 @@ public class OperateController {
                     purchaseParam.put("discount",       0);
                     purchaseParam.put("vat",            0);
                     purchaseParam.put("taxFree",        0);
-                    purchaseParam.put("tax",            total);
+                    purchaseParam.put("tax",            0);
                     purchaseParam.put("payType",        1);
                     purchaseParam.put("totalCash",      total);
                     purchaseParam.put("totalCard",      0);
