@@ -41,7 +41,7 @@ public interface BusinessMapper {
 	List<Map<String, Object>> AccountEctDietList(Map<String, Object> paramMap);			// 고객사 관리 -> 고객사 상세관리 -> 추가 식단가 조회
 	int AccountEctDietSave(Map<String, Object> paramMap);								// 고객사 관리 -> 고객사 상세관리 -> 추가 식단가 저장
 	int DinerNumberUpdate(Map<String, Object> paramMap);								// 고객사 관리 -> 식수현황 -> 추가 식단가 수정
-	List<Map<String, Object>> BusinessMemberList();										// 영업관리 -> 일정관리 -> 영업팀 조회
+	List<Map<String, Object>> BusinessMemberList(Map<String, Object> paramMap);			// 영업관리 -> 일정관리 -> 영업팀 조회
 	int BusinessScheduleSave(Map<String, Object> paramMap);								// 영업관리 -> 일정관리 저장
 	List<Map<String, Object>> BusinessScheduleList(Map<String, Object> paramMap);		// 영업관리 -> 일정관리 조회
 	List<Map<String, Object>> BusinessScheduleTodayList(Map<String, Object> paramMap);	// 메인화면 -> 당일 영업팀 일정 조회

@@ -48,5 +48,6 @@ public interface HeadOfficeMapper {
 	int ElectronicPaymentNotificationReadSave(Map<String, Object> paramMap);							// 본사 -> 전자결재 알림 읽음 처리
 	List<Map<String, Object>> HeadOfficeDepartmentList(Map<String, Object> paramMap); 				// 본사 -> 전자결재 관리 -> 부서목록 조회
 	List<Map<String, Object>> HeadOfficeUserListByDepartment(Map<String, Object> paramMap); 		// 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
+	List<Map<String, Object>> HeadOfficeScheduleList(Map<String, Object> paramMap);				// 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회
 }
 	

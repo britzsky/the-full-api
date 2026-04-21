@@ -255,4 +255,9 @@ public class HeadOfficeService {
 		resultList = headOfficeMapper.HeadOfficeUserListByDepartment(paramMap);
 		return resultList;
 	}
+
+	// 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회
+	public List<Map<String, Object>> HeadOfficeScheduleList(Map<String, Object> paramMap) {
+		return headOfficeMapper.HeadOfficeScheduleList(paramMap);
+	}
 }

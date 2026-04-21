@@ -93,6 +93,25 @@ public class AccountService {
 		return value != null && !value.trim().isEmpty();
 	}
 
+	// 조회 파라미터의 전체 선택값("0")을 빈 문자열로 정규화
+	private static void normalizeZeroToEmpty(Map<String, Object> paramMap, String... keys) {
+		if (paramMap == null || keys == null) {
+			return;
+		}
+		for (String key : keys) {
+			if (key == null || !paramMap.containsKey(key)) {
+				continue;
+			}
+			Object raw = paramMap.get(key);
+			if (raw == null) {
+				continue;
+			}
+			if ("0".equals(String.valueOf(raw).trim())) {
+				paramMap.put(key, "");
+			}
+		}
+	}
+
 	// 이미지 경로를 /image/... 형태로 정규화
 	private static String normalizeImagePath(String rawPath) {
 		if (!hasText(rawPath))
@@ -745,6 +764,7 @@ public class AccountService {
 	// 회계 -> 매입 -> 매입마감 조회
 	public List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
+		normalizeZeroToEmpty(paramMap, "account_id", "type", "year", "month", "payType");
 		resultList = accountMapper.AccountPurchaseTallyList(paramMap);
 		return resultList;
 	}
@@ -752,6 +772,7 @@ public class AccountService {
 	// 회계 -> 매입집계(TallyTab) 조회
 	public List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
+		normalizeZeroToEmpty(paramMap, "account_id", "type", "year", "month", "payType");
 		resultList = accountMapper.AccountPurchaseTallyForTallyTab(paramMap);
 		return resultList;
 	}
@@ -1071,6 +1092,7 @@ public class AccountService {
 	// 회계 -> 매입(본사용) 조회
 	public List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
+		normalizeZeroToEmpty(paramMap, "account_id", "type", "year", "month", "payType");
 		resultList = accountMapper.AccountPurchaseTallyV2List(paramMap);
 		return resultList;
 	}

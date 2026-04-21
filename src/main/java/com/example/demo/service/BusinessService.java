@@ -198,10 +198,10 @@ public class BusinessService {
 		iResult = businessMapper.AccountEctDietSave(paramMap);
 		return iResult;
 	}
-	// 영업 -> 일정관리 -> 영업팀 조회 
-	public List<Map<String, Object>> BusinessMemberList() {
+	// 영업 -> 일정관리 -> 영업팀 조회
+	public List<Map<String, Object>> BusinessMemberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = businessMapper.BusinessMemberList();
+		resultList = businessMapper.BusinessMemberList(paramMap);
 		return resultList;
 	}
 	// 영업 -> 일정관리 -> 캘린더 조회

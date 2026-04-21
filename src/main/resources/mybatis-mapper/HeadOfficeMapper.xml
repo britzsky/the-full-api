@@ -2296,5 +2296,31 @@
 		AND department = #{department}
 		ORDER BY position ASC
 	</select>
+
+	<!-- 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회 (UNION ALL) -->
+	<!-- 본사 -> 일정관리 -> 영업(1)/운영(2)/급식사업부(3) 통합 조회 (tb_business_calendar 단일 테이블) -->
+	<select id="HeadOfficeScheduleList" parameterType="map" resultType="hashmap">
+		SELECT bc.idx,
+		       DATE_FORMAT(bc.start_date, '%Y-%m-%d') AS start_date,
+		       DATE_FORMAT(bc.end_date,   '%Y-%m-%d') AS end_date,
+		       bc.content,
+		       bc.type,
+		       bc.team_code,
+		       bc.del_yn,
+		       bc.update_dt,
+		       DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') AS reg_dt,
+		       bc.user_id,
+		       bc.account_id,
+		       IFNULL(a.account_name, '') AS account_name,
+		       bc.reg_user_id,
+		       u.user_name
+		FROM tb_business_calendar bc
+		JOIN tb_user u ON u.user_id = bc.user_id
+		LEFT JOIN tb_account a
+		       ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
+		WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		  AND DATE_FORMAT(bc.end_date,   '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		ORDER BY bc.start_date ASC
+	</select>
 </mapper>
 

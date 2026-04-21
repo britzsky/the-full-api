@@ -400,112 +400,112 @@
 	    WHERE account_id = #{account_id}
 	</update>
 	
-	<select id="BusinessMemberList" resultType="hashmap">
-		SELECT *
-		FROM tb_user
-		WHERE department = 4
-		AND del_yn = 'N'
-		ORDER BY position ASC
+	<!-- 급식사업부 일정관리 -> 담당자 조회 -->
+	<select id="BusinessMemberList" parameterType="map" resultType="hashmap">
+		SELECT u.*
+		FROM tb_user u
+		WHERE u.del_yn = 'N'
+		<if test="team_code != null and team_code != ''">
+			AND u.department =
+			<choose>
+				<when test="team_code == 1 or team_code == '1'">4</when>
+				<when test="team_code == 2 or team_code == '2'">5</when>
+				<when test="team_code == 3 or team_code == '3'">8</when>
+				<otherwise>u.department</otherwise>
+			</choose>
+		</if>
+		ORDER BY u.position ASC
 	</select>
-	
+
+	<!-- 급식사업부 일정관리 ->  월별 일정 조회 -->
 	<select id="BusinessScheduleList" parameterType="map" resultType="hashmap">
-    	SELECT bc.idx,
-    		   DATE_FORMAT(bc.start_date, '%Y-%m-%d') as start_date,
-    		   DATE_FORMAT(bc.end_date, '%Y-%m-%d') as end_date,
-    		   bc.content,
-    		   bc.type,
-    		   bc.del_yn,
-    		   bc.update_dt,
-    		   DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') as reg_dt,
-    		   bc.user_id,
-    		   bc.reg_user_id,
-    		   bc.account_id,
-    		   IFNULL(a.account_name, '') AS account_name,
-    		   u.user_name
-			FROM tb_business_calendar bc
-			JOIN tb_user u
-			ON u.user_id = bc.user_id 
-			LEFT JOIN tb_account a
-			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
-			WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
-			AND DATE_FORMAT(bc.end_date, '%Y-%m') = CONCAT(#{year},'-',#{month})
-			AND bc.del_yn = 'N'
-    </select>
-    
-    <select id="BusinessScheduleTodayList" parameterType="map" resultType="hashmap">
-    	SELECT bc.idx,
-    		   DATE_FORMAT(bc.start_date, '%Y-%m-%d') as start_date,
-    		   DATE_FORMAT(bc.end_date, '%Y-%m-%d') as end_date,
-    		   bc.content,
-    		   bc.type,
-    		   bc.del_yn,
-    		   bc.update_dt,
-    		   DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') as reg_dt,
-    		   bc.user_id,
-    		   bc.reg_user_id,
-    		   bc.account_id,
-    		   IFNULL(a.account_name, '') AS account_name,
-    		   u.user_name,    		   
-    		   CASE WHEN u.position = 0 THEN 'CEO'
-			        WHEN u.position = 1 THEN '팀장'
-			        WHEN u.position = 2 THEN '파트장'
-			        ELSE '매니저'
-			    END AS position_name,
-			  u.department
-			FROM tb_business_calendar bc
-			JOIN tb_user u
-			ON u.user_id = bc.user_id 
-			LEFT JOIN tb_account a
-			ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
-			WHERE DATE_FORMAT(bc.start_date, '%Y-%m-%d') = #{today}
-    </select>
-	
+		SELECT bc.idx,
+		       DATE_FORMAT(bc.start_date, '%Y-%m-%d') AS start_date,
+		       DATE_FORMAT(bc.end_date,   '%Y-%m-%d') AS end_date,
+		       bc.content,
+		       bc.type,
+		       bc.team_code,
+		       bc.del_yn,
+		       bc.update_dt,
+		       DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') AS reg_dt,
+		       bc.user_id,
+		       bc.reg_user_id,
+		       bc.account_id,
+		       IFNULL(a.account_name, '') AS account_name,
+		       u.user_name
+		FROM tb_business_calendar bc
+		JOIN tb_user u ON u.user_id = bc.user_id
+		LEFT JOIN tb_account a
+		       ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
+		WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		  AND DATE_FORMAT(bc.end_date,   '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		  AND bc.del_yn = 'N'
+		<if test="team_code != null and team_code != ''">
+			AND bc.team_code = #{team_code}
+		</if>
+	</select>
+
+	<!-- 급식사업부 일정관리 -> 오늘 일정 조회 -->
+	<select id="BusinessScheduleTodayList" parameterType="map" resultType="hashmap">
+		SELECT bc.idx,
+		       DATE_FORMAT(bc.start_date, '%Y-%m-%d') AS start_date,
+		       DATE_FORMAT(bc.end_date,   '%Y-%m-%d') AS end_date,
+		       bc.content,
+		       bc.type,
+		       bc.team_code,
+		       bc.del_yn,
+		       bc.update_dt,
+		       DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') AS reg_dt,
+		       bc.user_id,
+		       bc.reg_user_id,
+		       bc.account_id,
+		       IFNULL(a.account_name, '') AS account_name,
+		       u.user_name,
+		       CASE WHEN u.position = 0 THEN 'CEO'
+		            WHEN u.position = 1 THEN '팀장'
+		            WHEN u.position = 2 THEN '파트장'
+		            ELSE '매니저'
+		       END AS position_name,
+		       u.department
+		FROM tb_business_calendar bc
+		JOIN tb_user u ON u.user_id = bc.user_id
+		LEFT JOIN tb_account a
+		       ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
+		WHERE DATE_FORMAT(bc.start_date, '%Y-%m-%d') = #{today}
+		<if test="team_code != null and team_code != ''">
+			AND bc.team_code = #{team_code}
+		</if>
+	</select>
+
+	<!-- 일정 저장/수정 -->
 	<insert id="BusinessScheduleSave" parameterType="map">
-        INSERT INTO tb_business_calendar
-    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        idx,
-	        start_date,
-	        end_date,
-	        content,
-	        type,
-	        update_dt,
-	        reg_dt,
-	        del_yn,
-	        user_id,
-	        account_id,
-	        reg_user_id
-	    </trim>
-	    
-	    VALUES
-	    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	#{idx},
-	    	DATE_FORMAT(#{start_date}, '%Y-%m-%d'),
-	        DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
-	        #{content},
-	        #{type},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
-	        IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(now(), '%Y-%m-%d')),
-	        #{del_yn},
-	        #{user_id},
-	        #{account_id},
-	        #{reg_user_id}
-	    </trim>
-	    
-	    ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	    	idx=#{idx},
-	        start_date=DATE_FORMAT(#{start_date}, '%Y-%m-%d'),
-	        end_date=DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
-	        content=#{content},
-	        type=#{type},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
-	        reg_dt=IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
-	        del_yn=#{del_yn},
-	        user_id=#{user_id},
-	        account_id=#{account_id},
-	        reg_user_id=#{reg_user_id}
-	    </trim>
-    </insert>
+		INSERT INTO tb_business_calendar
+		(idx, start_date, end_date, content, type, team_code, update_dt, reg_dt, del_yn, user_id, account_id, reg_user_id)
+		VALUES (
+			#{idx},
+			DATE_FORMAT(#{start_date}, '%Y-%m-%d'),
+			DATE_FORMAT(#{end_date},   '%Y-%m-%d'),
+			#{content},
+			#{type},
+			#{team_code},
+			DATE_FORMAT(now(), '%Y-%m-%d'),
+			IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(now(), '%Y-%m-%d')),
+			#{del_yn},
+			#{user_id},
+			#{account_id},
+			#{reg_user_id}
+		)
+		ON DUPLICATE KEY UPDATE
+			start_date   = DATE_FORMAT(#{start_date}, '%Y-%m-%d'),
+			end_date     = DATE_FORMAT(#{end_date},   '%Y-%m-%d'),
+			content      = #{content},
+			type         = #{type},
+			team_code    = #{team_code},
+			update_dt    = DATE_FORMAT(now(), '%Y-%m-%d'),
+			reg_dt       = IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
+			del_yn       = #{del_yn},
+			user_id      = #{user_id},
+			account_id   = #{account_id},
+			reg_user_id  = #{reg_user_id}
+	</insert>
 </mapper>

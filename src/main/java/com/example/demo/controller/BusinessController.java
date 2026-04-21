@@ -812,7 +812,7 @@ public class BusinessController {
     @GetMapping("Business/BusinessMemberList")
     public String BusinessMemberList(@RequestParam Map<String, Object> paramMap) {
     	List<Map<String, Object>> resultList = new ArrayList<>();
-    	resultList = businessService.BusinessMemberList();
+    	resultList = businessService.BusinessMemberList(paramMap);
     	
     	return new Gson().toJson(resultList);
     }

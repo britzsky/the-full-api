@@ -2074,7 +2074,7 @@
 		<if test="account_id != null and account_id != '' and account_id != '0'">
 			AND apt.account_id = #{account_id}
 		</if>
-		<if test="type != null and type != '' and type != '0'">
+		<if test="type != null and type != '' and type != &quot;0&quot;">
 			AND apt.type = #{type}
 		</if>
 		<if test="payType != null and payType.toString() == '1'">
@@ -2175,7 +2175,7 @@
 		        <if test="account_id != null and account_id != '' and account_id != '0'">
 		            AND apt2.account_id = #{account_id}
 		        </if>
-		        <if test="type != null and type != '' and type != '0'">
+		        <if test="type != null and type != '' and type != &quot;0&quot;">
 		            AND apt2.type = #{type}
 		        </if>
 		        <if test="startDate != null and startDate != ''">
@@ -2191,7 +2191,7 @@
 		    <if test="account_id != null and account_id != '' and account_id != '0'">
 		        AND apt.account_id = #{account_id}
 		    </if>
-		    <if test="type != null and type != '' and type != '0'">
+		    <if test="type != null and type != '' and type != &quot;0&quot;">
 		        AND apt.type = #{type}
 		    </if>
 		    <if test="startDate != null and startDate != ''">
@@ -2201,7 +2201,7 @@
 		        AND apt.saleDate <![CDATA[ < ]]> #{endDate}
 		    </if>
 		
-		    <if test="type == null or type == '' or type == '0' or type == '1002' or type == '1003'">
+		    <if test="type == null or type == '' or type == &quot;0&quot; or type == '1002' or type == '1003'">
 		        UNION ALL
 		
 		        /* 1002/1003: 본사 법인카드 결제 상세 기준 집계 */
@@ -2311,12 +2311,12 @@
 		            AND hcp.payment_dt <![CDATA[ < ]]> #{endDate}
 		        </if>
 		        AND hds.effective_type IN (1002, 1003)
-		        <if test="type != null and type != '' and type != '0'">
+		        <if test="type != null and type != '' and type != &quot;0&quot;">
 		            AND hds.effective_type = #{type}
 		        </if>
 		    </if>
 		
-		    <if test="type == null or type == '' or type == '0' or type == '1000'">
+		    <if test="type == null or type == '' or type == &quot;0&quot; or type == '1000'">
 		        UNION ALL
 		
 		        /* 1000: 현장 법인카드 결제 상세 기준 집계 */
@@ -3342,7 +3342,7 @@
 			AND account_id = #{account_id}
 		</if>
 		<!-- 타입 조건: 값이 있고 "0"(전체)이 아닐 때만 적용 -->
-		<if test="type != null and type != '' and type.toString() != '0'">
+		<if test="type != null and type != '' and type.toString() != &quot;0&quot;">
 			AND type = #{type}
 		</if>
 		<!-- 연월 조건: saleDate(YYYY-MM) 우선, 없으면 fromDate~toDate 범위로 조회 -->

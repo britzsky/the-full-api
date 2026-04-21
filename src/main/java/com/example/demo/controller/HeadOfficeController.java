@@ -702,7 +702,7 @@ public class HeadOfficeController {
 	    return new Gson().toJson(deptList);
 	}
 
-	/* 
+	/*
 	 * part		: 본사
      * method 	: HeadOfficeUserListByDepartment
      * comment 	: 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
@@ -710,7 +710,18 @@ public class HeadOfficeController {
 	@GetMapping("HeadOffice/HeadOfficeUserListByDepartment")
 	public String HeadOfficeUserListByDepartment(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeUserListByDepartment(paramMap);
-		
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 본사
+     * method 	: HeadOfficeScheduleList
+     * comment 	: 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회
+     */
+	@GetMapping("HeadOffice/HeadOfficeScheduleList")
+	public String HeadOfficeScheduleList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeScheduleList(paramMap);
 		return new Gson().toJson(resultList);
 	}
 

@@ -54,10 +54,6 @@ public interface OperateMapper {
 	List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 	List<Map<String, Object>> AnnualLeaveList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 정보 조회
 	List<Map<String, Object>> OverTimeList(Map<String, Object> paramMap); 						// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 초과근무 조회
-	List<Map<String, Object>> OperateMemberList();												// 운영관리 -> 일정관리 -> 운영팀 조회
-	int OperateScheduleSave(Map<String, Object> paramMap);										// 운영관리 -> 일정관리 저장
-	List<Map<String, Object>> OperateScheduleList(Map<String, Object> paramMap);				// 운영관리 -> 일정관리 조회
-	List<Map<String, Object>> OperateScheduleTodayList(Map<String, Object> paramMap);			// 메인화면 -> 운영팀 당일 일정 조회
 	List<Map<String, Object>> AccountRecordStandardList(Map<String, Object> paramMap);			// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 조회
 	int AccountRecordStandardSave(Map<String, Object> paramMap);								// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 저장
 	List<Map<String, Object>> TallySheetPointList(Map<String, Object> paramMap);				// 집계표 -> 셀 포인트 조회
