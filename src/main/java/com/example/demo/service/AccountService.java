@@ -112,6 +112,29 @@ public class AccountService {
 		}
 	}
 
+	// 프론트에서 전달한 tax/item 타입 키를 히스토리 저장용 표준 키로 정규화
+	private static void normalizeHistoryTypeFields(Map<String, Object> paramMap) {
+		if (paramMap == null) {
+			return;
+		}
+
+		String taxType = asText(paramMap.get("taxType"));
+		if (!hasText(taxType)) {
+			String altTaxType = asText(paramMap.get("taxtype"));
+			if (hasText(altTaxType)) {
+				paramMap.put("taxType", altTaxType);
+			}
+		}
+
+		String itemType = asText(paramMap.get("itemType"));
+		if (!hasText(itemType)) {
+			String altItemType = asText(paramMap.get("itemtype"));
+			if (hasText(altItemType)) {
+				paramMap.put("itemType", altItemType);
+			}
+		}
+	}
+
 	// 이미지 경로를 /image/... 형태로 정규화
 	private static String normalizeImagePath(String rawPath) {
 		if (!hasText(rawPath))
@@ -272,9 +295,9 @@ public class AccountService {
 	}
 
 	// 거래처 -> 거래처 목록 조회(V2)
-	public List<Map<String, Object>> AccountListV2(int accountType) {
+	public List<Map<String, Object>> AccountListV2(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = accountMapper.AccountListV2(accountType);
+		resultList = accountMapper.AccountListV2(paramMap);
 		return resultList;
 	}
 
@@ -734,7 +757,16 @@ public class AccountService {
 		iResult = accountMapper.AccountPurchaseSave(paramMap);
 		if (iResult > 0) {
 			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"));
-			try { accountMapper.AccountPurchaseHistorySave(paramMap); } catch (Exception ignored) {}
+			try {
+				Map<String, Object> historyParam = new HashMap<>(paramMap);
+				// 상단 저장 이력은 detail 없이도 남기되, tax/item 타입은 제외한다.
+				historyParam.remove("taxType");
+				historyParam.remove("itemType");
+				historyParam.remove("taxtype");
+				historyParam.remove("itemtype");
+				historyParam.put("savetype", 1);
+				accountMapper.AccountPurchaseHistorySave(historyParam);
+			} catch (Exception ignored) {}
 		}
 		return iResult;
 	}
@@ -755,6 +787,8 @@ public class AccountService {
 						if (historyParam.get("account_id") == null) historyParam.put("account_id", master.get("account_id"));
 					}
 				}
+				normalizeHistoryTypeFields(historyParam);
+				historyParam.put("savetype", 2);
 				accountMapper.AccountPurchaseHistorySave(historyParam);
 			} catch (Exception ignored) {}
 		}

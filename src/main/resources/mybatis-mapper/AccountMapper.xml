@@ -52,24 +52,38 @@
  		)
 	</select>
 	
-	<select id="AccountListV2" parameterType="int" resultType="hashmap">
-		SELECT account_id, 
-			   account_name, 
-			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address,
-			   case account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
-			   account_rqd_member,
-			   account_headcount,
-			   meal_type,
-			   del_yn
-		FROM tb_account
-		WHERE del_yn = 'N'
-		<if test='accountType == 0'>
-			AND account_type in (1,2,4,5)
+	<select id="AccountListV2" parameterType="map" resultType="hashmap">
+		SELECT T.account_id, 
+			   T.account_name, 
+			   concat(ifnull(T.account_address,''), ' ', ifnull(T.account_address_detail,'')) as account_address,
+			   case T.account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
+			   T.account_rqd_member,
+			   T.account_headcount,
+			   T.meal_type,
+			   T.del_yn,
+			   DATE_FORMAT(T2.contract_start, '%Y-%m-%d') as contract_start,
+        	   	   DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_info T2
+		ON T.account_id = T2.account_id
+		<choose>
+			<when test="del_yn != null and ('Y'.equals(del_yn.toString()) or 'N'.equals(del_yn.toString()))">
+				WHERE T.del_yn = #{del_yn}
+			</when>
+			<when test="del_yn != null and 'ALL'.equals(del_yn.toString())">
+				WHERE 1=1
+			</when>
+			<otherwise>
+				WHERE T.del_yn = 'N'
+			</otherwise>
+		</choose>
+		<if test='account_type != null and "0".equals(account_type.toString())'>
+			AND T.account_type in (1,2,4,5)
  		</if>
- 		<if test='accountType != 0'>
-			AND account_type = #{accountType}
+ 		<if test='account_type != null and !"0".equals(account_type.toString())'>
+			AND T.account_type = #{account_type}
  		</if>
- 		AND account_id not in 
+ 		AND T.account_id not in 
  		(
  			20260122065002,
 			20260122071337,
@@ -2023,7 +2037,7 @@
 	
 	<insert id="AccountPurchaseHistorySave" parameterType="map">
 		INSERT INTO tb_account_purchase_tally_history
-		(account_id, sale_id, saleDate, total, reg_dt, user_id)
+		(account_id, sale_id, saleDate, total, reg_dt, user_id, taxType, itemType, savetype)
 		VALUES
 		(
 			#{account_id},
@@ -2031,7 +2045,10 @@
 			DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
 			#{total},
 			DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s'),
-			#{user_id}
+			#{user_id},
+			#{taxType},
+			#{itemType},
+			#{savetype}
 		)
 	</insert>
 

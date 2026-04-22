@@ -120,8 +120,18 @@ public class AccountController {
 	@GetMapping("/Account/AccountListV2")
 	public String AccountListV2(@RequestParam(required = false) Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
-		resultList = accountService.AccountListV2(iAccountType);
+		if (paramMap == null) {
+			paramMap = new java.util.HashMap<>();
+		}
+		Object accountTypeObj = paramMap.get("account_type");
+		if (accountTypeObj == null || accountTypeObj.toString().trim().isEmpty()) {
+			paramMap.put("account_type", 0);
+		}
+		Object delYnObj = paramMap.get("del_yn");
+		if (delYnObj != null && !delYnObj.toString().trim().isEmpty()) {
+			paramMap.put("del_yn", delYnObj.toString().trim().toUpperCase());
+		}
+		resultList = accountService.AccountListV2(paramMap);
 
 		return new Gson().toJson(resultList);
 	}

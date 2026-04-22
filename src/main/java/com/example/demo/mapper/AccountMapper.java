@@ -10,7 +10,7 @@ public interface AccountMapper {
 	
 	String NowDateKey();
 	List<Map<String, Object>> AccountList(Map<String, Object> paramMap);								// 거래처 목록
-	List<Map<String, Object>> AccountListV2(int accountType);											// 거래처 목록
+	List<Map<String, Object>> AccountListV2(Map<String, Object> paramMap);								// 거래처 목록
 	List<Map<String, Object>> AccountDirectList();														// 신사업 -> 직영점 목록
 	List<Map<String, Object>> AccountMemberList();														// 직원 목록
 	List<Map<String, Object>> AccountUtilMemberList();													// 직원관리 -> 유틸직원 조회
