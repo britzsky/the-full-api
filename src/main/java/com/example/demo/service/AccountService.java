@@ -209,14 +209,29 @@ public class AccountService {
 	}
 
 	// 영수증 이미지 변경 시 이전 파일 삭제
-	private void deleteReplacedReceiptImage(String beforePath, Object afterPathObj) {
+	private void deleteReplacedReceiptImage(String beforePath, Object afterPathObj, boolean hasAfterKey) {
+		// 저장 payload에 해당 키가 없는 경우는 기존값 유지로 간주한다.
+		if (!hasAfterKey) {
+			return;
+		}
+
 		String oldPath = normalizeImagePath(beforePath);
 		String newPath = normalizeImagePath(asText(afterPathObj));
 
-		// 새 파일 경로가 들어온 경우에만 교체 삭제를 수행한다.
-		if (!hasText(oldPath) || !hasText(newPath) || oldPath.equals(newPath)) {
+		if (!hasText(oldPath)) {
 			return;
 		}
+
+		// 빈 문자열로 저장하면 DB는 NULL로 업데이트되므로 기존 파일을 삭제한다.
+		if (!hasText(newPath)) {
+			deletePhysicalReceiptImage(oldPath);
+			return;
+		}
+
+		if (oldPath.equals(newPath)) {
+			return;
+		}
+
 		deletePhysicalReceiptImage(oldPath);
 	}
 
@@ -225,9 +240,14 @@ public class AccountService {
 		return findAccountPurchaseReceiptImage(paramMap);
 	}
 
+	// 회계 -> OCR 컨트롤러에서 호출: 기존 영수증(1~3번) 경로 조회 (public)
+	public Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap) {
+		return findAccountPurchaseReceiptImages(paramMap);
+	}
+
 	// 회계 -> OCR 컨트롤러에서 호출: 기존 파일 삭제 (public)
 	public void DeleteOldReceiptImage(String oldPath, String newPath) {
-		deleteReplacedReceiptImage(oldPath, newPath);
+		deleteReplacedReceiptImage(oldPath, newPath, true);
 	}
 
 	// 회계 -> 매입집계 기존 영수증 경로 조회
@@ -241,6 +261,20 @@ public class AccountService {
 		queryMap.put("sale_id", saleId);
 		queryMap.put("account_id", asText(paramMap.get("account_id")));
 		return asText(accountMapper.AccountPurchaseReceiptImageBySaleId(queryMap));
+	}
+
+	// 회계 -> 매입집계 기존 영수증(1~3번) 경로 조회
+	private Map<String, Object> findAccountPurchaseReceiptImages(Map<String, Object> paramMap) {
+		String saleId = asText(paramMap.get("sale_id"));
+		if (!hasText(saleId)) {
+			return new HashMap<>();
+		}
+
+		Map<String, Object> queryMap = new HashMap<>();
+		queryMap.put("sale_id", saleId);
+		queryMap.put("account_id", asText(paramMap.get("account_id")));
+		Map<String, Object> resultMap = accountMapper.AccountPurchaseReceiptImagesBySaleId(queryMap);
+		return resultMap != null ? resultMap : new HashMap<>();
 	}
 
 	// 회계 -> 본사 법인카드 기존 영수증 경로 조회
@@ -753,10 +787,21 @@ public class AccountService {
 	// 현장 -> 집계표 -> 매입집계 저장
 	public int AccountPurchaseSave(Map<String, Object> paramMap) {
 		int iResult = 0;
-		String oldReceiptImage = findAccountPurchaseReceiptImage(paramMap);
+		Map<String, Object> oldReceiptImages = findAccountPurchaseReceiptImages(paramMap);
 		iResult = accountMapper.AccountPurchaseSave(paramMap);
 		if (iResult > 0) {
-			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"));
+			deleteReplacedReceiptImage(
+					asText(oldReceiptImages.get("receipt_image")),
+					paramMap.get("receipt_image"),
+					paramMap.containsKey("receipt_image"));
+			deleteReplacedReceiptImage(
+					asText(oldReceiptImages.get("receipt_image2")),
+					paramMap.get("receipt_image2"),
+					paramMap.containsKey("receipt_image2"));
+			deleteReplacedReceiptImage(
+					asText(oldReceiptImages.get("receipt_image3")),
+					paramMap.get("receipt_image3"),
+					paramMap.containsKey("receipt_image3"));
 			try {
 				Map<String, Object> historyParam = new HashMap<>(paramMap);
 				// 상단 저장 이력은 detail 없이도 남기되, tax/item 타입은 제외한다.
@@ -880,7 +925,7 @@ public class AccountService {
 		String oldReceiptImage = findHeadOfficeCorporateReceiptImage(paramMap);
 		iResult = accountMapper.HeadOfficeCorporateCardPaymentSave(paramMap);
 		if (iResult > 0) {
-			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"));
+			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"), true);
 		}
 		return iResult;
 	}
@@ -926,7 +971,7 @@ public class AccountService {
 		String oldReceiptImage = findAccountCorporateReceiptImage(paramMap);
 		iResult = accountMapper.AccountCorporateCardPaymentSave(paramMap);
 		if (iResult > 0) {
-			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"));
+			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"), true);
 		}
 		return iResult;
 	}

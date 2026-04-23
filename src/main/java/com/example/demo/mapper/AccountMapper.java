@@ -68,6 +68,7 @@ public interface AccountMapper {
 	Map<String, Object> AccountPurchaseTallyBySaleDateAndType(Map<String, Object> paramMap);			// 집계표 동기화 시 account_id+saleDate+type 기준 기존 row 조회
 	int AccountPurchaseTallyTotalUpdate(Map<String, Object> paramMap);									// 집계표 동기화 시 기존 row total UPDATE
 	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap);							// 현장 -> 매입집계 영수증 경로 조회
+	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap);			// 현장 -> 매입집계 영수증(1~3) 경로 조회
 	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회
 	List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap); 			// 회계 -> 매입집계(TallyTab) 조회
 	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입집계 조회

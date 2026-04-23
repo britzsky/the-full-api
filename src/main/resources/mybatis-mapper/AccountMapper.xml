@@ -1388,7 +1388,7 @@
 		FROM tb_account_deposit_history
 		WHERE account_id = #{account_id}
 		AND DATE_FORMAT(input_dt, '%Y') = #{year}
-		ORDER BY year DESC, month DESC, input_dt DESC
+		ORDER BY year DESC, month DESC, input_dt DESC, deposit_amount DESC
 	</select>
 	
 	<insert id="AccountDeadlineBalanceSave" parameterType="map">
@@ -1919,6 +1919,8 @@
 	        cardBrand,
 	        bizNo,
 	        receipt_image,
+	        receipt_image2,
+	        receipt_image3,
 	        note,
 	        use_name,
 	        cashReceiptType,
@@ -1944,6 +1946,8 @@
 	        #{cardBrand},
 	        #{bizNo},
 	        #{receipt_image},
+	        #{receipt_image2},
+	        #{receipt_image3},
 	        #{note},
 	        #{use_name},
 	        #{cashReceiptType},
@@ -1966,7 +1970,24 @@
 	        cardNo=#{cardNo},
 	        cardBrand=#{cardBrand},
 	        bizNo=#{bizNo},
-	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
+	        receipt_image=
+	        CASE
+	            WHEN #{receipt_image} IS NULL THEN receipt_image
+	            WHEN #{receipt_image} = '' THEN NULL
+	            ELSE #{receipt_image}
+	        END,
+	        receipt_image2=
+	        CASE
+	            WHEN #{receipt_image2} IS NULL THEN receipt_image2
+	            WHEN #{receipt_image2} = '' THEN NULL
+	            ELSE #{receipt_image2}
+	        END,
+	        receipt_image3=
+	        CASE
+	            WHEN #{receipt_image3} IS NULL THEN receipt_image3
+	            WHEN #{receipt_image3} = '' THEN NULL
+	            ELSE #{receipt_image3}
+	        END,
 	        note=#{note},
 	        use_name = #{use_name},
 	        cashReceiptType = #{cashReceiptType},
@@ -1978,6 +1999,19 @@
 
 	<select id="AccountPurchaseReceiptImageBySaleId" parameterType="map" resultType="string">
 		SELECT receipt_image
+		FROM tb_account_purchase_tally
+		WHERE sale_id = #{sale_id}
+		<if test="account_id != null and account_id != ''">
+			AND account_id = #{account_id}
+		</if>
+		LIMIT 1
+	</select>
+
+	<select id="AccountPurchaseReceiptImagesBySaleId" parameterType="map" resultType="map">
+		SELECT
+			receipt_image,
+			receipt_image2,
+			receipt_image3
 		FROM tb_account_purchase_tally
 		WHERE sale_id = #{sale_id}
 		<if test="account_id != null and account_id != ''">
@@ -2078,6 +2112,8 @@
 		       DATE_FORMAT(apt.reg_dt, '%Y-%m-%d') as reg_dt,
 		       apt.receipt_type,
 		       apt.receipt_image,
+		       apt.receipt_image2,
+		       apt.receipt_image3,
 		       apt.note,
 		       apt.bizNo,
 		       am.ceo_name,
@@ -2447,7 +2483,9 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
-			   apt.receipt_image
+			   apt.receipt_image,
+			   apt.receipt_image2,
+			   apt.receipt_image3
 		FROM tb_account a
 		JOIN tb_account_purchase_tally apt
 		ON apt.account_id = a.account_id
@@ -2479,7 +2517,9 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
-			   apt.receipt_image
+			   apt.receipt_image,
+			   apt.receipt_image2,
+			   apt.receipt_image3
 		FROM tb_account a
 		JOIN tb_account_purchase_tally apt
 		ON apt.account_id = a.account_id
@@ -2506,6 +2546,8 @@
 		       apt.cardNo,
 		       apt.cardBrand,
 		       apt.receipt_image,
+		       apt.receipt_image2,
+		       apt.receipt_image3,
 		       apt.note,
 		       apt.bizNo,
 		       am.ceo_name,
@@ -2546,7 +2588,9 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
-			   apt.receipt_image
+			   apt.receipt_image,
+			   apt.receipt_image2,
+			   apt.receipt_image3
 		FROM tb_account a
 		JOIN tb_account_purchase_tally apt
 		ON apt.account_id = a.account_id
@@ -2591,6 +2635,8 @@
 		       cardNo,
 		       cardBrand,
 		       receipt_image,
+		       receipt_image2,
+		       receipt_image3,
 		       note,
 		       bizNo,
 		       receipt_type,

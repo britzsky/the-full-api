@@ -9,6 +9,7 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 
 public abstract class BaseReceiptParser {
+    protected static final int MAX_DETAIL_ITEMS = 3;
 
     // -------------------- 추상 메서드 --------------------
     public abstract ReceiptResult parse(Document doc);
@@ -195,5 +196,22 @@ public abstract class BaseReceiptParser {
         s = s.trim();
         if (s.equalsIgnoreCase("null")) return "";
         return s;
+    }
+
+    // 상세 품목은 최대 개수까지만 유지한다.
+    public static void capItems(ReceiptResult result, int maxCount) {
+        if (result == null || result.items == null) return;
+        if (maxCount < 1) return;
+        if (result.items.size() <= maxCount) return;
+        result.items = new ArrayList<>(result.items.subList(0, maxCount));
+    }
+
+    protected void limitItemCount(ReceiptResult result) {
+        limitItemCount(result, MAX_DETAIL_ITEMS);
+    }
+
+    // 파서별로 최대 개수를 다르게 써야 하는 경우를 위한 오버로드
+    protected void limitItemCount(ReceiptResult result, int maxCount) {
+        capItems(result, maxCount);
     }
 }

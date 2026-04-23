@@ -49,6 +49,7 @@ public class CardReceiptParseService {
 
         BaseReceiptParser parser = factory.get(type);
         BaseReceiptParser.ReceiptResult result = parser.parse(doc);
+        BaseReceiptParser.capItems(result, 3);
         attachRawText(result, doc);
 
         return new CardReceiptResponse(type, conf, result);

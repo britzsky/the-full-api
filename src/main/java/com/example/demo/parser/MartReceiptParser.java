@@ -72,9 +72,9 @@ public class MartReceiptParser extends BaseReceiptParser {
             r.items.addAll(parseLooseFallbackItems(lines));
         }
 
-        // 상품 최대 2개만 저장
-        if (r.items.size() > 2) {
-            r.items = new ArrayList<>(r.items.subList(0, 2));
+        // 상품 최대 3개만 저장
+        if (r.items.size() > 3) {
+            r.items = new ArrayList<>(r.items.subList(0, 3));
         }
 
         // 7️⃣ 합계/결제/고객 정보

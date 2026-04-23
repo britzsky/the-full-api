@@ -27,6 +27,8 @@ public class ReceiptParserFactory {
                 throw new IllegalArgumentException("지원하지 않는 영수증 타입: " + type);
         }
 
-        return parser.parse(doc);
+        BaseReceiptParser.ReceiptResult result = parser.parse(doc);
+        BaseReceiptParser.capItems(result, 3);
+        return result;
     }
 }

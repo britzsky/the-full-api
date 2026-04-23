@@ -109,7 +109,8 @@ public class OcrControllerV3 {
      */
     @PostMapping("/receipt-scanV3")
     public ResponseEntity<?> scanReceipt(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "total", required = false) Integer total,
             @RequestParam(value = "type", required = false) Integer type,
             @RequestParam(value = "card_idx", required = false) Integer idx,
@@ -122,8 +123,30 @@ public class OcrControllerV3 {
             @RequestParam(value = "card_brand", required = false) String card_brand,
             @RequestParam(value = "card_no", required = false) String card_no) {
 
-        // 1️⃣ 파일 저장
-        File tempFile = saveFile(file);
+        // 다중 업로드 요청(files)과 단일 업로드 요청(file)을 모두 수용한다.
+        List<MultipartFile> uploadFiles = new ArrayList<>();
+        if (files != null) {
+            for (MultipartFile f : files) {
+                if (f != null && !f.isEmpty()) uploadFiles.add(f);
+            }
+        }
+        if (uploadFiles.isEmpty() && file != null && !file.isEmpty()) {
+            uploadFiles.add(file);
+        }
+        if (uploadFiles.isEmpty()) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", 400);
+            error.put("message", "업로드된 파일이 없습니다.");
+            return ResponseEntity.badRequest().body(error);
+        }
+        if (uploadFiles.size() > 3) {
+            uploadFiles = new ArrayList<>(uploadFiles.subList(0, 3));
+        }
+
+        MultipartFile primaryFile = uploadFiles.get(0);
+
+        // 첫 번째 파일만 OCR 파싱 대상으로 임시 저장한다.
+        File tempFile = saveFile(primaryFile);
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
@@ -153,16 +176,16 @@ public class OcrControllerV3 {
             } catch (TimeoutException te) {
                 parseFuture.cancel(true); // 인터럽트 시도
                 // ✅ 파싱 10초 초과 -> requestParam 기반 fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             } catch (Exception ex) {
                 // ✅ 파싱 예외 -> requestParam 기반 fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
             BaseReceiptParser.ReceiptResult result = res.result;
 
             if (result == null || result.meta == null || result.meta.saleDate == null) {
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
             // tb_account_purchase_tally 저장 map
@@ -334,25 +357,37 @@ public class OcrControllerV3 {
             }
 
             if (!accountMap.isEmpty()) {
+                Map<String, Object> imageParam = new HashMap<>();
+                imageParam.put("sale_id", accountMap.get("sale_id"));
+                imageParam.put("account_id", account_id);
+                Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+                List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+                if (availableKeys.isEmpty()) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("code", 400);
+                    error.put("message", "영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+                    return ResponseEntity.badRequest().body(error);
+                }
+                if (uploadFiles.size() > availableKeys.size()) {
+                    Map<String, Object> error = new HashMap<>();
+                    error.put("code", 400);
+                    error.put("message", "영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+                    return ResponseEntity.badRequest().body(error);
+                }
 
-                String resultPath = "";
-
-                // 프로젝트 루트 대신 static 폴더 경로 사용
-                String staticPath = new File(uploadDir).getAbsolutePath();
-                String basePath = staticPath + "/" + "receipt/" + saleId + "/";
-
-                Path dirPath = Paths.get(basePath);
-                Files.createDirectories(dirPath); // 폴더 없으면 생성
-
-                String originalFileName = file.getOriginalFilename();
-                String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-                Path filePath = dirPath.resolve(uniqueFileName);
-
-                file.transferTo(filePath.toFile()); // 파일 저장
-
-                // 브라우저 접근용 경로 반환
-                resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
-                accountMap.put("receipt_image", resultPath);
+                // 첫 번째 파일만 파싱 결과로 저장하고, 나머지는 파싱 없이 슬롯에 저장한다.
+                attachReceiptImage(
+                        accountMap,
+                        primaryFile,
+                        String.valueOf(accountMap.get("sale_id")),
+                        availableKeys.get(0));
+                for (int i = 1; i < uploadFiles.size(); i++) {
+                    attachReceiptImage(
+                            accountMap,
+                            uploadFiles.get(i),
+                            String.valueOf(accountMap.get("sale_id")),
+                            availableKeys.get(i));
+                }
             }
 
             int iResult = 0;
@@ -380,7 +415,7 @@ public class OcrControllerV3 {
 
         } catch (Exception e) {
         	try {
-				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
 			} catch (Exception e1) {
 				return ResponseEntity.internalServerError()
 			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
@@ -402,7 +437,7 @@ public class OcrControllerV3 {
     // =========================
     private Map<String, Object> saveWithRequestParamsOnly(
             Map<String, Object> purchase,
-            MultipartFile file) throws Exception {
+            List<MultipartFile> uploadFiles) throws Exception {
         Map<String, Object> accountMap = new HashMap<>();
 
         int total = safeInt(purchase.get("total"));
@@ -444,7 +479,6 @@ public class OcrControllerV3 {
         accountMap.put("receipt_type", receiptType);
         accountMap.put("cardBrand", cardBrand);
         accountMap.put("cardNo", cardNo);
-
         // 금액 관련 기본값
         accountMap.put("total", total);
         accountMap.put("discount", 0);
@@ -462,8 +496,22 @@ public class OcrControllerV3 {
             accountMap.put("totalCash", 0);
         }
 
-        // 이미지 저장 및 경로 세팅
-        attachReceiptImage(accountMap, file, saleId);
+        Map<String, Object> imageParam = new HashMap<>();
+        imageParam.put("sale_id", saleId);
+        imageParam.put("account_id", accountId);
+        Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+        List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+        if (availableKeys.isEmpty()) {
+            throw new IllegalStateException("영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+        }
+        if (uploadFiles.size() > availableKeys.size()) {
+            throw new IllegalStateException("영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+        }
+
+        // 첫 번째 파일은 기본 슬롯에 저장하고, 나머지는 다음 슬롯에 저장한다.
+        for (int i = 0; i < uploadFiles.size(); i++) {
+            attachReceiptImage(accountMap, uploadFiles.get(i), saleId, availableKeys.get(i));
+        }
 
         // 기본값 세팅
         String day = "day_" + dayStr;
@@ -483,7 +531,7 @@ public class OcrControllerV3 {
     }
 
     // ✅ fallback용 이미지 저장 로직 분리
-    private void attachReceiptImage(Map<String, Object> accountMap, MultipartFile file, String saleId)
+    private void attachReceiptImage(Map<String, Object> accountMap, MultipartFile file, String saleId, String targetKey)
             throws Exception {
         String staticPath = new File(uploadDir).getAbsolutePath();
         String basePath = staticPath + "/" + "receipt/" + saleId + "/";
@@ -497,7 +545,23 @@ public class OcrControllerV3 {
 
         file.transferTo(filePath.toFile());
         String resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
-        accountMap.put("receipt_image", resultPath);
+        accountMap.put(targetKey, resultPath);
+    }
+
+    // DB에 저장된 기존 경로를 기준으로 비어있는 저장 슬롯 목록을 반환한다.
+    private List<String> resolveNextReceiptImageKeys(Map<String, Object> existingImages) {
+        String img1 = asText(existingImages == null ? null : existingImages.get("receipt_image"));
+        String img2 = asText(existingImages == null ? null : existingImages.get("receipt_image2"));
+        String img3 = asText(existingImages == null ? null : existingImages.get("receipt_image3"));
+        List<String> keys = new ArrayList<>();
+        if (img1.isEmpty()) keys.add("receipt_image");
+        if (img2.isEmpty()) keys.add("receipt_image2");
+        if (img3.isEmpty()) keys.add("receipt_image3");
+        return keys;
+    }
+
+    private String asText(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private int safeInt(Object v) {

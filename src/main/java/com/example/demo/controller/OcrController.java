@@ -108,7 +108,8 @@ public class OcrController {
      */
     @PostMapping("/receipt-scan")
     public ResponseEntity<?> scanReceipt(
-            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "files", required = false) List<MultipartFile> files,
             @RequestParam(value = "type", required = false) Integer type,
             @RequestParam(value = "account_id", required = false) String account_id,
             @RequestParam(value = "cell_day", required = false) String cell_day,
@@ -120,8 +121,30 @@ public class OcrController {
             @RequestParam(value = "sale_id", required = false) String sale_id,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total) {
 
-        // 파일 저장
-        File tempFile = saveFile(file);
+        // 다중 업로드 요청(files)과 단일 업로드 요청(file)을 모두 수용한다.
+        List<MultipartFile> uploadFiles = new ArrayList<>();
+        if (files != null) {
+            for (MultipartFile f : files) {
+                if (f != null && !f.isEmpty()) uploadFiles.add(f);
+            }
+        }
+        if (uploadFiles.isEmpty() && file != null && !file.isEmpty()) {
+            uploadFiles.add(file);
+        }
+        if (uploadFiles.isEmpty()) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("code", 400);
+            error.put("message", "업로드된 파일이 없습니다.");
+            return ResponseEntity.badRequest().body(error);
+        }
+        if (uploadFiles.size() > 3) {
+            uploadFiles = new ArrayList<>(uploadFiles.subList(0, 3));
+        }
+
+        MultipartFile primaryFile = uploadFiles.get(0);
+
+        // 첫 번째 파일만 OCR 파싱 대상으로 임시 저장한다.
+        File tempFile = saveFile(primaryFile);
 
         // saleDate: cell_date 우선, 없으면 saleDate 파라미터 사용
         String resolvedSaleDate = (cell_date != null && !cell_date.trim().isEmpty()) ? cell_date : saleDate;
@@ -155,10 +178,10 @@ public class OcrController {
             } catch (TimeoutException te) {
                 docFuture.cancel(true); // 인터럽트 시도
                 // ✅ OCR이 10초 초과 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             } catch (Exception ex) {
                 // ✅ OCR 예외 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
             // 2) receiptType 자동 감지 (OCR 성공했을 때만 의미 있음)
@@ -186,15 +209,15 @@ public class OcrController {
             } catch (TimeoutException te) {
                 parseFuture.cancel(true);
                 // ✅ 파싱이 10초 초과 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             } catch (Exception ex) {
                 // ✅ 파싱 예외 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
             // 4) 파싱 결과가 없거나 핵심 meta가 없으면 fallback
             if (result == null || result.meta == null) {
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
             // =========================
@@ -340,21 +363,31 @@ public class OcrController {
                 }
             }
 
-            // 재업로드 시: DB에서 기존 receipt_image 경로 조회해서 삭제 대상으로 세팅
-            if (purchase.get("receipt_image") == null || String.valueOf(purchase.get("receipt_image")).trim().isEmpty()) {
-                try {
-                    Map<String, Object> imgParam = new HashMap<>();
-                    imgParam.put("sale_id", finalSaleId);
-                    imgParam.put("account_id", account_id);
-                    String existingImg = accountService.AccountPurchaseReceiptImageBySaleId(imgParam);
-                    if (existingImg != null && !existingImg.trim().isEmpty()) {
-                        purchase.put("receipt_image", existingImg);
-                    }
-                } catch (Exception ignore) {}
+            Map<String, Object> imageParam = new HashMap<>();
+            imageParam.put("sale_id", finalSaleId);
+            imageParam.put("account_id", account_id);
+            Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+            List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+            if (availableKeys.isEmpty()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", 400);
+                error.put("message", "영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+                return ResponseEntity.badRequest().body(error);
+            }
+            if (uploadFiles.size() > availableKeys.size()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("code", 400);
+                error.put("message", "영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+                return ResponseEntity.badRequest().body(error);
             }
 
-            // 이미지 저장 + purchase.receipt_image (기존 파일 삭제 후 새 파일 저장)
-            attachReceiptImage(purchase, file, finalSaleId);
+            // 첫 번째 파일만 파싱 결과로 저장하고, 나머지는 파싱 없이 슬롯에 저장한다.
+            String targetKey = availableKeys.get(0);
+            attachReceiptImage(purchase, primaryFile, finalSaleId, targetKey);
+            for (int i = 1; i < uploadFiles.size(); i++) {
+                String extraKey = availableKeys.get(i);
+                attachReceiptImage(purchase, uploadFiles.get(i), finalSaleId, extraKey);
+            }
 
             // tally 저장값
             String day = "day_" + cell_day;
@@ -386,7 +419,7 @@ public class OcrController {
         } catch (Exception e) {
             System.err.println("[receipt-scan] 예외 발생, fallback 저장: " + e.getMessage());
             try {
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             } catch (Exception e1) {
                 return ResponseEntity.internalServerError()
                         .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
@@ -401,7 +434,7 @@ public class OcrController {
     // =========================
     // ✅ fallback: OCR/파싱 실패 시 requestParam만으로 저장
     // =========================
-    private Map<String, Object> saveWithRequestParamsOnly(Map<String, Object> purchase, MultipartFile file)
+    private Map<String, Object> saveWithRequestParamsOnly(Map<String, Object> purchase, List<MultipartFile> uploadFiles)
             throws Exception {
         // 재업로드 시 기존 sale_id 유지, 없을 때만 새로 생성
         LocalDateTime now = LocalDateTime.now();
@@ -442,8 +475,22 @@ public class OcrController {
         purchase.put("year", year);
         purchase.put("month", month);
 
-        // 이미지 저장(원하면 이 케이스에서는 저장 안해도 됨)
-        attachReceiptImage(purchase, file, saleId);
+        Map<String, Object> imageParam = new HashMap<>();
+        imageParam.put("sale_id", saleId);
+        imageParam.put("account_id", asText(purchase.get("account_id")));
+        Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+        List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+        if (availableKeys.isEmpty()) {
+            throw new IllegalStateException("영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+        }
+        if (uploadFiles.size() > availableKeys.size()) {
+            throw new IllegalStateException("영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
+        }
+
+        // 첫 번째 파일은 기본 슬롯에 저장하고, 나머지는 다음 슬롯에 저장한다.
+        for (int i = 0; i < uploadFiles.size(); i++) {
+            attachReceiptImage(purchase, uploadFiles.get(i), saleId, availableKeys.get(i));
+        }
 
         // tally 저장값
         String cellDay = (String) purchase.get("cell_day");
@@ -460,8 +507,8 @@ public class OcrController {
         return purchase;
     }
 
-    // ✅ 이미지 저장 로직: 재업로드 시 기존 파일 삭제 후 새 파일 저장
-    private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
+    // ✅ 이미지 저장 로직: 슬롯(receipt_image/2/3)에 새 파일 경로를 저장한다.
+    private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId, String targetKey) throws Exception {
         String staticPath = new File(uploadDir).getAbsolutePath();
         String basePath = staticPath + "/" + "receipt/" + saleId + "/";
         Path dirPath = Paths.get(basePath);
@@ -473,14 +520,23 @@ public class OcrController {
 
         file.transferTo(filePath.toFile());
         String newPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+        purchase.put(targetKey, newPath);
+    }
 
-        // 기존 파일 삭제 (service의 deleteReplacedReceiptImage 활용)
-        Object existingImageObj = purchase.get("receipt_image");
-        if (existingImageObj != null && !String.valueOf(existingImageObj).trim().isEmpty()) {
-            accountService.DeleteOldReceiptImage(String.valueOf(existingImageObj).trim(), newPath);
-        }
+    // DB에 저장된 기존 경로를 기준으로 비어있는 저장 슬롯 목록을 반환한다.
+    private List<String> resolveNextReceiptImageKeys(Map<String, Object> existingImages) {
+        String img1 = asText(existingImages == null ? null : existingImages.get("receipt_image"));
+        String img2 = asText(existingImages == null ? null : existingImages.get("receipt_image2"));
+        String img3 = asText(existingImages == null ? null : existingImages.get("receipt_image3"));
+        List<String> keys = new ArrayList<>();
+        if (img1.isEmpty()) keys.add("receipt_image");
+        if (img2.isEmpty()) keys.add("receipt_image2");
+        if (img3.isEmpty()) keys.add("receipt_image3");
+        return keys;
+    }
 
-        purchase.put("receipt_image", newPath);
+    private String asText(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private int safeInt(Object v) {
