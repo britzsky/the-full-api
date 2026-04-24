@@ -175,9 +175,13 @@ public class TransactionStatementParser extends BaseReceiptParser {
      // parties 파싱 이후 (AFTER_PARTIES 전에/후에)
         salvagePartiesByLabelOrder(text, res);
 
-        // ✅ items: Tables 우선 → 실패 시 기존 텍스트 파싱
+        // ✅ items: Tables 우선 → 실패 시 좌표 기반 보정 → 기존 텍스트 파싱
         List<StatementItem> tableItems = parseItemsFromTables(doc);
-        if (tableItems != null && !tableItems.isEmpty()) {
+        List<StatementItem> positionedItems = parseItemsFromTokenPositions(doc);
+        if (positionedItems != null && !positionedItems.isEmpty()
+                && (tableItems == null || tableItems.isEmpty() || isSuspiciousItemRows(tableItems))) {
+            res.items = positionedItems;
+        } else if (tableItems != null && !tableItems.isEmpty()) {
             res.items = tableItems;
         } else {
             res.items = parseItems(text);
@@ -628,6 +632,64 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return 0.5f;
     }
 
+    private float layoutCenterY(Document.Page.Layout layout, float pageHeight) {
+        if (layout == null || !layout.hasBoundingPoly()) return 0.5f;
+
+        BoundingPoly bp = layout.getBoundingPoly();
+
+        if (bp.getNormalizedVerticesCount() > 0) {
+            float min = 1f, max = 0f;
+            for (NormalizedVertex v : bp.getNormalizedVerticesList()) {
+                float y = v.getY();
+                min = Math.min(min, y);
+                max = Math.max(max, y);
+            }
+            return (min + max) / 2f;
+        }
+
+        if (bp.getVerticesCount() > 0 && pageHeight > 0) {
+            float min = Float.MAX_VALUE, max = 0f;
+            for (Vertex v : bp.getVerticesList()) {
+                float y = v.getY();
+                min = Math.min(min, y);
+                max = Math.max(max, y);
+            }
+            float cy = ((min + max) / 2f) / pageHeight;
+            if (cy < 0f) cy = 0f;
+            if (cy > 1f) cy = 1f;
+            return cy;
+        }
+
+        return 0.5f;
+    }
+
+    private float layoutMinX(Document.Page.Layout layout, float pageWidth) {
+        if (layout == null || !layout.hasBoundingPoly()) return 0.5f;
+
+        BoundingPoly bp = layout.getBoundingPoly();
+
+        if (bp.getNormalizedVerticesCount() > 0) {
+            float min = 1f;
+            for (NormalizedVertex v : bp.getNormalizedVerticesList()) {
+                min = Math.min(min, v.getX());
+            }
+            return Math.max(0f, Math.min(1f, min));
+        }
+
+        if (bp.getVerticesCount() > 0 && pageWidth > 0) {
+            float min = Float.MAX_VALUE;
+            for (Vertex v : bp.getVerticesList()) {
+                min = Math.min(min, v.getX());
+            }
+            float x = min / pageWidth;
+            if (x < 0f) x = 0f;
+            if (x > 1f) x = 1f;
+            return x;
+        }
+
+        return 0.5f;
+    }
+
     private List<StatementItem> parseItemsFromTables(Document doc) {
         if (doc == null || doc.getPagesCount() == 0) return null;
 
@@ -693,6 +755,250 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return out;
     }
 
+    private static class OcrToken {
+        String text;
+        float x;
+        float y;
+        float minX;
+
+        OcrToken(String text, float x, float y, float minX) {
+            this.text = text;
+            this.x = x;
+            this.y = y;
+            this.minX = minX;
+        }
+    }
+
+    private List<StatementItem> parseItemsFromTokenPositions(Document doc) {
+        if (doc == null || doc.getPagesCount() == 0) return null;
+
+        List<StatementItem> items = new ArrayList<>();
+
+        for (Document.Page page : doc.getPagesList()) {
+            List<OcrToken> tokens = pageTokens(doc, page);
+            if (tokens.isEmpty()) continue;
+
+            Float headerY = findItemHeaderY(tokens);
+            if (headerY == null) continue;
+
+            float bottomY = findItemTableBottomY(tokens, headerY);
+            List<List<OcrToken>> rows = groupTokensByRow(tokens, headerY + 0.025f, bottomY);
+
+            for (List<OcrToken> row : rows) {
+                StatementItem item = parsePositionedItemRow(row);
+                if (item != null && isValidItemName(item.name) && validateItemRow(item)) {
+                    items.add(item);
+                }
+            }
+
+            if (!items.isEmpty()) return items;
+        }
+
+        return items;
+    }
+
+    private List<OcrToken> pageTokens(Document doc, Document.Page page) {
+        List<OcrToken> tokens = new ArrayList<>();
+        float pageWidth = page.getDimension().getWidth();
+        float pageHeight = page.getDimension().getHeight();
+
+        for (Document.Page.Token token : page.getTokensList()) {
+            String value = safeTrim(layoutText(doc, token.getLayout()));
+            if (value.isEmpty()) continue;
+
+            tokens.add(new OcrToken(
+                    value,
+                    layoutCenterX(token.getLayout(), pageWidth),
+                    layoutCenterY(token.getLayout(), pageHeight),
+                    layoutMinX(token.getLayout(), pageWidth)
+            ));
+        }
+
+        return tokens;
+    }
+
+    private Float findItemHeaderY(List<OcrToken> tokens) {
+        for (OcrToken token : tokens) {
+            String compact = token.text.replaceAll("\\s+", "");
+            if (!(compact.contains("품목") || compact.contains("규격"))) continue;
+
+            float y = token.y;
+            boolean hasQty = hasTokenNearY(tokens, y, "수량");
+            boolean hasUnitPrice = hasTokenNearY(tokens, y, "단가");
+            boolean hasAmount = hasTokenNearY(tokens, y, "금액");
+            if (hasQty && (hasUnitPrice || hasAmount)) return y;
+        }
+        return null;
+    }
+
+    private boolean hasTokenNearY(List<OcrToken> tokens, float y, String keyword) {
+        for (OcrToken token : tokens) {
+            if (Math.abs(token.y - y) > 0.035f) continue;
+            if (token.text.replaceAll("\\s+", "").contains(keyword)) return true;
+        }
+        return false;
+    }
+
+    private float findItemTableBottomY(List<OcrToken> tokens, float headerY) {
+        float bottomY = 1.0f;
+        for (OcrToken token : tokens) {
+            if (token.y <= headerY) continue;
+            String compact = token.text.replaceAll("\\s+", "");
+            if (compact.contains("이하여백") || compact.contains("공급가액") || compact.contains("합계")) {
+                bottomY = Math.min(bottomY, token.y);
+            }
+        }
+        return bottomY;
+    }
+
+    private List<List<OcrToken>> groupTokensByRow(List<OcrToken> tokens, float topY, float bottomY) {
+        List<OcrToken> body = new ArrayList<>();
+        for (OcrToken token : tokens) {
+            if (token.y <= topY || token.y >= bottomY) continue;
+            if (token.text.replaceAll("\\s+", "").contains("이하여백")) continue;
+            body.add(token);
+        }
+
+        body.sort(Comparator.comparingDouble((OcrToken t) -> t.y).thenComparingDouble(t -> t.x));
+
+        List<List<OcrToken>> rows = new ArrayList<>();
+        for (OcrToken token : body) {
+            List<OcrToken> target = null;
+            for (List<OcrToken> row : rows) {
+                float rowY = averageY(row);
+                if (Math.abs(rowY - token.y) <= 0.012f) {
+                    target = row;
+                    break;
+                }
+            }
+            if (target == null) {
+                target = new ArrayList<>();
+                rows.add(target);
+            }
+            target.add(token);
+        }
+
+        for (List<OcrToken> row : rows) {
+            row.sort(Comparator.comparingDouble(t -> t.x));
+        }
+
+        return rows;
+    }
+
+    private float averageY(List<OcrToken> row) {
+        if (row == null || row.isEmpty()) return 0f;
+        float sum = 0f;
+        for (OcrToken token : row) {
+            sum += token.y;
+        }
+        return sum / row.size();
+    }
+
+    private StatementItem parsePositionedItemRow(List<OcrToken> row) {
+        if (row == null || row.isEmpty()) return null;
+
+        List<OcrToken> nameTokens = new ArrayList<>();
+        OcrToken unitToken = null;
+        List<OcrToken> qtyTokens = new ArrayList<>();
+        List<OcrToken> unitPriceTokens = new ArrayList<>();
+        List<OcrToken> amountTokens = new ArrayList<>();
+        List<OcrToken> taxTokens = new ArrayList<>();
+
+        for (OcrToken token : row) {
+            String value = safeTrim(token.text);
+            if (value.isEmpty()) continue;
+
+            if (token.x < 0.47f) {
+                nameTokens.add(token);
+            } else if (token.x < 0.54f) {
+                if (canonicalUnit(value) != null) unitToken = token;
+            } else if (token.x < 0.63f) {
+                qtyTokens.add(token);
+            } else if (token.x < 0.74f) {
+                unitPriceTokens.add(token);
+            } else if (token.x < 0.87f) {
+                amountTokens.add(token);
+            } else {
+                taxTokens.add(token);
+            }
+        }
+
+        String name = cleanItemName(joinTokens(nameTokens));
+        name = stripCodeTailFromItemName(name);
+        Integer amount = moneyFromTokens(amountTokens);
+        Integer unitPrice = moneyFromTokens(unitPriceTokens);
+        Double qty = decimalFromTokens(qtyTokens);
+        Integer tax = moneyFromTokens(taxTokens);
+
+        if (amount == null || unitPrice == null) return null;
+        if (qty == null || qty <= 0) qty = inferQtyFromAmount(unitPrice, amount, tax);
+        if (qty == null || qty <= 0) qty = 1.0;
+
+        StatementItem item = new StatementItem();
+        item.name = name;
+        item.unit = unitToken == null ? inferUnitFromName(name) : canonicalUnit(unitToken.text);
+        item.qty = qty;
+        item.unitPrice = unitPrice;
+        item.supplyAmt = amount;
+        item.taxAmt = tax;
+        return item;
+    }
+
+    private String joinTokens(List<OcrToken> tokens) {
+        if (tokens == null || tokens.isEmpty()) return "";
+        tokens.sort(Comparator.comparingDouble(t -> t.x));
+        StringBuilder sb = new StringBuilder();
+        for (OcrToken token : tokens) {
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(token.text);
+        }
+        return sb.toString().replaceAll("\\s{2,}", " ").trim();
+    }
+
+    private Integer moneyFromTokens(List<OcrToken> tokens) {
+        if (tokens == null || tokens.isEmpty()) return null;
+        List<Integer> numbers = new ArrayList<>();
+        for (OcrToken token : tokens) {
+            for (String n : extractNumbers(token.text)) {
+                Integer value = toIntSafe(n);
+                if (value != null) numbers.add(value);
+            }
+        }
+        if (numbers.isEmpty()) return null;
+        return numbers.get(numbers.size() - 1);
+    }
+
+    private Double decimalFromTokens(List<OcrToken> tokens) {
+        if (tokens == null || tokens.isEmpty()) return null;
+        List<Double> numbers = new ArrayList<>();
+        for (OcrToken token : tokens) {
+            for (String n : extractNumbers(token.text)) {
+                Double value = toDoubleSafe(n);
+                if (value != null) numbers.add(value);
+            }
+        }
+        if (numbers.isEmpty()) return null;
+        return numbers.get(numbers.size() - 1);
+    }
+
+    private Double inferQtyFromAmount(Integer unitPrice, Integer amount, Integer tax) {
+        if (unitPrice == null || unitPrice <= 0 || amount == null || amount <= 0) return null;
+        int grossAmount = amount + Optional.ofNullable(tax).orElse(0);
+        double qty = amount / (double) unitPrice;
+        double grossQty = grossAmount / (double) unitPrice;
+        if (Math.abs(qty - Math.round(qty)) < 0.03) return (double) Math.round(qty);
+        if (Math.abs(grossQty - Math.round(grossQty)) < 0.03) return (double) Math.round(grossQty);
+        return null;
+    }
+
+    private String stripCodeTailFromItemName(String name) {
+        if (name == null) return null;
+        String cleaned = name;
+        cleaned = cleaned.replaceAll("\\bL?\\d{8,}.*$", "").trim();
+        cleaned = cleaned.replaceAll("\\s{2,}", " ").trim();
+        return cleaned.isEmpty() ? name : cleaned;
+    }
+
     private boolean validateItemRow(StatementItem it) {
         if (it == null) return false;
         if (it.name == null || it.name.trim().length() < 2) return false;
@@ -725,6 +1031,25 @@ public class TransactionStatementParser extends BaseReceiptParser {
 
             return false;
         }
+    }
+
+    private boolean isSuspiciousItemRows(List<StatementItem> items) {
+        if (items == null || items.isEmpty()) return true;
+
+        int suspicious = 0;
+        for (StatementItem item : items) {
+            if (item == null) {
+                suspicious++;
+                continue;
+            }
+            String name = safeTrim(item.name);
+            if (name.length() > 45) suspicious++;
+            if (name.matches(".*\\d{8,}.*\\d{8,}.*")) suspicious++;
+            if (item.unitPrice != null && item.unitPrice > 0 && item.unitPrice < 100) suspicious++;
+            if (item.supplyAmt != null && item.supplyAmt > 0 && item.supplyAmt < 100) suspicious++;
+        }
+
+        return suspicious > 0;
     }
 
     // =========================================================

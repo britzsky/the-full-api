@@ -538,6 +538,7 @@ public class OcrControllerV4 {
         switch (receiptType) {
             case "MART_ITEMIZED":
             case "CONVENIENCE":
+            case "TRANSACTION":
                 return 1; // 마트/편의점 → 식재료
             default:
                 return 3; // 기타

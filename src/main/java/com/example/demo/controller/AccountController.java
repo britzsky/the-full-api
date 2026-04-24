@@ -76,6 +76,10 @@ public class AccountController {
 	public String AccountList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		int iAccountType = Integer.parseInt(paramMap.get("account_type").toString());
+		Object delYnObj = paramMap.get("del_yn");
+		if (delYnObj != null && !delYnObj.toString().trim().isEmpty()) {
+			paramMap.put("del_yn", delYnObj.toString().trim().toUpperCase());
+		}
 		resultList = accountService.AccountList(paramMap);
 
 		return new Gson().toJson(resultList);

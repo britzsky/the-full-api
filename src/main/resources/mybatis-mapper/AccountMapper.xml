@@ -19,8 +19,11 @@
 			   del_yn
 		FROM tb_account
 		<choose>
-			<when test="del_yn != null and del_yn != ''">
+			<when test="del_yn != null and ('Y'.equals(del_yn.toString()) or 'N'.equals(del_yn.toString()))">
 				WHERE del_yn = #{del_yn}
+			</when>
+			<when test="del_yn != null and 'ALL'.equals(del_yn.toString())">
+				WHERE 1=1
 			</when>
 			<otherwise>
 				WHERE del_yn = 'N'
