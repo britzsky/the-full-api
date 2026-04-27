@@ -177,6 +177,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
 
         // ✅ items: Tables 우선 → 실패 시 좌표 기반 보정 → 기존 텍스트 파싱
         List<StatementItem> tableItems = parseItemsFromTables(doc);
+        // 테이블 결과가 깨진 경우를 대비해 OCR 토큰의 좌표 기준으로 품목 행을 다시 추출한다.
         List<StatementItem> positionedItems = parseItemsFromTokenPositions(doc);
         if (positionedItems != null && !positionedItems.isEmpty()
                 && (tableItems == null || tableItems.isEmpty() || isSuspiciousItemRows(tableItems))) {
@@ -632,6 +633,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return 0.5f;
     }
 
+    // OCR 레이아웃의 세로 중앙 좌표를 0~1 범위로 변환한다.
     private float layoutCenterY(Document.Page.Layout layout, float pageHeight) {
         if (layout == null || !layout.hasBoundingPoly()) return 0.5f;
 
@@ -663,6 +665,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return 0.5f;
     }
 
+    // OCR 레이아웃의 시작 x좌표를 0~1 범위로 변환한다.
     private float layoutMinX(Document.Page.Layout layout, float pageWidth) {
         if (layout == null || !layout.hasBoundingPoly()) return 0.5f;
 
@@ -755,6 +758,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return out;
     }
 
+    // 좌표 기반 품목 파싱에서 사용하는 OCR 토큰 정보
     private static class OcrToken {
         String text;
         float x;
@@ -769,6 +773,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         }
     }
 
+    // 품목 테이블 영역을 OCR 토큰 좌표로 나누어 품목 목록을 추출한다.
     private List<StatementItem> parseItemsFromTokenPositions(Document doc) {
         if (doc == null || doc.getPagesCount() == 0) return null;
 
@@ -782,6 +787,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
             if (headerY == null) continue;
 
             float bottomY = findItemTableBottomY(tokens, headerY);
+            // 헤더 아래부터 합계 영역 전까지 같은 y축에 있는 토큰을 한 행으로 묶는다.
             List<List<OcrToken>> rows = groupTokensByRow(tokens, headerY + 0.025f, bottomY);
 
             for (List<OcrToken> row : rows) {
@@ -797,6 +803,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return items;
     }
 
+    // Document AI 페이지 토큰을 텍스트와 정규화 좌표 정보로 변환한다.
     private List<OcrToken> pageTokens(Document doc, Document.Page page) {
         List<OcrToken> tokens = new ArrayList<>();
         float pageWidth = page.getDimension().getWidth();
@@ -817,6 +824,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return tokens;
     }
 
+    // 품목/규격과 수량/단가/금액 라벨이 같은 줄에 있는 품목 헤더 y좌표를 찾는다.
     private Float findItemHeaderY(List<OcrToken> tokens) {
         for (OcrToken token : tokens) {
             String compact = token.text.replaceAll("\\s+", "");
@@ -831,6 +839,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return null;
     }
 
+    // 같은 헤더 줄로 볼 수 있는 y좌표 범위에서 특정 라벨 토큰을 찾는다.
     private boolean hasTokenNearY(List<OcrToken> tokens, float y, String keyword) {
         for (OcrToken token : tokens) {
             if (Math.abs(token.y - y) > 0.035f) continue;
@@ -839,6 +848,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return false;
     }
 
+    // 품목 영역이 끝나는 지점을 합계/여백 라벨 위치로 판단한다.
     private float findItemTableBottomY(List<OcrToken> tokens, float headerY) {
         float bottomY = 1.0f;
         for (OcrToken token : tokens) {
@@ -851,6 +861,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return bottomY;
     }
 
+    // 품목 영역 안의 토큰을 y좌표 기준으로 같은 행 단위로 묶는다.
     private List<List<OcrToken>> groupTokensByRow(List<OcrToken> tokens, float topY, float bottomY) {
         List<OcrToken> body = new ArrayList<>();
         for (OcrToken token : tokens) {
@@ -894,6 +905,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return sum / row.size();
     }
 
+    // 한 행의 토큰을 x좌표 기준 품목명/단위/수량/단가/금액/세액 열로 분리한다.
     private StatementItem parsePositionedItemRow(List<OcrToken> row) {
         if (row == null || row.isEmpty()) return null;
 
@@ -924,6 +936,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         }
 
         String name = cleanItemName(joinTokens(nameTokens));
+        // 품목명 뒤에 붙은 상품코드 OCR 값은 품목명에서 제외한다.
         name = stripCodeTailFromItemName(name);
         Integer amount = moneyFromTokens(amountTokens);
         Integer unitPrice = moneyFromTokens(unitPriceTokens);
@@ -931,6 +944,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         Integer tax = moneyFromTokens(taxTokens);
 
         if (amount == null || unitPrice == null) return null;
+        // 수량 열이 누락된 경우 단가와 금액 관계로 수량을 보정한다.
         if (qty == null || qty <= 0) qty = inferQtyFromAmount(unitPrice, amount, tax);
         if (qty == null || qty <= 0) qty = 1.0;
 
@@ -944,6 +958,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return item;
     }
 
+    // 한 열에 속한 토큰들을 좌측에서 우측 순서로 이어붙인다.
     private String joinTokens(List<OcrToken> tokens) {
         if (tokens == null || tokens.isEmpty()) return "";
         tokens.sort(Comparator.comparingDouble(t -> t.x));
@@ -955,6 +970,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return sb.toString().replaceAll("\\s{2,}", " ").trim();
     }
 
+    // 금액 열 토큰에서 마지막 숫자 값을 금액으로 사용한다.
     private Integer moneyFromTokens(List<OcrToken> tokens) {
         if (tokens == null || tokens.isEmpty()) return null;
         List<Integer> numbers = new ArrayList<>();
@@ -968,6 +984,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return numbers.get(numbers.size() - 1);
     }
 
+    // 수량 열 토큰에서 마지막 숫자 값을 소수 수량으로 사용한다.
     private Double decimalFromTokens(List<OcrToken> tokens) {
         if (tokens == null || tokens.isEmpty()) return null;
         List<Double> numbers = new ArrayList<>();
@@ -981,6 +998,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return numbers.get(numbers.size() - 1);
     }
 
+    // 공급가액 또는 세액 포함 금액을 단가로 나누어 누락된 수량을 추정한다.
     private Double inferQtyFromAmount(Integer unitPrice, Integer amount, Integer tax) {
         if (unitPrice == null || unitPrice <= 0 || amount == null || amount <= 0) return null;
         int grossAmount = amount + Optional.ofNullable(tax).orElse(0);
@@ -991,6 +1009,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         return null;
     }
 
+    // 품목명 끝에 붙은 긴 숫자 상품코드나 바코드 형태의 꼬리를 제거한다.
     private String stripCodeTailFromItemName(String name) {
         if (name == null) return null;
         String cleaned = name;
@@ -1033,6 +1052,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         }
     }
 
+    // 테이블 파싱 결과가 품목명/금액 형태상 깨졌는지 판단한다.
     private boolean isSuspiciousItemRows(List<StatementItem> items) {
         if (items == null || items.isEmpty()) return true;
 

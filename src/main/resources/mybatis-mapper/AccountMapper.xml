@@ -64,6 +64,9 @@
 			   T.account_headcount,
 			   T.meal_type,
 			   T.del_yn,
+			   T2.full_room,
+			   T2.diet_price,
+			   T2.normal,
 			   DATE_FORMAT(T2.contract_start, '%Y-%m-%d') as contract_start,
         	   	   DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end
 		FROM tb_account T
