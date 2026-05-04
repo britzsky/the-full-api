@@ -925,7 +925,7 @@ public class AccountService {
 		String oldReceiptImage = findHeadOfficeCorporateReceiptImage(paramMap);
 		iResult = accountMapper.HeadOfficeCorporateCardPaymentSave(paramMap);
 		if (iResult > 0) {
-			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"), true);
+			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"), paramMap.containsKey("receipt_image"));
 		}
 		return iResult;
 	}

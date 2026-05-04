@@ -193,8 +193,7 @@ public class HeadOfficeAuctionReceiptParser extends BaseReceiptParser {
         String productName = parseProductName(lines, normalized);
         Item item = new Item();
         item.name = firstNonNull(productName, "상품");
-        // 요청사항: 옥션 전표 디테일 수량은 비워서 저장(null)
-        item.qty = null;
+        item.qty = 1;
         String taxFlag = resolveTaxFlag(vatRaw, r.totals.vat, hasVatLabel);
         applyTaxTotalsByFlag(r, taxFlag);
         Integer itemAmount = (r.totals.total != null) ? r.totals.total : r.totals.taxable;

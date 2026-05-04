@@ -75,7 +75,7 @@ public class OcrControllerV2 {
             "고기", "쇠고기", "소고기", "돼지고기", "돈육", "닭", "계육", "정육", "삼겹살",
             "계란", "달걀", "두부", "콩", "콩나물", "숙주",
             "생선", "연어", "참치", "고등어", "오징어", "새우", "조개", "해물",
-            "김치", "고춧가루", "된장", "간장", "맛술", "참기름", "식초", "소금", "설탕",
+            "김치", "고춧가루", "된장", "간장", "맛술", "참기름", "들기름", "식초", "소금", "설탕",
             "밀가루", "전분", "치즈", "버터", "우유", "생크림", "요거트",
             "사과", "바나나", "딸기", "배", "포도", "과일");
 
@@ -86,7 +86,10 @@ public class OcrControllerV2 {
             "위생장갑", "고무장갑", "앞치마", "마스크",
             "종이컵", "비닐", "봉투", "랩", "호일", "포장",
             "세제", "주방세제", "락스", "세척제", "소독제",
-            "수세미", "스펀지", "필터", "호스", "밥솥");
+            "수세미", "스펀지", "필터", "호스", "밥솥",
+            "그릇", "식기", "접시", "공기", "쟁반", "바구니", "찬합", "반찬통", "용기",
+            "냄비", "솥", "팬", "프라이팬", "볼", "채반", "소쿠리", "체", "카트", "서빙카",
+            "다라이", "양푼", "스텐", "타공");
 
     // ✅ 예외 케이스 (예: "칼국수" → 음식)
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList(
@@ -110,18 +113,22 @@ public class OcrControllerV2 {
             @RequestParam(value = "cardNo", required = false) String cardNo,
             @RequestParam(value = "cardBrand", required = false) String cardBrand,
             @RequestParam(value = "saveType", required = false) String saveType,
-            @RequestParam(value = "receiptType", required = false) String receiptType) {
+            @RequestParam(value = "receiptType", required = false) String receiptType,
+            @RequestParam(value = "tallyType", required = false) String tallyType,
+            @RequestParam(value = "use_name", required = false) String use_name,
+            @RequestParam(value = "total", required = false) String total,
+            @RequestParam(value = "cell_date", required = false) String cell_date) {
 
         // 파일 저장
         File tempFile = saveFile(file);
 
         // ✅ purchase는 "기본적으로 다 들어간다" 전제: requestParam 기반 기본값을 먼저 세팅
         Map<String, Object> purchase = new HashMap<>();
-        
+
         if (sale_id != null && !sale_id.isBlank()) {
             purchase.put("sale_id", sale_id);
         }
-        
+
         purchase.put("account_id", objectValue);
         purchase.put("type", type);
         purchase.put("saveType", saveType);
@@ -129,6 +136,10 @@ public class OcrControllerV2 {
         purchase.put("folderValue", folderValue);
         purchase.put("cardNo", cardNo);
         purchase.put("cardBrand", cardBrand);
+        purchase.put("tallyType", tallyType);
+        purchase.put("use_name", use_name);
+        purchase.put("total", total);
+        purchase.put("cell_date", cell_date);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -162,8 +173,10 @@ public class OcrControllerV2 {
             // }
 
             // 2) 파싱 + 10초 타임아웃
+            // 집계표 법인카드는 type에 1002/1003 저장 타입이 들어오므로 receiptType을 OCR 파서 타입으로 사용
+            String parserType = resolveParserType(type, receiptType);
             Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
-                    .submit(() -> HeadOfficeReceiptParserFactory.parse(doc, type));
+                    .submit(() -> HeadOfficeReceiptParserFactory.parse(doc, parserType));
 
             BaseReceiptParser.ReceiptResult result;
             try {
@@ -219,7 +232,9 @@ public class OcrControllerV2 {
             // 5) DB 저장 payload 만들기
             Map<String, Object> corporateCard = new HashMap<>();
 
-            boolean isAccount = "account".equalsIgnoreCase(saveType); // ✅ NPE 방지
+            boolean isAccount = "account".equalsIgnoreCase(saveType);
+            boolean isHeadoffice = "headoffice".equalsIgnoreCase(saveType);
+            System.out.println("[OCR] saveType=" + saveType + ", isAccount=" + isAccount + ", isHeadoffice=" + isHeadoffice + ", total(user)=" + purchase.get("total") + ", tallyType=" + purchase.get("tallyType"));
 
             corporateCard.put("account_id", objectValue);
             corporateCard.put("year", year);
@@ -230,53 +245,50 @@ public class OcrControllerV2 {
 
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
-            
+
             corporateCard.put("sale_id", targetSaleId);
-            
+
+            System.out.println("🏪 [OCR] use_name 세팅: " + result.merchant.name);
             corporateCard.put("use_name", result.merchant.name); // use_name 세팅.
             corporateCard.put("payment_dt", date); // payment_dt 세팅.
-            corporateCard.put("discount", result.totals.discount); // discount 세팅.
-            corporateCard.put("vat", result.totals.vat); // vat 세팅.
-            corporateCard.put("taxFree", result.totals.taxFree); // taxFree 세팅.
-            corporateCard.put("tax", result.totals.taxable); // tax 세팅.
 
-            String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
+            if (true) {
+                corporateCard.put("discount", result.totals.discount);
+                corporateCard.put("vat", result.totals.vat);
+                corporateCard.put("taxFree", result.totals.taxFree);
+                corporateCard.put("tax", result.totals.taxable);
 
-            String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
+                String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
+                String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
 
-            if (approvalAmt == null) {
-                corporateCard.put("total", result.totals.total);
-
-                if (paymentCardBrand == null) {
-                    corporateCard.put("payType", 1);
-                    corporateCard.put("totalCash", result.totals.total);
-                    corporateCard.put("totalCard", 0);
-                } else {
-                    corporateCard.put("payType", 2);
-                    corporateCard.put("totalCard", result.totals.total);
-                    corporateCard.put("totalCash", 0);
-                }
-
-            } else {
-                int iApprovalAmt = 0;
-                if (approvalAmt != null && !approvalAmt.isBlank()) {
-                    String clean = approvalAmt.replaceAll("[^0-9]", ""); // 숫자만 남기기
-                    if (!clean.isEmpty()) {
-                        iApprovalAmt = Integer.parseInt(clean);
+                if (approvalAmt == null) {
+                    corporateCard.put("total", result.totals.total);
+                    if (paymentCardBrand == null) {
+                        corporateCard.put("payType", 1);
+                        corporateCard.put("totalCash", result.totals.total);
+                        corporateCard.put("totalCard", 0);
+                    } else {
+                        corporateCard.put("payType", 2);
+                        corporateCard.put("totalCard", result.totals.total);
+                        corporateCard.put("totalCash", 0);
                     }
-                }
-
-                // total(int 컬럼)에는 콤마 제거된 숫자값으로 저장해야 Data truncated(1265)를 피할 수 있다.
-                corporateCard.put("total", iApprovalAmt); // total 세팅.
-
-                if (paymentCardBrand == null) {
-                    corporateCard.put("payType", 1);
-                    corporateCard.put("totalCash", iApprovalAmt);
-                    corporateCard.put("totalCard", 0);
                 } else {
-                    corporateCard.put("payType", 2);
-                    corporateCard.put("totalCard", iApprovalAmt);
-                    corporateCard.put("totalCash", 0);
+                    int iApprovalAmt = 0;
+                    if (!approvalAmt.isBlank()) {
+                        String clean = approvalAmt.replaceAll("[^0-9\\-]", "");
+                        if (!clean.isEmpty())
+                            iApprovalAmt = Integer.parseInt(clean);
+                    }
+                    corporateCard.put("total", iApprovalAmt);
+                    if (paymentCardBrand == null) {
+                        corporateCard.put("payType", 1);
+                        corporateCard.put("totalCash", iApprovalAmt);
+                        corporateCard.put("totalCard", 0);
+                    } else {
+                        corporateCard.put("payType", 2);
+                        corporateCard.put("totalCard", iApprovalAmt);
+                        corporateCard.put("totalCash", 0);
+                    }
                 }
             }
 
@@ -295,6 +307,8 @@ public class OcrControllerV2 {
 
             // tb_account_purchase_tally_detail 저장 map
             List<Map<String, Object>> detailList = new ArrayList<>();
+            int forcedTallyType = resolveForcedTallyType(tallyType);
+            int forcedItemType = resolveForcedItemType(forcedTallyType);
 
             for (Item r : result.items) {
                 Map<String, Object> detailMap = new HashMap<String, Object>();
@@ -305,15 +319,17 @@ public class OcrControllerV2 {
                 detailMap.put("amount", r.amount);
                 detailMap.put("unitPrice", r.unitPrice);
                 detailMap.put("taxType", taxify(r.taxFlag));
-                detailMap.put("itemType", classify(r.name));
+                detailMap.put("itemType", forcedItemType > 0 ? forcedItemType : classify(r.name));
 
                 // 본사법인카드 특성상, 디테일에 있는 itemType(소모품, 식재료)에 따라
                 // 집계표의 거래처(기타:type 1002, 기타비용:1003) 따로 저장이 되어야 함.
                 // 따라서 payment_dt 가 집계표의 날짜와 매핑하기 때문에 detail 에도 적용해야 함.
                 detailMap.put("payment_dt", date);
 
-                // 상품구분 3:알수없음 은 우선 소모품 type:1002 로 저장
-                if (classify(r.name) == 3) {
+                // 집계표 1002/1003에서 넘어온 행 타입이 있으면 해당 타입으로 저장
+                if (forcedTallyType == 1002 || forcedTallyType == 1003) {
+                    detailMap.put("type", forcedTallyType);
+                } else if (classify(r.name) == 3) {
                     detailMap.put("type", 1002);
                 } else if (classify(r.name) == 1) { // 식재료면 type:1003
                     detailMap.put("type", 1003);
@@ -339,6 +355,9 @@ public class OcrControllerV2 {
                 Files.createDirectories(dirPath); // 폴더 없으면 생성
 
                 String originalFileName = file.getOriginalFilename();
+                if (originalFileName == null || originalFileName.isBlank()) {
+                    originalFileName = "receipt";
+                }
                 String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
                 Path filePath = dirPath.resolve(uniqueFileName);
 
@@ -347,6 +366,22 @@ public class OcrControllerV2 {
                 // 브라우저 접근용 경로 반환
                 resultPath = "/image/" + folderValue + "/" + targetSaleId + "/" + uniqueFileName;
                 corporateCard.put("receipt_image", resultPath);
+            }
+
+            // item을 파싱했지만 전체 amount 합계가 0이면 첫 번째 detail에만 total 채움
+            if (!isAccount && !detailList.isEmpty()) {
+                int totalAmount = detailList.stream()
+                        .mapToInt(m -> toInt(m.get("amount")))
+                        .sum();
+                if (totalAmount == 0) {
+                    // 집계표 경로: corporateCard에 total 없으므로 사용자 입력값 사용
+                    int mainTotal = isHeadoffice ? toInt(purchase.get("total")) : toInt(corporateCard.get("total"));
+                    if (mainTotal > 0) {
+                        detailList.get(0).put("amount", mainTotal);
+                    }
+                }
+                // detail taxType 기준으로 master 합계/과세/면세/부가세 금액을 계산
+                applyDetailTaxSummaryToMaster(corporateCard, detailList, true);
             }
 
             // DB 저장
@@ -358,22 +393,67 @@ public class OcrControllerV2 {
                     iResult += accountService.AccountCorporateCardPaymentDetailLSave(m);
                 }
             } else {
+                applyMasterZeroDefaults(corporateCard);
                 iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
+                // headoffice 경로: detail이 없으면 사용자 입력값으로 1건 생성
+                if (isHeadoffice && detailList.isEmpty()) {
+                    int userTotal = toInt(purchase.get("total"));
+                    int typeInt = resolveForcedTallyType(purchase.get("tallyType"));
+                    System.out.println("[FALLBACK] detailList 비어있음 → 사용자입력 사용: total=" + userTotal + ", tallyType=" + purchase.get("tallyType") + ", typeInt=" + typeInt);
+                    if (typeInt == 0)
+                        typeInt = toInt(corporateCard.get("type"));
+                    if (typeInt == 0)
+                        typeInt = 1002;
+                    Map<String, Object> fallbackDetail = new HashMap<>();
+                    fallbackDetail.put("sale_id", targetSaleId);
+                    fallbackDetail.put("name", "");
+                    fallbackDetail.put("qty", 0);
+                    fallbackDetail.put("amount", userTotal);
+                    fallbackDetail.put("unitPrice", 0);
+                    fallbackDetail.put("taxType", 3);
+                    int fallbackItemType = resolveForcedItemType(typeInt);
+                    fallbackDetail.put("itemType", fallbackItemType > 0 ? fallbackItemType : typeInt == 1003 ? 1 : 2);
+                    fallbackDetail.put("type", typeInt);
+                    fallbackDetail.put("payment_dt", corporateCard.get("payment_dt"));
+                    fallbackDetail.put("year", year);
+                    fallbackDetail.put("month", month);
+                    fallbackDetail.put("account_id", objectValue);
+                    detailList.add(fallbackDetail);
+                }
+                // headoffice 경로: detail 합계를 master total/vat/taxFree에 반영
+                if (isHeadoffice && !detailList.isEmpty()) {
+                    applyDetailTaxSummaryToMaster(corporateCard, detailList, true);
+                    applyMasterZeroDefaults(corporateCard);
+                    accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
+                }
                 for (Map<String, Object> m : detailList) {
                     iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
                     iResult += accountService.TallySheetCorporateCardPaymentSaveV2(m);
                 }
+
+                Map<String, Object> detailQuery = new HashMap<>();
+                detailQuery.put("sale_id", targetSaleId);
+                detailQuery.put("account_id", objectValue);
+                detailQuery.put("payment_dt", corporateCard.get("payment_dt"));
+                List<Map<String, Object>> savedDetailList = accountService.HeadOfficeCorporateCardPaymentDetailList(detailQuery);
+                applyDetailTaxSummaryToMaster(corporateCard, savedDetailList, true);
+                applyMasterZeroDefaults(corporateCard);
+                accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
+                detailList = savedDetailList;
             }
 
-            return ResponseEntity.ok(corporateCard);
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("main", corporateCard);
+            responseMap.put("item", detailList);
+            return ResponseEntity.ok(responseMap);
 
         } catch (Exception e) {
-        	try {
-				return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-			} catch (Exception e1) {
-				return ResponseEntity.internalServerError()
-			            .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
-			}
+            try {
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+            } catch (Exception e1) {
+                return ResponseEntity.internalServerError()
+                        .body("❌ 영수증 처리 중 오류 발생: " + e.getMessage());
+            }
         } finally {
             executor.shutdownNow(); // 타임아웃 스레드 정리
             try {
@@ -404,11 +484,11 @@ public class OcrControllerV2 {
         if (folderValue == null || folderValue.isBlank()) {
             folderValue = "card";
         }
-        
+
         // sale_id 생성
         LocalDateTime now = LocalDateTime.now();
         String saleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
-        
+
         // ✅ purchase에 sale_id가 없을 수 있으므로 null-safe 처리
         Object saleObj = purchase.get("sale_id");
         String targetSaleId;
@@ -418,13 +498,11 @@ public class OcrControllerV2 {
             targetSaleId = saleObj.toString();
         }
         corporateCard.put("sale_id", targetSaleId);
-        
+
         String saveType = (String) purchase.get("saveType");
         boolean isAccount = "account".equalsIgnoreCase(saveType);
 
         corporateCard.put("account_id", purchase.get("account_id"));
-        corporateCard.put("year", now.getYear());
-        corporateCard.put("month", now.getMonthValue());
         corporateCard.put("receipt_type", purchase.get("receipt_type"));
         // fallback에서도 집계표 프로시저용 type을 숫자로 보정한다.
         corporateCard.put("type", resolveTallyType(purchase.get("type"), isAccount));
@@ -433,38 +511,78 @@ public class OcrControllerV2 {
         String cardBrand = (String) purchase.get("cardBrand");
         corporateCard.put("cardNo", cardNo);
         corporateCard.put("cardBrand", cardBrand);
-        
-        corporateCard.put("use_name", null);
-        corporateCard.put("payment_dt", now.toLocalDate());
 
-        // 금액 관련 기본값
-        corporateCard.put("total", 0);
-        corporateCard.put("discount", 0);
-        corporateCard.put("vat", 0);
-        corporateCard.put("taxFree", 0);
-        corporateCard.put("tax", 0);
+        // 사용자 입력값 우선, 없으면 현재시각 기준
+        String useName = (String) purchase.get("use_name");
+        corporateCard.put("use_name", (useName != null && !useName.isBlank()) ? useName : null);
 
-        if (cardBrand == null || cardBrand.isBlank()) {
-            corporateCard.put("payType", 1);
-            corporateCard.put("totalCash", 0);
-            corporateCard.put("totalCard", 0);
+        String cellDate = (String) purchase.get("cell_date");
+        if (cellDate != null && !cellDate.isBlank()) {
+            try {
+                LocalDate parsedDate = LocalDate.parse(cellDate);
+                corporateCard.put("payment_dt", parsedDate);
+                corporateCard.put("year", parsedDate.getYear());
+                corporateCard.put("month", parsedDate.getMonthValue());
+            } catch (Exception e) {
+                corporateCard.put("payment_dt", now.toLocalDate());
+                corporateCard.put("year", now.getYear());
+                corporateCard.put("month", now.getMonthValue());
+            }
         } else {
-            corporateCard.put("payType", 2);
-            corporateCard.put("totalCard", 0);
-            corporateCard.put("totalCash", 0);
+            corporateCard.put("payment_dt", now.toLocalDate());
+            corporateCard.put("year", now.getYear());
+            corporateCard.put("month", now.getMonthValue());
+        }
+
+        String totalStr = (String) purchase.get("total");
+        int userTotal = 0;
+        if (totalStr != null && !totalStr.isBlank()) {
+            try {
+                userTotal = Integer.parseInt(totalStr.replaceAll("[^0-9\\-]", ""));
+            } catch (Exception ignored) {
+            }
         }
 
         // 이미지 저장 및 경로 세팅
         attachReceiptImage(corporateCard, file, targetSaleId, folderValue);
 
-        // DB 저장 (detail 저장은 없음)
         int iResult = 0;
         if (isAccount) {
             iResult += accountService.AccountCorporateCardPaymentSave(corporateCard);
             iResult += accountService.TallySheetCorporateCardPaymentSave(corporateCard);
         } else {
+            // fallback detail 1건 생성 (taxType=3: 알수없음)
+            Map<String, Object> detailMap = new HashMap<>();
+            detailMap.put("sale_id", targetSaleId);
+            detailMap.put("name", "");
+            detailMap.put("qty", 0);
+            detailMap.put("amount", userTotal);
+            detailMap.put("unitPrice", 0);
+            detailMap.put("taxType", 3);
+            int typeInt = resolveForcedTallyType(purchase.get("tallyType"));
+            if (typeInt == 0) {
+                Object typeObj = corporateCard.get("type");
+                typeInt = (typeObj instanceof Integer) ? (Integer) typeObj : 1002;
+            }
+            if (typeInt == 0)
+                typeInt = 1002;
+            int fallbackItemType = resolveForcedItemType(typeInt);
+            detailMap.put("itemType", fallbackItemType > 0 ? fallbackItemType : typeInt == 1003 ? 1 : 2);
+            detailMap.put("type", typeInt);
+            detailMap.put("payment_dt", corporateCard.get("payment_dt"));
+            detailMap.put("year", corporateCard.get("year"));
+            detailMap.put("month", corporateCard.get("month"));
+            detailMap.put("account_id", corporateCard.get("account_id"));
+
+            // detail 합계를 master total에 반영 (taxType=3이므로 vat=0, taxFree=0)
+            corporateCard.put("total", userTotal);
+            corporateCard.put("vat", 0);
+            corporateCard.put("taxFree", 0);
+            corporateCard.put("tax", userTotal);
+
+            applyMasterZeroDefaults(corporateCard);
             iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
-            iResult += accountService.TallySheetCorporateCardPaymentSaveV2(corporateCard);
+            iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(detailMap);
         }
 
         return corporateCard;
@@ -480,6 +598,9 @@ public class OcrControllerV2 {
         Files.createDirectories(dirPath);
 
         String originalFileName = file.getOriginalFilename();
+        if (originalFileName == null || originalFileName.isBlank()) {
+            originalFileName = "receipt";
+        }
         String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
         Path filePath = dirPath.resolve(uniqueFileName);
 
@@ -488,16 +609,107 @@ public class OcrControllerV2 {
         corporateCard.put("receipt_image", resultPath);
     }
 
+    // OCR 파서 타입과 집계표 저장 타입을 분리
+    private String resolveParserType(String type, String receiptType) {
+        if (type != null && !type.isBlank() && !type.matches("^-?\\d+$")) {
+            return type;
+        }
+        if (receiptType != null && !receiptType.isBlank() && !"UNKNOWN".equalsIgnoreCase(receiptType)) {
+            return receiptType;
+        }
+        return "coupang";
+    }
+
+    // 집계표 1002/1003 행 타입
+    private int resolveForcedTallyType(Object tallyType) {
+        int typeInt = toInt(tallyType);
+        return (typeInt == 1002 || typeInt == 1003) ? typeInt : 0;
+    }
+
+    // 집계표 행 타입별 detail 상품분류값
+    private int resolveForcedItemType(int tallyType) {
+        if (tallyType == 1002) {
+            return 2;
+        }
+        if (tallyType == 1003) {
+            return 1;
+        }
+        return 0;
+    }
+
+    // detail taxType 기준으로 master 세금 금액을 계산
+    private void applyDetailTaxSummaryToMaster(Map<String, Object> corporateCard, List<Map<String, Object>> detailList,
+            boolean updateTotal) {
+        int detailTotal = 0;
+        int vat = 0;
+        int taxFree = 0;
+        int tax = 0;
+
+        for (Map<String, Object> detail : detailList) {
+            int amount = toInt(detail.get("amount"));
+            int taxType = toInt(detail.get("taxType"));
+            detailTotal += amount;
+
+            if (taxType == 1) { // 과세
+                int itemVat = amount / 11;
+                vat += itemVat;
+                tax += amount - itemVat;
+            } else if (taxType == 2) { // 면세
+                taxFree += amount;
+            }
+            // taxType=3(알수없음)은 total에는 포함되지만 과세/면세/부가세에는 반영하지 않음
+        }
+
+        if (updateTotal) {
+            corporateCard.put("total", detailTotal);
+        }
+        corporateCard.put("vat", vat);
+        corporateCard.put("taxFree", taxFree);
+        corporateCard.put("tax", tax);
+    }
+
+    // master 숫자 필드가 비어 있으면 DB에 빈칸 대신 0으로 저장
+    private void applyMasterZeroDefaults(Map<String, Object> corporateCard) {
+        putZeroIfBlank(corporateCard, "total");
+        putZeroIfBlank(corporateCard, "discount");
+        putZeroIfBlank(corporateCard, "vat");
+        putZeroIfBlank(corporateCard, "taxFree");
+        putZeroIfBlank(corporateCard, "tax");
+        putZeroIfBlank(corporateCard, "totalCard");
+        putZeroIfBlank(corporateCard, "totalCash");
+    }
+
+    // 숫자 컬럼 기본값 보정
+    private void putZeroIfBlank(Map<String, Object> map, String key) {
+        Object value = map.get(key);
+        if (value == null || String.valueOf(value).trim().isEmpty()) {
+            map.put(key, 0);
+        }
+    }
+
+    private int toInt(Object val) {
+        if (val == null)
+            return 0;
+        try {
+            return Integer.parseInt(String.valueOf(val).replaceAll("[^0-9\\-]", ""));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
     // 집계표 프로시저 p_type은 정수 컬럼이므로 문자열 타입값(CONVENIENCE/MART_ITEMIZED)은 1000으로 보정한다.
     private int resolveTallyType(Object rawType, boolean isAccount) {
         if (isAccount) {
             // account 경로는 별도 프로시저(TallySheetCorporateCardPaymentSave)를 사용하므로 값은 의미가 거의 없음.
             return 1000;
         }
-        if (rawType == null) return 1000;
+        if (rawType == null)
+            return 1000;
         String s = String.valueOf(rawType).trim();
-        if (s.isEmpty()) return 1000;
-        if (!s.matches("^-?\\d+$")) return 1000;
+        if (s.isEmpty())
+            return 1000;
+        if (!s.matches("^-?\\d+$"))
+            return 1000;
         try {
             return Integer.parseInt(s);
         } catch (NumberFormatException e) {

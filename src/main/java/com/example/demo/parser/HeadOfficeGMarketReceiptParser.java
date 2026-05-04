@@ -237,7 +237,7 @@ public class HeadOfficeGMarketReceiptParser extends BaseReceiptParser {
         }
 
         // 아이템 1개
-        r.items = buildSingleItem(product, r.totals.total);
+        r.items = buildSingleItem(product, r.totals.total, r.totals.vat);
 
         if (DEBUG) System.out.println("---- [DEBUG] parseKoreanLightSlip END ----");
         return r;
@@ -250,67 +250,62 @@ public class HeadOfficeGMarketReceiptParser extends BaseReceiptParser {
 
         if (DEBUG) System.out.println("---- [DEBUG] parseSalesSlipEnglish ----");
 
-        // 주문번호
-        String orderNo = debugExtract("orderNo",
-                text,
-                "(?m)주문번호\\s*[:：]?\\s*(?:\\n\\s*)?([0-9/\\-]{8,})",
-                1
-        );
-        r.meta.receiptNo = cleanField(orderNo);
-
-        // 카드종류: 다음 라벨(유효기간 등)로 넘어가지 않게 한 줄만
-        String cardBrand = debugExtract("cardBrand",
-                text,
-                "(?m)카드종류\\s*[:：]?\\s*(?:\\n\\s*)?([^\\n\\r]{1,30})",
-                1
-        );
-        r.payment.cardBrand = normalizeCardBrand(cleanField(cardBrand));
-
-        // 카드번호
-        String cardMasked = debugExtract("cardMasked",
-                text,
-                "(?m)카드번호\\s*[:：]?\\s*(?:\\n\\s*)?([^\\n\\r]{6,50})",
-                1
-        );
-        r.payment.cardMasked = normalizeCardMasked(cardMasked);
-
-        // 승인번호
-        String approval = debugExtract("approvalNo",
-                text,
-                "(?m)승인번호\\s*[:：]?\\s*(?:\\n\\s*)?([0-9]{6,12})",
-                1
-        );
-        r.approval.approvalNo = cleanField(approval);
-
-        // 거래일자(일시)
-        String dt = debugExtract("tradeDatetime",
-                text,
-                "(?m)거래일자\\s*[:：]?\\s*(?:\\n\\s*)?(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2}\\s+[0-2]?\\d:[0-5]\\d:[0-5]\\d\\s*(?:AM|PM)?)",
-                1
-        );
-        if (dt != null) {
-            r.meta.saleDate = extract(dt, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})", 1);
-            String tm = extract(dt, "([0-2]?\\d:[0-5]\\d:[0-5]\\d\\s*(?:AM|PM)?)", 1);
-            r.meta.saleTime = cleanField(tm);
-        } else {
-            // fallback: 라벨 근처 탐색
-            r.meta.saleDate = findDateNearLabel(text, "거래일자");
-            r.meta.saleTime = debugExtract("saleTime_fallback",
-                    text,
-                    "([0-2]?\\d:[0-5]\\d:[0-5]\\d\\s*(?:AM|PM)?)",
-                    1
-            );
+        // 라인 목록 출력
+        String[] allLines = text.replace("\r", "\n").split("\n");
+        for (int i = 0; i < allLines.length; i++) {
+            System.out.printf("[GMARKET] L%02d: %s%n", i, allLines[i]);
         }
 
-        // 거래유형/거래종류
-        String tradeType = debugExtract("tradeType",
-                text,
-                "(?m)(거래유형|거래종류)\\s*[:：]?\\s*(?:\\n\\s*)?([^\\n\\r]{1,30})",
-                2
-        );
-        r.payment.type = cleanField(tradeType);
+        // OCR 구조: 라벨 컬럼 전체 → 값 컬럼 전체 (또는 인터리브)
+        // → 라벨 다음 줄이 값이 아닐 수 있음 → 전체 텍스트에서 패턴으로 직접 추출
 
-        // 상품명 블록에서 라벨 라인 제거 후 최적 라인 선택
+        // ---- 결제정보 ----
+        System.out.println("[GMARKET] ---- 결제정보 ----");
+
+        // 주문번호: "5476888886/4421175091" - 슬래시 포함 14자리 이상
+        String orderNo = extract(text, "([0-9]{10}/[0-9]{10,13})");
+        if (!notEmpty(orderNo)) {
+            orderNo = extract(text, "([0-9]{12,20})");
+        }
+        r.meta.receiptNo = cleanField(orderNo);
+        System.out.println("[GMARKET] orderNo=" + safe(r.meta.receiptNo));
+
+        // 카드종류: 비씨/BC/국민 등 한글영문 카드명 (숫자만이면 제외)
+        String cardBrand = extract(text, "(비씨|BC카드|BC|국민|신한|현대|롯데|농협|하나|NH|KB|IBK비씨|IBK)");
+        r.payment.cardBrand = normalizeCardBrand(cleanField(cardBrand));
+        System.out.println("[GMARKET] cardBrand=" + safe(r.payment.cardBrand));
+
+        // 카드번호: "5130-41******-8923" 마스킹 형태
+        String cardMasked = extract(text, "([0-9]{4}-[0-9]{2}\\*{4,}-[0-9]{4})");
+        r.payment.cardMasked = normalizeCardMasked(cardMasked);
+        System.out.println("[GMARKET] cardMasked=" + safe(r.payment.cardMasked));
+
+        // 승인번호: 6~12자리 독립 숫자 (카드번호/주문번호/날짜 제외)
+        String approval = extractApprovalNoGmarket(text);
+        r.approval.approvalNo = cleanField(approval);
+        System.out.println("[GMARKET] approvalNo=" + safe(r.approval.approvalNo));
+
+        // 거래일자: "2026-03-23 11:13:32 AM" 형태
+        Matcher dtm = Pattern.compile("(20\\d{2}[./-]\\d{2}[./-]\\d{2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d(?:\\s*(?:AM|PM))?)").matcher(text);
+        if (dtm.find()) {
+            r.meta.saleDate = dtm.group(1).replace(".", "-").replace("/", "-");
+            r.meta.saleTime = dtm.group(2).trim();
+        } else {
+            r.meta.saleDate = extract(text, "(20\\d{2}[./-]\\d{2}[./-]\\d{2})");
+        }
+        System.out.println("[GMARKET] saleDate=" + safe(r.meta.saleDate) + ", saleTime=" + safe(r.meta.saleTime));
+
+        // 거래유형/거래종류: "신용거래", "일시불" 등 고정값
+        String tradeType = firstNonNull(
+                extract(text, "(신용거래|체크거래|현금거래)"),
+                extract(text, "(일시불|할부)")
+        );
+        r.payment.type = firstNonNull(tradeType, "신용거래");
+        System.out.println("[GMARKET] tradeType=" + safe(r.payment.type));
+
+        // ---- 상품정보 ----
+        System.out.println("[GMARKET] ---- 상품정보 ----");
+
         String productBlock = debugExtract("productBlock",
                 text,
                 "(?s)상품명\\s*[:：]?\\s*(?:\\n\\s*)?([\\s\\S]*?)\\s*(?:\\n\\s*)?(금액|부가세|봉사료|합계|판매자정보|$)",
@@ -318,65 +313,124 @@ public class HeadOfficeGMarketReceiptParser extends BaseReceiptParser {
         );
         String product = pickBestProductLine(productBlock);
         product = cleanProductName(product);
+        System.out.println("[GMARKET] product=" + safe(product));
 
-        // 판매자정보 섹션 슬라이스
+        // ---- 판매자정보 ----
+        System.out.println("[GMARKET] ---- 판매자정보 ----");
+
+        // 판매자정보 섹션에서 라벨-값 분리 구조 대응
         String sellerSection = sliceSection(text, "판매자정보", null, 2000);
-
-        // 상호
-        String merchant = debugExtract("merchantName",
-                sellerSection,
-                "(?s)(상호)\\s*[:：]?\\s*(?:\\n\\s*)?([\\s\\S]*?)\\s*(?:\\n\\s*)?(사업자등록번호|대표자명|전화번호|과세유형|사업장주소|$)",
-                2
-        );
-        merchant = cleanField(merchant);
+        String merchant = extractGmarketSellerName(sellerSection);
         r.merchant.name = firstNonNull(merchant, "Unknown");
 
-        // 사업자등록번호
-        String bizNo = debugExtract("bizNo",
-                sellerSection,
-                "(?m)사업자등록번호\\s*[:：]?\\s*(?:\\n\\s*)?([0-9]{3}-[0-9]{2}-[0-9]{5})",
-                1
-        );
-        if (!notEmpty(bizNo)) {
-            bizNo = debugExtract("bizNo_fallback",
-                    sellerSection,
-                    "([0-9]{3}-[0-9]{2}-[0-9]{5})",
-                    1
-            );
-        }
+        String bizNo = extract(sellerSection, "([0-9]{3}-[0-9]{2}-[0-9]{5})");
         if (notEmpty(bizNo)) r.merchant.bizNo = cleanField(bizNo);
 
-        // 전화번호
-        String tel = debugExtract("sellerTel",
-                sellerSection,
-                "(?m)전화번호\\s*[:：]?\\s*(?:\\n\\s*)?([0-9\\-]{8,20})",
-                1
-        );
+        String tel = extract(sellerSection, "([0-9]{2,4}-[0-9]{3,4}-[0-9]{4})");
         if (notEmpty(tel)) r.merchant.tel = cleanField(tel);
 
-        // 사업장주소
-        String addr = debugExtract("sellerAddr",
-                sellerSection,
-                "(?s)사업장주소\\s*[:：]?\\s*(?:\\n\\s*)?([\\s\\S]*?)(?:\\n\\s*)?(본\\s*영수증|본\\s*확인서|$)",
-                1
-        );
+        // 주소: "사업장주소" 이후 실제 주소값 (일반과세자 같은 과세유형 제외)
+        String addr = extractGmarketAddress(sellerSection);
         if (notEmpty(addr)) r.merchant.address = cleanField(addr);
 
-        // ✅ 금액테이블: 라벨과 숫자가 떨어져 하단에 나오는 케이스 대응
-        AmountBundle ab = parseSalesSlipAmounts(text);
+        System.out.println("[GMARKET] sellerName=" + safe(r.merchant.name));
+        System.out.println("[GMARKET] bizNo=" + safe(r.merchant.bizNo));
+        System.out.println("[GMARKET] tel=" + safe(r.merchant.tel));
+        System.out.println("[GMARKET] address=" + safe(r.merchant.address));
 
+        // ---- 금액정보 ----
+        System.out.println("[GMARKET] ---- 금액정보 ----");
+
+        AmountBundle ab = parseSalesSlipAmounts(text);
         if (ab != null) {
             r.totals.taxable = ab.amount;
             r.totals.vat = ab.vat;
             r.totals.total = ab.total;
-
-            trySetApprovalAmt(r.payment, ab.total); // ✅ 여기로 교체
+            trySetApprovalAmt(r.payment, ab.total);
         }
 
-        r.items = buildSingleItem(product, r.totals.total);
+        System.out.println("[GMARKET] taxable=" + safeInt(r.totals.taxable) + ", vat=" + safeInt(r.totals.vat) + ", total=" + safeInt(r.totals.total));
+
+        r.items = buildSingleItem(product, r.totals.total, r.totals.vat);
+        System.out.println("[GMARKET] item => name=" + safe(product) + " | taxFlag=" + safe(r.items.isEmpty() ? null : r.items.get(0).taxFlag));
 
         if (DEBUG) System.out.println("---- [DEBUG] parseSalesSlipEnglish END ----");
         return r;
+    }
+
+    /** 지마켓 OCR 라벨-값 분리 구조에서 상호명 추출 */
+    private String extractGmarketSellerName(String section) {
+        if (section == null) return null;
+        String[] lines = section.replace("\r", "\n").split("\n");
+
+        Pattern BIZ = Pattern.compile("^[0-9]{3}-[0-9]{2}-[0-9]{5}$");
+        Set<String> LABELS = new HashSet<>(Arrays.asList(
+                "상호", "사업자등록번호", "대표자명", "전화번호", "과세유형", "사업장주소", "판매자정보"
+        ));
+
+        // 사업자번호 위치 찾기
+        int bizIdx = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (BIZ.matcher(lines[i].trim()).matches()) { bizIdx = i; break; }
+        }
+
+        if (bizIdx > 0) {
+            // 값들을 역방향 수집: 사업자번호 앞 값 목록
+            List<Integer> valueLines = new ArrayList<>();
+            for (int j = bizIdx - 1; j >= 0; j--) {
+                String t = lines[j].trim();
+                if (t.isEmpty()) continue;
+                if (LABELS.contains(t.replace(" ", ""))) continue;
+                if (BIZ.matcher(t).matches()) continue;
+                if (t.matches("[0-9\\-/\\*\\s]+")) continue;
+                if (t.matches(".*[시도군구].*")) continue;
+                if (t.matches("(일반과세자|간이과세자|면세사업자)")) continue;
+                valueLines.add(j);
+            }
+            System.out.println("[GMARKET.seller] bizIdx=" + bizIdx + ", valueLines=" + valueLines);
+            // valueLines[0]=대표자명값, valueLines[1]=상호명값
+            if (valueLines.size() >= 2) return lines[valueLines.get(1)].trim();
+            if (valueLines.size() == 1) return lines[valueLines.get(0)].trim();
+        }
+
+        // fallback: "상호" 라벨 다음에 오는 비-라벨 값
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].trim().equals("상호") && i + 1 < lines.length) {
+                String next = lines[i + 1].trim();
+                if (!LABELS.contains(next.replace(" ", "")) && !next.matches("[0-9\\-]+")) return next;
+            }
+        }
+        return null;
+    }
+
+    /** 지마켓 주소 추출 (과세유형 라인 제외) */
+    private String extractGmarketAddress(String section) {
+        if (section == null) return null;
+        String[] lines = section.replace("\r", "\n").split("\n");
+        boolean inAddr = false;
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines) {
+            String t = line.trim();
+            if (t.replace(" ", "").equals("사업장주소")) { inAddr = true; continue; }
+            if (!inAddr) continue;
+            if (t.isEmpty()) continue;
+            if (t.matches("(일반과세자|간이과세자|면세사업자)")) continue;
+            if (t.startsWith("본 영수증") || t.startsWith("본영수증")) break;
+            if (sb.length() > 0) sb.append(" ");
+            sb.append(t);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    /** 승인번호: 6~12자리 독립 숫자, 카드번호/주문번호/날짜와 구분 */
+    private String extractApprovalNoGmarket(String text) {
+        String[] lines = text.replace("\r", "\n").split("\n");
+        for (String line : lines) {
+            String t = line.trim();
+            // 순수 6~12자리 숫자 라인
+            if (t.matches("[0-9]{6,12}")) return t;
+        }
+        return null;
     }
 
     /* ========================= SalesSlip 금액 파싱 ========================= */
@@ -467,11 +521,20 @@ public class HeadOfficeGMarketReceiptParser extends BaseReceiptParser {
     /* ========================= Items ========================= */
 
     private List<Item> buildSingleItem(String productName, Integer totalAmount) {
+        return buildSingleItem(productName, totalAmount, null);
+    }
+
+    private List<Item> buildSingleItem(String productName, Integer totalAmount, Integer vat) {
         Item it = new Item();
         it.name = notEmpty(productName) ? productName : "상품";
         it.qty = 1;
         it.amount = totalAmount;
         it.unitPrice = totalAmount;
+        if (vat != null && vat > 0) {
+            it.taxFlag = "과세";
+        } else if (vat != null && vat == 0) {
+            it.taxFlag = "면세";
+        }
         return List.of(it);
     }
 

@@ -367,6 +367,14 @@ public class HeadOffice11PostReceiptParser extends BaseReceiptParser {
                 "(?s)(판매자정보|판매자\\s*정보)\\s*.*?상호\\s*[:：]?\\s*([\\s\\S]*?)\\s*(사업자등록번호|대표자명|과세유형|전화번호|사업장주소|$)", 2);
         merchant = cleanField(merchant);
 
+        // 판매자상호 레이블 뒤에 대표자명 레이블이 오고 그 다음 줄에 상호명이 있는 구조 처리
+        // ex) "판매자상호\n대표자명\n주방다움\n홍세미"
+        if (!notEmpty(merchant)) {
+            merchant = extract(text,
+                    "판매자상호\\s*대표자명\\s*([^\\n]+)");
+            merchant = cleanField(merchant);
+        }
+
         if (!notEmpty(merchant)) {
             merchant = extractDot(text, "(?s)상호\\s*[:：]?\\s*([\\s\\S]*?)\\s*(사업자등록번호|대표자명|과세유형|전화번호|사업장주소|$)", 1);
             merchant = cleanField(merchant);

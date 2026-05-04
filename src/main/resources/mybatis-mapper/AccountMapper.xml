@@ -2659,31 +2659,45 @@
 	</select>
 	
 	<select id="HeadOfficeCorporateCardPaymentList" parameterType="map" resultType="hashmap">
-		SELECT sale_id, 
-			   account_id, 
-			   DATE_FORMAT(payment_dt, '%Y-%m-%d') as payment_dt, 
-			   use_name, 
-			   bizNo, 
-			   total, 
-			   vat, 
-			   taxFree, 
-			   tax,
-			   totalCard, 
-			   cardNo,
-			   cardBrand, 
-			   receipt_image, 
-			   note, 
-			   DATE_FORMAT(reg_dt, '%Y-%m-%d') as reg_dt, 
-			   user_id,
-			   receipt_type,
-			   idx
-		FROM tb_headoffice_corporate_card_payment_list
-		WHERE DATE_FORMAT(payment_dt, '%Y') = ${year}
-		AND DATE_FORMAT(payment_dt, '%m') = ${month}
-		AND account_id = #{account_id}
-		ORDER BY payment_dt ASC, sale_id ASC
+		SELECT m.sale_id,
+			   m.account_id,
+			   DATE_FORMAT(m.payment_dt, '%Y-%m-%d') as payment_dt,
+			   m.use_name,
+			   m.bizNo,
+			   m.total,
+			   m.vat,
+			   m.taxFree,
+			   m.tax,
+			   m.totalCard,
+			   m.cardNo,
+			   m.cardBrand,
+			   m.receipt_image,
+			   m.note,
+			   DATE_FORMAT(m.reg_dt, '%Y-%m-%d') as reg_dt,
+			   m.user_id,
+			   m.receipt_type,
+			   m.idx,
+			   IFNULL(d.detail_total, 0) AS detail_total
+		FROM tb_headoffice_corporate_card_payment_list m
+		LEFT JOIN (
+		    SELECT sale_id, SUM(amount) AS detail_total
+		    FROM tb_headoffice_corporate_card_payment_detail_list
+		    GROUP BY sale_id
+		) d ON m.sale_id = d.sale_id
+		WHERE DATE_FORMAT(m.payment_dt, '%Y') = ${year}
+		AND DATE_FORMAT(m.payment_dt, '%m') = ${month}
+		AND m.account_id = #{account_id}
+		<choose>
+			<when test="type == '1003' or type == 1003">
+		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 1)
+			</when>
+			<when test="type == '1002' or type == 1002">
+		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 2)
+			</when>
+		</choose>
+		ORDER BY m.payment_dt ASC, m.sale_id ASC
 	</select>
-	
+
 	<select id="HeadOfficeCorporateCardPaymentDetailList" parameterType="map" resultType="hashmap">
 		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType, itemType
 		FROM tb_headoffice_corporate_card_payment_detail_list
@@ -2766,23 +2780,23 @@
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        sale_id=#{sale_id},
-	        account_id=#{account_id},
-	        payment_dt=DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'),
-	        use_name=#{use_name},
-	        bizNo=#{bizNo},
-	        total=#{total},
-	        vat=#{vat},
-	        taxFree=#{taxFree},
-	        tax=#{tax},
-	        totalCard=#{totalCard},
-	        cardNo=#{cardNo},
-	        cardBrand=#{cardBrand},
+	        account_id=IFNULL(#{account_id}, account_id),
+	        payment_dt=IFNULL(NULLIF(DATE_FORMAT(#{payment_dt}, '%Y-%m-%d'), '0000-00-00'), payment_dt),
+	        use_name=IFNULL(NULLIF(#{use_name}, ''), use_name),
+	        bizNo=IFNULL(#{bizNo}, bizNo),
+	        total=IFNULL(#{total}, total),
+	        vat=IFNULL(#{vat}, vat),
+	        taxFree=IFNULL(#{taxFree}, taxFree),
+	        tax=IFNULL(#{tax}, tax),
+	        totalCard=IFNULL(#{totalCard}, totalCard),
+	        cardNo=IFNULL(#{cardNo}, cardNo),
+	        cardBrand=IFNULL(#{cardBrand}, cardBrand),
 	        receipt_image=IFNULL(NULLIF(#{receipt_image}, ''), receipt_image),
-	        note=#{note},
+	        note=IFNULL(#{note}, note),
 	        reg_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
-	        user_id=#{user_id},
-	        receipt_type=#{receipt_type},
-	        idx=#{idx}
+	        user_id=IFNULL(#{user_id}, user_id),
+	        receipt_type=IFNULL(#{receipt_type}, receipt_type),
+	        idx=IFNULL(#{idx}, idx)
 	    </trim>
 	</insert>
 
@@ -2797,39 +2811,26 @@
 	</select>
 	
 	<insert id="HeadOfficeCorporateCardPaymentDetailLSave" parameterType="map">
-		INSERT INTO tb_headoffice_corporate_card_payment_detail_list
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	idx,
-	        sale_id,
-	        name,
-	        qty,
-	        amount,
-	        unitPrice,
-	        taxType,
-	        itemType
-	    </trim>
-	    VALUES
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	    	#{idx},
-	        #{sale_id},
-	        #{name},
-	        #{qty},
-	        #{amount},
-	        #{unitPrice},
-	        #{taxType},
-	        #{itemType}
-	    </trim>
-	    ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	    	idx=#{idx},
-	        sale_id=#{sale_id},
-	        name=#{name},
-	        qty=#{qty},
-	        amount=#{amount},
-	        unitPrice=#{unitPrice},
-	        taxType=#{taxType},
-	        itemType=#{itemType}
-	    </trim>
+		<choose>
+			<when test="idx != null">
+				UPDATE tb_headoffice_corporate_card_payment_detail_list
+				SET
+					sale_id=#{sale_id},
+					<if test="name != null">name=#{name},</if>
+					<if test="qty != null">qty=#{qty},</if>
+					amount=#{amount},
+					<if test="unitPrice != null">unitPrice=#{unitPrice},</if>
+					taxType=#{taxType},
+					itemType=#{itemType}
+				WHERE idx=#{idx}
+			</when>
+			<otherwise>
+				INSERT INTO tb_headoffice_corporate_card_payment_detail_list
+				(sale_id, name, qty, amount, unitPrice, taxType, itemType)
+				VALUES
+				(#{sale_id}, #{name}, #{qty}, #{amount}, #{unitPrice}, #{taxType}, #{itemType})
+			</otherwise>
+		</choose>
 	</insert>
 	
 	<select id="AccountCorporateCardList" parameterType="string" resultType="hashmap">
@@ -3100,7 +3101,7 @@
 	        #{result, mode=OUT, jdbcType=INTEGER}
 	    ) }
 	</select>
-	
+
 	<select id="TallySheetPaymentSave" statementType="CALLABLE" parameterType="map">
 	    { CALL sp_sync_tally_sheet_one_day(
 	        #{account_id, mode=IN, jdbcType=VARCHAR},

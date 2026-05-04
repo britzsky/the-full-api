@@ -156,6 +156,11 @@ public class OperateController {
         return obj.toString();
     }
 
+    /*
+     * part : 운영
+     * method : syncTallySheetToPurchaseTally
+     * comment : 급식사업부 -> 운영관리 -> 집계표 저장(거래처 자료입력 저장)
+     */
     /**
      * type 1~4 집계표 행을 tb_account_purchase_tally에 연동한다.
      * sale_id: 입력 당시 시각 yyyyMMddHHmmssSSS (AccountController와 동일한 방식)
@@ -166,18 +171,24 @@ public class OperateController {
         if (!typeStr.equals("1") && !typeStr.equals("2") && !typeStr.equals("3") && !typeStr.equals("4"))
             return;
 
-        String accountId  = String.valueOf(paramMap.getOrDefault("account_id", ""));
-        String countYear  = String.valueOf(paramMap.getOrDefault("count_year", ""));
+        String accountId = String.valueOf(paramMap.getOrDefault("account_id", ""));
+        String countYear = String.valueOf(paramMap.getOrDefault("count_year", ""));
         String countMonth = String.valueOf(paramMap.getOrDefault("count_month", ""));
-        String userId     = String.valueOf(paramMap.getOrDefault("user_id", ""));
+        String userId = String.valueOf(paramMap.getOrDefault("user_id", ""));
 
-        if (accountId.isEmpty() || countYear.isEmpty() || countMonth.isEmpty())
+        System.out.println("[syncTallySheet] 시작 account_id=" + accountId + " type=" + typeStr + " count_year="
+                + countYear + " count_month=" + countMonth);
+
+        if (accountId.isEmpty() || countYear.isEmpty() || countMonth.isEmpty()) {
+            System.out.println("[syncTallySheet] early return: account_id/count_year/count_month 비어있음");
             return;
+        }
 
         int monthInt;
         try {
             monthInt = Integer.parseInt(countMonth.replace(",", "").trim());
         } catch (NumberFormatException e) {
+            System.out.println("[syncTallySheet] early return: count_month 파싱 실패=" + countMonth);
             return;
         }
         String monthPadded = String.format("%02d", monthInt);
@@ -197,56 +208,60 @@ public class OperateController {
                     continue;
                 total = Long.parseLong(rawStr);
             } catch (NumberFormatException e) {
+                System.out.println("[syncTallySheet] day_" + day + " 파싱 실패: " + dayVal);
                 continue;
             }
             if (total == 0)
                 continue;
 
             String dayPadded = String.format("%02d", day);
-            String saleDate  = countYear + "-" + monthPadded + "-" + dayPadded;
+            String saleDate = countYear + "-" + monthPadded + "-" + dayPadded;
 
-            // 기존 row 조회 (account_id + saleDate + type 기준)
             Map<String, Object> lookupParam = new HashMap<>();
             lookupParam.put("account_id", accountId);
-            lookupParam.put("saleDate",   saleDate);
-            lookupParam.put("type",       typeStr);
+            lookupParam.put("saleDate", saleDate);
+            lookupParam.put("type", typeStr);
             Map<String, Object> existing = accountMapper.AccountPurchaseTallyBySaleDateAndType(lookupParam);
+
+            System.out.println("[syncTallySheet] saleDate=" + saleDate + " total=" + total + " existing=" + existing);
 
             try {
                 if (existing != null && existing.get("sale_id") != null) {
-                    // 기존 row 있음 → total만 UPDATE
+                    System.out
+                            .println("[syncTallySheet] UPDATE sale_id=" + existing.get("sale_id") + " total=" + total);
                     Map<String, Object> updateParam = new HashMap<>();
-                    updateParam.put("sale_id",  existing.get("sale_id"));
-                    updateParam.put("total",    total);
-                    updateParam.put("tax",      0);
+                    updateParam.put("sale_id", existing.get("sale_id"));
+                    updateParam.put("total", total);
+                    updateParam.put("tax", 0);
                     updateParam.put("totalCash", total);
-                    updateParam.put("user_id",  userId);
+                    updateParam.put("user_id", userId);
                     accountMapper.AccountPurchaseTallyTotalUpdate(updateParam);
                 } else {
-                    // 기존 row 없음 → INSERT
                     String saleId = LocalDateTime.now().format(saleIdFmt);
+                    System.out.println("[syncTallySheet] INSERT new sale_id=" + saleId + " saleDate=" + saleDate
+                            + " total=" + total);
                     Map<String, Object> purchaseParam = new HashMap<>();
-                    purchaseParam.put("account_id",    accountId);
-                    purchaseParam.put("sale_id",        saleId);
-                    purchaseParam.put("type",           typeStr);
-                    purchaseParam.put("saleDate",       saleDate);
-                    purchaseParam.put("total",          total);
-                    purchaseParam.put("discount",       0);
-                    purchaseParam.put("vat",            0);
-                    purchaseParam.put("taxFree",        0);
-                    purchaseParam.put("tax",            0);
-                    purchaseParam.put("payType",        1);
-                    purchaseParam.put("totalCash",      total);
-                    purchaseParam.put("totalCard",      0);
-                    purchaseParam.put("cardNo",         "");
-                    purchaseParam.put("cardBrand",      "");
-                    purchaseParam.put("bizNo",          "");
-                    purchaseParam.put("receipt_image",  "");
-                    purchaseParam.put("note",           "");
-                    purchaseParam.put("use_name",       "");
+                    purchaseParam.put("account_id", accountId);
+                    purchaseParam.put("sale_id", saleId);
+                    purchaseParam.put("type", typeStr);
+                    purchaseParam.put("saleDate", saleDate);
+                    purchaseParam.put("total", total);
+                    purchaseParam.put("discount", 0);
+                    purchaseParam.put("vat", 0);
+                    purchaseParam.put("taxFree", 0);
+                    purchaseParam.put("tax", 0);
+                    purchaseParam.put("payType", 1);
+                    purchaseParam.put("totalCash", total);
+                    purchaseParam.put("totalCard", 0);
+                    purchaseParam.put("cardNo", "");
+                    purchaseParam.put("cardBrand", "");
+                    purchaseParam.put("bizNo", "");
+                    purchaseParam.put("receipt_image", "");
+                    purchaseParam.put("note", "");
+                    purchaseParam.put("use_name", "");
                     purchaseParam.put("cashReceiptType", null);
-                    purchaseParam.put("user_id",        userId);
-                    purchaseParam.put("receipt_type",   "");
+                    purchaseParam.put("user_id", userId);
+                    purchaseParam.put("receipt_type", "");
                     accountService.AccountPurchaseSave(purchaseParam);
                 }
             } catch (Exception e) {
@@ -951,21 +966,24 @@ public class OperateController {
             // 마지막: 년/월+거래처 조합 중복 없이 ProfitLossTotalSave 호출
             Set<String> seen = new LinkedHashSet<>();
             for (Map<String, Object> paramMap : paramList) {
-                String year      = String.valueOf(paramMap.getOrDefault("diner_year", ""));
-                String month     = String.valueOf(paramMap.getOrDefault("diner_month", ""));
+                String year = String.valueOf(paramMap.getOrDefault("diner_year", ""));
+                String month = String.valueOf(paramMap.getOrDefault("diner_month", ""));
                 String accountId = String.valueOf(paramMap.getOrDefault("account_id", ""));
                 String key = year + "_" + month + "_" + accountId;
-                if (year.isEmpty() || month.isEmpty() || accountId.isEmpty()) continue;
-                if (!seen.add(key)) continue;
+                if (year.isEmpty() || month.isEmpty() || accountId.isEmpty())
+                    continue;
+                if (!seen.add(key))
+                    continue;
 
                 try {
                     Map<String, Object> profitParam = new HashMap<>();
-                    profitParam.put("year",       year);
-                    profitParam.put("month",      month);
+                    profitParam.put("year", year);
+                    profitParam.put("month", month);
                     profitParam.put("account_id", accountId);
                     operateService.callProfitLossTotalSave(profitParam);
                 } catch (Exception e) {
-                    System.err.println("[AccountDinnersNumberSave] ProfitLossTotalSave 실패: " + key + " / " + e.getMessage());
+                    System.err.println(
+                            "[AccountDinnersNumberSave] ProfitLossTotalSave 실패: " + key + " / " + e.getMessage());
                 }
             }
         }
@@ -1083,7 +1101,6 @@ public class OperateController {
 
         return new Gson().toJson(resultList);
     }
-
 
     /*
      * part : 운영

@@ -116,17 +116,7 @@ public class HeadOfficeHomePlusReceiptParser extends BaseReceiptParser {
         String itemName = findNextProductLineUntil(lines, cursor, 200, "결제금액");
         itemName = cleanField(itemName);
 
-        // "외1건" 처리
-        Integer qtyGuess = 1;
         String itemCore = itemName;
-        if (notEmpty(itemName)) {
-            Matcher m = Pattern.compile("(?s)(.+?)\\s*외\\s*([0-9]+)\\s*건\\s*$").matcher(itemName);
-            if (m.find()) {
-                itemCore = cleanField(m.group(1));
-                Integer extra = toInt(m.group(2));
-                if (extra != null && extra >= 0) qtyGuess = 1 + extra;
-            }
-        }
 
         if (DEBUG) {
             System.out.println("[HOMEPLUS.scan] approvalNo=" + safe(r.approval.approvalNo));
@@ -213,21 +203,23 @@ public class HeadOfficeHomePlusReceiptParser extends BaseReceiptParser {
                 "홈플러스"
         );
 
-        // ✅ 5) 아이템 1개 구성
+        // ✅ 5) 아이템 1개 구성 (수량 고정 1, 단가=합계금액)
         Item it = new Item();
         it.name = notEmpty(itemCore) ? itemCore : "품목";
-        it.qty = (qtyGuess != null && qtyGuess > 0) ? qtyGuess : 1;
+        it.qty = 1;
         it.amount = r.totals.total;
-        it.unitPrice = (it.qty != null && it.qty > 0 && r.totals.total != null) ? (r.totals.total / it.qty) : r.totals.total;
+        it.unitPrice = r.totals.total;
+        it.taxFlag = (pay.vat != null && pay.vat > 0) ? "과세" : "면세";
         r.items = List.of(it);
 
         if (DEBUG) {
             System.out.println("[HOMEPLUS] ✅ FINAL => approvalNo=" + safe(r.approval.approvalNo)
                     + ", orderNo=" + safe(r.meta.receiptNo)
                     + ", item=" + safe(it.name)
-                    + ", qty=" + safe(it.qty)
+                    + ", qty=1"
                     + ", amount=" + safeInt(it.amount)
                     + ", vat=" + safeInt(r.totals.vat)
+                    + ", taxFlag=" + safe(it.taxFlag)
                     + ", total=" + safeInt(r.totals.total)
                     + ", seller=" + safe(r.merchant.name)
                     + ", bizNo=" + safe(r.merchant.bizNo)

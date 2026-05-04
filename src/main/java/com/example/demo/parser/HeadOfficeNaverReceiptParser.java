@@ -60,12 +60,16 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     /* ========================= ✅ 네이버 "카드 영수증" 감지 ========================= */
 
     private boolean isNaverCardReceipt(String text) {
-        if (text == null) return false;
+        if (text == null)
+            return false;
 
         boolean hasTitle = text.contains("카드 영수증");
         boolean hasSeller = text.contains("판매자 정보") || text.contains("판매자정보") || text.contains("판매자상호");
         boolean hasFranchise = text.contains("가맹점 정보") || text.contains("가맹점정보") || text.contains("가맹점명");
-        boolean hasAmounts = text.contains("승인금액") && (text.contains("공급가액") || text.contains("부가세액")) && text.contains("합계");
+        // 취소 영수증은 승인금액+취소금액, 일반 영수증은 승인금액+공급가액dmsl
+        boolean hasAmounts = text.contains("승인금액") &&
+                (text.contains("공급가액") || text.contains("부가세액") || text.contains("취소금액")) &&
+                text.contains("합계");
 
         return hasTitle && hasSeller && hasFranchise && hasAmounts;
     }
@@ -73,200 +77,404 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     /* ========================= ✅ 네이버 "카드 영수증" 파싱 ========================= */
 
     private ReceiptResult parseNaverCardReceipt(String text) {
-        System.out.println("=== ▶ parseNaverCardReceipt START ===");
+        System.out.println("[NAVER] ---- parseNaverCardReceipt 시작 ----");
+
+        // 라인 목록 출력 (쿠팡 파서 스타일)
+        String[] allLines = text.replace("\r", "\n").split("\n");
+        for (int i = 0; i < allLines.length; i++) {
+            System.out.printf("[NAVER] L%02d: %s%n", i, allLines[i]);
+        }
 
         ReceiptResult r = new ReceiptResult();
 
-        // 1) 카드사/승인번호: "비씨/50138672"
-        String cardAndApproval = debugExtract("cardCompanyAndApproval", text,
-                "(?m)카드사\\s*/\\s*승인번호\\s*\\n\\s*([^\\n]+)", 1);
+        // ---- 결제정보 ----
+        System.out.println("[NAVER] ---- 결제정보 파싱 ----");
 
-        if (notEmpty(cardAndApproval)) {
-            String[] parts = cardAndApproval.split("/");
-            if (parts.length >= 1) r.payment.cardBrand = normalizeCardBrand(cleanField(parts[0]));
-            if (parts.length >= 2) r.approval.approvalNo = cleanField(parts[1]);
+        // 카드사/승인번호: "비씨/32009723" 형태
+        Matcher cm = Pattern.compile("([가-힣A-Za-z]+)\\s*/\\s*([0-9]{6,12})").matcher(text);
+        if (cm.find()) {
+            r.payment.cardBrand = normalizeCardBrand(cleanField(cm.group(1)));
+            r.approval.approvalNo = cleanField(cm.group(2));
         }
+        System.out.println(
+                "[NAVER] cardBrand=" + safe(r.payment.cardBrand) + ", approvalNo=" + safe(r.approval.approvalNo));
 
-        // fallback: 승인번호만이라도
-        if (!notEmpty(r.approval.approvalNo)) {
-            r.approval.approvalNo = debugExtract("approvalNo_fallback", text,
-                    "(?m)승인번호\\s*[:：]?\\s*([0-9]{6,12})", 1);
+        // 카드번호: "5130-****-****-8923(**/**)" 형태
+        String cardNo = extract(text, "([0-9]{4}[-\\s][0-9*]{4}[-\\s][0-9*]{4}[-\\s][0-9*]{4})");
+        r.payment.cardMasked = normalizeCardMasked(cardNo);
+        System.out.println("[NAVER] cardMasked=" + safe(r.payment.cardMasked));
+
+        // 거래종류/할부
+        String tradeType = extract(text, "(신용|체크|직불)\\s*[（(]?(법인|개인)?[）)]?\\s*/\\s*(일시불|[0-9]+개월)");
+        if (notEmpty(tradeType)) {
+            r.payment.type = tradeType;
+        } else {
+            r.payment.type = firstNonNull(
+                    extract(text, "(신용\\(법인\\))"),
+                    extract(text, "(신용|체크|직불)"));
         }
+        System.out.println("[NAVER] paymentType=" + safe(r.payment.type));
 
-        // 2) 카드번호(유효기간)
-        String cardMaskedRaw = debugExtract("cardMaskedRaw", text,
-                "(?m)카드번호\\(유효기간\\)\\s*\\n\\s*([^\\n]+)", 1);
-        r.payment.cardMasked = normalizeCardMasked(cardMaskedRaw);
+        // 취소 영수증 여부 감지
+        boolean isCancelled = text.contains("취소된 결제건") || text.contains("취소금액") || text.contains("취소일자");
+        System.out.println("[NAVER] isCancelled=" + isCancelled);
 
-        // 3) 거래종류/할부: "신용(법인) / 일시불"
-        String tradeInstall = debugExtract("tradeInstall", text,
-                "(?m)거래종류\\s*/\\s*할부\\s*\\n\\s*([^\\n]+)", 1);
-        if (notEmpty(tradeInstall)) {
-            String[] parts = tradeInstall.split("/");
-            r.payment.type = cleanField(parts[0]);
-            if (parts.length >= 2) r.payment.installment = cleanField(parts[1]);
+        // 결제일자 / 취소일자
+        // 취소 영수증은 "결제일자"와 "취소일자" 두 줄이 모두 있음 → 결제일자 기준으로 파싱
+        Matcher dtm = Pattern.compile("(20\\d{2}-\\d{2}-\\d{2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)").matcher(text);
+        if (dtm.find()) {
+            r.meta.saleDate = normalizeDate(dtm.group(1));
+            r.meta.saleTime = normalizeTime(dtm.group(2));
+        } else {
+            r.meta.saleDate = normalizeDate(extract(text, "(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})"));
         }
+        System.out.println("[NAVER] saleDate=" + safe(r.meta.saleDate) + ", saleTime=" + safe(r.meta.saleTime));
 
-        // 4) 결제일자: "2026-01-14 10:47:36"
-        r.meta.saleDate = normalizeDate(debugExtract("saleDate", text,
-                "(?m)결제일자\\s*\\n\\s*(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})", 1));
-        r.meta.saleTime = normalizeTime(debugExtract("saleTime", text,
-                "(?m)결제일자\\s*\\n\\s*(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 2));
+        // ---- 상품정보 ----
+        System.out.println("[NAVER] ---- 상품정보 파싱 ----");
 
-        // 5) 상품명 + 주문번호 (블록)
-        String productBlock = debugExtractDot("productBlock", text,
-                "(?s)상품명\\s*\\n([\\s\\S]*?)\\n\\s*판매자\\s*정보", 1);
+        String productBlock = extractDot(text, "(?s)상품명\\s*([\\s\\S]*?)\\s*(?:판매자\\s*정보|판매자정보)", 1);
+        String productName = null;
+        String orderNo = null;
 
-        // 주문번호는 PD... 형태가 많음
-        String orderNo = extract(productBlock == null ? "" : productBlock, "(PD[0-9A-Za-z]+)", 1);
+        if (notEmpty(productBlock)) {
+            orderNo = extract(productBlock, "([PDF][A-Z]?[0-9]{10,})");
+            // 상품명 블록에서 노이즈 줄 제거 후 후보 선택
+            StringBuilder pnSb = new StringBuilder();
+            for (String ln : productBlock.replace("\r", "\n").split("\n")) {
+                String t = ln.trim();
+                if (t.isEmpty())
+                    continue;
+                if (notEmpty(orderNo) && t.contains(orderNo))
+                    continue; // 주문번호 줄
+                if (t.matches(".*\\d{4}[-\\s*]+[\\d*]{4}[-\\s*]+[\\d*]{4}.*"))
+                    continue; // 카드번호 패턴
+                if (t.matches("20\\d{2}-\\d{2}-\\d{2}.*"))
+                    continue; // 날짜 줄
+                if (t.matches("[가-힣A-Za-z]+\\([가-힣A-Za-z]+\\)/[가-힣]+"))
+                    continue; // 거래종류 줄 (신용(법인)/일시불)
+                pnSb.append(t).append("\n");
+            }
+            productName = pickBestProductLine(pnSb.toString());
+            productName = cleanProductName(productName);
+        }
+        if (!notEmpty(orderNo)) {
+            orderNo = extract(text, "상품\\s*주문번호\\s*([PD][0-9A-Za-z]+)");
+            if (!notEmpty(orderNo))
+                orderNo = extract(text, "([PD][A-Z]?[0-9]{15,})");
+        }
         r.meta.receiptNo = cleanField(orderNo);
 
-        // 상품명 라인 추출: 라벨 제거 후 가장 긴 라인
-        String productName = pickBestProductLine(productBlock);
-        // 상품명에 주문번호가 붙으면 제거
-        if (notEmpty(orderNo) && notEmpty(productName)) {
-            productName = productName.replace(orderNo, "").trim();
-        }
-        productName = cleanProductName(productName);
+        System.out.println("[NAVER] productName=" + safe(productName));
+        System.out.println("[NAVER] orderNo=" + safe(orderNo));
 
-        // 6) ✅ 상호명(판매자상호) 이 OCR에서 비는 경우가 많음
-        //    우선: "판매자상호" 다음 라인
-        String sellerName = extractValueAfterLabel(text, "판매자상호", 12);
-        sellerName = cleanField(sellerName);
+        // ---- 판매자정보 ----
+        System.out.println("[NAVER] ---- 판매자정보 파싱 ----");
 
-        //    다음: "가맹점명" 다음 라인에서 (네이버파이낸셜 제외) → (주)크로바케미칼 케이스 해결
-        String franchiseFirst = extractValueAfterLabel(text, "가맹점명", 12);
-        franchiseFirst = cleanField(franchiseFirst);
-        if (notEmpty(franchiseFirst) && !franchiseFirst.contains("네이버")) {
-            // 이 타입에서 실제 판매자 상호가 여기 붙는 OCR이 많음
-            sellerName = franchiseFirst;
-        }
-
-        //    fallback: 판매자/가맹점 섹션에서 회사명 후보 스캔 (네이버파이낸셜 제외)
-        if (!notEmpty(sellerName) || isLooksLikeLabel(sellerName)) {
-            String section = sliceSection(text, "가맹점 정보", "금액", 2000);
-            String cand = findCompanyLikeLine(section, "네이버파이낸셜", "네이버");
-            if (notEmpty(cand)) sellerName = cand;
-        }
-        if (!notEmpty(sellerName) || isLooksLikeLabel(sellerName)) {
-            String section = sliceSection(text, "판매자 정보", "가맹점 정보", 2000);
-            String cand = findCompanyLikeLine(section, "네이버파이낸셜", "네이버");
-            if (notEmpty(cand)) sellerName = cand;
-        }
-
+        String sellerName = extractNaverSellerName(text);
         r.merchant.name = firstNonNull(cleanField(sellerName), "Unknown");
 
-        // 7) 판매자 사업자등록번호: 두 개 중 판매자 쪽(네이버파이낸셜이 아닌 것) 우선
         List<String> bizNos = findAllBizNo(text);
         String sellerBiz = null;
         for (String b : bizNos) {
-            // 네이버파이낸셜(가맹점) 사업자번호는 제외
-            if ("524-86-01528".equals(b)) continue;
+            if ("524-86-01528".equals(b))
+                continue;
             sellerBiz = b;
             break;
         }
-        if (!notEmpty(sellerBiz)) sellerBiz = (bizNos.isEmpty() ? null : bizNos.get(0));
+        if (!notEmpty(sellerBiz))
+            sellerBiz = (bizNos.isEmpty() ? null : bizNos.get(0));
         r.merchant.bizNo = cleanField(sellerBiz);
 
-        // 8) 판매자 전화번호/주소 (판매자/가맹점 영역 혼재 가능 → 넓게 스캔)
-        String sectionTelAddr = sliceSection(text, "판매자 정보", "금액", 4000);
+        r.merchant.tel = extract(text, "([0-9]{2,4}-[0-9]{3,4}-[0-9]{4})");
 
-        String tel = debugExtract("sellerTel", sectionTelAddr,
-                "(?m)전화번호\\s*\\n\\s*([0-9\\-]{8,20})", 1);
-        if (notEmpty(tel)) r.merchant.tel = cleanField(tel);
+        String addr = extractDot(text,
+                "(?s)사업장주소\\s*([\\s\\S]*?)\\s*(?:가맹점\\s*정보|가맹점정보|금액|$)", 1);
+        if (notEmpty(addr))
+            r.merchant.address = cleanField(addr);
 
-        String addr = debugExtractDot("sellerAddr", sectionTelAddr,
-                "(?s)(사업장주소|주소)\\s*\\n\\s*([\\s\\S]*?)\\s*(?:\\n\\s*(가맹점\\s*정보|금액)|$)", 2);
-        if (notEmpty(addr)) r.merchant.address = cleanField(addr);
+        System.out.println("[NAVER] sellerName=" + safe(r.merchant.name));
+        System.out.println("[NAVER] bizNo=" + safe(r.merchant.bizNo));
+        System.out.println("[NAVER] tel=" + safe(r.merchant.tel));
+        System.out.println("[NAVER] address=" + safe(r.merchant.address));
 
-        // 9) ✅ 금액: "금액" 섹션에서 숫자 5개(승인/공급/부가세/봉사료/합계)
+        // ---- 금액정보 ----
+        System.out.println("[NAVER] ---- 금액정보 파싱 ----");
+
         AmountsNav a = parseNaverAmounts(text);
         if (a != null) {
-            r.totals.taxable = a.supply;
             r.totals.vat = a.vat;
-            r.totals.total = a.total;
-
-            // approvalAmt가 String이면 변환해서 세팅
-            if (r.payment != null && r.payment.approvalAmt == null && a.approval != null) {
-                r.payment.approvalAmt = String.valueOf(a.approval);
+            if (isCancelled) {
+                // 취소 영수증: taxable=0, total=취소금액(음수)
+                r.totals.taxable = 0;
+                Integer cancelAmt = (a.cancel != null) ? a.cancel
+                        : (a.approval != null ? -Math.abs(a.approval) : 0);
+                r.totals.total = cancelAmt;
+                if (r.payment != null)
+                    r.payment.approvalAmt = String.valueOf(cancelAmt);
+            } else {
+                r.totals.taxable = a.supply;
+                r.totals.total = (a.approval != null && a.approval > 0) ? a.approval : a.total;
+                if (r.payment != null && a.approval != null) {
+                    r.payment.approvalAmt = String.valueOf(a.approval);
+                }
             }
         }
 
-        // 10) 아이템 1개
+        System.out.println("[NAVER] taxable(공급가액)=" + safeInt(r.totals.taxable));
+        System.out.println("[NAVER] vat(부가세액)=" + safeInt(r.totals.vat));
+        System.out.println("[NAVER] total=" + safeInt(r.totals.total));
+        System.out.println("[NAVER] approvalAmt=" + safe(r.payment.approvalAmt));
+
+        // taxFlag: 부가세액 > 0 → 과세, == 0 → 면세
+        String taxFlag = null;
+        if (r.totals.vat != null && r.totals.vat > 0) {
+            taxFlag = "과세";
+        } else if (r.totals.vat != null && r.totals.vat == 0) {
+            taxFlag = "면세";
+        }
+        System.out.println("[NAVER] taxFlag=" + safe(taxFlag));
+
+        // ---- 아이템 (항상 1개) ----
         Item it = new Item();
         it.name = notEmpty(productName) ? productName : "상품";
         it.qty = 1;
         it.amount = r.totals.total;
         it.unitPrice = r.totals.total;
+        it.taxFlag = taxFlag;
         r.items = List.of(it);
 
-        System.out.println("[NAVER] merchant=" + safe(r.merchant.name)
-                + ", bizNo=" + safe(r.merchant.bizNo)
-                + ", total=" + safeInt(r.totals.total)
-                + ", approvalAmt=" + safe(r.payment.approvalAmt));
-
-        System.out.println("=== ◀ parseNaverCardReceipt END ===");
+        System.out.println("[NAVER] item => name=" + safe(it.name) + " | qty=1 | amount=" + safeInt(it.amount)
+                + " | taxFlag=" + safe(taxFlag));
+        System.out.println("[NAVER] ---- parseNaverCardReceipt 종료 ----");
         return r;
+    }
+
+    /**
+     * 네이버 영수증에서 판매자상호 추출
+     * OCR 구조: 라벨 컬럼 전체 → 값 컬럼 전체 (또는 인터리브)
+     * 전략: "판매자 정보" ~ "가맹점 정보" 구간에서 사업자번호(XXX-XX-XXXXX) 바로 앞 줄
+     */
+    private String extractNaverSellerName(String text) {
+        if (text == null)
+            return null;
+        String[] lines = text.replace("\r", "\n").split("\n");
+
+        // "판매자 정보" 구간 시작/끝 인덱스
+        int sellerSectionStart = -1;
+        int sellerSectionEnd = lines.length;
+        for (int i = 0; i < lines.length; i++) {
+            String t = lines[i].trim().replace(" ", "");
+            if (t.equals("판매자정보") || t.equals("판매자정보:")) {
+                sellerSectionStart = i;
+            }
+            if (sellerSectionStart >= 0 && (t.equals("가맹점정보") || t.startsWith("가맹점명"))) {
+                sellerSectionEnd = i;
+                break;
+            }
+        }
+
+        if (sellerSectionStart < 0)
+            sellerSectionStart = 0;
+
+        // 판매자 구간에서 사업자번호(XXX-XX-XXXXX) 위치 찾기 (524-86-01528 제외)
+        Pattern BIZ = Pattern.compile("^[0-9]{3}-[0-9]{2}-[0-9]{5}$");
+        int bizIdx = -1;
+        for (int i = sellerSectionStart; i < sellerSectionEnd; i++) {
+            String t = lines[i].trim();
+            if (BIZ.matcher(t).matches() && !"524-86-01528".equals(t)) {
+                bizIdx = i;
+                break;
+            }
+        }
+
+        System.out.println(
+                "[NAVER.seller] sellerSection=[" + sellerSectionStart + "," + sellerSectionEnd + "], bizIdx=" + bizIdx);
+
+        // 패턴1: "판매자상호" 라벨 바로 다음 줄이 값인 경우 (라벨/사업자번호/전화번호/주소 제외)
+        int sellerLabelIdx = -1;
+        for (int i = sellerSectionStart; i < sellerSectionEnd; i++) {
+            if (lines[i].trim().replace(" ", "").equals("판매자상호")) {
+                sellerLabelIdx = i;
+                break;
+            }
+        }
+        if (sellerLabelIdx >= 0) {
+            for (int j = sellerLabelIdx + 1; j < sellerSectionEnd; j++) {
+                String t = lines[j].trim();
+                if (t.isEmpty())
+                    continue;
+                String tNoSpc = t.replace(" ", "");
+                if (tNoSpc.equals("대표자명") || tNoSpc.equals("사업자등록번호")
+                        || tNoSpc.equals("전화번호") || tNoSpc.equals("사업장주소") || tNoSpc.equals("판매자정보"))
+                    break;
+                if (t.matches("[0-9]{2,4}-[0-9]{3,4}-[0-9]{4}"))
+                    break;
+                if (BIZ.matcher(t).matches())
+                    break;
+                if (t.matches("[0-9\\-/\\*\\s]+"))
+                    continue;
+                System.out.println("[NAVER.seller] pattern1 found at line " + j + ": " + t);
+                return t;
+            }
+        }
+
+        // 패턴2: 값 컬럼 순서 활용
+        // 네이버 OCR에서 값은 순서대로 나옴: 상호명 → 대표자명(사람) → 사업자번호 → 전화번호
+        // → 사업자번호(bizIdx) 기준으로 "값 역방향 목록"을 수집해서 두번째 값이 상호명
+        if (bizIdx > sellerSectionStart) {
+            List<Integer> valueLines = new ArrayList<>();
+            for (int j = bizIdx - 1; j > sellerSectionStart; j--) {
+                String t = lines[j].trim();
+                if (t.isEmpty())
+                    continue;
+                String tNoSpc = t.replace(" ", "");
+                // 라벨이면 건너뜀 (값만 수집)
+                if (tNoSpc.equals("판매자상호") || tNoSpc.equals("대표자명") || tNoSpc.equals("사업자등록번호")
+                        || tNoSpc.equals("전화번호") || tNoSpc.equals("사업장주소") || tNoSpc.equals("판매자정보"))
+                    continue;
+                if (BIZ.matcher(t).matches())
+                    continue;
+                if (t.matches("[0-9\\-/\\*\\s]+"))
+                    continue;
+                valueLines.add(j);
+            }
+            System.out.println("[NAVER.seller] valueLines(역방향)=" + valueLines);
+            // valueLines[0] = 사업자번호 바로 앞 값 = 대표자명(사람이름)
+            // valueLines[1] = 그 앞 값 = 상호명
+            if (valueLines.size() >= 2) {
+                String candidate = lines[valueLines.get(1)].trim();
+                System.out.println("[NAVER.seller] pattern2 found: " + candidate);
+                return candidate;
+            } else if (valueLines.size() == 1) {
+                // 대표자명 없이 상호명만 있는 경우
+                String candidate = lines[valueLines.get(0)].trim();
+                System.out.println("[NAVER.seller] pattern2(단독) found: " + candidate);
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private static class AmountsNav {
         Integer approval; // 승인금액
-        Integer supply;   // 공급가액
-        Integer vat;      // 부가세액
-        Integer svc;      // 봉사료
-        Integer total;    // 합계
+        Integer cancel; // 취소금액 (취소 영수증)
+        Integer supply; // 공급가액
+        Integer vat; // 부가세액
+        Integer svc; // 봉사료
+        Integer total; // 합계
     }
 
     /**
-     * ✅ FIX: 기존 "라인 단독 숫자" 정규식은 OCR 특수공백/제어문자 때문에 candidates=[]가 자주 발생
-     * -> "어디에 있든 금액 형태(콤마 포함)"를 모두 뽑고, 뒤에서 5개를 매핑
+     * 네이버 영수증 금액 파싱
+     * OCR 구조: 라벨 컬럼(승인금액/공급가액/부가세액/봉사료/합계) 먼저, 값 컬럼 나중에
+     * → 금액 섹션에서 라벨 순서 위치 파악 후 숫자 순서대로 매핑
      */
     private AmountsNav parseNaverAmounts(String text) {
-        if (text == null) return null;
-        int idx = text.indexOf("금액");
-        if (idx < 0) return null;
+        if (text == null)
+            return null;
 
-        String tail = text.substring(idx);
+        String[] lines = text.replace("\r", "\n").split("\n");
 
-        // 숫자 수집: 34,700 / 31,546 / 3,154 / 0 / 34,700
-        List<Integer> nums = new ArrayList<>();
-
-        // ✅ 콤마 금액 우선(네이버 영수증은 거의 콤마형)
-        Matcher m = Pattern.compile("(\\d{1,3}(?:,\\d{3})+)").matcher(tail);
-        while (m.find()) {
-            Integer v = toInt(m.group(1));
-            if (v != null) nums.add(v);
+        // 금액 섹션 시작 찾기
+        int amtSectionStart = -1;
+        for (int i = 0; i < lines.length; i++) {
+            if (lines[i].trim().equals("금액")) {
+                amtSectionStart = i;
+                break;
+            }
         }
+        if (amtSectionStart < 0)
+            return null;
 
-        // 봉사료가 "0"처럼 단독 숫자로만 나올 수 있어 보완
-        if (nums.size() < 5) {
-            Matcher m2 = Pattern.compile("(?m)^\\s*(\\d{1,8})\\s*$").matcher(tail);
-            while (m2.find()) {
-                Integer v = toInt(m2.group(1));
-                if (v != null) nums.add(v);
+        // 금액 섹션에서 라벨 순서 파악 (취소금액 포함)
+        List<String> labels = new ArrayList<>();
+        List<Integer> labelIdxs = new ArrayList<>();
+        String[] expectedLabels = { "승인금액", "취소금액", "공급가액", "부가세액", "봉사료", "합계" };
+        Set<String> expectedSet = new HashSet<>(Arrays.asList(expectedLabels));
+
+        for (int i = amtSectionStart; i < lines.length; i++) {
+            String t = lines[i].trim();
+            if (expectedSet.contains(t)) {
+                labels.add(t);
+                labelIdxs.add(i);
             }
         }
 
-        if (DEBUG) {
-            System.out.println("[DEBUG.naverAmounts] nums=" + nums);
+        // 라벨 바로 뒤에 오는 숫자를 라벨 순서대로 매핑
+        // OCR 구조: 라벨 줄들이 먼저 나오고, 값 줄들이 이어서 나옴
+        // → 첫 번째 라벨 이후부터 숫자/0 값을 순서대로 수집 (라벨 줄은 건너뜀)
+        List<Integer> nums = new ArrayList<>();
+        Pattern AMT = Pattern.compile("^-?\\d{1,3}(?:,\\d{3})*$");
+        int valueStart = labelIdxs.isEmpty() ? amtSectionStart : labelIdxs.get(0) + 1;
+        for (int i = valueStart; i < lines.length; i++) {
+            String t = lines[i].trim();
+            if (expectedSet.contains(t)) continue; // 라벨 줄 건너뜀
+            if (t.matches("^-?\\d{1,3}(?:,\\d{3})*$") || t.equals("0")) {
+                nums.add(toInt(t));
+            }
         }
 
-        if (nums.size() < 5) return null;
-
-        // 뒤에서 5개(노이즈 섞였을 때 대비)
-        List<Integer> last5 = nums.subList(nums.size() - 5, nums.size());
+        System.out.println("[DEBUG.naverAmounts] labels=" + labels + ", nums=" + nums);
 
         AmountsNav a = new AmountsNav();
-        a.approval = last5.get(0);
-        a.supply = last5.get(1);
-        a.vat = last5.get(2);
-        a.svc = last5.get(3);
-        a.total = last5.get(4);
+
+        // 라벨 순서대로 nums 1:1 매핑
+        if (labels.size() >= 4 && nums.size() >= labels.size()) {
+            for (int i = 0; i < labels.size(); i++) {
+                switch (labels.get(i)) {
+                    case "승인금액":
+                        a.approval = nums.get(i);
+                        break;
+                    case "취소금액":
+                        a.cancel = nums.get(i);
+                        break;
+                    case "공급가액":
+                        a.supply = nums.get(i);
+                        break;
+                    case "부가세액":
+                        a.vat = nums.get(i);
+                        break;
+                    case "봉사료":
+                        a.svc = nums.get(i);
+                        break;
+                    case "합계":
+                        a.total = nums.get(i);
+                        break;
+                }
+            }
+        } else if (nums.size() >= 4) {
+            // fallback: 마지막 값들을 합계→봉사료→부가세→공급가→승인 역순으로
+            List<Integer> rev = new ArrayList<>(nums.subList(Math.max(0, nums.size() - 5), nums.size()));
+            Collections.reverse(rev);
+            if (rev.size() > 0)
+                a.total = rev.get(0);
+            if (rev.size() > 1)
+                a.svc = rev.get(1);
+            if (rev.size() > 2)
+                a.vat = rev.get(2);
+            if (rev.size() > 3)
+                a.supply = rev.get(3);
+            if (rev.size() > 4)
+                a.approval = rev.get(4);
+        }
+
+        System.out.println("[DEBUG.naverAmounts] approval=" + a.approval + ", cancel=" + a.cancel
+                + ", supply=" + a.supply + ", vat=" + a.vat + ", svc=" + a.svc + ", total=" + a.total);
+
+        // 합계가 없거나 0이면 승인금액으로 대체
+        if (a.total == null || a.total == 0)
+            a.total = a.approval;
+        if (a.approval == null || a.approval == 0)
+            a.approval = a.total;
+
         return a;
     }
 
     private String normalizeCardMasked(String raw) {
-        if (raw == null) return null;
+        if (raw == null)
+            return null;
         String x = cleanField(raw);
         // 괄호 유효기간 제거
         x = x.replaceAll("\\(.*?\\)", "").trim();
@@ -277,22 +485,27 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private String extractValueAfterLabel(String text, String label, int maxLines) {
-        if (text == null) return null;
+        if (text == null)
+            return null;
         String[] lines = text.replace("\r", "\n").split("\n");
         for (int i = 0; i < lines.length; i++) {
             String ln = cleanField(lines[i]);
-            if (!notEmpty(ln)) continue;
+            if (!notEmpty(ln))
+                continue;
 
             String lnNoSpace = ln.replace(" ", "");
             String labelNoSpace = label.replace(" ", "");
             if (lnNoSpace.equals(labelNoSpace) || lnNoSpace.startsWith(labelNoSpace)) {
                 for (int k = 1; k <= maxLines && (i + k) < lines.length; k++) {
                     String cand = cleanField(lines[i + k]);
-                    if (!notEmpty(cand)) continue;
-                    if (isLooksLikeLabel(cand)) continue;
+                    if (!notEmpty(cand))
+                        continue;
+                    if (isLooksLikeLabel(cand))
+                        continue;
 
                     // 섹션 헤더면 중단
-                    if (cand.contains("가맹점 정보") || cand.contains("금액") || cand.contains("판매자 정보")) break;
+                    if (cand.contains("가맹점 정보") || cand.contains("금액") || cand.contains("판매자 정보"))
+                        break;
 
                     return cand;
                 }
@@ -303,43 +516,54 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private boolean isLooksLikeLabel(String s) {
-        if (s == null) return false;
+        if (s == null)
+            return false;
         String t = s.replace(" ", "");
         String[] labels = {
-                "대표자명","사업자등록번호","전화번호","사업장주소",
-                "가맹점정보","가맹점명","가맹점번호","주소",
-                "승인금액","공급가액","부가세액","봉사료","합계",
-                "상품주문번호","상품주문","주문번호","상품명"
+                "대표자명", "사업자등록번호", "전화번호", "사업장주소",
+                "가맹점정보", "가맹점명", "가맹점번호", "주소",
+                "승인금액", "공급가액", "부가세액", "봉사료", "합계",
+                "상품주문번호", "상품주문", "주문번호", "상품명"
         };
         for (String l : labels) {
-            if (t.equals(l) || t.startsWith(l)) return true;
+            if (t.equals(l) || t.startsWith(l))
+                return true;
         }
         return false;
     }
 
     private String findCompanyLikeLine(String section, String... blacklistContains) {
-        if (section == null) return null;
+        if (section == null)
+            return null;
         String[] lines = section.replace("\r", "\n").split("\n");
         String best = null;
 
         for (String line : lines) {
             String t = cleanField(line);
-            if (!notEmpty(t)) continue;
-            if (isLooksLikeLabel(t)) continue;
+            if (!notEmpty(t))
+                continue;
+            if (isLooksLikeLabel(t))
+                continue;
 
             boolean blocked = false;
             for (String b : blacklistContains) {
-                if (b != null && !b.isEmpty() && t.contains(b)) { blocked = true; break; }
+                if (b != null && !b.isEmpty() && t.contains(b)) {
+                    blocked = true;
+                    break;
+                }
             }
-            if (blocked) continue;
+            if (blocked)
+                continue;
 
             // 사람 이름(2~4글자) 같은 건 제외
-            if (t.matches("^[가-힣]{2,4}$")) continue;
+            if (t.matches("^[가-힣]{2,4}$"))
+                continue;
 
             // 회사명 형태 힌트
             if (t.contains("(주)") || t.contains("주식회사") || t.contains("회사") ||
                     t.endsWith("케미칼") || t.endsWith("상사") || t.endsWith("마트") || t.endsWith("점")) {
-                if (best == null || t.length() > best.length()) best = t;
+                if (best == null || t.length() > best.length())
+                    best = t;
             }
         }
         return best;
@@ -347,35 +571,44 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
 
     private List<String> findAllBizNo(String text) {
         List<String> list = new ArrayList<>();
-        if (text == null) return list;
+        if (text == null)
+            return list;
         Matcher m = Pattern.compile("([0-9]{3}-[0-9]{2}-[0-9]{5})").matcher(text);
         while (m.find()) {
             String v = m.group(1);
-            if (!list.contains(v)) list.add(v);
+            if (!list.contains(v))
+                list.add(v);
         }
         return list;
     }
 
     private String sliceSection(String text, String startLabel, String endLabel, int maxLen) {
-        if (text == null) return "";
+        if (text == null)
+            return "";
         int s = text.indexOf(startLabel);
-        if (s < 0) return "";
+        if (s < 0)
+            return "";
         int e = (endLabel == null)
                 ? Math.min(text.length(), s + maxLen)
                 : text.indexOf(endLabel, s + startLabel.length());
-        if (e < 0) e = Math.min(text.length(), s + maxLen);
+        if (e < 0)
+            e = Math.min(text.length(), s + maxLen);
         return text.substring(s, e);
     }
 
     private String pickBestProductLine(String block) {
-        if (block == null) return null;
+        if (block == null)
+            return null;
         String[] lines = block.replace("\r", "\n").split("\n");
         String best = null;
         for (String ln : lines) {
             String t = cleanField(ln);
-            if (!notEmpty(t)) continue;
-            if (isLooksLikeLabel(t)) continue;
-            if (best == null || t.length() > best.length()) best = t;
+            if (!notEmpty(t))
+                continue;
+            if (isLooksLikeLabel(t))
+                continue;
+            if (best == null || t.length() > best.length())
+                best = t;
         }
         return best;
     }
@@ -392,16 +625,14 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         boolean hasSellerSection = text.contains("판매자 정보") || text.contains("판매자정보") || text.contains("판매자상호");
         boolean hasFranchiseSection = text.contains("가맹점 정보") || text.contains("가맹점정보") || text.contains("가맹점점명");
 
-        boolean hasKeyFields =
-                text.contains("승인번호") &&
-                        (text.contains("주문번호") || text.contains("주 문 번 호") || text.contains("주문 번호")) &&
-                        (text.contains("품명") || text.contains("품목") || text.contains("상품명")) &&
-                        (text.contains("승인일시") || text.contains("승인 일시"));
+        boolean hasKeyFields = text.contains("승인번호") &&
+                (text.contains("주문번호") || text.contains("주 문 번 호") || text.contains("주문 번호")) &&
+                (text.contains("품명") || text.contains("품목") || text.contains("상품명")) &&
+                (text.contains("승인일시") || text.contains("승인 일시"));
 
         // ✅ Homeplus 로고가 OCR에서 누락될 수 있으니, 타이틀+섹션+키필드 조합으로도 인정
-        boolean result =
-                (hasBrand && (hasTitle || (hasPaySection && (hasSellerSection || hasFranchiseSection))))
-                        || (hasTitle && hasPaySection && (hasSellerSection || hasFranchiseSection) && hasKeyFields);
+        boolean result = (hasBrand && (hasTitle || (hasPaySection && (hasSellerSection || hasFranchiseSection))))
+                || (hasTitle && hasPaySection && (hasSellerSection || hasFranchiseSection) && hasKeyFields);
 
         System.out.println("[DETECT] Homeplus hasBrand=" + hasBrand
                 + ", hasTitle=" + hasTitle
@@ -424,26 +655,21 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         // 1) 승인번호 / 주문번호
         r.approval.approvalNo = firstNonNull(
                 debugExtract("approvalNo#1", text, "승인번호\\s*[:：]?\\s*([0-9]{6,12})", 1),
-                debugExtract("approvalNo#2", text, "승\\s*인\\s*번\\s*호\\s*[:：]?\\s*([0-9]{6,12})", 1)
-        );
+                debugExtract("approvalNo#2", text, "승\\s*인\\s*번\\s*호\\s*[:：]?\\s*([0-9]{6,12})", 1));
 
         r.meta.receiptNo = firstNonNull(
                 debugExtract("orderNo#1", text, "주문번호\\s*[:：]?\\s*([0-9]{8,})", 1),
                 debugExtract("orderNo#2", text, "주\\s*문\\s*번\\s*호\\s*[:：]?\\s*([0-9]{8,})", 1),
-                debugExtract("orderNo#3", text, "주문\\s*번호\\s*[:：]?\\s*([0-9]{8,})", 1)
-        );
+                debugExtract("orderNo#3", text, "주문\\s*번호\\s*[:：]?\\s*([0-9]{8,})", 1));
 
         // 2) 품명(=상품명 역할)
         String itemName = firstNonNull(
                 debugExtractDot("itemName#1", text,
                         "(?s)품명\\s*[:：]?\\s*([\\s\\S]*?)\\s*(카드종류|카드번호|유효기간|거래유형|할부개월|승인일시|결제금액|판매자\\s*정보|가맹점\\s*정보|$)",
-                        1
-                ),
+                        1),
                 debugExtractDot("itemName#2", text,
                         "(?s)(품목|상품명)\\s*[:：]?\\s*([\\s\\S]*?)\\s*(카드종류|카드번호|유효기간|거래유형|할부개월|승인일시|결제금액|판매자\\s*정보|가맹점\\s*정보|$)",
-                        2
-                )
-        );
+                        2));
         itemName = cleanField(itemName);
 
         // "외 N건" 처리
@@ -455,7 +681,8 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
             if (m.find()) {
                 itemCore = cleanField(m.group(1));
                 Integer extra = toInt(m.group(2));
-                if (extra != null && extra >= 0) qtyGuess = 1 + extra;
+                if (extra != null && extra >= 0)
+                    qtyGuess = 1 + extra;
                 System.out.println("[HOMEPLUS] itemName has '외N건' => core=" + itemCore + ", qtyGuess=" + qtyGuess);
             }
         }
@@ -465,14 +692,13 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 debugExtractDot("cardType#1", text,
                         "(?s)카드종류\\s*[:：]?\\s*([\\s\\S]*?)\\s*(카드번호|유효기간|거래유형|할부개월|승인일시|$)", 1),
                 debugExtract("cardType#2", text,
-                        "카드종류\\s*[:：]?\\s*([가-힣A-Za-z0-9()\\-\\s]{2,30})", 1)
-        );
+                        "카드종류\\s*[:：]?\\s*([가-힣A-Za-z0-9()\\-\\s]{2,30})", 1));
         cardType = cleanField(cardType);
 
         r.payment.cardBrand = normalizeCardBrand(firstNonNull(
                 cardType,
-                debugExtract("cardBrand#fallback", text, "(IBK비씨카드|IBK\\s*비씨카드|BC\\s*카드\\(.*?\\)|BC\\s*카드|BC카드|비씨카드|BC|국민|신한|현대|롯데|농협|하나|NH|KB)", 1)
-        ));
+                debugExtract("cardBrand#fallback", text,
+                        "(IBK비씨카드|IBK\\s*비씨카드|BC\\s*카드\\(.*?\\)|BC\\s*카드|BC카드|비씨카드|BC|국민|신한|현대|롯데|농협|하나|NH|KB)", 1)));
 
         // 카드번호: 마스킹/하이픈/부분숫자 등 다양
         String cardNo = firstNonNull(
@@ -480,12 +706,12 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 debugExtract("cardNo#2", text, "카드번호\\s*[:：]?\\s*([0-9\\-* ]{7,25})", 1),
                 debugExtract("cardNo#3", text, "카드번호\\s*[:：]?\\s*([0-9]{6,20})", 1),
                 debugExtractDot("cardNo#4_near", text,
-                        "(?s)카드번호\\s*[:：]?\\s*([\\s\\S]{0,40})\\s*(유효기간|거래유형|할부개월|승인일시|$)", 1)
-        );
+                        "(?s)카드번호\\s*[:：]?\\s*([\\s\\S]{0,40})\\s*(유효기간|거래유형|할부개월|승인일시|$)", 1));
         cardNo = cleanField(cardNo);
         if (notEmpty(cardNo) && cardNo.length() > 25) {
             String refined = extract(cardNo, "([0-9]{4}[- ]?[0-9\\*\\- ]{3,20})", 1);
-            if (refined != null) cardNo = refined;
+            if (refined != null)
+                cardNo = refined;
         }
         r.payment.cardMasked = cardNo;
 
@@ -493,16 +719,14 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 debugExtractDot("tradeType#1", text,
                         "(?s)거래유형\\s*[:：]?\\s*([\\s\\S]*?)\\s*(할부개월|승인일시|결제금액|$)", 1),
                 debugExtract("tradeType#2", text,
-                        "거래유형\\s*[:：]?\\s*(정상매출|취소매출|정상|취소|승인|매출)", 1)
-        );
+                        "거래유형\\s*[:：]?\\s*(정상매출|취소매출|정상|취소|승인|매출)", 1));
         tradeType = cleanField(tradeType);
         r.payment.type = firstNonNull(tradeType, "신용거래");
 
         String installment = firstNonNull(
                 debugExtractDot("installment#1", text,
                         "(?s)할부개월\\s*[:：]?\\s*([\\s\\S]*?)\\s*(승인일시|결제금액|$)", 1),
-                debugExtract("installment#2", text, "할부개월\\s*[:：]?\\s*(일시불|[0-9]{1,2}개월)", 1)
-        );
+                debugExtract("installment#2", text, "할부개월\\s*[:：]?\\s*(일시불|[0-9]{1,2}개월)", 1));
         installment = cleanField(installment);
         System.out.println("[HOMEPLUS] installment=" + safe(installment));
 
@@ -510,14 +734,12 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         String datePart = firstNonNull(
                 debugExtract("approveDate#1", text,
                         "승인일시\\s*[:：]?\\s*(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 1),
-                debugExtract("approveDate#fallback", text, "(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})", 1)
-        );
+                debugExtract("approveDate#fallback", text, "(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})", 1));
 
         String timePart = firstNonNull(
                 debugExtract("approveTime#1", text,
                         "승인일시\\s*[:：]?\\s*(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 2),
-                debugExtract("approveTime#fallback", text, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 1)
-        );
+                debugExtract("approveTime#fallback", text, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)", 1));
 
         r.meta.saleDate = normalizeDate(datePart);
         r.meta.saleTime = normalizeTime(timePart);
@@ -525,24 +747,23 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         // 5) 결제금액 블록
         Integer amount = firstNonNullInt(
                 debugInt("amount#1", text, "금액\\s*[:：]?\\s*([0-9]{1,3}(?:,[0-9]{3})*)\\s*원?", 1),
-                debugInt("amount#2", text, "결제금액[\\s\\S]*?금액\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1)
-        );
+                debugInt("amount#2", text, "결제금액[\\s\\S]*?금액\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1));
         Integer vat = firstNonNullInt(
                 debugInt("vat#1", text, "부가세\\s*[:：]?\\s*([0-9]{1,3}(?:,[0-9]{3})*)\\s*원?", 1),
-                debugInt("vat#2", text, "결제금액[\\s\\S]*?부가세\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1)
-        );
+                debugInt("vat#2", text, "결제금액[\\s\\S]*?부가세\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1));
         Integer total = firstNonNullInt(
                 debugInt("total#1", text, "합계\\s*[:：]?\\s*([0-9]{1,3}(?:,[0-9]{3})*)\\s*원?", 1),
-                debugInt("total#2", text, "결제금액[\\s\\S]*?합계\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1)
-        );
+                debugInt("total#2", text, "결제금액[\\s\\S]*?합계\\s*([0-9]{1,3}(?:,[0-9]{3})*)", 1));
 
         r.totals.taxable = amount;
         r.totals.vat = vat;
         r.totals.total = total;
 
         if (r.totals.total == null) {
-            if (amount != null && vat != null) r.totals.total = amount + vat;
-            else if (amount != null) r.totals.total = amount;
+            if (amount != null && vat != null)
+                r.totals.total = amount + vat;
+            else if (amount != null)
+                r.totals.total = amount;
         }
 
         // 6) 판매자상호 / 가맹점점명
@@ -550,16 +771,14 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 debugExtractDot("seller#1", text,
                         "(?s)판매자상호\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|전화번호|가맹점\\s*정보|가맹점정보|$)", 1),
                 debugExtractDot("seller#2", text,
-                        "(?s)판매자\\s*정보[\\s\\S]*?판매자상호\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|전화번호|$)", 1)
-        );
+                        "(?s)판매자\\s*정보[\\s\\S]*?판매자상호\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|전화번호|$)", 1));
         seller = cleanField(seller);
 
         String franchiseName = firstNonNull(
                 debugExtractDot("franchise#1", text,
                         "(?s)가맹점점명\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|가맹점주소|전화번호|$)", 1),
                 debugExtractDot("franchise#2", text,
-                        "(?s)가맹점\\s*정보[\\s\\S]*?가맹점점명\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|가맹점주소|전화번호|$)", 1)
-        );
+                        "(?s)가맹점\\s*정보[\\s\\S]*?가맹점점명\\s*[:：]?\\s*([\\s\\S]*?)\\s*(대표자명|사업자등록번호|가맹점주소|전화번호|$)", 1));
         franchiseName = cleanField(franchiseName);
 
         String merchantName = firstNonNull(
@@ -567,8 +786,7 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 notEmpty(franchiseName) ? franchiseName : null,
                 extract(text, "(홈플러스\\s*[가-힣A-Za-z0-9()\\-]*점)", 1),
                 (text.toLowerCase().contains("homeplus") ? "Homeplus" : null),
-                "홈플러스"
-        );
+                "홈플러스");
         r.merchant.name = merchantName;
 
         // 7) 아이템 구성
@@ -576,7 +794,8 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         it.name = notEmpty(itemCore) ? itemCore : (notEmpty(itemName) ? itemName : "품목");
         it.qty = (qtyGuess != null && qtyGuess > 0) ? qtyGuess : 1;
         it.amount = r.totals.total;
-        it.unitPrice = (it.qty != null && it.qty > 0 && r.totals.total != null) ? (r.totals.total / it.qty) : r.totals.total;
+        it.unitPrice = (it.qty != null && it.qty > 0 && r.totals.total != null) ? (r.totals.total / it.qty)
+                : r.totals.total;
 
         r.items = List.of(it);
 
@@ -594,7 +813,8 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         r.merchant.name = "쿠팡";
 
         String totalStr = extract(text, "쿠팡\\(쿠페이\\)\\s*[-]?\\s*([0-9,]+)\\s*원");
-        if (totalStr == null) totalStr = extract(text, "(-?[0-9,]+)\\s*원");
+        if (totalStr == null)
+            totalStr = extract(text, "(-?[0-9,]+)\\s*원");
         r.totals.total = toInt(totalStr);
 
         r.payment.cardBrand = firstNonNull(extract(text, "(쿠페이)"), extract(text, "(쿠팡페이)"));
@@ -605,8 +825,7 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
 
         String memoItem = firstNonNull(
                 extractDot(text, "(?s)거래메모\\s*[:：]?\\s*([가-힣A-Za-z0-9\\s:/,\\.\\-()]{2,60})\\s*(결제|승인|$)", 1),
-                extract(text, "([가-힣A-Za-z0-9]+\\s?(절단미역|쌀강정|세제|쿠키|강정|미역))")
-        );
+                extract(text, "([가-힣A-Za-z0-9]+\\s?(절단미역|쌀강정|세제|쿠키|강정|미역))"));
 
         Item it = new Item();
         it.name = (memoItem != null ? memoItem : "쿠팡 구매상품").trim();
@@ -631,8 +850,7 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         r.merchant.name = firstNonNull(
                 notEmpty(sellerName) ? sellerName : null,
                 extract(text, "(쿠팡\\(주\\)|쿠팡주식회사|쿠팡)"),
-                "쿠팡"
-        );
+                "쿠팡");
 
         String cardType = extractDot(text,
                 "(?s)카드종류\\s*([가-힣A-Za-z0-9\\s]*?카드)\\s*(거래종류|할부개월|카드번호|거래일시|승인번호|$)", 1);
@@ -642,15 +860,13 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 notEmpty(cardType) ? cardType : null,
                 extract(text, "(IBK비씨카드|IBK\\s*비씨카드|BC카드|비씨카드|BC)"),
                 extract(text, "(농협|하나|국민|신한|롯데|현대|NH|KB)"),
-                extract(text, "(농협카드|하나카드|국민카드|신한카드|롯데카드|현대카드)")
-        );
+                extract(text, "(농협카드|하나카드|국민카드|신한카드|롯데카드|현대카드)"));
         r.payment.cardBrand = normalizeCardBrand(r.payment.cardBrand);
 
         r.payment.cardMasked = firstNonNull(
                 extract(text, "(\\d{4}\\*+\\d{2,6}\\*?\\d{0,6})"),
                 extract(text, "(\\d{4}\\*{4,}\\d{3,4}\\*?)"),
-                extract(text, "카드번호\\s*[:：]?\\s*([0-9\\-*]{7,25})", 1)
-        );
+                extract(text, "카드번호\\s*[:：]?\\s*([0-9\\-*]{7,25})", 1));
 
         String tradeType = extractDot(text,
                 "(?s)거래종류\\s*([가-힣A-Za-z0-9\\s]{2,20})\\s*(할부개월|카드번호|거래일시|승인번호|$)", 1);
@@ -659,8 +875,7 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         r.payment.type = firstNonNull(
                 notEmpty(tradeType) ? tradeType : null,
                 extract(text, "(신용거래|현금거래|일시불|할부)"),
-                "신용거래"
-        );
+                "신용거래");
 
         r.meta.receiptNo = extract(text, "(주문\\s*번호)\\s*[:：]?\\s*([0-9]{8,})", 2);
         r.approval.approvalNo = extract(text, "(승인\\s*번호)\\s*[:：]?\\s*([0-9]{6,12})", 2);
@@ -668,9 +883,9 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         r.meta.saleDate = extract(text, "(20\\d{2}[./-]\\d{1,2}[./-]\\d{1,2})");
         r.meta.saleTime = extract(text, "([0-2]?\\d:[0-5]\\d:[0-5]\\d)");
 
-        r.totals.taxable  = firstInt(text, "과세금액[^0-9]*([0-9,]+)");
-        r.totals.vat      = firstInt(text, "부가세[^0-9]*([0-9,]+)");
-        r.totals.taxFree  = firstInt(text, "비과세금액[^0-9]*([0-9,]+)");
+        r.totals.taxable = firstInt(text, "과세금액[^0-9]*([0-9,]+)");
+        r.totals.vat = firstInt(text, "부가세[^0-9]*([0-9,]+)");
+        r.totals.taxFree = firstInt(text, "비과세금액[^0-9]*([0-9,]+)");
 
         Integer totalFromLabel = firstInt(text, "합계금액[^0-9]*([0-9]{1,3}(?:,[0-9]{3})+)");
         if (totalFromLabel == null) {
@@ -714,43 +929,55 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         return hasCoupay && hasMemo && !hasCardReceipt;
     }
 
-    /* ========================= printFullResult (요청 버전) ========================= */
+    /*
+     * ========================= printFullResult (요청 버전) =========================
+     */
 
     private void printFullResult(ReceiptResult r) {
         System.out.println("------ ✅ 최종 파싱 결과 요약 ------");
 
         // Merchant
         System.out.println("[MERCHANT] name: " + safe(getMerchantName(r)));
-        try { System.out.println("[MERCHANT] (reflection) " + reflectFields(getMerchant(r))); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[MERCHANT] (reflection) " + reflectFields(getMerchant(r)));
+        } catch (Exception ignore) {
+        }
 
         // Meta
         System.out.println("[META] receiptNo(orderNo): " + safe(getMetaReceiptNo(r)));
         System.out.println("[META] saleDate: " + safe(getMetaSaleDate(r)));
         System.out.println("[META] saleTime: " + safe(getMetaSaleTime(r)));
-        try { System.out.println("[META] (reflection) " + reflectFields(getMeta(r))); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[META] (reflection) " + reflectFields(getMeta(r)));
+        } catch (Exception ignore) {
+        }
 
         // Payment
         System.out.println("[PAYMENT] type: " + safe(getPaymentType(r)));
         System.out.println("[PAYMENT] cardBrand: " + safe(getPaymentCardBrand(r)));
         System.out.println("[PAYMENT] cardMasked: " + safe(getPaymentCardMasked(r)));
         System.out.println("[PAYMENT] approvalAmt: " + safe(getPaymentApprovalAmt(r)));
-        try { System.out.println("[PAYMENT] (reflection) " + reflectFields(getPayment(r))); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[PAYMENT] (reflection) " + reflectFields(getPayment(r)));
+        } catch (Exception ignore) {
+        }
 
         // Approval
         System.out.println("[APPROVAL] approvalNo: " + safe(getApprovalNo(r)));
-        try { System.out.println("[APPROVAL] (reflection) " + reflectFields(getApproval(r))); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[APPROVAL] (reflection) " + reflectFields(getApproval(r)));
+        } catch (Exception ignore) {
+        }
 
         // Totals
         System.out.println("[TOTALS] total: " + safeInt(getTotalsTotal(r)));
         System.out.println("[TOTALS] taxable: " + safeInt(getTotalsTaxable(r)));
         System.out.println("[TOTALS] vat: " + safeInt(getTotalsVat(r)));
         System.out.println("[TOTALS] taxFree: " + safeInt(getTotalsTaxFree(r)));
-        try { System.out.println("[TOTALS] (reflection) " + reflectFields(getTotals(r))); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[TOTALS] (reflection) " + reflectFields(getTotals(r)));
+        } catch (Exception ignore) {
+        }
 
         // Items
         int itemCount = (r != null && r.items != null) ? r.items.size() : 0;
@@ -763,40 +990,95 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                         + " | qty=" + safe(it != null ? it.qty : null)
                         + " | amount=" + safeInt(it != null ? it.amount : null)
                         + " | unitPrice=" + safeInt(it != null ? it.unitPrice : null));
-                try { System.out.println("    [ITEM reflection] " + reflectFields(it)); }
-                catch (Exception ignore) {}
+                try {
+                    System.out.println("    [ITEM reflection] " + reflectFields(it));
+                } catch (Exception ignore) {
+                }
             }
         }
 
         // Root reflection
-        try { System.out.println("[ROOT reflection] " + reflectFields(r)); }
-        catch (Exception ignore) {}
+        try {
+            System.out.println("[ROOT reflection] " + reflectFields(r));
+        } catch (Exception ignore) {
+        }
 
         System.out.println("---------------------------------");
     }
 
     /* ========================= safe getters ========================= */
 
-    private Merchant getMerchant(ReceiptResult r) { return (r == null ? null : r.merchant); }
-    private Meta getMeta(ReceiptResult r) { return (r == null ? null : r.meta); }
-    private Payment getPayment(ReceiptResult r) { return (r == null ? null : r.payment); }
-    private Approval getApproval(ReceiptResult r) { return (r == null ? null : r.approval); }
-    private Totals getTotals(ReceiptResult r) { return (r == null ? null : r.totals); }
+    private Merchant getMerchant(ReceiptResult r) {
+        return (r == null ? null : r.merchant);
+    }
 
-    private String getMerchantName(ReceiptResult r) { return (getMerchant(r) == null ? null : getMerchant(r).name); }
-    private String getMetaReceiptNo(ReceiptResult r) { return (getMeta(r) == null ? null : getMeta(r).receiptNo); }
-    private String getMetaSaleDate(ReceiptResult r) { return (getMeta(r) == null ? null : getMeta(r).saleDate); }
-    private String getMetaSaleTime(ReceiptResult r) { return (getMeta(r) == null ? null : getMeta(r).saleTime); }
-    private String getPaymentType(ReceiptResult r) { return (getPayment(r) == null ? null : getPayment(r).type); }
-    private String getPaymentCardBrand(ReceiptResult r) { return (getPayment(r) == null ? null : getPayment(r).cardBrand); }
-    private String getPaymentCardMasked(ReceiptResult r) { return (getPayment(r) == null ? null : getPayment(r).cardMasked); }
-    private String getPaymentApprovalAmt(ReceiptResult r) { return (getPayment(r) == null ? null : getPayment(r).approvalAmt); }
-    private String getApprovalNo(ReceiptResult r) { return (getApproval(r) == null ? null : getApproval(r).approvalNo); }
+    private Meta getMeta(ReceiptResult r) {
+        return (r == null ? null : r.meta);
+    }
 
-    private Integer getTotalsTotal(ReceiptResult r) { return (getTotals(r) == null ? null : getTotals(r).total); }
-    private Integer getTotalsTaxable(ReceiptResult r) { return (getTotals(r) == null ? null : getTotals(r).taxable); }
-    private Integer getTotalsVat(ReceiptResult r) { return (getTotals(r) == null ? null : getTotals(r).vat); }
-    private Integer getTotalsTaxFree(ReceiptResult r) { return (getTotals(r) == null ? null : getTotals(r).taxFree); }
+    private Payment getPayment(ReceiptResult r) {
+        return (r == null ? null : r.payment);
+    }
+
+    private Approval getApproval(ReceiptResult r) {
+        return (r == null ? null : r.approval);
+    }
+
+    private Totals getTotals(ReceiptResult r) {
+        return (r == null ? null : r.totals);
+    }
+
+    private String getMerchantName(ReceiptResult r) {
+        return (getMerchant(r) == null ? null : getMerchant(r).name);
+    }
+
+    private String getMetaReceiptNo(ReceiptResult r) {
+        return (getMeta(r) == null ? null : getMeta(r).receiptNo);
+    }
+
+    private String getMetaSaleDate(ReceiptResult r) {
+        return (getMeta(r) == null ? null : getMeta(r).saleDate);
+    }
+
+    private String getMetaSaleTime(ReceiptResult r) {
+        return (getMeta(r) == null ? null : getMeta(r).saleTime);
+    }
+
+    private String getPaymentType(ReceiptResult r) {
+        return (getPayment(r) == null ? null : getPayment(r).type);
+    }
+
+    private String getPaymentCardBrand(ReceiptResult r) {
+        return (getPayment(r) == null ? null : getPayment(r).cardBrand);
+    }
+
+    private String getPaymentCardMasked(ReceiptResult r) {
+        return (getPayment(r) == null ? null : getPayment(r).cardMasked);
+    }
+
+    private String getPaymentApprovalAmt(ReceiptResult r) {
+        return (getPayment(r) == null ? null : getPayment(r).approvalAmt);
+    }
+
+    private String getApprovalNo(ReceiptResult r) {
+        return (getApproval(r) == null ? null : getApproval(r).approvalNo);
+    }
+
+    private Integer getTotalsTotal(ReceiptResult r) {
+        return (getTotals(r) == null ? null : getTotals(r).total);
+    }
+
+    private Integer getTotalsTaxable(ReceiptResult r) {
+        return (getTotals(r) == null ? null : getTotals(r).taxable);
+    }
+
+    private Integer getTotalsVat(ReceiptResult r) {
+        return (getTotals(r) == null ? null : getTotals(r).vat);
+    }
+
+    private Integer getTotalsTaxFree(ReceiptResult r) {
+        return (getTotals(r) == null ? null : getTotals(r).taxFree);
+    }
 
     /* ========================= Debug extract helpers ========================= */
 
@@ -833,29 +1115,34 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private Integer firstNonNullInt(Integer... nums) {
-        for (Integer n : nums) if (n != null) return n;
+        for (Integer n : nums)
+            if (n != null)
+                return n;
         return null;
     }
 
     /* ========================= 공통 유틸 ========================= */
 
     private String normalizeTextKeepNewlines(String s) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         s = s.replace("\r\n", "\n").replace("\r", "\n");
-        s = s.replaceAll("[\\u00A0]", " ");       // NBSP
-        s = s.replaceAll("[\\t\\x0B\\f]+", " ");  // tab류
+        s = s.replaceAll("[\\u00A0]", " "); // NBSP
+        s = s.replaceAll("[\\t\\x0B\\f]+", " "); // tab류
 
         String[] lines = s.split("\n");
         StringBuilder sb = new StringBuilder();
         for (String line : lines) {
             String x = line.replaceAll(" +", " ").trim();
-            if (!x.isEmpty()) sb.append(x).append("\n");
+            if (!x.isEmpty())
+                sb.append(x).append("\n");
         }
         return sb.toString().trim();
     }
 
     private String normalizeDate(String date) {
-        if (date == null) return null;
+        if (date == null)
+            return null;
         String d = date.trim()
                 .replace(".", "-")
                 .replace("/", "-")
@@ -872,17 +1159,22 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private String normalizeTime(String time) {
-        if (time == null) return null;
+        if (time == null)
+            return null;
         return time.trim().replaceAll("\\s+", " ");
     }
 
-    protected String extract(String text, String regex) { return extract(text, regex, 1); }
+    protected String extract(String text, String regex) {
+        return extract(text, regex, 1);
+    }
 
     protected String extract(String text, String regex, int group) {
         try {
-            if (text == null) return null;
+            if (text == null)
+                return null;
             Matcher m = Pattern.compile(regex).matcher(text);
-            if (!m.find()) return null;
+            if (!m.find())
+                return null;
             int g = Math.min(group, m.groupCount());
             return m.group(g).trim();
         } catch (Exception e) {
@@ -892,9 +1184,11 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
 
     protected String extractDot(String text, String regex, int group) {
         try {
-            if (text == null) return null;
+            if (text == null)
+                return null;
             Matcher m = Pattern.compile(regex, Pattern.DOTALL).matcher(text);
-            if (!m.find()) return null;
+            if (!m.find())
+                return null;
             int g = Math.min(group, m.groupCount());
             return m.group(g).trim();
         } catch (Exception e) {
@@ -902,25 +1196,38 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         }
     }
 
-    private String safe(Object o) { return (o == null ? "" : String.valueOf(o)); }
-    private String safeInt(Integer n) { return (n == null ? "null" : n.toString()); }
+    private String safe(Object o) {
+        return (o == null ? "" : String.valueOf(o));
+    }
+
+    private String safeInt(Integer n) {
+        return (n == null ? "null" : n.toString());
+    }
 
     protected Integer toInt(String s) {
-        try { return (s == null) ? null : Integer.parseInt(s.replaceAll("[^0-9-]", "")); }
-        catch (Exception e) { return null; }
+        try {
+            return (s == null) ? null : Integer.parseInt(s.replaceAll("[^0-9-]", ""));
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     protected Integer firstInt(String text, String regex) {
         try {
-            if (text == null) return null;
+            if (text == null)
+                return null;
             Matcher m = Pattern.compile(regex).matcher(text);
-            if (m.find()) return toInt(m.group(m.groupCount()));
-        } catch (Exception ignore) {}
+            if (m.find())
+                return toInt(m.group(m.groupCount()));
+        } catch (Exception ignore) {
+        }
         return null;
     }
 
     protected String firstNonNull(String... arr) {
-        for (String s : arr) if (s != null && !s.trim().isEmpty()) return s.trim();
+        for (String s : arr)
+            if (s != null && !s.trim().isEmpty())
+                return s.trim();
         return null;
     }
 
@@ -929,14 +1236,16 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private String cleanField(String s) {
-        if (s == null) return null;
+        if (s == null)
+            return null;
         return s.replaceAll("[\\u00A0]+", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
     }
 
     private String cleanProductName(String s) {
-        if (s == null) return null;
+        if (s == null)
+            return null;
         s = s.replaceAll("[\\u00A0]+", " ");
         s = s.replaceAll("\\s+", " ").trim();
         s = s.replaceAll("(카드종류|카드번호|유효기간|거래유형|할부개월|승인일시|결제금액|판매자\\s*정보|가맹점\\s*정보).*", "").trim();
@@ -945,29 +1254,43 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
     }
 
     private String normalizeCardBrand(String s) {
-        if (s == null) return null;
+        if (s == null)
+            return null;
         s = s.replaceAll("\\s+", "");
-        if (s.equalsIgnoreCase("BC")) return "BC카드";
-        if (s.equals("비씨")) return "비씨카드";
-        if (s.contains("비씨") && !s.endsWith("카드")) return s + "카드";
-        if (s.equals("BC카드")) return "BC카드";
-        if (s.equals("IBK비씨카드") || s.equals("IBK비씨카드카드")) return "IBK비씨카드";
+        if (s.equalsIgnoreCase("BC"))
+            return "BC카드";
+        if (s.equals("비씨"))
+            return "비씨카드";
+        if (s.contains("비씨") && !s.endsWith("카드"))
+            return s + "카드";
+        if (s.equals("BC카드"))
+            return "BC카드";
+        if (s.equals("IBK비씨카드") || s.equals("IBK비씨카드카드"))
+            return "IBK비씨카드";
         return s;
     }
 
     /* ========================= reflectFields ========================= */
 
     protected String reflectFields(Object obj) {
-        if (obj == null) return "null";
+        if (obj == null)
+            return "null";
         StringBuilder sb = new StringBuilder();
         Map<Object, Boolean> visited = new IdentityHashMap<>();
         reflectFieldsInternal(obj, sb, visited, 0, 2);
         return sb.toString();
     }
 
-    private void reflectFieldsInternal(Object obj, StringBuilder sb, Map<Object, Boolean> visited, int depth, int maxDepth) {
-        if (obj == null) { sb.append("null"); return; }
-        if (visited.containsKey(obj)) { sb.append("(circular-ref)"); return; }
+    private void reflectFieldsInternal(Object obj, StringBuilder sb, Map<Object, Boolean> visited, int depth,
+            int maxDepth) {
+        if (obj == null) {
+            sb.append("null");
+            return;
+        }
+        if (visited.containsKey(obj)) {
+            sb.append("(circular-ref)");
+            return;
+        }
         visited.put(obj, true);
 
         Class<?> c = obj.getClass();
@@ -977,9 +1300,11 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         boolean first = true;
 
         for (Field f : fields) {
-            if (Modifier.isStatic(f.getModifiers())) continue;
+            if (Modifier.isStatic(f.getModifiers()))
+                continue;
 
-            if (!first) sb.append(", ");
+            if (!first)
+                sb.append(", ");
             first = false;
 
             f.setAccessible(true);
@@ -987,10 +1312,14 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
 
             try {
                 Object v = f.get(obj);
-                if (v == null) sb.append("null");
-                else if (isPrimitiveLike(v)) sb.append(String.valueOf(v));
-                else if (depth >= maxDepth) sb.append(v.getClass().getSimpleName());
-                else reflectFieldsInternal(v, sb, visited, depth + 1, maxDepth);
+                if (v == null)
+                    sb.append("null");
+                else if (isPrimitiveLike(v))
+                    sb.append(String.valueOf(v));
+                else if (depth >= maxDepth)
+                    sb.append(v.getClass().getSimpleName());
+                else
+                    reflectFieldsInternal(v, sb, visited, depth + 1, maxDepth);
             } catch (Exception e) {
                 sb.append("(error:").append(e.getClass().getSimpleName()).append(")");
             }

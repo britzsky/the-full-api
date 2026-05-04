@@ -90,7 +90,10 @@ public class OcrController {
             "위생장갑", "고무장갑", "앞치마", "마스크",
             "종이컵", "비닐", "봉투", "랩", "호일", "포장",
             "세제", "주방세제", "락스", "세척제", "소독제",
-            "수세미", "스펀지", "필터", "호스", "밥솥");
+            "수세미", "스펀지", "필터", "호스", "밥솥",
+            "그릇", "식기", "접시", "공기", "쟁반", "바구니", "찬합", "반찬통", "용기",
+            "냄비", "솥", "팬", "프라이팬", "볼", "채반", "소쿠리", "체", "카트", "서빙카",
+            "다라이", "양푼", "스텐", "타공");
 
     // ✅ 예외 케이스 (예: "칼국수" → 음식)
     private static final List<String> FOOD_EXCEPTIONS = Arrays.asList(
@@ -224,8 +227,14 @@ public class OcrController {
             // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
             // =========================
 
-            // saleId 생성(영수증 날짜 기반)
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            // saleId 생성 - OCR 날짜 우선, 없으면 requestParam 날짜 사용
+            String effectiveSaleDate = (result.meta.saleDate != null && !result.meta.saleDate.isBlank())
+                    ? result.meta.saleDate
+                    : resolvedSaleDate;
+            if (effectiveSaleDate == null || effectiveSaleDate.isBlank()) {
+                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
+            }
+            LocalDate date = DateUtils.parseFlexibleDate(effectiveSaleDate);
             LocalTime nowTime = LocalTime.now();
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
@@ -278,7 +287,7 @@ public class OcrController {
             int iApprovalAmt = 0;
 
             if (approvalAmt != null && !approvalAmt.isBlank()) {
-                String clean = approvalAmt.replaceAll("[^0-9]", "");
+                String clean = approvalAmt.replaceAll("[^0-9\\-]", "");
                 if (!clean.isEmpty())
                     iApprovalAmt = Integer.parseInt(clean);
             }

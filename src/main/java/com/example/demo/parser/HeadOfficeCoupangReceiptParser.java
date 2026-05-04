@@ -197,18 +197,48 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
                 + ", vat=" + safeInt(r.totals.vat)
                 + ", total=" + safeInt(r.totals.total));
 
-        // 상품명 정리 + 수량
+        // 상품명 정리 (수량은 무조건 1, 단가=금액)
         ProductName pn = refineProductName(p.productNameRaw);
-        Integer qty = firstPositive(pn.qty, 1);
 
-        System.out.println("[CARD] refineProductName => name=" + safe(pn.name) + ", qtyFound=" + safeInt(pn.qty) + ", qtyUse=" + qty);
+        System.out.println("[CARD] refineProductName => name=" + safe(pn.name));
 
-        Item it = new Item();
-        it.name = pn.name;
-        it.qty = qty;
-        it.amount = r.totals.total;
-        it.unitPrice = (r.totals.total != null && qty > 0) ? (r.totals.total / qty) : r.totals.total;
-        r.items = List.of(it);
+        boolean hasTaxable = r.totals.taxable != null && r.totals.taxable > 0
+                && r.totals.vat != null && r.totals.vat > 0;
+        boolean hasTaxFree = r.totals.taxFree != null && r.totals.taxFree > 0;
+
+        System.out.println("[CARD] hasTaxable=" + hasTaxable + ", hasTaxFree=" + hasTaxFree);
+
+        if (hasTaxable && hasTaxFree) {
+            // 과세+면세 혼합 → detail 2건
+            int taxableTotal = r.totals.taxable + r.totals.vat;
+            int taxFreeTotal = r.totals.taxFree;
+
+            Item itTaxable = new Item();
+            itTaxable.name = pn.name;
+            itTaxable.qty = 1;
+            itTaxable.amount = taxableTotal;
+            itTaxable.unitPrice = taxableTotal;
+            itTaxable.taxFlag = "과세";
+
+            Item itTaxFree = new Item();
+            itTaxFree.name = pn.name;
+            itTaxFree.qty = 1;
+            itTaxFree.amount = taxFreeTotal;
+            itTaxFree.unitPrice = taxFreeTotal;
+            itTaxFree.taxFlag = "면세";
+
+            r.items = List.of(itTaxable, itTaxFree);
+            System.out.println("[CARD] items=2 (혼합: 과세" + taxableTotal + " + 면세" + taxFreeTotal + ")");
+        } else {
+            Item it = new Item();
+            it.name = pn.name;
+            it.qty = 1;
+            it.amount = r.totals.total;
+            it.unitPrice = r.totals.total;
+            it.taxFlag = hasTaxable ? "과세" : hasTaxFree ? "면세" : null;
+            r.items = List.of(it);
+            System.out.println("[CARD] items=1 taxFlag=" + safe(it.taxFlag));
+        }
 
         // ---- 상점정보: 판매자상호/사업자번호/주소 ----
         System.out.println("[CARD] ---- 상점정보 파싱 시작 ----");
@@ -334,18 +364,25 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
 
     /**
      * 돈으로 인정하는 조건(승인번호/주문번호 같은 숫자 배제)
-     * - 콤마 또는 '원'이 있어야 돈으로 인정
+     * - '원' 또는 콤마+숫자3자리 패턴이 있어야 돈으로 인정
+     * - 숫자/콤마/원 외에 다른 문자(한글 '원' 제외)가 있으면 금액 아님
      */
     private Integer parseMoneyStrict(String s) {
         if (s == null) return null;
         String x = s.trim();
         if (x.isEmpty()) return null;
 
+        // '원'을 제거했을 때 숫자/콤마/공백만 남아야 금액으로 인정
+        // "5,840원" → "5,840" → 숫자+콤마만 ✅
+        // "곰곰 곱슬이 콩나물, 3.5kg, 1박스" → 제거 후 잡문자 남음 ❌
+        String stripped = x.replaceAll("원$", "").trim();
+        if (!stripped.matches("[0-9,\\s]+")) return null;
+
         Matcher m = MONEY.matcher(x);
         if (!m.find()) return null;
 
-        boolean hasWon = x.contains("원");
-        boolean hasComma = x.contains(",");
+        boolean hasWon = x.endsWith("원");
+        boolean hasComma = stripped.contains(",");
         String digits = m.group(1).replaceAll("[^0-9]", "");
 
         if (!hasWon && !hasComma) return null;
@@ -391,6 +428,13 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
     private Integer extractQty(String text) {
         if (text == null) return null;
 
+        // "총 N건" 우선 (쿠팡 묶음 주문)
+        Matcher mt = Pattern.compile("총\\s*([0-9]+)\\s*건").matcher(text);
+        if (mt.find()) {
+            Integer v = toInt(mt.group(1));
+            if (v != null && v > 0) return v;
+        }
+
         Matcher m = QTY_UNIT.matcher(text);
         Integer best = null;
         while (m.find()) {
@@ -432,7 +476,10 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
     private ShopParsed parseShop(List<String> lines) {
         ShopParsed sp = new ShopParsed();
 
-        sp.sellerName = valueAfterLabel(lines, "판매자상호");
+        sp.sellerName = firstNonNull(
+                sellerNameAfterLabel(lines, "판매자상호"),
+                sellerNameAfterLabel(lines, "판매자 상호")
+        );
         System.out.println("[SHOP] sellerName.afterLabel=" + safe(sp.sellerName));
 
         sp.bizNo = firstNonNull(
@@ -582,13 +629,67 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
 
     private String valueAfterLabel(List<String> lines, String label) {
         for (int i = 0; i < lines.size() - 1; i++) {
-            if (lines.get(i).equals(label) || lines.get(i).contains(label)) {
+            if (lines.get(i).trim().equals(label)) {
                 String next = lines.get(i + 1).trim();
                 if (next.isEmpty()) return null;
-                if (JUNK_LABELS.matcher(next).find()) return null;
+                if (next.contains("사업자등록번호") || next.contains("판매자주소")) return null;
                 return next;
             }
         }
+        return null;
+    }
+
+    // 판매자상호 추출: 3가지 패턴 순서대로 시도
+    // 패턴1: 사업자등록번호 라벨 바로 앞 줄 (라벨 아닌 유효한 줄)
+    // 패턴2: 사업자번호 값 바로 앞 줄 (라벨들 사이에 상호명이 끼어있는 경우)
+    private String sellerNameAfterLabel(List<String> lines, String label) {
+        int labelIdx = -1;
+        for (int i = 0; i < lines.size(); i++) {
+            if (lines.get(i).trim().equals(label)) { labelIdx = i; break; }
+        }
+        if (labelIdx < 0) return null;
+
+        // 사업자등록번호 라벨 위치
+        int bizLabelIdx = -1;
+        for (int j = labelIdx + 1; j < lines.size(); j++) {
+            if (lines.get(j).trim().contains("사업자등록번호")) { bizLabelIdx = j; break; }
+        }
+
+        // 사업자번호 값 위치
+        int bizValIdx = -1;
+        int searchFrom = bizLabelIdx >= 0 ? bizLabelIdx + 1 : labelIdx + 1;
+        for (int j = searchFrom; j < lines.size(); j++) {
+            if (BIZNO_DASH.matcher(lines.get(j).trim()).matches()) { bizValIdx = j; break; }
+        }
+
+        // 패턴1: 사업자등록번호 라벨 바로 앞에서 역방향 탐색
+        if (bizLabelIdx > labelIdx) {
+            for (int j = bizLabelIdx - 1; j > labelIdx; j--) {
+                String t = lines.get(j).trim();
+                if (t.isEmpty()) continue;
+                if (JUNK_LABELS.matcher(t).find()) continue;
+                if (t.contains("사업자등록번호") || t.contains("판매자주소") || t.contains("판매자상호")) continue;
+                if (ORDER_NO.matcher(t).matches()) continue;
+                if (parseMoneyStrict(t) != null) continue;
+                if (t.matches("[^가-힣A-Za-z0-9()\\[\\]]+")) continue;
+                return t;
+            }
+        }
+
+        // 패턴2: 사업자번호 값 바로 앞에서 역방향 탐색
+        if (bizValIdx > 0) {
+            for (int j = bizValIdx - 1; j > labelIdx; j--) {
+                String t = lines.get(j).trim();
+                if (t.isEmpty()) continue;
+                if (JUNK_LABELS.matcher(t).find()) continue;
+                if (t.contains("사업자등록번호") || t.contains("판매자주소") || t.contains("판매자상호")) continue;
+                if (ORDER_NO.matcher(t).matches()) continue;
+                if (parseMoneyStrict(t) != null) continue;
+                if (t.matches("[^가-힣A-Za-z0-9()\\[\\]]+")) continue;
+                return t;
+            }
+        }
+
         return null;
     }
 

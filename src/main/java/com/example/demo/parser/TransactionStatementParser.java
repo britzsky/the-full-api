@@ -75,6 +75,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
     ));
 
     private static final Pattern P_BIZNO = Pattern.compile("\\b\\d{3}-\\d{2}-\\d{5}\\b");
+    private static final Pattern P_PHONE = Pattern.compile("\\b0\\d{1,2}-\\d{3,4}-\\d{4}\\b");
     private static final Pattern P_NUM = Pattern.compile("\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?");
 
     private static final Pattern P_UNIT_FOLLOWED_BY_QTY = Pattern.compile(
@@ -161,19 +162,43 @@ public class TransactionStatementParser extends BaseReceiptParser {
 
         String text = normalize(raw);
         res.normalizedText = text;
+        printRawDebug(raw, text);
         dumpResult("AFTER_NORMALIZE", res);
 
         parseHeader(text, res);
         dumpResult("AFTER_HEADER", res);
 
         // ✅ parties: FormFields(레이아웃) 우선 → 실패 시 기존 텍스트 파싱
-        if (!tryParsePartiesFromFormFields(doc, res)) {
+        boolean formFieldParsed = tryParsePartiesFromFormFields(doc, res);
+        tracePartyStep("FORM_FIELDS", null, res);
+        if (!formFieldParsed) {
             parseParties(text, res);
+            tracePartyStep("TEXT_PARTIES", null, res);
         }
         dumpResult("AFTER_PARTIES", res);
         
      // parties 파싱 이후 (AFTER_PARTIES 전에/후에)
+        String partyBefore = partySnapshot(res);
         salvagePartiesByLabelOrder(text, res);
+        tracePartyStep("LABEL_ORDER", partyBefore, res);
+        partyBefore = partySnapshot(res);
+        salvagePartyNamesAroundBizNo(text, res);
+        tracePartyStep("BIZNO_AROUND", partyBefore, res);
+        partyBefore = partySnapshot(res);
+        salvagePartyNamesByDocumentHints(text, res);
+        tracePartyStep("DOCUMENT_HINTS", partyBefore, res);
+        partyBefore = partySnapshot(res);
+        salvagePartyRolesByKnownLabels(text, res);
+        tracePartyStep("KNOWN_LABELS", partyBefore, res);
+        partyBefore = partySnapshot(res);
+        salvageDetachedCompanySuffixFromText(text, res);
+        tracePartyStep("DETACHED_SUFFIX", partyBefore, res);
+        partyBefore = partySnapshot(res);
+        normalizePartyRoles(res);
+        normalizePartyNameAndCeo(res.supplier);
+        normalizePartyNameAndCeo(res.buyer);
+        sanitizeFinalPartyFields(res);
+        tracePartyStep("FINAL_SANITIZE", partyBefore, res);
 
         // ✅ items: Tables 우선 → 실패 시 좌표 기반 보정 → 기존 텍스트 파싱
         List<StatementItem> tableItems = parseItemsFromTables(doc);
@@ -182,14 +207,18 @@ public class TransactionStatementParser extends BaseReceiptParser {
         if (positionedItems != null && !positionedItems.isEmpty()
                 && (tableItems == null || tableItems.isEmpty() || isSuspiciousItemRows(tableItems))) {
             res.items = positionedItems;
+            traceItemsStep("TOKEN_POSITION", res.items);
         } else if (tableItems != null && !tableItems.isEmpty()) {
             res.items = tableItems;
+            traceItemsStep("DOCUMENT_TABLE", res.items);
         } else {
             res.items = parseItems(text);
+            traceItemsStep("TEXT_TABLE", res.items);
         }
         dumpResult("AFTER_ITEMS", res);
 
         parseTotals(text, res);
+        traceTotalsStep(res);
         dumpResult("AFTER_TOTALS", res);
 
         System.out.println("📄 [거래명세표] date=" + res.issueDate + ", docNo=" + res.docNo);
@@ -200,6 +229,14 @@ public class TransactionStatementParser extends BaseReceiptParser {
         System.out.println("💳 전미수=" + res.totals.prevBalance + ", 미수금=" + res.totals.balance);
 
         return res;
+    }
+
+    private void printRawDebug(String raw, String normalized) {
+        System.out.println("=== 🧾 거래명세표 RAW TEXT ===");
+        System.out.println(raw == null ? "" : raw);
+        System.out.println("=== 🧾 거래명세표 NORMALIZED TEXT ===");
+        System.out.println(normalized == null ? "" : normalized);
+        System.out.println("===================================");
     }
     
     private void salvagePartiesByLabelOrder(String text, TransactionStatementResult res) {
@@ -235,9 +272,26 @@ public class TransactionStatementParser extends BaseReceiptParser {
         if (res.supplier == null) res.supplier = new Party();
         if (res.buyer == null) res.buyer = new Party();
 
+        String externalName = null;
+        String ourName = null;
+        for (String name : names) {
+            if (ourName == null && isOurPartyText(name)) ourName = name;
+            if (externalName == null && !isOurPartyText(name)) externalName = name;
+        }
+
+        // 우리 쪽 상호가 같이 보이면 외부 상호를 공급자로 우선 매핑한다.
+        if ((res.supplier.name == null || isSuspiciousPartyName(res.supplier.name) || isOurPartyText(res.supplier.name))
+                && externalName != null) {
+            res.supplier.name = externalName;
+        }
+        if ((res.buyer.name == null || isSuspiciousPartyName(res.buyer.name) || !isOurPartyText(res.buyer.name))
+                && ourName != null) {
+            res.buyer.name = ourName;
+        }
+
         // 첫 번째 상호 = 공급자, 두 번째 상호 = 공급받는자
-        if (res.supplier.name == null && names.size() >= 1) res.supplier.name = names.get(0);
-        if (res.buyer.name == null && names.size() >= 2) res.buyer.name = names.get(1);
+        if ((res.supplier.name == null || isSuspiciousPartyName(res.supplier.name)) && names.size() >= 1) res.supplier.name = names.get(0);
+        if ((res.buyer.name == null || isSuspiciousPartyName(res.buyer.name)) && names.size() >= 2) res.buyer.name = names.get(1);
 
         // 2) 대표자(성/성명/대표) 순서대로 수집 후 매핑
         List<String> ceos = new ArrayList<>();
@@ -296,10 +350,301 @@ public class TransactionStatementParser extends BaseReceiptParser {
         }
 
         // 최종 정리 (특히 "받" 같은 꼬리 제거가 필요)
-        res.supplier.name = cleanPartyText(res.supplier.name);
+        res.supplier.name = cleanPartyNameText(res.supplier.name);
         res.supplier.ceo  = cleanPartyText(res.supplier.ceo);
-        res.buyer.name    = cleanPartyText(res.buyer.name);
+        res.buyer.name    = cleanPartyNameText(res.buyer.name);
         res.buyer.ceo     = cleanPartyText(res.buyer.ceo);
+    }
+
+    private void tracePartyStep(String step, String before, TransactionStatementResult res) {
+        String after = partySnapshot(res);
+        if (before != null && before.equals(after)) return;
+        System.out.println("🔎 [거래명세표:거래처] step=" + step + " -> " + after);
+    }
+
+    private String partySnapshot(TransactionStatementResult res) {
+        if (res == null) return "null";
+        Party supplier = res.supplier == null ? new Party() : res.supplier;
+        Party buyer = res.buyer == null ? new Party() : res.buyer;
+        return "공급자{biz=" + safeLog(supplier.bizNo) + ", name=" + safeLog(supplier.name) + ", ceo=" + safeLog(supplier.ceo) + "}"
+                + " / 공급받는자{biz=" + safeLog(buyer.bizNo) + ", name=" + safeLog(buyer.name) + ", ceo=" + safeLog(buyer.ceo) + "}";
+    }
+
+    private void traceItemsStep(String source, List<StatementItem> items) {
+        int count = items == null ? 0 : items.size();
+        String first = "";
+        if (items != null && !items.isEmpty()) first = ", first=" + items.get(0);
+        System.out.println("🔎 [거래명세표:품목] source=" + source + ", count=" + count + first);
+    }
+
+    private void traceTotalsStep(TransactionStatementResult res) {
+        if (res == null || res.totals == null) return;
+        System.out.println("🔎 [거래명세표:합계] supply=" + res.totals.supplyTotal
+                + ", tax=" + res.totals.taxTotal
+                + ", total=" + res.totals.grandTotal
+                + ", prev=" + res.totals.prevBalance
+                + ", balance=" + res.totals.balance);
+    }
+
+    private String safeLog(String s) {
+        return s == null ? "null" : s;
+    }
+
+    private void normalizePartyRoles(TransactionStatementResult res) {
+        if (res == null || res.supplier == null || res.buyer == null) return;
+
+        // 공급자 자리에 우리 쪽 상호가 들어가고 공급받는자 자리에 외부 상호가 들어간 경우 역할을 교정한다.
+        if (isOurPartyText(res.supplier.name) && res.buyer.name != null && !isOurPartyText(res.buyer.name)) {
+            Party tmp = res.supplier;
+            res.supplier = res.buyer;
+            res.buyer = tmp;
+        }
+    }
+
+    private void normalizePartyNameAndCeo(Party p) {
+        if (p == null) return;
+
+        p.name = cleanPartyNameText(p.name);
+        p.ceo = cleanPartyCeoText(p.ceo, p.name);
+
+        if (p.name == null) return;
+
+        String companySuffix = findDetachedCompanySuffix(p.name, p.address);
+        if (companySuffix != null) p.name = p.name + " " + companySuffix;
+
+        Matcher nameWithCeo = Pattern.compile("^(.+?)\\s+([가-힣]{2,5})\\s*(?:®|인)?$").matcher(p.name);
+        if (nameWithCeo.find()) {
+            String name = cleanPartyNameText(nameWithCeo.group(1));
+            String ceo = nameWithCeo.group(2);
+            if (name != null && name.length() >= 2) {
+                p.name = name;
+                if (p.ceo == null || p.ceo.contains(ceo)) p.ceo = ceo;
+            }
+        }
+    }
+
+    private String findDetachedCompanySuffix(String name, String address) {
+        if (name == null || address == null) return null;
+        String compactName = name.replaceAll("\\s+", "");
+        if (!compactName.matches(".*(유한회사|주식회사|농업회사법인|회사법인)$")) return null;
+
+        String cleanedAddress = cleanPartyText(address);
+        if (cleanedAddress == null) return null;
+
+        Matcher m = Pattern.compile("^([가-힣A-Za-z0-9()]{2,12})\\s+(경기도|서울|인천|부산|대구|광주|대전|울산|세종|강원|충청|전라|경상|제주|우편|주소|사업장)").matcher(cleanedAddress);
+        if (!m.find()) return null;
+
+        String suffix = m.group(1);
+        if (isPartyNameLabelNoise(suffix) || isOurPartyText(suffix)) return null;
+        return suffix;
+    }
+
+    private void salvageDetachedCompanySuffixFromText(String text, TransactionStatementResult res) {
+        if (text == null || res == null || res.supplier == null || res.supplier.name == null) return;
+
+        String compactName = res.supplier.name.replaceAll("\\s+", "");
+        if (!compactName.matches("^(유한회사|주식회사|농업회사법인|회사법인)$")) return;
+
+        String[] lines = text.split("\\n");
+        Pattern suffixPattern = Pattern.compile(Pattern.quote(res.supplier.name) + "\\s+(.+)");
+        for (String raw : lines) {
+            Matcher m = suffixPattern.matcher(safeTrim(raw));
+            if (!m.find()) continue;
+
+            String suffix = m.group(1);
+            suffix = suffix.replaceAll("(성\\s*명|대표\\s*자|대표|주\\s*소|주소|업\\s*태|종\\s*목|전화\\s*번호|등록\\s*번호|사업자\\s*번호).*", " ");
+            suffix = cleanPartyNameText(suffix);
+            if (suffix == null || isPartyNameLabelNoise(suffix) || isOurPartyText(suffix)) continue;
+            if (suffix.matches(".*(대표|성명|주소|업태|종목|전화|번호).*")) continue;
+            res.supplier.name = res.supplier.name + " " + suffix;
+            return;
+        }
+    }
+
+    private void sanitizeFinalPartyFields(TransactionStatementResult res) {
+        if (res == null) return;
+        sanitizePartyFields(res.supplier);
+        sanitizePartyFields(res.buyer);
+    }
+
+    private void sanitizePartyFields(Party p) {
+        if (p == null) return;
+        p.name = cleanPartyNameText(p.name);
+        p.ceo = cleanPartyCeoText(p.ceo, p.name);
+    }
+
+    private void salvagePartyNamesAroundBizNo(String text, TransactionStatementResult res) {
+        if (res == null || text == null) return;
+        String[] lines = text.split("\\n");
+
+        if (res.supplier != null && (res.supplier.name == null || isSuspiciousPartyName(res.supplier.name) || isOurPartyText(res.supplier.name))
+                && res.supplier.bizNo != null) {
+            String name = pickPartyNameAroundBizNo(lines, res.supplier.bizNo);
+            if (name != null && !isOurPartyText(name)) res.supplier.name = cleanPartyNameText(name);
+            else if (isOurPartyText(res.supplier.name)) res.supplier.name = null;
+        }
+
+        if (res.buyer != null && (res.buyer.name == null || isSuspiciousPartyName(res.buyer.name))
+                && res.buyer.bizNo != null) {
+            String name = pickPartyNameAroundBizNo(lines, res.buyer.bizNo);
+            if (name != null) res.buyer.name = cleanPartyNameText(name);
+        }
+    }
+
+    private void salvagePartyNamesByDocumentHints(String text, TransactionStatementResult res) {
+        if (res == null || text == null) return;
+        String[] lines = text.split("\\n");
+
+        if (res.supplier != null && (res.supplier.name == null || isSuspiciousPartyName(res.supplier.name) || isOurPartyText(res.supplier.name))) {
+            String external = pickExternalCompanyName(lines);
+            if (external != null) res.supplier.name = external;
+        }
+
+        if (res.buyer != null && (res.buyer.name == null || isSuspiciousPartyName(res.buyer.name))) {
+            String ours = pickOurCompanyName(lines);
+            if (ours != null) res.buyer.name = ours;
+        }
+    }
+
+    private String pickExternalCompanyName(String[] lines) {
+        if (lines == null) return null;
+
+        for (String raw : lines) {
+            String line = cleanPartyNameText(raw);
+            if (!isGoodNameCandidate(line)) continue;
+            if (isOurPartyText(line)) continue;
+
+            String compact = line.replaceAll("\\s+", "");
+            boolean externalHint = compact.contains("(주)") 
+            		|| compact.contains("㈜") || compact.contains("주식회사") || compact.contains("유통") 
+            		|| compact.contains("마트") || compact.contains("양곡") || compact.contains("식자재") 	
+            		|| compact.contains("푸드") || compact.contains("희망찬")
+                    || compact.contains("쌀집") || compact.contains("김치"); 
+            if (externalHint) return line;
+        }
+
+        return null;
+    }
+
+    private String pickOurCompanyName(String[] lines) {
+        if (lines == null) return null;
+
+        for (String raw : lines) {
+            String line = cleanPartyNameText(raw);
+            if (!isGoodNameCandidate(line)) continue;
+            if (isOurPartyText(line)) return line;
+        }
+
+        return null;
+    }
+
+    private void salvagePartyRolesByKnownLabels(String text, TransactionStatementResult res) {
+        if (res == null || text == null) return;
+        if (res.supplier == null) res.supplier = new Party();
+        if (res.buyer == null) res.buyer = new Party();
+
+        String buyerName = extractBuyerNameFromGeoraecheo(text);
+        String buyerCeo = extractBuyerCeoFromGeoraecheo(text);
+        String supplierName = extractSupplierNameFromSanghoSection(text);
+        List<String> bizNos = findAll(text, P_BIZNO);
+
+        if (buyerName != null && isOurPartyText(buyerName)) {
+            res.buyer.name = buyerName;
+            if (buyerCeo != null) res.buyer.ceo = buyerCeo;
+            if (bizNos.size() >= 1) res.buyer.bizNo = bizNos.get(0);
+            if (bizNos.size() >= 2) res.supplier.bizNo = bizNos.get(1);
+        }
+
+        if (supplierName != null && !isOurPartyText(supplierName)) {
+            res.supplier.name = supplierName;
+        }
+    }
+
+    private String extractBuyerNameFromGeoraecheo(String text) {
+        Matcher m = Pattern.compile("(거\\s*래\\s*처|거래처)\\s*[:：]?\\s*([^\\n]+)").matcher(text);
+        if (!m.find()) return null;
+
+        String value = m.group(2);
+        value = value.replaceAll("\\s*/.*$", " ");
+        value = cleanPartyNameText(value);
+        return isGoodNameCandidate(value) ? value : null;
+    }
+
+    private String extractBuyerCeoFromGeoraecheo(String text) {
+        Matcher m = Pattern.compile("(거\\s*래\\s*처|거래처)\\s*[:：]?\\s*([^\\n]+)").matcher(text);
+        if (!m.find()) return null;
+
+        String value = m.group(2);
+        Matcher slash = Pattern.compile("/\\s*([가-힣]{2,5})").matcher(value);
+        return slash.find() ? slash.group(1) : null;
+    }
+
+    private String extractSupplierNameFromSanghoSection(String text) {
+        Matcher m = Pattern.compile("상\\s*호\\s*[:：]?\\s*([^\\n]+)").matcher(text);
+        while (m.find()) {
+            String value = cleanPartyNameText(m.group(1));
+            if (isGoodNameCandidate(value) && !isOurPartyText(value)) return value;
+        }
+
+        String[] lines = text.split("\\n");
+        for (int i = 0; i < lines.length; i++) {
+            String compact = safeTrim(lines[i]).replaceAll("\\s+", "");
+            if (!"상".equals(compact) && !"호".equals(compact) && !"상호".equals(compact)) continue;
+
+            for (int j = i + 1; j < lines.length && j <= i + 3; j++) {
+                String value = cleanPartyNameText(lines[j]);
+                if (isGoodNameCandidate(value) && !isOurPartyText(value)) return value;
+            }
+        }
+
+        return null;
+    }
+
+    private String pickPartyNameAroundBizNo(String[] lines, String bizNo) {
+        if (lines == null || bizNo == null) return null;
+
+        Pattern bizPattern = Pattern.compile(".*" + Pattern.quote(bizNo) + ".*");
+        int bizIdx = indexOfFirst(lines, 0, bizPattern);
+        if (bizIdx < 0) return null;
+
+        int from = Math.max(0, bizIdx - 4);
+        int to = Math.min(lines.length, bizIdx + 6);
+        for (int i = from; i < to; i++) {
+            String line = safeTrim(lines[i]);
+            if (line.isEmpty()) continue;
+
+            String name = extractNameFromSanghoLine(line);
+            if (name != null) return name;
+
+            String compact = line.replaceAll("\\s+", "");
+            if ("상".equals(compact) || "호".equals(compact) || "상호".equals(compact)) {
+                for (int j = i + 1; j < to && j <= i + 3; j++) {
+                    String cand = cleanPartyNameText(lines[j]);
+                    if (isGoodNameCandidate(cand)) return cand;
+                }
+            }
+        }
+
+        // 상호 라벨 값이 표 셀 분리로 앞줄에만 남는 경우 사업자번호 바로 위쪽에서 회사명 후보를 찾는다.
+        for (int i = bizIdx - 1; i >= from && i >= bizIdx - 4; i--) {
+            String cand = cleanPartyNameText(lines[i]);
+            if (isGoodNameCandidate(cand)) return cand;
+        }
+
+        return null;
+    }
+
+    private String extractNameFromSanghoLine(String line) {
+        if (line == null) return null;
+        String s = safeTrim(line);
+        if (s.isEmpty()) return null;
+
+        Matcher m = Pattern.compile("상\\s*호\\s*[:：]?\\s*(.+)$").matcher(s);
+        if (!m.find()) return null;
+
+        String tail = cleanPartyNameText(m.group(1));
+        if (!isGoodNameCandidate(tail)) return null;
+        return tail;
     }
     
     private void salvageSupplierFromText(String text, TransactionStatementResult res) {
@@ -446,11 +791,20 @@ public class TransactionStatementParser extends BaseReceiptParser {
         if (v.length() < 2) return false;
         if (v.matches("^[0-9,]+$")) return false;
         if (v.contains("￦")) return false;
+        if (P_PHONE.matcher(v).find()) return false;
+        if (isPartyNameLabelNoise(v)) return false;
+        if (v.matches(".*\\d{2,4}[./\\-]\\d{1,2}[./\\-]\\d{1,2}.*")) return false;
         // 너무 주소처럼 보이면 제외
         if (v.matches(".*(로|길|동|번지|층|호|시|군|구|읍|면).*") && v.length() > 12) return false;
         // 라벨/문서타이틀 제외
-        if (v.matches(".*(거래명세표|공급가액|세액|합계|전미수|미수금).*")) return false;
+        if (v.matches(".*(권\\s*호|명\\s*세\\s*표|거래명세표|공급받는자\\s*보관용|공급가액|세액|합계|전미수|미수금).*")) return false;
         return true;
+    }
+
+    private boolean isPartyNameLabelNoise(String s) {
+        if (s == null) return true;
+        String v = s.replaceAll("\\s+", "");
+        return v.matches("^(권|호|권호|명세표|거래명세표|상|상호|일자|날짜|거래처|처|등록번호|사업자번호|사업자등록번호|대표자|성명|전화번호|팩스번호|주소|주|소|사업장|소재지|사업장소재지|업태|종목|입금액|전잔액|현잔액)$");
     }
     
     /**
@@ -507,8 +861,36 @@ public class TransactionStatementParser extends BaseReceiptParser {
         if (bizNos.size() >= 1) res.supplier.bizNo = bizNos.get(0);
         if (bizNos.size() >= 2) res.buyer.bizNo = bizNos.get(1);
 
-        applyPartyMap(res.supplier, left);
-        applyPartyMap(res.buyer, right);
+        Map<String, String> supplierMap = left;
+        Map<String, String> buyerMap = right;
+
+        boolean leftIsOurParty = isOurPartyMap(left);
+        boolean rightIsOurParty = isOurPartyMap(right);
+
+        // 우리 쪽 명칭이 있는 영역은 공급받는자로 보고, 반대쪽을 실제 거래처로 본다.
+        if (leftIsOurParty && !rightIsOurParty) {
+            supplierMap = right;
+            buyerMap = left;
+        } else if (rightIsOurParty && !leftIsOurParty) {
+            supplierMap = left;
+            buyerMap = right;
+        } else if (res.supplier.bizNo != null) {
+            // 거래명세표 양식마다 공급자 위치가 달라서 사업자번호 위치는 보조 기준으로만 사용한다.
+            boolean leftHasSupplierBiz = containsPartyBizNo(left, res.supplier.bizNo);
+            boolean rightHasSupplierBiz = containsPartyBizNo(right, res.supplier.bizNo);
+            if (rightHasSupplierBiz && !leftHasSupplierBiz) {
+                supplierMap = right;
+                buyerMap = left;
+            }
+        }
+
+        String supplierBizFromMap = cleanBizNo(supplierMap.get("bizNo"));
+        String buyerBizFromMap = cleanBizNo(buyerMap.get("bizNo"));
+        if (supplierBizFromMap != null) res.supplier.bizNo = supplierBizFromMap;
+        if (buyerBizFromMap != null) res.buyer.bizNo = buyerBizFromMap;
+
+        applyPartyMap(res.supplier, supplierMap);
+        applyPartyMap(res.buyer, buyerMap);
 
         // ✅ 보정 1) supplier가 비고 buyer만 찼는데, 사실 right로 몰린 케이스 (centerX 실패/양식 한쪽 몰림)
         boolean supplierEmpty = (res.supplier.name == null && res.supplier.ceo == null && res.supplier.address == null
@@ -516,9 +898,9 @@ public class TransactionStatementParser extends BaseReceiptParser {
         boolean buyerFilled = (res.buyer.name != null || res.buyer.ceo != null || res.buyer.address != null
                 || res.buyer.bizType != null || res.buyer.bizItem != null);
 
-        if (supplierEmpty && buyerFilled && left.isEmpty() && !right.isEmpty()) {
+        if (supplierEmpty && buyerFilled && supplierMap.isEmpty() && !buyerMap.isEmpty()) {
             // right에만 쌓였으면 supplier도 right로 채워보기
-            applyPartyMap(res.supplier, right);
+            applyPartyMap(res.supplier, buyerMap);
             // buyer는 그대로 두되, 최소 supplier라도 살리기
         }
 
@@ -528,7 +910,7 @@ public class TransactionStatementParser extends BaseReceiptParser {
         buyerFilled = (res.buyer.name != null || res.buyer.ceo != null || res.buyer.address != null
                 || res.buyer.bizType != null || res.buyer.bizItem != null);
 
-        if (supplierEmpty && buyerFilled && !left.isEmpty() && !right.isEmpty()) {
+        if (supplierEmpty && buyerFilled && !supplierMap.isEmpty() && !buyerMap.isEmpty()) {
             Party tmp = res.supplier;
             res.supplier = res.buyer;
             res.buyer = tmp;
@@ -547,8 +929,11 @@ public class TransactionStatementParser extends BaseReceiptParser {
              .replace("：", ":")
              .replace("|", "");
 
-        // ✅ 상호: "상호", "상호명", "상" (한 글자만 찍히는 케이스)
-        if (k.contains("상호") || k.contains("상호명") || k.equals("상")) return "name";
+        // ✅ 상호: "상호", "상호명", "거래처", "상" (한 글자만 찍히는 케이스)
+        if (k.contains("상호") || k.contains("상호명") || k.contains("거래처") || k.equals("상")) return "name";
+
+        // 등록번호/사업자번호는 공급자 위치 판단에 사용한다.
+        if (k.contains("등록번호") || k.contains("사업번호") || k.contains("사업자번호") || k.contains("사업자등록번호")) return "bizNo";
 
         // ✅ 대표/성명: "성명", "성", "대표", "대표자"
         if (k.contains("대표자") || k.equals("대표") || k.contains("대표") || k.contains("성명") || k.equals("성")) return "ceo";
@@ -563,11 +948,46 @@ public class TransactionStatementParser extends BaseReceiptParser {
 
     private void applyPartyMap(Party p, Map<String, String> m) {
         if (p == null || m == null) return;
-        if (p.name == null)    p.name = cleanPartyText(m.get("name"));
+        if (p.bizNo == null)   p.bizNo = cleanBizNo(m.get("bizNo"));
+        if (p.name == null)    p.name = cleanPartyNameText(m.get("name"));
         if (p.ceo == null)     p.ceo = cleanPartyText(m.get("ceo"));
         if (p.address == null) p.address = cleanPartyText(m.get("address"));
         if (p.bizType == null) p.bizType = cleanPartyText(m.get("bizType"));
         if (p.bizItem == null) p.bizItem = cleanPartyText(m.get("bizItem"));
+    }
+
+    private boolean containsPartyBizNo(Map<String, String> m, String bizNo) {
+        if (m == null || m.isEmpty() || bizNo == null) return false;
+        for (String v : m.values()) {
+            if (v != null && v.contains(bizNo)) return true;
+        }
+        return false;
+    }
+
+    private String cleanBizNo(String s) {
+        if (s == null) return null;
+        Matcher m = P_BIZNO.matcher(s);
+        return m.find() ? m.group() : null;
+    }
+
+    private boolean isOurPartyMap(Map<String, String> m) {
+        if (m == null || m.isEmpty()) return false;
+        // 우리 쪽 여부는 상호/거래처명 중심으로 판단해서 공급자 주소나 OCR 결합문으로 인한 오판을 줄인다.
+        if (isOurPartyText(m.get("name"))) return true;
+        return isOurPartyText(m.get("address")) && !hasExternalNameHint(m.get("name"));
+    }
+
+    private boolean isOurPartyText(String s) {
+        if (s == null) return false;
+        String v = s.replaceAll("\\s+", "");
+        return v.contains("요양원") || v.contains("더채움");
+    }
+
+    private boolean hasExternalNameHint(String s) {
+        if (s == null) return false;
+        String v = s.replaceAll("\\s+", "");
+        if (v.isEmpty()) return false;
+        return !isOurPartyText(v);
     }
 
     private String mergeKeepSpace(String a, String b) {
@@ -1129,6 +1549,30 @@ public class TransactionStatementParser extends BaseReceiptParser {
         Matcher m2 = p2.matcher(text);
         if (m2.find()) {
             res.issueDate = m2.group(1) + "-" + pad2(m2.group(2)) + "-" + pad2(m2.group(3));
+            return;
+        }
+
+        Pattern p2Loose = Pattern.compile("((?:\\d\\s*){4})\\s*년\\s*(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일");
+        Matcher m2Loose = p2Loose.matcher(text);
+        if (m2Loose.find()) {
+            String year = m2Loose.group(1).replaceAll("[^0-9]", "");
+            res.issueDate = year + "-" + pad2(m2Loose.group(2)) + "-" + pad2(m2Loose.group(3));
+            return;
+        }
+
+        Pattern p3 = Pattern.compile("(납품\\s*일자|작성\\s*일자|거래\\s*일자|일\\s*자)\\s*[:：]?\\s*(20\\d{2}|\\d{2})[./\\-]\\s*(\\d{1,2})[./\\-]\\s*(\\d{1,2})");
+        Matcher m3 = p3.matcher(text);
+        if (m3.find()) {
+            String year = m3.group(2);
+            if (year.length() == 2) year = "20" + year;
+            res.issueDate = year + "-" + pad2(m3.group(3)) + "-" + pad2(m3.group(4));
+            return;
+        }
+
+        Pattern p4 = Pattern.compile("(20\\d{2})[./\\-]\\s*(\\d{1,2})[./\\-]\\s*(\\d{1,2})\\s*(?:\\([^)]*\\))?");
+        Matcher m4 = p4.matcher(text);
+        if (m4.find()) {
+            res.issueDate = m4.group(1) + "-" + pad2(m4.group(2)) + "-" + pad2(m4.group(3));
         }
     }
 
@@ -1189,13 +1633,13 @@ public class TransactionStatementParser extends BaseReceiptParser {
         refinePartyHeuristics(res.supplier, supplierLines, true);
         refinePartyHeuristics(res.buyer, buyerLines, false);
 
-        res.supplier.name    = cleanPartyText(res.supplier.name);
+        res.supplier.name    = cleanPartyNameText(res.supplier.name);
         res.supplier.ceo     = cleanPartyText(res.supplier.ceo);
         res.supplier.address = cleanPartyText(res.supplier.address);
         res.supplier.bizType = cleanPartyText(res.supplier.bizType);
         res.supplier.bizItem = cleanPartyText(res.supplier.bizItem);
 
-        res.buyer.name    = cleanPartyText(res.buyer.name);
+        res.buyer.name    = cleanPartyNameText(res.buyer.name);
         res.buyer.ceo     = cleanPartyText(res.buyer.ceo);
         res.buyer.address = cleanPartyText(res.buyer.address);
         res.buyer.bizType = cleanPartyText(res.buyer.bizType);
@@ -1321,9 +1765,9 @@ public class TransactionStatementParser extends BaseReceiptParser {
 
         // 4) 괄호/찌꺼기 정리 (채움) 같은 경우)
         if (p.name != null) {
-            p.name = p.name.replaceAll("\\s{2,}", " ").trim();
+            p.name = cleanPartyNameText(p.name);
             // 단독 ')' 같은 것만 정리 (완전 제거는 위험해서 최소만)
-            p.name = p.name.replaceAll("^\\)+", "").trim();
+            if (p.name != null) p.name = p.name.replaceAll("^\\)+", "").trim();
         }
     }
 
@@ -1358,9 +1802,92 @@ public class TransactionStatementParser extends BaseReceiptParser {
         String v = s.replaceAll("[\\n\\r]+", " ").replaceAll("\\s{2,}", " ").trim();
         v = v.replaceAll("\\(\\s*1\\s*/\\s*1\\s*\\)", " ");
         v = v.replaceAll("\\(공급받는자\\s*보관용\\)", " ");
+        v = v.replaceAll("\\[\\s*공급받는자\\s*보관용\\s*\\]", " ");
         v = v.replaceAll("\\b거래명세표\\b", " ");
         v = v.replaceAll("\\s{2,}", " ").trim();
         return v.isEmpty() ? null : v;
+    }
+
+    private String cleanPartyNameText(String s) {
+        String v = cleanPartyText(s);
+        if (v == null) return null;
+
+        // 상호 값에 문서 제목, 사업자번호, 주소가 한 줄로 붙는 OCR 결과를 상호 후보만 남긴다.
+        int honorIdx = v.indexOf("귀하");
+        if (honorIdx >= 0) {
+            v = v.substring(0, honorIdx).trim();
+
+            int lastBizEnd = -1;
+            Matcher biz = P_BIZNO.matcher(v);
+            while (biz.find()) lastBizEnd = biz.end();
+            if (lastBizEnd >= 0 && lastBizEnd < v.length()) {
+                v = v.substring(lastBizEnd).trim();
+            }
+        }
+
+        v = v.replaceAll("\\b\\d{3}-\\d{2}-\\d{5}\\b", " ");
+        v = v.replaceAll("\\b0\\d{1,2}-\\d{3,4}-\\d{4}\\b", " ");
+        v = v.replaceAll("[/|]+", " ");
+        v = v.replaceAll("^(일\\s*자|날\\s*짜)\\s*[:：]?\\s*\\d{2,4}[./\\-]\\d{1,2}[./\\-]\\d{1,2}.*$", " ");
+        v = v.replaceAll("^(거\\s*래\\s*처|거래처|처)\\s*[:：]?", " ");
+        v = v.replaceAll("^(상\\s*호|상|호)\\s+", " ");
+        v = v.replaceAll("^(권\\s*호|명\\s*세\\s*표)$", " ");
+        v = v.replaceAll("\\s+(받|청구|합니다|입금액|전잔액|현잔액).*$", " ");
+        v = v.replaceAll("\\s+(경기도|서울|인천|부산|대구|광주|대전|울산|세종|강원|충청|전라|경상|제주).*$", " ");
+        v = v.replaceAll("(사업장\\s*소재지|사업장\\s*주소|소재지|주\\s*소|주소|업\\s*태|종\\s*목).*$", " ");
+        v = v.replaceAll("\\s+(상\\s*호|등록\\s*번호|사업자\\s*번호|사업자\\s*등록\\s*번호|대표\\s*자|성\\s*명|전화\\s*번호|팩스\\s*번호).*$", " ");
+        v = v.replaceAll("^(상\\s*호|등록\\s*번호|사업자\\s*번호|사업자\\s*등록\\s*번호|대표\\s*자|성\\s*명|전화\\s*번호|팩스\\s*번호)\\s*[:：]?$", " ");
+        v = v.replaceAll("(거래\\s*)+", " ");
+        v = normalizeCompanyWordSpacing(v);
+        v = v.replaceAll("\\s{2,}", " ").trim();
+
+        return v.isEmpty() ? null : v;
+    }
+
+    private String cleanPartyCeoText(String s, String partyName) {
+        String v = cleanPartyText(s);
+        if (v == null) return null;
+        if (isPartyNameLabelNoise(v)) return null;
+        if (v.matches(".*(권\\s*호|명\\s*세\\s*표|거래명세표|공급받는자\\s*보관용).*")) return null;
+
+        Matcher explicit = Pattern.compile("(성\\s*명|대표\\s*자|대표)\\s*[:：]?\\s*([가-힣]{2,5})").matcher(v);
+        if (explicit.find()) return explicit.group(2);
+
+        Matcher stampedName = Pattern.compile("([가-힣]{2,5})\\s*(?:®|인)").matcher(v);
+        if (stampedName.find()) {
+            String name = stampedName.group(1);
+            if (partyName == null || !partyName.replaceAll("\\s+", "").contains(name)) return name;
+        }
+
+        if (v.matches(".*(귀하|사업장\\s*소재지|사업장\\s*주소|주소|거래명세표).*")) return null;
+
+        v = v.replaceAll("[®인]", " ").replaceAll("\\s{2,}", " ").trim();
+        if (v.matches("^[가-힣]{2,5}$")) return v;
+        return null;
+    }
+
+    private String normalizeCompanyWordSpacing(String s) {
+        if (s == null) return null;
+        String v = s;
+        // OCR이 회사명 업종어를 글자 단위로 띄운 경우만 제한적으로 붙인다.
+        v = v.replaceAll("식\\s+자\\s+재", "식자재");
+        v = v.replaceAll("유\\s+통", "유통");
+        v = v.replaceAll("마\\s+트", "마트");
+        v = v.replaceAll("양\\s+곡", "양곡");
+        v = v.replaceAll("푸\\s+드", "푸드");
+        v = v.replaceAll("요\\s+양\\s+원", "요양원");
+        v = v.replaceAll("문\\s+평", "문평");
+        v = v.replaceAll("더\\s+란", "더란");
+        return v;
+    }
+
+    private boolean isSuspiciousPartyName(String s) {
+        String v = cleanPartyText(s);
+        if (v == null) return false;
+        if (v.matches(".*\\b\\d{3}-\\d{2}-\\d{5}\\b.*")) return true;
+        if (P_PHONE.matcher(v).find()) return true;
+        if (v.matches(".*(권\\s*호|명\\s*세\\s*표|거래명세표|공급받는자\\s*보관용|사업장\\s*소재지|사업장\\s*주소|귀하|공급가액|전미수|미수금).*")) return true;
+        return v.length() > 40;
     }
 
     // =========================================================

@@ -671,27 +671,27 @@ public class AccountController {
 
 		Map<String, Object> formData = (Map<String, Object>) payload.get("formData");
 		Map<String, Object> payloadMap = new HashMap<>();
-		
-	    if (formData != null) {
-	        // 1. 거래처 기본정보 먼저 저장 (ID 확보 등)
-	        iResult += accountService.AccountSave(formData);
 
-	        // 2. 주소값 가져오기 (formData에 저장된 필드명 확인 필요)
-	        String address = (String) formData.get("account_address"); 
+		if (formData != null) {
+			// 1. 거래처 기본정보 먼저 저장 (ID 확보 등)
+			iResult += accountService.AccountSave(formData);
 
-	        if (address != null && !address.isEmpty()) {
-	        	// 3. API 호출하여 좌표 구하기
-	        	Coordinate result = geocodingService.getCoordinates(address);
-	        	
-	        	if (result != null) {
-	        	    // Coordinate 클래스에 getX(), getY()가 있어야 빨간 줄이 사라집니다.
-	        	    formData.put("x_coordinate", result.getX()); 
-	        	    formData.put("y_coordinate", result.getY());
-	        	    
-	        	    iResult += accountService.AccountCoordinateSave(formData);
-	        	}
-	        }
-	    }
+			// 2. 주소값 가져오기 (formData에 저장된 필드명 확인 필요)
+			String address = (String) formData.get("account_address");
+
+			if (address != null && !address.isEmpty()) {
+				// 3. API 호출하여 좌표 구하기
+				Coordinate result = geocodingService.getCoordinates(address);
+
+				if (result != null) {
+					// Coordinate 클래스에 getX(), getY()가 있어야 빨간 줄이 사라집니다.
+					formData.put("x_coordinate", result.getX());
+					formData.put("y_coordinate", result.getY());
+
+					iResult += accountService.AccountCoordinateSave(formData);
+				}
+			}
+		}
 
 		List<Map<String, Object>> priceData = (List<Map<String, Object>>) payload.get("priceData");
 		List<Map<String, Object>> etcData = (List<Map<String, Object>>) payload.get("etcData");
@@ -701,7 +701,7 @@ public class AccountController {
 		if (formData != null) {
 			payloadMap.putAll(formData);
 		}
-		
+
 		if (etcData != null) {
 			for (Map<String, Object> row : etcData) {
 				if (row != null)
@@ -772,12 +772,13 @@ public class AccountController {
 				try {
 					LocalDate now = LocalDate.now();
 					Map<String, Object> profitParam = new HashMap<>();
-					profitParam.put("year",       now.getYear());
-					profitParam.put("month",      now.getMonthValue());
+					profitParam.put("year", now.getYear());
+					profitParam.put("month", now.getMonthValue());
 					profitParam.put("account_id", accountId);
 					accountService.callProfitLossTotalSave(profitParam);
 				} catch (Exception e) {
-					System.err.println("[AccountInfoSave] ProfitLossTotalSave 실패: " + accountId + " / " + e.getMessage());
+					System.err
+							.println("[AccountInfoSave] ProfitLossTotalSave 실패: " + accountId + " / " + e.getMessage());
 				}
 			}
 		}
@@ -921,12 +922,14 @@ public class AccountController {
 	 */
 	private String decodeUriPathRepeatedly(String value) {
 		String current = value == null ? "" : String.valueOf(value).trim();
-		if (current.isEmpty()) return "";
+		if (current.isEmpty())
+			return "";
 
 		for (int i = 0; i < 3; i++) {
 			try {
 				String next = URLDecoder.decode(current, StandardCharsets.UTF_8);
-				if (next.equals(current)) break;
+				if (next.equals(current))
+					break;
 				current = next;
 			} catch (Exception e) {
 				break;
@@ -1521,7 +1524,8 @@ public class AccountController {
 		int iResult = 0;
 
 		for (Map<String, Object> paramMap : paramList) {
-			System.out.println("[AccountPurchaseSave] sale_id=" + paramMap.get("sale_id") + " saleDate=" + paramMap.get("saleDate"));
+			System.out.println("[AccountPurchaseSave] sale_id=" + paramMap.get("sale_id") + " saleDate="
+					+ paramMap.get("saleDate"));
 			iResult += accountService.AccountPurchaseSave(paramMap);
 			// 여러 타입의 날짜형식을 매핑.
 			LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
@@ -2083,9 +2087,15 @@ public class AccountController {
 		List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
 
 		int iResult = 0;
+		List<String> manualMasterSaleIds = new ArrayList<>();
 
 		if (mainList != null) {
 			for (Map<String, Object> mainMap : mainList) {
+				String saleId = String.valueOf(mainMap.getOrDefault("sale_id", "")).trim();
+				if (!saleId.isEmpty() && isHeadOfficeCorporateManualMasterAmount(mainMap)) {
+					manualMasterSaleIds.add(saleId);
+				}
+
 				iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
 
 				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
@@ -2098,13 +2108,15 @@ public class AccountController {
 				mainMap.put("year", year);
 				mainMap.put("month", month);
 
-				// 집계표도 다시 적용.
+				// 집계표 적용.
 				iResult += accountService.TallySheetCorporateCardPaymentSaveV2(mainMap);
 			}
 		}
 		if (itemList != null) {
+			Map<String, Map<String, Object>> detailMasterBaseMap = new HashMap<>();
+
 			for (Map<String, Object> itemMap : itemList) {
-				iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
+				accountService.HeadOfficeCorporateCardPaymentDetailLSave(itemMap);
 
 				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
 				String paymentDate = String.valueOf(itemMap.get("payment_dt")); // "2026-01-01"
@@ -2116,13 +2128,51 @@ public class AccountController {
 				itemMap.put("year", year);
 				itemMap.put("month", month);
 
-				// 집계표도 다시 적용.
-				iResult += accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
+				// type을 Integer로 보정 (프로시저 IN 파라미터가 INT)
+				Object typeObj = itemMap.get("type");
+				if (typeObj instanceof String) {
+					try {
+						itemMap.put("type", Integer.parseInt((String) typeObj));
+					} catch (NumberFormatException ignored) {
+					}
+				}
+
+				String saleId = String.valueOf(itemMap.getOrDefault("sale_id", "")).trim();
+				if (!saleId.isEmpty()) {
+					detailMasterBaseMap.putIfAbsent(saleId, itemMap);
+				}
+
+				// 집계표 적용 (detail 기준 v2)
+				accountService.TallySheetCorporateCardPaymentSaveV2(itemMap);
+			}
+
+			for (Map.Entry<String, Map<String, Object>> entry : detailMasterBaseMap.entrySet()) {
+				if (manualMasterSaleIds.contains(entry.getKey())) {
+					continue;
+				}
+
+				Map<String, Object> baseMap = detailMasterBaseMap.get(entry.getKey());
+				Map<String, Object> detailQuery = new HashMap<>();
+				detailQuery.put("sale_id", entry.getKey());
+				detailQuery.put("account_id", baseMap.get("account_id"));
+				detailQuery.put("payment_dt", baseMap.get("payment_dt"));
+
+				Map<String, Object> summary = summarizeHeadOfficeCorporateDetails(
+						accountService.HeadOfficeCorporateCardPaymentDetailList(detailQuery));
+
+				Map<String, Object> masterUpdate = new HashMap<>();
+				masterUpdate.put("sale_id", entry.getKey());
+				masterUpdate.put("account_id", baseMap.get("account_id"));
+				masterUpdate.put("payment_dt", baseMap.get("payment_dt"));
+				masterUpdate.put("total", summary.get("total"));
+				masterUpdate.put("vat", summary.get("vat"));
+				masterUpdate.put("taxFree", summary.get("taxFree"));
+				masterUpdate.put("tax", summary.get("tax"));
+				iResult += accountService.HeadOfficeCorporateCardPaymentSave(masterUpdate);
 			}
 		}
 
 		JsonObject obj = new JsonObject();
-
 		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
@@ -2427,6 +2477,70 @@ public class AccountController {
 		}
 
 		return obj.toString();
+	}
+
+	// 본사 법인카드 상세 전체 행을 master 금액으로 합산
+	private Map<String, Object> summarizeHeadOfficeCorporateDetails(List<Map<String, Object>> detailList) {
+		Map<String, Object> summary = new HashMap<>();
+		summary.put("total", 0);
+		summary.put("vat", 0);
+		summary.put("taxFree", 0);
+		summary.put("tax", 0);
+
+		if (detailList == null) {
+			return summary;
+		}
+
+		for (Map<String, Object> itemMap : detailList) {
+			int amount = parseHeadOfficeCorporateCardAmount(itemMap.get("amount"));
+			int taxType = parseHeadOfficeCorporateCardTaxType(itemMap.get("taxType"));
+
+			summary.put("total", ((Integer) summary.get("total")) + amount);
+
+			if (taxType == 1) {
+				int vat = amount / 11;
+				summary.put("vat", ((Integer) summary.get("vat")) + vat);
+				summary.put("tax", ((Integer) summary.get("tax")) + amount - vat);
+			} else if (taxType == 2) {
+				summary.put("taxFree", ((Integer) summary.get("taxFree")) + amount);
+			}
+		}
+
+		return summary;
+	}
+
+	// 상단 금액을 수기 수정한 행은 상세 기준 자동계산으로 다시 덮지 않는다.
+	private boolean isHeadOfficeCorporateManualMasterAmount(Map<String, Object> mainMap) {
+		Object value = mainMap.get("manualMasterAmount");
+		if (value instanceof Boolean) {
+			return (Boolean) value;
+		}
+		return "true".equalsIgnoreCase(String.valueOf(value));
+	}
+
+	// 금액 문자열을 저장 계산용 숫자로 변환
+	private int parseHeadOfficeCorporateCardAmount(Object value) {
+		try {
+			return Integer.parseInt(String.valueOf(value == null ? "0" : value).replaceAll("[^0-9-]", ""));
+		} catch (NumberFormatException e) {
+			return 0;
+		}
+	}
+
+	// 과세구분 값을 저장 계산용 코드로 변환
+	private int parseHeadOfficeCorporateCardTaxType(Object value) {
+		if (value == null) return 0;
+		String text = String.valueOf(value).trim();
+		if (text.isEmpty()) return 0;
+		try {
+			return Integer.parseInt(text);
+		} catch (NumberFormatException e) {
+			String lower = text.toLowerCase();
+			if (lower.contains("면세") || lower.contains("taxfree") || lower.contains("tax_free")) return 2;
+			if (lower.contains("과세") || lower.contains("taxable") || "tax".equals(lower)) return 1;
+			if (lower.contains("알수") || lower.contains("unknown")) return 3;
+			return 0;
+		}
 	}
 
 	/*
