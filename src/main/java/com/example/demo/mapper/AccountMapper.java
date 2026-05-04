@@ -80,6 +80,7 @@ public interface AccountMapper {
 	int HeadOfficeCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 본사 법인카드 결제내역 저장
 	int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 상세내역 저장
 	String HeadOfficeCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap);					// 회계 -> 본사 법인카드 영수증 경로 조회
+	String HeadOfficeCorporateCardPaymentDtBySaleId(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 sale_id 기준 기존 결제일자 조회
 	List<Map<String, Object>> AccountCorporateCardList(Map<String, Object> paramMap); 					// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap); 			// 회계 -> 본사 법인카드 결제내역 조회
 	List<Map<String, Object>> AccountCorporateCardPaymentDetailList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제 상세내역 조회

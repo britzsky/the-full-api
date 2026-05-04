@@ -1526,7 +1526,23 @@ public class AccountController {
 		for (Map<String, Object> paramMap : paramList) {
 			System.out.println("[AccountPurchaseSave] sale_id=" + paramMap.get("sale_id") + " saleDate="
 					+ paramMap.get("saleDate"));
+			// 저장 전 기존 결제일자를 조회해서 저장 후 결제일자 변경 여부를 비교.
+			Map<String, Object> oldPurchase = accountService.AccountPurchaseTallyTotalBySaleId(paramMap);
+			String oldSaleDate = oldPurchase != null && oldPurchase.get("saleDate") != null
+					? oldPurchase.get("saleDate").toString()
+					: "";
+			String newSaleDate = paramMap.get("saleDate") != null ? paramMap.get("saleDate").toString() : "";
 			iResult += accountService.AccountPurchaseSave(paramMap);
+			// 결제일자가 바뀐 경우 같은 값에서 saleDate만 이전 날짜로 바꿔 동일 프로시저를 한 번 더 태움.
+			if (!oldSaleDate.isEmpty()
+					&& !DateUtils.parseFlexibleDate(oldSaleDate).equals(DateUtils.parseFlexibleDate(newSaleDate))) {
+				Map<String, Object> oldParamMap = new HashMap<>(paramMap);
+				oldParamMap.put("saleDate", oldSaleDate);
+				LocalDate oldDate = DateUtils.parseFlexibleDate(oldSaleDate);
+				oldParamMap.put("year", oldDate.getYear());
+				oldParamMap.put("month", oldDate.getMonthValue());
+				iResult += accountService.TallySheetPaymentSave(oldParamMap);
+			}
 			// 여러 타입의 날짜형식을 매핑.
 			LocalDate date = DateUtils.parseFlexibleDate(paramMap.get("saleDate").toString());
 			// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
@@ -2088,6 +2104,7 @@ public class AccountController {
 
 		int iResult = 0;
 		List<String> manualMasterSaleIds = new ArrayList<>();
+		List<Map<String, Object>> orgDateProcs = new ArrayList<>();
 
 		if (mainList != null) {
 			for (Map<String, Object> mainMap : mainList) {
@@ -2096,19 +2113,32 @@ public class AccountController {
 					manualMasterSaleIds.add(saleId);
 				}
 
+				// 저장 전에 DB에서 기존 결제일자 조회
+				String paymentDate = String.valueOf(mainMap.get("payment_dt"));
+				if (!saleId.isEmpty()) {
+					Map<String, Object> queryMap = new HashMap<>();
+					queryMap.put("sale_id", saleId);
+					String existingDt = accountService.HeadOfficeCorporateCardPaymentDtBySaleId(queryMap);
+					if (existingDt != null && !existingDt.trim().isEmpty() && !existingDt.trim().equals(paymentDate.trim())) {
+						Map<String, Object> orgPaymentMap = new HashMap<>(mainMap);
+						LocalDate orgPayDate = LocalDate.parse(existingDt.trim());
+						orgPaymentMap.put("payment_dt", existingDt.trim());
+						orgPaymentMap.put("year", orgPayDate.getYear());
+						orgPaymentMap.put("month", orgPayDate.getMonthValue());
+						orgDateProcs.add(orgPaymentMap);
+					}
+				}
+
 				iResult += accountService.HeadOfficeCorporateCardPaymentSave(mainMap);
 
 				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-				String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
-
-				LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
-				int year = payDate.getYear(); // 2026
-				int month = payDate.getMonthValue(); // 1~12
+				LocalDate payDate = LocalDate.parse(paymentDate);
+				int year = payDate.getYear();
+				int month = payDate.getMonthValue();
 
 				mainMap.put("year", year);
 				mainMap.put("month", month);
 
-				// 집계표 적용.
 				iResult += accountService.TallySheetCorporateCardPaymentSaveV2(mainMap);
 			}
 		}
@@ -2170,6 +2200,11 @@ public class AccountController {
 				masterUpdate.put("tax", summary.get("tax"));
 				iResult += accountService.HeadOfficeCorporateCardPaymentSave(masterUpdate);
 			}
+		}
+
+		// 이전 결제일자 집계표 동기화 (모든 저장 완료 후)
+		for (Map<String, Object> orgMap : orgDateProcs) {
+			accountService.TallySheetCorporateCardPaymentSaveV2(orgMap);
 		}
 
 		JsonObject obj = new JsonObject();
@@ -2269,13 +2304,11 @@ public class AccountController {
 		List<Map<String, Object>> itemList = (List<Map<String, Object>>) paramMap.get("item");
 
 		int iResult = 0;
+		List<Map<String, Object>> orgDateProcs = new ArrayList<>();
 
 		if (mainList != null) {
 			for (Map<String, Object> mainMap : mainList) {
-				iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
-
 				// 손익표, 예산 프로시저용 연/월 계산 전에 입력값을 정규화한다.
-				// idx가 ""이면 NULL로, 금액 필드는 비어있으면 0으로, 결제일이 없으면 오늘 날짜로 보정.
 				Object idxVal = mainMap.get("idx");
 				if (idxVal != null && String.valueOf(idxVal).trim().isEmpty())
 					mainMap.put("idx", null);
@@ -2285,23 +2318,43 @@ public class AccountController {
 					if (v == null || String.valueOf(v).trim().isEmpty())
 						mainMap.put(k, 0);
 				}
-				String paymentDate = String.valueOf(mainMap.get("payment_dt")); // "2026-01-01"
+				String paymentDate = String.valueOf(mainMap.get("payment_dt"));
 				if (paymentDate == null || paymentDate.trim().isEmpty() || "null".equalsIgnoreCase(paymentDate)) {
 					paymentDate = java.time.LocalDate.now().toString();
 					mainMap.put("payment_dt", paymentDate);
 				}
 
+				// 저장 전에 DB에서 기존 결제일자 조회
+				String saleId = String.valueOf(mainMap.getOrDefault("sale_id", "")).trim();
+				if (!saleId.isEmpty()) {
+					Map<String, Object> queryMap = new HashMap<>();
+					queryMap.put("sale_id", saleId);
+					Map<String, Object> existing = accountService.AccountPurchaseTallyTotalBySaleId(queryMap);
+					if (existing != null) {
+						String existingDt = String.valueOf(existing.getOrDefault("saleDate", "")).trim();
+						if (!existingDt.isEmpty() && !existingDt.equalsIgnoreCase("null") && !existingDt.equals(paymentDate.trim())) {
+							Map<String, Object> orgPaymentMap = new HashMap<>(mainMap);
+							LocalDate orgPayDate = LocalDate.parse(existingDt);
+							orgPaymentMap.put("payment_dt", existingDt);
+							orgPaymentMap.put("year", orgPayDate.getYear());
+							orgPaymentMap.put("month", orgPayDate.getMonthValue());
+							orgDateProcs.add(orgPaymentMap);
+						}
+					}
+				}
+
+				iResult += accountService.AccountCorporateCardPaymentSave(mainMap);
+
 				// 손익표, 예산 프로시저 적용을 위한 연,월 추출.
-				LocalDate payDate = LocalDate.parse(paymentDate); // 기본 ISO(yyyy-MM-dd) 파싱됨
-				int year = payDate.getYear(); // 2026
-				int month = payDate.getMonthValue(); // 1~12
+				LocalDate payDate = LocalDate.parse(paymentDate);
+				int year = payDate.getYear();
+				int month = payDate.getMonthValue();
 
 				mainMap.put("year", year);
 				mainMap.put("month", month);
 
 				iResult += accountService.AccountCorporateCardPaymentToPurchaseTallySave(mainMap);
 
-				// 집계표도 다시 적용.
 				iResult += accountService.TallySheetCorporateCardPaymentSave(mainMap);
 			}
 		}
@@ -2309,6 +2362,11 @@ public class AccountController {
 			for (Map<String, Object> itemMap : itemList) {
 				iResult += accountService.AccountCorporateCardPaymentDetailLSave(itemMap);
 			}
+		}
+
+		// 이전 결제일자 집계표 동기화 (모든 저장 완료 후)
+		for (Map<String, Object> orgMap : orgDateProcs) {
+			accountService.TallySheetCorporateCardPaymentSave(orgMap);
 		}
 
 		JsonObject obj = new JsonObject();

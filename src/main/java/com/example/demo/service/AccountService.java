@@ -840,6 +840,16 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 회계 -> 매입마감 sale_id 기준 기존 결제일자 조회
+	public Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap) {
+		return accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
+	}
+
+	// 회계 -> 본사 법인카드 sale_id 기준 기존 결제일자 조회
+	public String HeadOfficeCorporateCardPaymentDtBySaleId(Map<String, Object> paramMap) {
+		return accountMapper.HeadOfficeCorporateCardPaymentDtBySaleId(paramMap);
+	}
+
 	// 회계 -> 매입 -> 매입마감 조회
 	public List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

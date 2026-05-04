@@ -2809,6 +2809,13 @@
 		</if>
 		LIMIT 1
 	</select>
+
+	<select id="HeadOfficeCorporateCardPaymentDtBySaleId" parameterType="map" resultType="string">
+		SELECT DATE_FORMAT(payment_dt, '%Y-%m-%d')
+		FROM tb_headoffice_corporate_card_payment_list
+		WHERE sale_id = #{sale_id}
+		LIMIT 1
+	</select>
 	
 	<insert id="HeadOfficeCorporateCardPaymentDetailLSave" parameterType="map">
 		<choose>
