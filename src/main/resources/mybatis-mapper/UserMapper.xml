@@ -119,7 +119,8 @@
             join_dt,
             account_id,
             position,
-            department
+            department,
+            use_yn
         )
         VALUES (
             #{user_id},
@@ -130,7 +131,8 @@
             DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
             #{account_id},
             #{position},
-            #{department}
+            #{department},
+            COALESCE(#{use_yn}, 'N')
         )
         ON DUPLICATE KEY UPDATE
         <trim suffixOverrides=",">
@@ -142,7 +144,8 @@
             join_dt = DATE_FORMAT(#{join_dt}, '%Y-%m-%d'),
             account_id = #{account_id},
             position = #{position},
-            department = #{department}
+            department = #{department},
+            use_yn = COALESCE(#{use_yn}, use_yn)
         </trim>
     </insert>
 

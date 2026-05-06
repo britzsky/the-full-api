@@ -278,6 +278,10 @@ public class UserController {
 			String isUpdateRaw = String.valueOf(paramMap.getOrDefault("is_update", "")).trim();
 			boolean isUpdate = "true".equalsIgnoreCase(isUpdateRaw) || "y".equalsIgnoreCase(isUpdateRaw)
 					|| "1".equals(isUpdateRaw);
+			// 신규 사용자 승인 상태 기본값
+			if (!isUpdate && !info.containsKey("use_yn")) {
+				info.put("use_yn", "N");
+			}
 
 			if (userId.isEmpty()) {
 				obj.addProperty("code", 400);
@@ -331,6 +335,120 @@ public class UserController {
 			}
 
 			iResult += userService.UserRgtAll(info, detail, accountMember);
+
+			if (iResult > 0) {
+				obj.addProperty("code", 200);
+				obj.addProperty("message", "성공");
+			} else {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "실패");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("code", 400);
+			obj.addProperty("message", e.getMessage() == null ? "실패" : e.getMessage());
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * method : UserRgt_v2
+	 * comment : 사용자 일괄 등록 (배열)
+	 */
+	@PostMapping("/User/UserRgt_v2")
+	public String UserRgt_v2(@RequestBody List<Map<String, Object>> items) {
+
+		JsonObject obj = new JsonObject();
+
+		try {
+			if (items == null || items.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "요청 데이터가 없습니다.");
+				return obj.toString();
+			}
+
+			List<Map<String, Object>> infoList = new java.util.ArrayList<>();
+			List<Map<String, Object>> detailList = new java.util.ArrayList<>();
+			List<Map<String, Object>> accountMemberList = new java.util.ArrayList<>();
+
+			for (Map<String, Object> paramMap : items) {
+				Map<String, Object> info = (Map<String, Object>) paramMap.get("info");
+				Map<String, Object> detail = (Map<String, Object>) paramMap.get("detail");
+				Map<String, Object> reqAccountMember = (Map<String, Object>) paramMap.get("account_member");
+				Map<String, Object> accountMember = null;
+
+				if (info == null || detail == null) {
+					obj.addProperty("code", 400);
+					obj.addProperty("message", "요청 형식이 올바르지 않습니다.");
+					return obj.toString();
+				}
+
+				String userType = String.valueOf(info.getOrDefault("user_type", "")).trim();
+				String userId = String.valueOf(info.getOrDefault("user_id", "")).trim();
+				String isUpdateRaw = String.valueOf(paramMap.getOrDefault("is_update", "")).trim();
+				boolean isUpdate = "true".equalsIgnoreCase(isUpdateRaw) || "y".equalsIgnoreCase(isUpdateRaw)
+						|| "1".equals(isUpdateRaw);
+
+				if (!isUpdate && !info.containsKey("use_yn")) {
+					info.put("use_yn", "N");
+				}
+
+				if (userId.isEmpty()) {
+					obj.addProperty("code", 400);
+					obj.addProperty("message", "user_id는 필수입니다.");
+					return obj.toString();
+				}
+
+				Map<String, Object> userIdParam = new HashMap<>();
+				userIdParam.put("user_id", userId);
+				int existsUserId = userService.CountUserId(userIdParam);
+				if (existsUserId > 0 && !isUpdate) {
+					obj.addProperty("code", 400);
+					obj.addProperty("message", "이미 사용 중인 아이디입니다. (" + userId + ")");
+					return obj.toString();
+				}
+
+				if ("4".equals(userType)) {
+					info.put("department", 7);
+					String positionType = "";
+					if (reqAccountMember != null && reqAccountMember.get("position_type") != null) {
+						positionType = String.valueOf(reqAccountMember.get("position_type")).trim();
+					}
+					if (positionType.isEmpty() && info.get("util_member_type") != null) {
+						positionType = String.valueOf(info.get("util_member_type")).trim();
+					}
+					if (!"6".equals(positionType) && !"7".equals(positionType)) {
+						obj.addProperty("code", 400);
+						obj.addProperty("message", "통합/유틸 구분값이 필요합니다. (" + userId + ")");
+						return obj.toString();
+					}
+
+					String utilMemberId = userService.SelectUtilMemberIdByUserId(userIdParam);
+					if (utilMemberId == null || utilMemberId.trim().isEmpty()) {
+						utilMemberId = userService.NowDateKey();
+					}
+
+					accountMember = new HashMap<>();
+					accountMember.put("member_id", utilMemberId);
+					accountMember.put("account_id", "6".equals(positionType) ? "2" : "1");
+					accountMember.put("name", info.get("user_name"));
+					accountMember.put("join_dt", info.get("join_dt"));
+					accountMember.put("del_yn", "N");
+					accountMember.put("display_yn", "Y");
+					accountMember.put("position_type", Integer.valueOf(positionType));
+					accountMember.put("address", detail.get("address"));
+					accountMember.put("phone", detail.get("phone"));
+					accountMember.put("note", reqAccountMember == null ? null : reqAccountMember.get("note"));
+					accountMember.put("user_id", userId);
+				}
+
+				infoList.add(info);
+				detailList.add(detail);
+				accountMemberList.add(accountMember);
+			}
+
+			int iResult = userService.UserRgtAllBatch(infoList, detailList, accountMemberList);
 
 			if (iResult > 0) {
 				obj.addProperty("code", 200);

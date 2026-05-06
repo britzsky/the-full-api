@@ -112,6 +112,21 @@ public class UserService {
 		return iResult;
 	}
 
+	// 사용자 일괄 저장 (배열)
+	@Transactional(rollbackFor = Exception.class)
+	public int UserRgtAllBatch(List<Map<String, Object>> infoList, List<Map<String, Object>> detailList, List<Map<String, Object>> accountMemberList) {
+		int iResult = 0;
+		for (int i = 0; i < infoList.size(); i++) {
+			iResult += userMapper.UserRgt(infoList.get(i));
+			iResult += userMapper.UserRgtDetail(detailList.get(i));
+			Map<String, Object> accountMember = accountMemberList.get(i);
+			if (accountMember != null && !accountMember.isEmpty()) {
+				iResult += userMapper.UserRgtAccountMember(accountMember);
+			}
+		}
+		return iResult;
+	}
+
 	// 직원 정보 조회
 	public List<Map<String, Object>> SelectUserInfo(Map<String, Object> paramMap) {
 		return userMapper.SelectUserInfo(paramMap);

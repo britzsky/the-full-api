@@ -235,6 +235,14 @@ public class OcrController {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
             LocalDate date = DateUtils.parseFlexibleDate(effectiveSaleDate);
+            if (cell_date != null && !cell_date.isBlank()) {
+                LocalDate cellDate = DateUtils.parseFlexibleDate(cell_date);
+                if (!date.equals(cellDate)
+                        && date.getMonthValue() == cellDate.getMonthValue()
+                        && date.getDayOfMonth() == cellDate.getDayOfMonth()) {
+                    date = cellDate;
+                }
+            }
             LocalTime nowTime = LocalTime.now();
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
