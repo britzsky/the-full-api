@@ -788,12 +788,16 @@
 			   move_lunch_tel,
 			   sub_restaurant1,
 			   sub_restaurant1_tel,
+			   sub_restaurant1_note,
 			   sub_restaurant2,
 			   sub_restaurant2_tel,
+			   sub_restaurant2_note,
 			   sub_restaurant3,
 			   sub_restaurant3_tel,
+			   sub_restaurant3_note,
 			   sub_restaurant4,
-			   sub_restaurant4_tel
+			   sub_restaurant4_tel,
+			   sub_restaurant4_note
 		FROM tb_account a
 		LEFT OUTER JOIN tb_account_sub_restaurant asr
 		ON asr.account_id = a.account_id
@@ -804,7 +808,7 @@
 	
 	<insert id="AccountSubRestaurantSave" parameterType="map">
 	    INSERT INTO tb_account_sub_restaurant
-	    (account_id, move_lunch, move_lunch_tel, sub_restaurant1, sub_restaurant1_tel, sub_restaurant2, sub_restaurant2_tel, sub_restaurant3, sub_restaurant3_tel, sub_restaurant4, sub_restaurant4_tel, update_dt, user_id)
+	    (account_id, move_lunch, move_lunch_tel, sub_restaurant1, sub_restaurant1_tel, sub_restaurant1_note, sub_restaurant2, sub_restaurant2_tel, sub_restaurant2_note, sub_restaurant3, sub_restaurant3_tel, sub_restaurant3_note, sub_restaurant4, sub_restaurant4_tel, sub_restaurant4_note, update_dt, user_id)
 	    VALUES
 	    (
 	        #{account_id},
@@ -812,12 +816,16 @@
 	        #{move_lunch_tel},
 	        #{sub_restaurant1},
 	        #{sub_restaurant1_tel},
+	        #{sub_restaurant1_note},
 	        #{sub_restaurant2},
 	        #{sub_restaurant2_tel},
+	        #{sub_restaurant2_note},
 	        #{sub_restaurant3},
 	        #{sub_restaurant3_tel},
+	        #{sub_restaurant3_note},
 	        #{sub_restaurant4},
 	        #{sub_restaurant4_tel},
+	        #{sub_restaurant4_note},
 	        DATE_FORMAT(now(), '%Y-%m-%d'),
 	        #{user_id}
 	    )
@@ -827,12 +835,16 @@
         move_lunch_tel = #{move_lunch_tel},
         sub_restaurant1 = #{sub_restaurant1},
         sub_restaurant1_tel = #{sub_restaurant1_tel},
+        sub_restaurant1_note = #{sub_restaurant1_note},
         sub_restaurant2 = #{sub_restaurant2},
         sub_restaurant2_tel = #{sub_restaurant2_tel},
+        sub_restaurant2_note = #{sub_restaurant2_note},
         sub_restaurant3 = #{sub_restaurant3},
         sub_restaurant3_tel = #{sub_restaurant3_tel},
+        sub_restaurant3_note = #{sub_restaurant3_note},
         sub_restaurant4 = #{sub_restaurant4},
         sub_restaurant4_tel = #{sub_restaurant4_tel},
+        sub_restaurant4_note = #{sub_restaurant4_note},
 	    update_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
 	    user_id = #{user_id}
 	</insert>

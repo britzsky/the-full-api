@@ -1,7 +1,6 @@
 package com.example.demo.controller;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -779,13 +778,22 @@ public class OcrControllerV2 {
 
     /**
      * MultipartFile → 임시파일 저장
+     * OpenCV가 한글/특수문자 경로를 읽지 못하는 문제를 방지하기 위해
+     * 임시파일명은 원본 확장자만 유지하고 나머지는 제거한다.
      */
     private File saveFile(MultipartFile file) {
         try {
-            File tempFile = File.createTempFile("upload_", "_" + file.getOriginalFilename());
-            try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-                fos.write(file.getBytes());
+            String ext = ".jpg";
+            String originalName = file.getOriginalFilename();
+            if (originalName != null && originalName.contains(".")) {
+                String raw = originalName.substring(originalName.lastIndexOf(".")).toLowerCase();
+                // 허용할 확장자만 사용, 나머지는 .jpg 기본값
+                if (raw.matches("\\.(jpg|jpeg|png|pdf|tiff?|bmp|webp)")) {
+                    ext = raw;
+                }
             }
+            File tempFile = File.createTempFile("upload_", ext);
+            Files.write(tempFile.toPath(), file.getBytes());
             System.out.println("📂 업로드된 파일 저장 완료: " + tempFile.getAbsolutePath());
             return tempFile;
         } catch (IOException e) {

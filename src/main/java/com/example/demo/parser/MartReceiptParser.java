@@ -7,6 +7,11 @@ import com.google.cloud.documentai.v1.Document;
 
 public class MartReceiptParser extends BaseReceiptParser {
 
+    private static final Pattern P_QTY_SINGLE = Pattern.compile("^(\\d+)개\\s+(\\d{1,3}(?:,\\d{3})*)$");
+    private static final Pattern P_QTY_ONLY   = Pattern.compile("^(\\d+)개$");
+    private static final Pattern P_PRICE_ONLY = Pattern.compile("^(\\d{1,3}(?:,\\d{3})*)$");
+    private static final Pattern P_NOISE      = Pattern.compile(".*(합계|총액|부가세|할인|면세|과세|카드|현금|승인|거래NO|감사).*");
+
     @Override
     public ReceiptResult parse(Document doc) {
         ReceiptResult r = new ReceiptResult();
@@ -115,6 +120,14 @@ public class MartReceiptParser extends BaseReceiptParser {
             if (trimmed.isEmpty()) continue;
             if (phase.equals("merchant") && trimmed.matches(".*(NO\\.|상품명|단가|수량|금액).*")) {
                 sections.add(new ArrayList<>(current)); current.clear(); phase = "items";
+            } else if (phase.equals("merchant")
+                    && trimmed.matches("\\d{4}[./\\-]\\d{1,2}[./\\-]\\d{1,2}\\s+\\d{1,2}:\\d{2}.*")) {
+                // 날짜+시각 라인 → 이 라인까지 merchant에 포함하고 items 시작
+                current.add(trimmed);
+                sections.add(new ArrayList<>(current));
+                current.clear();
+                phase = "items";
+                continue;
             } else if (phase.equals("items") && trimmed.matches(".*(합계|총액|할인|면세|부가세|VAT|현금|카드).*")) {
                 sections.add(new ArrayList<>(current)); current.clear(); phase = "totals";
             } else if (phase.equals("totals") && trimmed.matches(".*(고객|적립|승인|영수증|거래NO|감사|계산원).*")) {
@@ -127,7 +140,7 @@ public class MartReceiptParser extends BaseReceiptParser {
     }
 
     // -------------------- 영수증 타입 감지 --------------------
-    private enum ReceiptPatternType { NUMBERED, TWO_LINE_NUMBERED, INLINE, SPLIT }
+    private enum ReceiptPatternType { NUMBERED, TWO_LINE_NUMBERED, INLINE, QTY_PRICE, SPLIT }
 
     private ReceiptPatternType detectPattern(List<String> lines) {
         boolean hasNoHeader = lines.stream().anyMatch(l -> l.matches(".*\\bNO\\.?\\b.*상품명.*"));
@@ -171,6 +184,15 @@ public class MartReceiptParser extends BaseReceiptParser {
             return ReceiptPatternType.INLINE;
         }
 
+        // "N개 금액" 또는 "N개" 단독 라인 형식 (베이커리 등)
+        boolean hasQtyPrice = lines.stream().anyMatch(l ->
+                l.matches("^\\d+개\\s+\\d{1,3}(?:,\\d{3})*$")  // "1개 29,000" 한 줄
+                || l.matches("^\\d+개$"));                        // "1개" 단독 라인
+        if (hasQtyPrice) {
+            System.out.println("🟣 Pattern detected: QTY_PRICE");
+            return ReceiptPatternType.QTY_PRICE;
+        }
+
         System.out.println("⬜ Pattern detected: SPLIT");
         return ReceiptPatternType.SPLIT;
     }
@@ -192,6 +214,7 @@ public class MartReceiptParser extends BaseReceiptParser {
             case NUMBERED -> items.addAll(parseNumberedItems(clean));
             case TWO_LINE_NUMBERED -> items.addAll(parseTwoLineNumberedItems(clean));
             case INLINE -> items.addAll(parseInlineItems(clean));
+            case QTY_PRICE -> items.addAll(parseQtyPriceItems(clean));
             case SPLIT -> items.addAll(parseSplitItems(clean));
         }
 
@@ -288,7 +311,71 @@ public class MartReceiptParser extends BaseReceiptParser {
         return items;
     }
 
-    // -------------------- TYPE 3: SPLIT (마트형 단가→수량→금액 구조 전용) --------------------
+    // -------------------- TYPE 3: QTY_PRICE ("N개 금액" 형식 — 베이커리 등) --------------------
+    // 지원 포맷:
+    //   (A) "1개 29,000"  → 한 줄에 수량+금액
+    //   (B) "1개" / "29,000" → 수량·금액이 각각 별도 라인
+    private List<Item> parseQtyPriceItems(List<String> lines) {
+        List<Item> items = new ArrayList<>();
+        List<String> pendingNames = new ArrayList<>();
+        Integer pendingQty = null;
+
+        for (String line : lines) {
+            // (A) "1개 29,000" 한 줄
+            Matcher sm = P_QTY_SINGLE.matcher(line);
+            if (sm.matches()) {
+                if (!pendingNames.isEmpty()) {
+                    int qty = Integer.parseInt(sm.group(1));
+                    int amt = Integer.parseInt(sm.group(2).replace(",", ""));
+                    items.add(buildItem(pendingNames.remove(0), qty, amt));
+                }
+                pendingQty = null;
+                continue;
+            }
+
+            // (B-1) "1개" 단독
+            Matcher qm = P_QTY_ONLY.matcher(line);
+            if (qm.matches()) {
+                pendingQty = Integer.parseInt(qm.group(1));
+                continue;
+            }
+
+            // (B-2) 금액 단독 — 바로 앞에 수량이 있었던 경우만
+            Matcher pm = P_PRICE_ONLY.matcher(line);
+            if (pm.matches() && pendingQty != null) {
+                if (!pendingNames.isEmpty()) {
+                    int amt = Integer.parseInt(pm.group(1).replace(",", ""));
+                    items.add(buildItem(pendingNames.remove(0), pendingQty, amt));
+                }
+                pendingQty = null;
+                continue;
+            }
+
+            // 이름 라인
+            if (line.matches("^[가-힣A-Za-z(].*") && !P_NOISE.matcher(line).matches()) {
+                pendingNames.add(line);
+                pendingQty = null;
+            }
+        }
+
+        System.out.println("=== 🧾 PARSED ITEMS (QTY_PRICE) ===");
+        for (Item it : items)
+            System.out.printf("📦 %s | 단가:%s | 수량:%s | 금액:%s | %s%n",
+                    it.name, it.unitPrice, it.qty, it.amount, it.taxFlag);
+        return items;
+    }
+
+    private Item buildItem(String name, int qty, int amt) {
+        Item it = new Item();
+        it.name = name.length() > 30 ? name.substring(0, 30).trim() : name;
+        it.qty = qty;
+        it.amount = amt;
+        it.unitPrice = qty > 0 ? amt / qty : amt;
+        it.taxFlag = "과세";
+        return it;
+    }
+
+    // -------------------- TYPE 4: SPLIT (마트형 단가→수량→금액 구조 전용) --------------------
     private List<Item> parseSplitItems(List<String> lines) {
         List<Item> items = new ArrayList<>();
         List<String> names = new ArrayList<>();
