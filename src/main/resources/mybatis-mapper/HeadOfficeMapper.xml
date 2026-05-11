@@ -593,6 +593,8 @@
 					    -- [6. 영업이익 (Profit)]
 					    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
 					    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+					    total_business_profit,
+					    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 					
 					    -- [7. 기존 기타 항목들]
 					    utility_bills_note,
@@ -634,6 +636,7 @@
 					        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 					        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 					        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+					        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 					        
 					        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
 					        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
@@ -733,6 +736,8 @@
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 				    ifnull(business_profit,0) as business_profit,
 				    ifnull(business_profit_ratio,0) as business_profit_ratio,
+				    ifnull(total_business_profit,0) as total_business_profit,
+				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -860,6 +865,8 @@
 				    -- [6. 영업이익 (Profit)]
 				    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
 				    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+				    total_business_profit,
+				    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 				
 				    -- [7. 기존 기타 항목들]
 				    utility_bills_note,
@@ -899,6 +906,7 @@
 				        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 				        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 				        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+				        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 				        
 				        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
 				        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
@@ -1003,6 +1011,8 @@
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 				    ifnull(business_profit,0) as business_profit,
 				    ifnull(business_profit_ratio,0) as business_profit_ratio,
+				    ifnull(total_business_profit,0) as total_business_profit,
+				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -1130,6 +1140,8 @@
 		    -- [6. 영업이익 (Profit)]
 		    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
 		    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+		    total_business_profit,
+		    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 		
 		    -- [7. 기존 기타 항목들]
 		    utility_bills_note,
@@ -1170,6 +1182,7 @@
 		        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 		        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 		        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+		        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 		        
 		        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
 		        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 

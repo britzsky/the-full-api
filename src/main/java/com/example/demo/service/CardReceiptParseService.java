@@ -23,13 +23,18 @@ public class CardReceiptParseService {
     }
 
     public CardReceiptResponse parseFile(File file, String typeOverride) throws Exception {
+        System.out.println("=== 🧾 CARD RECEIPT PARSE SERVICE START ===");
+        System.out.println("📌 요청 receipt_type: " + typeOverride);
         Document doc = ocrService.processDocumentFile(file);
+        System.out.println("📌 OCR 문서 처리 완료");
 
         // 본사 법인카드(auction/gmarket/11post/naver/homeplus/coupang/daiso)는 전용 파서 라우팅
         String headOfficeType = normalizeHeadOfficeType(typeOverride);
         if (isHeadOfficeType(headOfficeType)) {
+            System.out.println("📌 본사 전용 파서 타입: " + headOfficeType);
             BaseReceiptParser.ReceiptResult result = HeadOfficeReceiptParserFactory.parse(doc, headOfficeType);
             attachRawText(result, doc);
+            printParsedSummary(result);
             return new CardReceiptResponse(CardReceiptType.CARD_SLIP_GENERIC, 1.0, result);
         }
 
@@ -47,12 +52,29 @@ public class CardReceiptParseService {
             conf = c.confidence;
         }
 
+        System.out.println("📌 사용 파서 타입: " + type + " / confidence=" + conf);
         BaseReceiptParser parser = factory.get(type);
         BaseReceiptParser.ReceiptResult result = parser.parse(doc);
         BaseReceiptParser.capItems(result, 3);
         attachRawText(result, doc);
+        printParsedSummary(result);
 
         return new CardReceiptResponse(type, conf, result);
+    }
+
+    private void printParsedSummary(BaseReceiptParser.ReceiptResult result) {
+        if (result == null) {
+            System.out.println("⚠ 카드 영수증 파싱 결과 없음");
+            return;
+        }
+        String saleDate = result.meta != null ? result.meta.saleDate : null;
+        String saleTime = result.meta != null ? result.meta.saleTime : null;
+        String merchantName = result.merchant != null ? result.merchant.name : null;
+        Integer total = result.totals != null ? result.totals.total : null;
+        int itemCount = result.items != null ? result.items.size() : 0;
+        System.out.println("=== ✅ CARD RECEIPT PARSE SERVICE DONE ===");
+        System.out.println("📌 saleDate=" + saleDate + ", saleTime=" + saleTime
+                + ", merchant=" + merchantName + ", total=" + total + ", itemCount=" + itemCount);
     }
 
     private void attachRawText(BaseReceiptParser.ReceiptResult result, Document doc) {

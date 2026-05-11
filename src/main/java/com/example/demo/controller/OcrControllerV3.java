@@ -169,6 +169,8 @@ public class OcrControllerV3 {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
+            System.out.println("=== 🧾 /receipt-scanV3 PARSE REQUEST ===");
+            System.out.println("📌 receipt_type=" + receipt_type + ", type=" + type + ", cell_date=" + cell_date);
             // 1) OCR+파싱 + 10초 타임아웃
             Future<CardReceiptResponse> parseFuture = executor
                     .submit(() -> cardReceiptParseService.parseFile(tempFile, receipt_type));
@@ -178,9 +180,12 @@ public class OcrControllerV3 {
                 res = parseFuture.get(10, TimeUnit.SECONDS);
             } catch (TimeoutException te) {
                 parseFuture.cancel(true); // 인터럽트 시도
+                System.err.println("⚠ /receipt-scanV3 카드 영수증 파싱 타임아웃: " + receipt_type);
                 // ✅ 파싱 10초 초과 -> requestParam 기반 fallback 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             } catch (Exception ex) {
+                System.err.println("⚠ /receipt-scanV3 카드 영수증 파싱 예외: " + receipt_type + " / " + ex.getMessage());
+                ex.printStackTrace();
                 // ✅ 파싱 예외 -> requestParam 기반 fallback 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
@@ -188,6 +193,7 @@ public class OcrControllerV3 {
             BaseReceiptParser.ReceiptResult result = res.result;
 
             if (result == null || result.meta == null || result.meta.saleDate == null) {
+                System.err.println("⚠ /receipt-scanV3 카드 영수증 거래일자 없음: " + receipt_type);
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
 
@@ -206,6 +212,14 @@ public class OcrControllerV3 {
 
             // 여러 타입의 날짜형식을 매핑.
             LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            if (cell_date != null && !cell_date.isBlank()) {
+                LocalDate cellDate = DateUtils.parseFlexibleDate(cell_date);
+                if (!date.equals(cellDate)
+                        && date.getMonthValue() == cellDate.getMonthValue()
+                        && date.getDayOfMonth() == cellDate.getDayOfMonth()) {
+                    date = cellDate;
+                }
+            }
             LocalTime nowTime = LocalTime.now(); // 시:분:초
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
@@ -258,7 +272,7 @@ public class OcrControllerV3 {
             accountMap.put("tax", result.totals.taxable); // tax 세팅.
 
             // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
-            if (!receiptDate.equals(cell_date)) {
+            if (cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);
                 error.put("message",
