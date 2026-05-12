@@ -942,8 +942,8 @@
                     -- 20250819193613,		 대교뉴이프(마음고향2호점)
                     -- 20250819193535		 마음고향
 				)
-				ORDER BY year ASC, month ASC
-	        
+				ORDER BY T.account_id ASC, year ASC, month ASC
+
 	        </when>
 	        <otherwise>
 	        	SELECT T.account_id,
@@ -1216,9 +1216,9 @@
             -- 20250819193613,		 대교뉴이프(마음고향2호점)
             -- 20250819193535		 마음고향
 		)
-		ORDER BY year ASC
+		ORDER BY T.account_id ASC, year ASC
 	</select>
-    
+
     <select id="ProfitLossTotalSave" statementType="CALLABLE" parameterType="map">
 	    { CALL ProfitLossTotalSave(
 	        #{year, mode=IN, jdbcType=INTEGER},
