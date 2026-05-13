@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 public interface OperateMapper {
 	
 	List<Map<String, Object>> TallySheetList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 집계표 조회
+	List<Map<String, Object>> TallySheetAllList(Map<String, Object> paramMap);					// 급식사업부 -> 운영관리 -> 집계표 전체 업장 조회 (엑셀 다운로드 전용)
 	Map<String, Object> TallySheetNote(Map<String, Object> paramMap);							// 급식사업부 -> 운영관리 -> 집계표 메모 조회
 	
 	String NowDateKey();

@@ -82,6 +82,24 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : TallySheetAllList
+     * comment : 운영파트 -> 집계표 전체 업장 조회 (엑셀 다운로드 전용)
+     */
+    @GetMapping("/Operate/TallySheetAllList")
+    public String TallySheetAllList(@RequestParam Map<String, Object> paramMap) {
+        String monthString = paramMap.get("month").toString();
+        int monthValue = Integer.parseInt(monthString);
+        String formattedNumber = String.format("%02d", monthValue);
+        paramMap.put("month", formattedNumber);
+
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        resultList = operateService.TallySheetAllList(paramMap);
+
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
      * method : TallySheetNote
      * comment : 급식사업부 -> 운영관리 -> 집계표 메모 조회
      */

@@ -176,24 +176,47 @@ public class HeadOfficeController {
      */
 	@PostMapping("HeadOffice/ProfitLossTableSave")
 	public String ProfitLossTableSave(@RequestBody Map<String, Object> payload) {
-		
+
 		// payload에서 rows만 꺼냄
 	    List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
-		
+
+		// 인건비 변경 히스토리 저장
+		for (Map<String, Object> paramMap : rows) {
+			if (!paramMap.containsKey("person_cost")) continue;	// 인건비 미포함 행 제외
+
+			Map<String, Object> existing = headOfficeService.getProfitLossPersonCost(paramMap);	// DB 기존 인건비 조회
+			Object orgPriceObj = (existing != null) ? existing.get("person_cost") : null;
+			Object newPriceObj = paramMap.get("person_cost");
+
+			long orgPrice = (orgPriceObj != null) ? ((Number) orgPriceObj).longValue() : 0L;	// 기존 금액
+			long newPrice = (newPriceObj != null) ? ((Number) newPriceObj).longValue() : 0L;	// 변경 금액
+
+			if (orgPrice != newPrice) {	// 금액 변경 시 히스토리 저장
+				Map<String, Object> histParam = new java.util.HashMap<>();
+				histParam.put("account_id", paramMap.get("account_id"));	// 업장 아이디
+				histParam.put("year", paramMap.get("year"));				// 년도
+				histParam.put("month", paramMap.get("month"));				// 월
+				histParam.put("mod_id", paramMap.get("update_id"));			// 수정자 아이디
+				histParam.put("org_price", orgPrice);						// 기존 인건비
+				histParam.put("mod_price", newPrice);						// 변경 인건비
+				headOfficeService.savePersonCostHistory(histParam);
+			}
+		}
+
 		int iResult = 0;
-		
+
 		for (Map<String, Object> paramMap : rows) {
 			iResult += headOfficeService.ProfitLossTableSave(paramMap);
         }
-		
+
 		if (iResult > 0) {
 			for (Map<String, Object> paramMap : rows) {
 				iResult += headOfficeService.processProfitLoss(paramMap);
 	        }
 		}
-		
+
 		JsonObject obj =new JsonObject();
-    	
+
     	if(iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
@@ -201,7 +224,7 @@ public class HeadOfficeController {
     		obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
     	}
-    	
+
     	return obj.toString();
 	}
 	

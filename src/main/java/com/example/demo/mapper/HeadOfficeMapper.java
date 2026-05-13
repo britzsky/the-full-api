@@ -15,6 +15,8 @@ public interface HeadOfficeMapper {
 	List<Map<String, Object>> EventList(Map<String, Object> paramMap);								// 본사 -> 행사달력 조회
 	List<Map<String, Object>> PeopleCountingList(Map<String, Object> paramMap);						// 본사 -> 인원증감 조회
 	int ProfitLossTableSave(Map<String, Object> paramMap);											// 본사 -> 손익표 저장
+	Map<String, Object> getProfitLossPersonCost(Map<String, Object> paramMap);					// 본사 -> 손익표 인건비 조회
+	int savePersonCostHistory(Map<String, Object> paramMap);										// 본사 -> 인건비 변경 히스토리 저장
 	List<Map<String, Object>> ProfitLossTableList(Map<String, Object> paramMap);					// 본사 -> 손익표 조회
 	List<Map<String, Object>> ExcelDownProfitLossTableList(Map<String, Object> paramMap);			// 본사 -> 손익표 엑셀다운
 	List<Map<String, Object>> ExcelDownMonthProfitLossTableList(Map<String, Object> paramMap);		// 본사 -> 손익표 엑셀다운

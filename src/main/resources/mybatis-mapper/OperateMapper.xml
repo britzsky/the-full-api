@@ -56,6 +56,60 @@
 		ORDER BY amv.type asc
 	</select>
 
+	<select id="TallySheetAllList" parameterType="map" resultType="hashmap">
+		SELECT a.account_name,
+			(SELECT case when add_yn = 'Y' then add_name else name end as name FROM tb_account_mapping WHERE type = amv.type) as name,
+			amv.type,
+			amv.account_id,
+			#{year} as count_year,
+			#{month} as count_month,
+			abm.budget_grant,
+		   	ifnull(FORMAT(ats.day_1, 0), 0) as day_1,
+			ifnull(FORMAT(ats.day_2, 0), 0) as day_2,
+			ifnull(FORMAT(ats.day_3, 0), 0) as day_3,
+			ifnull(FORMAT(ats.day_4, 0), 0) as day_4,
+			ifnull(FORMAT(ats.day_5, 0), 0) as day_5,
+			ifnull(FORMAT(ats.day_6, 0), 0) as day_6,
+			ifnull(FORMAT(ats.day_7, 0), 0) as day_7,
+			ifnull(FORMAT(ats.day_8, 0), 0) as day_8,
+			ifnull(FORMAT(ats.day_9, 0), 0) as day_9,
+			ifnull(FORMAT(ats.day_10, 0), 0) as day_10,
+			ifnull(FORMAT(ats.day_11, 0), 0) as day_11,
+			ifnull(FORMAT(ats.day_12, 0), 0) as day_12,
+			ifnull(FORMAT(ats.day_13, 0), 0) as day_13,
+			ifnull(FORMAT(ats.day_14, 0), 0) as day_14,
+			ifnull(FORMAT(ats.day_15, 0), 0) as day_15,
+			ifnull(FORMAT(ats.day_16, 0), 0) as day_16,
+			ifnull(FORMAT(ats.day_17, 0), 0) as day_17,
+			ifnull(FORMAT(ats.day_18, 0), 0) as day_18,
+			ifnull(FORMAT(ats.day_19, 0), 0) as day_19,
+			ifnull(FORMAT(ats.day_20, 0), 0) as day_20,
+			ifnull(FORMAT(ats.day_21, 0), 0) as day_21,
+			ifnull(FORMAT(ats.day_22, 0), 0) as day_22,
+			ifnull(FORMAT(ats.day_23, 0), 0) as day_23,
+			ifnull(FORMAT(ats.day_24, 0), 0) as day_24,
+			ifnull(FORMAT(ats.day_25, 0), 0) as day_25,
+			ifnull(FORMAT(ats.day_26, 0), 0) as day_26,
+			ifnull(FORMAT(ats.day_27, 0), 0) as day_27,
+			ifnull(FORMAT(ats.day_28, 0), 0) as day_28,
+			ifnull(FORMAT(ats.day_29, 0), 0) as day_29,
+			ifnull(FORMAT(ats.day_30, 0), 0) as day_30,
+			ifnull(FORMAT(ats.day_31, 0), 0) as day_31
+		FROM tb_account_mapping_v2 amv
+		JOIN tb_account a ON a.account_id = amv.account_id AND a.del_yn = 'N'
+		LEFT OUTER JOIN tb_account_tally_sheet ats
+		ON ats.account_id = amv.account_id
+		AND ats.type = amv.type
+		AND ats.count_year = #{year}
+		AND ats.count_month = #{month}
+		LEFT OUTER JOIN tb_account_budget_management abm
+		ON abm.account_id = amv.account_id
+		AND abm.year = #{year}
+		AND abm.month = #{month}
+		WHERE amv.del_yn = 'N'
+		ORDER BY a.account_name ASC, amv.account_id, amv.type ASC
+	</select>
+
 	<select id="TallySheetNote" parameterType="map" resultType="hashmap">
 		SELECT IFNULL((
 		    SELECT ats.note

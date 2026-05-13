@@ -211,6 +211,7 @@
 		    business_profit,
 		    business_profit_ratio,
 		    update_dt,
+		    update_id,
 		    event_cost,
 		    event_ratio,
 		    not_budget_cost,
@@ -285,6 +286,7 @@
 		    #{business_profit},
 		    #{business_profit_ratio},
 		    CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+		    #{update_id},
 		    #{event_cost},
 		    #{event_ratio},
 		    #{not_budget_cost},
@@ -468,6 +470,7 @@
 		        business_profit_ratio = #{business_profit_ratio},
 		    </if>
 		    update_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+		    update_id = #{update_id},
 		    <if test="event_cost != null">
 		        event_cost = #{event_cost},
 		    </if>
@@ -500,7 +503,36 @@
 		    </if>
 		</trim>
     </insert>
-    
+
+    <select id="getProfitLossPersonCost" parameterType="map" resultType="hashmap">
+        SELECT person_cost
+        FROM tb_account_managerment_table
+        WHERE account_id = #{account_id}
+          AND year = #{year}
+          AND month = #{month}
+        LIMIT 1
+    </select>
+
+    <insert id="savePersonCostHistory" parameterType="map">
+        INSERT INTO tb_account_managerment_table_person_history (
+            account_id,
+            year,
+            month,
+            mod_id,
+            mod_dt,
+            org_price,
+            mod_price
+        ) VALUES (
+            #{account_id},
+            #{year},
+            #{month},
+            #{mod_id},
+            DATE_ADD(NOW(), INTERVAL 9 HOUR),
+            #{org_price},
+            #{mod_price}
+        )
+    </insert>
+
     <select id="ProfitLossTableList" parameterType="map" resultType="hashmap">
     	
 		    <choose>

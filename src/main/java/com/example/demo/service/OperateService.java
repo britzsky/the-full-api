@@ -31,6 +31,12 @@ public class OperateService {
 		resultList = operateMapper.TallySheetList(paramMap);
 		return resultList;
 	}
+	// 급식사업부 -> 운영관리 -> 집계표 전체 업장 조회 (엑셀 다운로드 전용)
+	public List<Map<String, Object>> TallySheetAllList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.TallySheetAllList(paramMap);
+		return resultList;
+	}
 	// 급식사업부 -> 운영관리 -> 집계표 메모 조회
 	public Map<String, Object> TallySheetNote(Map<String, Object> paramMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();
