@@ -839,6 +839,22 @@ public class AccountService {
 		}
 		return iResult;
 	}
+	
+	// 회계 -> 매입집계 삭제
+	public int AccountPurchaseTallyDelete(Map<String, Object> paramMap) {
+		
+		int result = 0;
+
+		paramMap.put("result", 0); // OUT 값 초기화
+		accountMapper.AccountPurchaseTallyDelete(paramMap);
+		// OUT 값 확인
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day_v2 프로시저 실패");
+		}
+		
+		return result;
+	}
 
 	// 회계 -> 매입마감 sale_id 기준 기존 결제일자 조회
 	public Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap) {
@@ -940,6 +956,22 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 회계 -> 현장 법인카드 결제내역 삭제
+	public int HeadOfficeCorporateCardPaymentDelete(Map<String, Object> paramMap) {
+		
+		int result = 0;
+
+		paramMap.put("result", 0); // OUT 값 초기화
+		accountMapper.HeadOfficeCorporateCardPaymentDelete(paramMap);
+		// OUT 값 확인
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ sp_sync_headoffice_corp_card_payment_delete 프로시저 실패");
+		}
+		
+		return result;
+	}
+	
 	// 회계 -> 본사 법인카드 상세내역 저장
 	public int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -975,7 +1007,7 @@ public class AccountService {
 		return iResult;
 	}
 
-	// 회계 -> 본사 법인카드 결제내역 저장
+	// 회계 -> 현장 법인카드 결제내역 저장
 	public int AccountCorporateCardPaymentSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		String oldReceiptImage = findAccountCorporateReceiptImage(paramMap);
@@ -984,6 +1016,22 @@ public class AccountService {
 			deleteReplacedReceiptImage(oldReceiptImage, paramMap.get("receipt_image"), true);
 		}
 		return iResult;
+	}
+	
+	// 회계 -> 현장 법인카드 결제내역 삭제
+	public int AccountCorporateCardPaymentDelete(Map<String, Object> paramMap) {
+		
+		int result = 0;
+
+		paramMap.put("result", 0); // OUT 값 초기화
+		accountMapper.AccountCorporateCardPaymentDelete(paramMap);
+		// OUT 값 확인
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ sp_sync_account_corp_card_payment_delete 프로시저 실패");
+		}
+		
+		return result;
 	}
 
 	// 회계 -> 본사 법인카드 상세내역 저장
@@ -1093,18 +1141,20 @@ public class AccountService {
 			System.err.println("[TallySheetPaymentSave] saleDate가 없어 스킵: " + paramMap.get("sale_id"));
 			return 0;
 		}
-
+		
 		paramMap.put("result", 0); // OUT 값 초기화
+		System.out.println("TallySheetPaymentSave + " + paramMap);
 		accountMapper.TallySheetPaymentSave(paramMap);
 		// OUT 값 확인
 		result = (int) paramMap.get("result");
 		if (result != 1) {
-			throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day 프로시저 실패");
+			throw new RuntimeException("❌ sp_sync_tally_sheet_one_day 프로시저 실패");
 		}
 
 		if (result > 0) {
 			// ③ 손익표 합계 + 비율 저장 프로시저 호출
 			paramMap.put("result", 0); // OUT 값 초기화
+			System.out.println("ProfitLossTotalSave + " + paramMap);
 			headOfficeMapper.ProfitLossTotalSave(paramMap);
 		}
 
@@ -1117,6 +1167,7 @@ public class AccountService {
 		if (result > 0) {
 			// 예산 저장 프로시저 호출
 			paramMap.put("result", 0); // OUT 값 초기화
+			System.out.println("BudgetTotalSave + " + paramMap);
 			operateMapper.BudgetTotalSave(paramMap);
 		}
 

@@ -63,12 +63,13 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
+	void AccountPurchaseTallyDelete(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 삭제
 	int AccountPurchaseHistorySave(Map<String, Object> paramMap);										// 회계 -> 매입마감 변경이력 저장
 	Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap);				// 회계 -> 매입마감 sale_id 기준 total/saleDate 조회
 	Map<String, Object> AccountPurchaseTallyBySaleDateAndType(Map<String, Object> paramMap);			// 집계표 동기화 시 account_id+saleDate+type 기준 기존 row 조회
 	int AccountPurchaseTallyTotalUpdate(Map<String, Object> paramMap);									// 집계표 동기화 시 기존 row total UPDATE
 	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap);							// 현장 -> 매입집계 영수증 경로 조회
-	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap);			// 현장 -> 매입집계 영수증(1~3) 경로 조회
+	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap);				// 현장 -> 매입집계 영수증(1~3) 경로 조회
 	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회
 	List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap); 			// 회계 -> 매입집계(TallyTab) 조회
 	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입집계 조회
@@ -76,6 +77,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); 				// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제내역 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제 상세내역 조회
+	void HeadOfficeCorporateCardPaymentDelete(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 결제내역 삭제
 	int HeadOfficeCorporateCardSave(Map<String, Object> paramMap);										// 회계 -> 본사 법인카드 저장
 	int HeadOfficeCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 본사 법인카드 결제내역 저장
 	int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 상세내역 저장
@@ -84,9 +86,10 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountCorporateCardList(Map<String, Object> paramMap); 					// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap); 			// 회계 -> 본사 법인카드 결제내역 조회
 	List<Map<String, Object>> AccountCorporateCardPaymentDetailList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제 상세내역 조회
-	int AccountCorporateCardSave(Map<String, Object> paramMap);											// 회계 -> 본사 법인카드 저장
-	int AccountCorporateCardPaymentSave(Map<String, Object> paramMap);									// 회계 -> 본사 법인카드 결제내역 저장
-	int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 상세내역 저장
+	int AccountCorporateCardSave(Map<String, Object> paramMap);											// 회계 -> 현장 법인카드 저장
+	void AccountCorporateCardPaymentDelete(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 결제내역 삭제
+	int AccountCorporateCardPaymentSave(Map<String, Object> paramMap);									// 회계 -> 현장 법인카드 결제내역 저장
+	int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);							// 회계 -> 현장 법인카드 상세내역 저장
 	int AccountCorporateCardPaymentToPurchaseTallySave(Map<String, Object> paramMap);					// 회계 -> 현장 법인카드 결제내역을 매입집계(type=1000)로 동기화
 	String AccountCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap);						// 회계 -> 현장 법인카드 영수증 경로 조회
 	void TallySheetCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 집계표 적용
