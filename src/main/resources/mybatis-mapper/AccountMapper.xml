@@ -2734,6 +2734,13 @@
 	    </trim>
 	</insert>
 	
+	<select id="HeadOfficeCorporateCardPaymentDelete" statementType="CALLABLE" parameterType="map">
+	    { CALL sp_sync_headoffice_corp_card_payment_delete(
+	        #{sale_id, mode=IN, jdbcType=VARCHAR},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
+	
 	<insert id="HeadOfficeCorporateCardPaymentSave" parameterType="map">
 		INSERT INTO tb_headoffice_corporate_card_payment_list
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -2902,6 +2909,13 @@
 	        del_yn=#{del_yn},
 	    </trim>
 	</insert>
+	
+	<select id="AccountCorporateCardPaymentDelete" statementType="CALLABLE" parameterType="map">
+	    { CALL sp_sync_account_corp_card_payment_delete(
+	        #{sale_id, mode=IN, jdbcType=VARCHAR},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
 	
 	<insert id="AccountCorporateCardPaymentSave" parameterType="map">
 		INSERT INTO tb_account_corporate_card_payment_list
@@ -3458,6 +3472,14 @@
 	        del_yn='N'
 	    </trim>
 	</insert>
+	
+	<select id="AccountPurchaseTallyDelete" statementType="CALLABLE" parameterType="map">
+	    { CALL sp_sync_account_purchase_delete(
+	        #{sale_id, mode=IN, jdbcType=VARCHAR},
+	        #{type, mode=IN, jdbcType=INTEGER},
+	        #{result, mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
 	
 	<delete id="AccountDispatchMemberDelete" parameterType="map">
 		DELETE FROM tb_account_members_dispatch

@@ -1656,6 +1656,50 @@ public class AccountController {
 
 		return obj.toString();
 	}
+	
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyDelete
+	 * comment : 회계 -> 매입집계 삭제
+	 */
+	@PostMapping("Account/AccountPurchaseTallyDelete")
+	private String AccountPurchaseTallyDelete(@RequestBody Map<String, Object> params) {
+		
+		System.out.println(params);
+		
+		int iResult = 0;
+		iResult += accountService.AccountPurchaseTallyDelete(params);
+		
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+		
+		date = DateUtils.parseFlexibleDate(params.get("saleDate").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+		
+		iResult += accountService.TallySheetPaymentSave(params);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
 
 	/*
 	 * part : 운영,회계
@@ -2060,6 +2104,48 @@ public class AccountController {
 
 		return new Gson().toJson(resultList);
 	}
+	
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentDelete
+	 * comment : 회계 -> 본사 법인카드 결제내역 삭제
+	 */
+	@PostMapping("Account/HeadOfficeCorporateCardPaymentDelete")
+	private String HeadOfficeCorporateCardPaymentDelete(@RequestBody Map<String, Object> params) {
+		
+		int iResult = 0;
+		iResult += accountService.HeadOfficeCorporateCardPaymentDelete(params);
+		
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+		
+		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+		
+		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(params);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
 
 	/*
 	 * part : 회계
@@ -2275,6 +2361,48 @@ public class AccountController {
 			iResult += accountService.AccountCorporateCardSave(paramMap);
 			iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
 		}
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+	
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentDelete
+	 * comment : 회계 -> 현장 법인카드 결제내역 삭제
+	 */
+	@PostMapping("Account/AccountCorporateCardPaymentDelete")
+	private String AccountCorporateCardPaymentDelete(@RequestBody Map<String, Object> params) {
+		
+		int iResult = 0;
+		iResult += accountService.AccountCorporateCardPaymentDelete(params);
+		
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+		
+		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+		
+		iResult += accountService.TallySheetCorporateCardPaymentSave(params);
 
 		JsonObject obj = new JsonObject();
 
