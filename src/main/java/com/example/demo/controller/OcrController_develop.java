@@ -31,11 +31,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.example.demo.model.CardReceiptResponse;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.parser.ReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
+import com.example.demo.service.CardReceiptParseService;
 import com.example.demo.service.OcrService;
 import com.example.demo.service.OperateService;
 import com.example.demo.utils.BizNoUtils;
@@ -61,6 +63,9 @@ public class OcrController_develop {
 
     @Autowired
     private OperateService operateService;
+
+    @Autowired
+    private CardReceiptParseService cardReceiptParseService;
 
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
@@ -146,50 +151,53 @@ public class OcrController_develop {
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
         try {
-            // 1) OCR + 10초 타임아웃
-            Future<Document> docFuture = executor.submit(() -> ocrService.processDocumentFile(tempFile));
-
-            Document doc;
-            try {
-                doc = docFuture.get(10, TimeUnit.SECONDS);
-            } catch (TimeoutException te) {
-                docFuture.cancel(true); // 인터럽트 시도
-                // ✅ OCR이 10초 초과 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-            } catch (Exception ex) {
-                // ✅ OCR 예외 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-            }
-
-            // 2) receiptType 자동 감지 (OCR 성공했을 때만 의미 있음)
-            String resolvedReceiptType = receiptType;
-
-            if (receiptType == null || receiptType.isEmpty()) {
-                if (aiAnalyzer != null) {
-                    resolvedReceiptType = aiAnalyzer.detectType(doc);
-                } else {
-                    resolvedReceiptType = "MART_ITEMIZED";
-                }
-                purchase.put("receipt_type", resolvedReceiptType);
-            } else {
-                purchase.put("receipt_type", resolvedReceiptType);
-            }
-
-            // 3) 파싱 + 10초 타임아웃 (원하면 3~5초로 줄여도 됨)
-            Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
-                    .submit(() -> ReceiptParserFactory.parse(doc, receiptType));
-
             BaseReceiptParser.ReceiptResult result;
 
-            try {
-                result = parseFuture.get(10, TimeUnit.SECONDS);
-            } catch (TimeoutException te) {
-                parseFuture.cancel(true);
-                // ✅ 파싱이 10초 초과 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-            } catch (Exception ex) {
-                // ✅ 파싱 예외 -> fallback 저장
-                return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+            if (isCorpCardType(type)) {
+                // 법인카드(type=1000)는 V3와 동일하게 카드전표/마트 전용 파서 라우팅을 사용한다.
+                Future<CardReceiptResponse> parseFuture = executor
+                        .submit(() -> cardReceiptParseService.parseFile(tempFile, receiptType));
+
+                try {
+                    CardReceiptResponse response = parseFuture.get(10, TimeUnit.SECONDS);
+                    result = response != null ? response.result : null;
+                    if ((receiptType == null || receiptType.isBlank()) && response != null && response.detectedType != null) {
+                        purchase.put("receipt_type", response.detectedType.name());
+                    }
+                } catch (TimeoutException te) {
+                    parseFuture.cancel(true);
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                } catch (Exception ex) {
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                }
+            } else {
+                // 개인결제(type=1008)와 기타 매입은 V4/기존 develop과 동일한 공통 영수증 파서를 사용한다.
+                Future<Document> docFuture = executor.submit(() -> ocrService.processDocumentFile(tempFile));
+
+                Document doc;
+                try {
+                    doc = docFuture.get(10, TimeUnit.SECONDS);
+                } catch (TimeoutException te) {
+                    docFuture.cancel(true);
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                } catch (Exception ex) {
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                }
+
+                String resolvedReceiptType = resolveReceiptType(receiptType, doc);
+                purchase.put("receipt_type", resolvedReceiptType);
+
+                Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
+                        .submit(() -> ReceiptParserFactory.parse(doc, resolvedReceiptType));
+
+                try {
+                    result = parseFuture.get(10, TimeUnit.SECONDS);
+                } catch (TimeoutException te) {
+                    parseFuture.cancel(true);
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                } catch (Exception ex) {
+                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                }
             }
 
             // 4) 파싱 결과가 없거나 핵심 meta가 없으면 fallback
@@ -219,6 +227,23 @@ public class OcrController_develop {
             String monthStr = date.format(DateTimeFormatter.ofPattern("MM"));
 
             purchase.put("sale_id", saleId);
+
+            /*
+             * 영수증 거래일자와 집계표 선택일자 검증은 현재 통과 처리한다.
+             * 팀 기준이 확정되면 아래 조건을 복구해서 사용한다.
+             *
+             * if (cell_date != null && !cell_date.isBlank()) {
+             *     String receiptDate = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+             *     if (!receiptDate.equals(cell_date)) {
+             *         Map<String, Object> error = new HashMap<>();
+             *         error.put("code", 400);
+             *         error.put("message", "선택된 집계표 일자와 영수증 거래일자가 일치하지 않습니다.\n");
+             *         error.put("[집계표]", cell_date);
+             *         error.put("[거래일자]", receiptDate);
+             *         return ResponseEntity.badRequest().body(error);
+             *     }
+             * }
+             */
 
             if (result.totals.total == 0 || result.totals.total == null) {
                 purchase.put("total", total); // total 세팅.
@@ -429,6 +454,23 @@ public class OcrController_develop {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private boolean isCorpCardType(Integer type) {
+        return type != null && type == 1000;
+    }
+
+    private String resolveReceiptType(String receiptType, Document doc) {
+        if (receiptType != null && !receiptType.isBlank()) {
+            return receiptType;
+        }
+        if (aiAnalyzer != null) {
+            String detectedType = aiAnalyzer.detectType(doc);
+            if (detectedType != null && !detectedType.isBlank()) {
+                return detectedType;
+            }
+        }
+        return "MART_ITEMIZED";
     }
 
     /**

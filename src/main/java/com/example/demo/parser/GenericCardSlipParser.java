@@ -32,6 +32,12 @@ public class GenericCardSlipParser extends BaseReceiptParser {
         String raw = text(doc);
         String text = normalize(raw);
 
+        System.out.println("=== 🧾 NORMALIZED LINES (카드전표) ===");
+        Arrays.stream(text.split("\\n"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .forEach(System.out::println);
+
         // 1) 일시(날짜/시간)
         extractDateTime(text, r);
 
@@ -88,6 +94,12 @@ public class GenericCardSlipParser extends BaseReceiptParser {
         );
 
         if (r.totals.total != null) r.payment.approvalAmt = String.valueOf(r.totals.total);
+
+        System.out.println("=== ✅ PARSED CARD SLIP ===");
+        System.out.println("📌 거래일자: " + r.meta.saleDate + " " + r.meta.saleTime);
+        System.out.println("📌 가맹점: " + r.merchant.name + " / 사업자번호: " + r.merchant.bizNo);
+        System.out.println("📌 카드: " + r.payment.cardBrand + " / " + r.payment.cardNo);
+        System.out.println("📌 승인번호: " + r.approval.approvalNo + " / 합계: " + r.totals.total);
 
         return r;
     }

@@ -547,7 +547,7 @@
 					    ROUND(IFNULL(living_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost2 / NULLIF(sales_total, 0) * 100, 0), 1)
 					    + ROUND(IFNULL(living_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost / NULLIF(sales_total, 0) * 100, 0), 1)
 					    + ROUND(IFNULL(daycare_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(daycare_emp_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(integrity_cost / NULLIF(sales_total, 0) * 100, 0), 1)
-					    + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1) + + ROUND(IFNULL(return_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+					    + ROUND(IFNULL(return_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
 					    
 					    -- ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
 					
@@ -577,22 +577,24 @@
 					    ROUND(IFNULL(person_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS person_ratio,
 					    dispatch_cost,
 					    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS dispatch_ratio,
-					    (person_cost + dispatch_cost) AS person_total,
-					    ROUND(IFNULL((person_cost + dispatch_cost) / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+					    person_total,
+					    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
 					
 					    -- [5. 간접비 및 기타 (Indirect)]
 					    utility_bills,
 					    etc_indirect_cost,
 					    ROUND(IFNULL(etc_indirect_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS etc_indirect_ratio,
 					    ROUND(IFNULL(utility_bills / NULLIF(sales_total, 0) * 100, 0), 1) AS utility_ratio,
-					    ROUND(sales_total * 0.1, 0) AS duty_secure,
-					    10.0 AS duty_secure_ratio,
-					    (utility_bills + ROUND(sales_total * 0.1, 0)) AS indirect_total,
-					    ROUND(IFNULL((utility_bills + (sales_total * 0.1)) / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+					    duty_secure,
+					    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 1) AS duty_secure_ratio,
+					    indirect_total,
+					    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
 					    
 					    -- [6. 영업이익 (Profit)]
-					    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
-					    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+					    business_profit,
+					    ROUND(IFNULL(business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+					    total_business_profit,
+					    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 					
 					    -- [7. 기존 기타 항목들]
 					    utility_bills_note,
@@ -634,14 +636,13 @@
 					        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 					        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 					        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+					        SUM(IFNULL(person_total, 0)) AS person_total,
+					        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
+					        SUM(IFNULL(business_profit, 0)) AS business_profit,
+					        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 					        
-					        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
-					        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
-					         SUM(IFNULL(living_cost2, 0)) + SUM(IFNULL(basic_cost2, 0)) + SUM(IFNULL(employ_cost2, 0)) + 
-					         SUM(IFNULL(daycare_cost, 0)) + SUM(IFNULL(daycare_emp_cost, 0)) + SUM(IFNULL(payback_price, 0)) + SUM(IFNULL(integrity_cost, 0))) AS sales_total,
-					        
-					        (SUM(IFNULL(food_process, 0)) + SUM(IFNULL(dishwasher, 0)) + SUM(IFNULL(cesco, 0)) + 
-					         SUM(IFNULL(water_puri, 0)) + SUM(IFNULL(food_cost, 0)) + SUM(IFNULL(etc_cost, 0)) + SUM(IFNULL(event_cost, 0)) + SUM(IFNULL(not_budget_cost, 0))) AS purchase_total,
+					        SUM(IFNULL(sales_total, 0)) AS sales_total,
+					        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
 					        
 					        -- 식수 추정치 로직 (필요시 내부 변수/상수 적용)
 					        ROUND(SUM(IFNULL(living_cost, 0)) / 30 / 5000, 1) AS living_estimate, 
@@ -733,6 +734,8 @@
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 				    ifnull(business_profit,0) as business_profit,
 				    ifnull(business_profit_ratio,0) as business_profit_ratio,
+				    ifnull(total_business_profit,0) as total_business_profit,
+				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -814,7 +817,7 @@
 				    ROUND(IFNULL(living_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost2 / NULLIF(sales_total, 0) * 100, 0), 1)
 				    + ROUND(IFNULL(living_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost / NULLIF(sales_total, 0) * 100, 0), 1)
 				    + ROUND(IFNULL(daycare_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(daycare_emp_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(integrity_cost / NULLIF(sales_total, 0) * 100, 0), 1)
-				    + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+				    AS sales_total_ratio,
 				    
 				    -- ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
 				
@@ -844,22 +847,24 @@
 				    ROUND(IFNULL(person_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS person_ratio,
 				    dispatch_cost,
 				    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS dispatch_ratio,
-				    (person_cost + dispatch_cost) AS person_total,
-				    ROUND(IFNULL((person_cost + dispatch_cost) / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+				    person_total,
+				    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
 				
 				    -- [5. 간접비 및 기타 (Indirect)]
 				    utility_bills,
 				    etc_indirect_cost,
 				    ROUND(IFNULL(etc_indirect_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS etc_indirect_ratio,
 				    ROUND(IFNULL(utility_bills / NULLIF(sales_total, 0) * 100, 0), 1) AS utility_ratio,
-				    ROUND(sales_total * 0.1, 0) AS duty_secure,
-				    10.0 AS duty_secure_ratio,
-				    (utility_bills + ROUND(sales_total * 0.1, 0)) AS indirect_total,
-				    ROUND(IFNULL((utility_bills + (sales_total * 0.1)) / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+				    duty_secure,
+				    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 1) AS duty_secure_ratio,
+				    indirect_total,
+				    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
 				    
 				    -- [6. 영업이익 (Profit)]
-				    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
-				    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+				    business_profit,
+				    ROUND(IFNULL(business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+				    total_business_profit,
+				    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 				
 				    -- [7. 기존 기타 항목들]
 				    utility_bills_note,
@@ -899,14 +904,13 @@
 				        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 				        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 				        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+				        SUM(IFNULL(person_total, 0)) AS person_total,
+				        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
+				        SUM(IFNULL(business_profit, 0)) AS business_profit,
+				        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 				        
-				        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
-				        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
-				         SUM(IFNULL(living_cost2, 0)) + SUM(IFNULL(basic_cost2, 0)) + SUM(IFNULL(employ_cost2, 0)) + 
-				         SUM(IFNULL(daycare_cost, 0)) + SUM(IFNULL(daycare_emp_cost, 0)) + SUM(IFNULL(payback_price, 0)) + SUM(IFNULL(integrity_cost, 0))) AS sales_total,
-				        
-				        (SUM(IFNULL(food_process, 0)) + SUM(IFNULL(dishwasher, 0)) + SUM(IFNULL(cesco, 0)) + 
-				         SUM(IFNULL(water_puri, 0)) + SUM(IFNULL(food_cost, 0)) + SUM(IFNULL(etc_cost, 0)) + SUM(IFNULL(event_cost, 0)) + SUM(IFNULL(not_budget_cost, 0))) AS purchase_total,
+				        SUM(IFNULL(sales_total, 0)) AS sales_total,
+				        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
 				        
 				        -- 식수 추정치 로직 (필요시 내부 변수/상수 적용)
 				        ROUND(SUM(IFNULL(living_cost, 0)) / 30 / 5000, 1) AS living_estimate, 
@@ -938,8 +942,8 @@
                     -- 20250819193613,		 대교뉴이프(마음고향2호점)
                     -- 20250819193535		 마음고향
 				)
-				ORDER BY year ASC, month ASC
-	        
+				ORDER BY T.account_id ASC, year ASC, month ASC
+
 	        </when>
 	        <otherwise>
 	        	SELECT T.account_id,
@@ -1003,6 +1007,8 @@
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 				    ifnull(business_profit,0) as business_profit,
 				    ifnull(business_profit_ratio,0) as business_profit_ratio,
+				    ifnull(total_business_profit,0) as total_business_profit,
+				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -1084,7 +1090,7 @@
 		    ROUND(IFNULL(living_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost2 / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost2 / NULLIF(sales_total, 0) * 100, 0), 1)
 		    + ROUND(IFNULL(living_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(basic_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(employ_cost / NULLIF(sales_total, 0) * 100, 0), 1)
 		    + ROUND(IFNULL(daycare_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(daycare_emp_cost / NULLIF(sales_total, 0) * 100, 0), 1) + ROUND(IFNULL(integrity_cost / NULLIF(sales_total, 0) * 100, 0), 1)
-		    + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+		    AS sales_total_ratio,
 		    
 		    -- ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
 		
@@ -1114,22 +1120,24 @@
 		    ROUND(IFNULL(person_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS person_ratio,
 		    dispatch_cost,
 		    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS dispatch_ratio,
-		    (person_cost + dispatch_cost) AS person_total,
-		    ROUND(IFNULL((person_cost + dispatch_cost) / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+		    person_total,
+		    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
 		
 		    -- [5. 간접비 및 기타 (Indirect)]
 		    utility_bills,
 		    etc_indirect_cost,
 		    ROUND(IFNULL(etc_indirect_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS etc_indirect_ratio,
 		    ROUND(IFNULL(utility_bills / NULLIF(sales_total, 0) * 100, 0), 1) AS utility_ratio,
-		    ROUND(sales_total * 0.1, 0) AS duty_secure,
-		    10.0 AS duty_secure_ratio,
-		    (utility_bills + ROUND(sales_total * 0.1, 0)) AS indirect_total,
-		    ROUND(IFNULL((utility_bills + (sales_total * 0.1)) / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+		    duty_secure,
+		    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 1) AS duty_secure_ratio,
+		    indirect_total,
+		    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
 		    
 		    -- [6. 영업이익 (Profit)]
-		    (sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) AS business_profit,
-		    ROUND(IFNULL((sales_total - purchase_total - (person_cost + dispatch_cost) - (utility_bills + ROUND(sales_total * 0.1, 0))) / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+		    business_profit,
+		    ROUND(IFNULL(business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS business_profit_ratio,
+		    total_business_profit,
+		    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 		
 		    -- [7. 기존 기타 항목들]
 		    utility_bills_note,
@@ -1170,14 +1178,13 @@
 		        SUM(IFNULL(utility_bills, 0)) AS utility_bills,
 		        SUM(IFNULL(duty_secure, 0)) AS duty_secure,
 		        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
+		        SUM(IFNULL(person_total, 0)) AS person_total,
+		        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
+		        SUM(IFNULL(business_profit, 0)) AS business_profit,
+		        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
 		        
-		        -- 공통 합계(상수처럼 사용하기 위해 서브쿼리에서 계산)
-		        (SUM(IFNULL(living_cost, 0)) + SUM(IFNULL(basic_cost, 0)) + SUM(IFNULL(employ_cost, 0)) + 
-		         SUM(IFNULL(living_cost2, 0)) + SUM(IFNULL(basic_cost2, 0)) + SUM(IFNULL(employ_cost2, 0)) + 
-		         SUM(IFNULL(daycare_cost, 0)) + SUM(IFNULL(daycare_emp_cost, 0)) + SUM(IFNULL(payback_price, 0)) + SUM(IFNULL(integrity_cost, 0))) AS sales_total,
-		        
-		        (SUM(IFNULL(food_process, 0)) + SUM(IFNULL(dishwasher, 0)) + SUM(IFNULL(cesco, 0)) + 
-		         SUM(IFNULL(water_puri, 0)) + SUM(IFNULL(food_cost, 0)) + SUM(IFNULL(etc_cost, 0)) + SUM(IFNULL(event_cost, 0)) + SUM(IFNULL(not_budget_cost, 0))) AS purchase_total,
+		        SUM(IFNULL(sales_total, 0)) AS sales_total,
+		        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
 		        
 		        -- 식수 추정치 로직 (필요시 내부 변수/상수 적용)
 		        ROUND(SUM(IFNULL(living_cost, 0)) / 30 / 5000, 1) AS living_estimate, 
@@ -1209,9 +1216,9 @@
             -- 20250819193613,		 대교뉴이프(마음고향2호점)
             -- 20250819193535		 마음고향
 		)
-		ORDER BY year ASC
+		ORDER BY T.account_id ASC, year ASC
 	</select>
-    
+
     <select id="ProfitLossTotalSave" statementType="CALLABLE" parameterType="map">
 	    { CALL ProfitLossTotalSave(
 	        #{year, mode=IN, jdbcType=INTEGER},
