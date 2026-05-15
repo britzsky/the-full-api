@@ -259,16 +259,18 @@ public class OcrControllerV2 {
 
                 String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
                 String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
+                Integer parsedTotal = result.totals != null ? result.totals.total : null;
+                int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? toInt(total) : parsedTotal;
 
                 if (approvalAmt == null) {
-                    corporateCard.put("total", result.totals.total);
+                    corporateCard.put("total", effectiveTotal);
                     if (paymentCardBrand == null) {
                         corporateCard.put("payType", 1);
-                        corporateCard.put("totalCash", result.totals.total);
+                        corporateCard.put("totalCash", effectiveTotal);
                         corporateCard.put("totalCard", 0);
                     } else {
                         corporateCard.put("payType", 2);
-                        corporateCard.put("totalCard", result.totals.total);
+                        corporateCard.put("totalCard", effectiveTotal);
                         corporateCard.put("totalCash", 0);
                     }
                 } else {
@@ -277,6 +279,9 @@ public class OcrControllerV2 {
                         String clean = approvalAmt.replaceAll("[^0-9\\-]", "");
                         if (!clean.isEmpty())
                             iApprovalAmt = Integer.parseInt(clean);
+                    }
+                    if (iApprovalAmt < 100) {
+                        iApprovalAmt = effectiveTotal;
                     }
                     corporateCard.put("total", iApprovalAmt);
                     if (paymentCardBrand == null) {

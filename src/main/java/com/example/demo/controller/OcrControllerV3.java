@@ -211,10 +211,12 @@ public class OcrControllerV3 {
             // =========================
 
             // 여러 타입의 날짜형식을 매핑.
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            boolean useCellDateForType45 = Integer.valueOf(45).equals(type)
+                    && cell_date != null && !cell_date.isBlank();
+            LocalDate date = DateUtils.parseFlexibleDate(useCellDateForType45 ? cell_date : result.meta.saleDate);
             if (cell_date != null && !cell_date.isBlank()) {
                 LocalDate cellDate = DateUtils.parseFlexibleDate(cell_date);
-                if (!date.equals(cellDate)
+                if (!useCellDateForType45 && !date.equals(cellDate)
                         && date.getMonthValue() == cellDate.getMonthValue()
                         && date.getDayOfMonth() == cellDate.getDayOfMonth()) {
                     date = cellDate;
@@ -226,6 +228,7 @@ public class OcrControllerV3 {
             // 원하는 형식으로 출력 (예: 20251009152744)
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            boolean skipDateMismatchCheck = useCellDateForType45;
 
             // tally sheet 테이블 저장을 위한 연,월 세팅.
             String yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
@@ -260,7 +263,9 @@ public class OcrControllerV3 {
             accountMap.put("month", month); // 손익표/예산용 month 세팅
 
             // 영수증 파싱에서 합계금액을 못구하면 화면에서 입력된 금액으로 세팅.
-            if (result.totals.total == 0 || result.totals.total == null) {
+            Integer parsedTotal = result.totals != null ? result.totals.total : null;
+            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
+            if (parsedTotal == null || parsedTotal < 100) {
                 accountMap.put("total", total); // total 세팅.
             } else {
                 accountMap.put("total", result.totals.total); // total 세팅.
@@ -272,7 +277,7 @@ public class OcrControllerV3 {
             accountMap.put("tax", result.totals.taxable); // tax 세팅.
 
             // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
-            if (cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
+            if (!skipDateMismatchCheck && cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);
                 error.put("message",
@@ -283,6 +288,7 @@ public class OcrControllerV3 {
                 return ResponseEntity.badRequest().body(error);
             }
 
+            accountMap.put("total", effectiveTotal);
             String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
 
             int iApprovalAmt = 0;
@@ -291,6 +297,10 @@ public class OcrControllerV3 {
                 if (!clean.isEmpty()) {
                     iApprovalAmt = Integer.parseInt(clean);
                 }
+            }
+
+            if (iApprovalAmt < 100) {
+                iApprovalAmt = effectiveTotal;
             }
 
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {

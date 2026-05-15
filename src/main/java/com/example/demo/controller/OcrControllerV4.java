@@ -225,7 +225,8 @@ public class OcrControllerV4 {
             	// =========================
                 // ✅ 여기부터는 "10초 안에 완료 + result 정상"일 때만 수행
                 // =========================
-            	date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+                boolean useCellDateForType45 = type == 45 && cell_date != null && !cell_date.isBlank();
+                date = DateUtils.parseFlexibleDate(useCellDateForType45 ? cell_date : result.meta.saleDate);
                 LocalTime nowTime = LocalTime.now(); // 시:분:초
                 LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
@@ -250,9 +251,10 @@ public class OcrControllerV4 {
             purchase.put("sale_id", saleId); 						// saleId 세팅.
             
             Integer parsedTotal = (result.totals != null ? result.totals.total : null);
-            if (parsedTotal == null || parsedTotal == 0) {
+            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
+            if (parsedTotal == null || parsedTotal < 100) {
             	// 파싱 실패/0원인 경우 사용자 입력값 사용
-            	purchase.put("total", Optional.ofNullable(total).orElse(0));
+                purchase.put("total", effectiveTotal);
             } else {
             	purchase.put("total", parsedTotal);
             }
@@ -267,7 +269,8 @@ public class OcrControllerV4 {
             purchase.put("cashReceiptType", cash_receipt_type); 	// cashReceiptType 세팅.
 
             // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
-            if (!receiptDate.equals(cell_date)) {
+            boolean skipDateMismatchCheck = type == 45 && cell_date != null && !cell_date.isBlank();
+            if (!skipDateMismatchCheck && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);
                 error.put("message",
@@ -286,6 +289,10 @@ public class OcrControllerV4 {
                 if (!clean.isEmpty()) {
                     iApprovalAmt = Integer.parseInt(clean);
                 }
+            }
+
+            if (iApprovalAmt < 100) {
+                iApprovalAmt = effectiveTotal;
             }
 
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {

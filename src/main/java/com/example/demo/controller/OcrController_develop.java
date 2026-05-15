@@ -210,7 +210,10 @@ public class OcrController_develop {
             // =========================
 
             // saleId 생성(영수증 날짜 기반)
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            String effectiveSaleDate = (resolvedSaleDate != null && !resolvedSaleDate.isBlank())
+                    ? resolvedSaleDate
+                    : result.meta.saleDate;
+            LocalDate date = DateUtils.parseFlexibleDate(effectiveSaleDate);
             LocalTime nowTime = LocalTime.now();
             LocalDateTime dateTime = LocalDateTime.of(date, nowTime);
 
@@ -245,7 +248,9 @@ public class OcrController_develop {
              * }
              */
 
-            if (result.totals.total == 0 || result.totals.total == null) {
+            Integer parsedTotal = result.totals != null ? result.totals.total : null;
+            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
+            if (parsedTotal == null || parsedTotal < 100) {
                 purchase.put("total", total); // total 세팅.
             } else {
                 purchase.put("total", result.totals.total); // total 세팅.
@@ -257,6 +262,7 @@ public class OcrController_develop {
             //purchase.put("use_name", result.merchant != null ? result.merchant.name : null);
 
             // 결제금액
+            purchase.put("total", effectiveTotal);
             String approvalAmt = (result.payment != null ? result.payment.approvalAmt : null);
             int iApprovalAmt = 0;
 
@@ -264,6 +270,10 @@ public class OcrController_develop {
                 String clean = approvalAmt.replaceAll("[^0-9]", "");
                 if (!clean.isEmpty())
                     iApprovalAmt = Integer.parseInt(clean);
+            }
+
+            if (iApprovalAmt < 100) {
+                iApprovalAmt = effectiveTotal;
             }
 
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {

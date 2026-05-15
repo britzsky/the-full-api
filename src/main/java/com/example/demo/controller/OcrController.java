@@ -234,10 +234,12 @@ public class OcrController {
             if (effectiveSaleDate == null || effectiveSaleDate.isBlank()) {
                 return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, uploadFiles));
             }
-            LocalDate date = DateUtils.parseFlexibleDate(effectiveSaleDate);
+            boolean useCellDateForType45 = Integer.valueOf(45).equals(type)
+                    && cell_date != null && !cell_date.isBlank();
+            LocalDate date = DateUtils.parseFlexibleDate(useCellDateForType45 ? cell_date : effectiveSaleDate);
             if (cell_date != null && !cell_date.isBlank()) {
                 LocalDate cellDate = DateUtils.parseFlexibleDate(cell_date);
-                if (!date.equals(cellDate)
+                if (!useCellDateForType45 && !date.equals(cellDate)
                         && date.getMonthValue() == cellDate.getMonthValue()
                         && date.getDayOfMonth() == cellDate.getDayOfMonth()) {
                     date = cellDate;
@@ -255,9 +257,10 @@ public class OcrController {
 
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            boolean skipDateMismatchCheck = useCellDateForType45;
 
             // 집계표 날짜 불일치면 기존 로직 유지(원하면 이 케이스도 fallback으로 바꿀 수 있음)
-            if (cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
+            if (!skipDateMismatchCheck && cell_date != null && !cell_date.isBlank() && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);
                 error.put("message", "선택된 집계표 일자와 영수증 거래일자가 일치하지 않습니다.\n");
@@ -279,12 +282,15 @@ public class OcrController {
             purchase.put("saleDate", receiptDate);
             purchase.put("payment_dt", receiptDate);
 
-            if (result.totals.total == 0 || result.totals.total == null) {
+            Integer parsedTotal = result.totals != null ? result.totals.total : null;
+            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
+            if (parsedTotal == null || parsedTotal < 100) {
                 purchase.put("total", total); // total 세팅.
             } else {
                 purchase.put("total", result.totals.total); // total 세팅.
             }
 
+            purchase.put("total", effectiveTotal);
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
             purchase.put("taxFree", result.totals.taxFree);
@@ -298,6 +304,9 @@ public class OcrController {
                 String clean = approvalAmt.replaceAll("[^0-9\\-]", "");
                 if (!clean.isEmpty())
                     iApprovalAmt = Integer.parseInt(clean);
+            }
+            if (iApprovalAmt < 100) {
+                iApprovalAmt = effectiveTotal;
             }
 
             if ("cash".equals(result.payment != null ? result.payment.type : null)) {
