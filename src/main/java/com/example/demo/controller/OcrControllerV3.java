@@ -53,6 +53,9 @@ import com.example.demo.utils.DateUtils;
 })
 public class OcrControllerV3 {
 
+    // 사랑의(20250819193632) 일 때 영수증 파싱 금액보다 사용자 입력 금액을 우선 적용한다.
+    private static final String USER_INPUT_TOTAL_ACCOUNT_ID = "20250819193632";
+
     @Autowired
     private OcrService ocrService;
 
@@ -264,7 +267,11 @@ public class OcrControllerV3 {
 
             // 영수증 파싱에서 합계금액을 못구하면 화면에서 입력된 금액으로 세팅.
             Integer parsedTotal = result.totals != null ? result.totals.total : null;
-            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
+            boolean useUserInputTotal = isUserInputTotalAccount(account_id);
+            int requestTotal = safeInt(total);
+            int effectiveTotal = useUserInputTotal
+                    ? requestTotal
+                    : (parsedTotal == null || parsedTotal < 100) ? requestTotal : parsedTotal;
             if (parsedTotal == null || parsedTotal < 100) {
                 accountMap.put("total", total); // total 세팅.
             } else {
@@ -299,7 +306,7 @@ public class OcrControllerV3 {
                 }
             }
 
-            if (iApprovalAmt < 100) {
+            if (useUserInputTotal || iApprovalAmt < 100) {
                 iApprovalAmt = effectiveTotal;
             }
 
@@ -371,12 +378,13 @@ public class OcrControllerV3 {
             List<Map<String, Object>> detailList = new ArrayList<>();
 
             for (Item r : result.items) {
+                boolean isFirstDetail = detailList.isEmpty();
                 Map<String, Object> detailMap = new HashMap<String, Object>();
                 detailMap.put("sale_id", saleId);
                 detailMap.put("name", r.name);
                 detailMap.put("qty", r.qty);
-                detailMap.put("amount", r.amount);
-                detailMap.put("unitPrice", r.unitPrice);
+                detailMap.put("amount", resolveDetailAmount(r.amount, effectiveTotal, useUserInputTotal, isFirstDetail));
+                detailMap.put("unitPrice", resolveDetailAmount(r.unitPrice, effectiveTotal, useUserInputTotal, isFirstDetail));
                 detailMap.put("taxType", taxify(r.taxFlag));
                 detailMap.put("itemType", classify(r.name, receipt_type));
 
@@ -599,6 +607,18 @@ public class OcrControllerV3 {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    private boolean isUserInputTotalAccount(Object accountId) {
+        return USER_INPUT_TOTAL_ACCOUNT_ID.equals(String.valueOf(accountId == null ? "" : accountId).trim());
+    }
+
+    // 상세 품목 금액이 파싱 금액으로 다시 저장되지 않도록 첫 품목에 입력 금액을 세팅한다.
+    private Object resolveDetailAmount(Object parsedAmount, int userInputTotal, boolean useUserInputTotal, boolean isFirstDetail) {
+        if (!useUserInputTotal) {
+            return parsedAmount;
+        }
+        return isFirstDetail ? userInputTotal : 0;
     }
 
     /**

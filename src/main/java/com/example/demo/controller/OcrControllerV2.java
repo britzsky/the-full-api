@@ -51,6 +51,9 @@ import com.google.cloud.documentai.v1.Document;
 })
 public class OcrControllerV2 {
 
+    // 사랑의(20250819193632) 일 때 영수증 파싱 금액보다 사용자 입력 금액을 우선 적용한다.
+    private static final String USER_INPUT_TOTAL_ACCOUNT_ID = "20250819193632";
+
     @Autowired
     private OcrService ocrService;
 
@@ -233,6 +236,7 @@ public class OcrControllerV2 {
 
             boolean isAccount = "account".equalsIgnoreCase(saveType);
             boolean isHeadoffice = "headoffice".equalsIgnoreCase(saveType);
+            boolean useUserInputTotal = isUserInputTotalAccount(objectValue);
             System.out.println("[OCR] saveType=" + saveType + ", isAccount=" + isAccount + ", isHeadoffice=" + isHeadoffice + ", total(user)=" + purchase.get("total") + ", tallyType=" + purchase.get("tallyType"));
 
             corporateCard.put("account_id", objectValue);
@@ -260,7 +264,10 @@ public class OcrControllerV2 {
                 String approvalAmt = result.payment != null ? result.payment.approvalAmt : null;
                 String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
                 Integer parsedTotal = result.totals != null ? result.totals.total : null;
-                int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? toInt(total) : parsedTotal;
+                int userInputTotal = toInt(total);
+                int effectiveTotal = useUserInputTotal
+                        ? userInputTotal
+                        : (parsedTotal == null || parsedTotal < 100) ? userInputTotal : parsedTotal;
 
                 if (approvalAmt == null) {
                     corporateCard.put("total", effectiveTotal);
@@ -280,7 +287,7 @@ public class OcrControllerV2 {
                         if (!clean.isEmpty())
                             iApprovalAmt = Integer.parseInt(clean);
                     }
-                    if (iApprovalAmt < 100) {
+                    if (useUserInputTotal || iApprovalAmt < 100) {
                         iApprovalAmt = effectiveTotal;
                     }
                     corporateCard.put("total", iApprovalAmt);
@@ -315,13 +322,14 @@ public class OcrControllerV2 {
             int forcedItemType = resolveForcedItemType(forcedTallyType);
 
             for (Item r : result.items) {
+                boolean isFirstDetail = detailList.isEmpty();
                 Map<String, Object> detailMap = new HashMap<String, Object>();
                 detailMap.put("account_id", objectValue);
                 detailMap.put("sale_id", targetSaleId);
                 detailMap.put("name", r.name);
                 detailMap.put("qty", r.qty);
-                detailMap.put("amount", r.amount);
-                detailMap.put("unitPrice", r.unitPrice);
+                detailMap.put("amount", resolveDetailAmount(r.amount, toInt(total), useUserInputTotal, isFirstDetail));
+                detailMap.put("unitPrice", resolveDetailAmount(r.unitPrice, toInt(total), useUserInputTotal, isFirstDetail));
                 detailMap.put("taxType", taxify(r.taxFlag));
                 detailMap.put("itemType", forcedItemType > 0 ? forcedItemType : classify(r.name));
 
@@ -702,6 +710,18 @@ public class OcrControllerV2 {
     }
 
     // 집계표 프로시저 p_type은 정수 컬럼이므로 문자열 타입값(CONVENIENCE/MART_ITEMIZED)은 1000으로 보정한다.
+    private boolean isUserInputTotalAccount(Object accountId) {
+        return USER_INPUT_TOTAL_ACCOUNT_ID.equals(String.valueOf(accountId == null ? "" : accountId).trim());
+    }
+
+    // 상세 품목 금액이 파싱 금액으로 다시 저장되지 않도록 첫 품목에 입력 금액을 세팅한다.
+    private Object resolveDetailAmount(Object parsedAmount, int userInputTotal, boolean useUserInputTotal, boolean isFirstDetail) {
+        if (!useUserInputTotal) {
+            return parsedAmount;
+        }
+        return isFirstDetail ? userInputTotal : 0;
+    }
+
     private int resolveTallyType(Object rawType, boolean isAccount) {
         if (isAccount) {
             // account 경로는 별도 프로시저(TallySheetCorporateCardPaymentSave)를 사용하므로 값은 의미가 거의 없음.

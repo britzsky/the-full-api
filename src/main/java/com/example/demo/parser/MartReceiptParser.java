@@ -133,6 +133,11 @@ public class MartReceiptParser extends BaseReceiptParser {
             } else if (phase.equals("totals") && trimmed.matches(".*(고객|적립|승인|영수증|거래NO|감사|계산원).*")) {
                 sections.add(new ArrayList<>(current)); current.clear(); phase = "footer";
             }
+            if (phase.equals("items") && isMartSummaryLine(trimmed)) {
+                sections.add(new ArrayList<>(current));
+                current.clear();
+                phase = "totals";
+            }
             current.add(trimmed);
         }
         if (!current.isEmpty()) sections.add(current);
@@ -141,6 +146,33 @@ public class MartReceiptParser extends BaseReceiptParser {
 
     // -------------------- 영수증 타입 감지 --------------------
     private enum ReceiptPatternType { NUMBERED, TWO_LINE_NUMBERED, INLINE, QTY_PRICE, SPLIT }
+
+    // 마트 영수증의 합계/결제 영역 라벨은 상품명으로 파싱하지 않는다.
+    private boolean isMartSummaryLine(String line) {
+        if (line == null || line.isBlank()) return false;
+        String compact = line.replaceAll("\\s+", "");
+        return compact.contains("과세물품")
+                || compact.contains("면세물품")
+                || compact.contains("부가세")
+                || compact.contains("VAT")
+                || compact.contains("합계")
+                || compact.contains("총액")
+                || compact.contains("할인")
+                || compact.contains("현금")
+                || compact.contains("카드")
+                || compact.contains("신용카드지불")
+                || compact.contains("승인금액");
+    }
+
+    private int findMartSummaryStartIndex(List<String> lines) {
+        if (lines == null) return -1;
+        for (int i = 0; i < lines.size(); i++) {
+            if (isMartSummaryLine(lines.get(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
 
     private ReceiptPatternType detectPattern(List<String> lines) {
         boolean hasNoHeader = lines.stream().anyMatch(l -> l.matches(".*\\bNO\\.?\\b.*상품명.*"));
@@ -200,13 +232,15 @@ public class MartReceiptParser extends BaseReceiptParser {
     // -------------------- 품목 파싱 분기 --------------------
     private List<Item> parseItems(List<String> lines) {
         System.out.println("\n=== 🔍 ITEM PARSING START ===");
-        List<String> clean = lines.stream()
+        int summaryStart = findMartSummaryStartIndex(lines);
+        List<String> itemLines = summaryStart >= 0 ? lines.subList(0, summaryStart) : lines;
+        List<String> clean = itemLines.stream()
                 .filter(l -> !l.matches(".*(NO\\.|상품명|단가|수량|금액).*"))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
 
-        ReceiptPatternType type = detectPattern(lines);
+        ReceiptPatternType type = detectPattern(itemLines);
         System.out.println("📄 Detected Type: " + type);
 
         List<Item> items = new ArrayList<>();

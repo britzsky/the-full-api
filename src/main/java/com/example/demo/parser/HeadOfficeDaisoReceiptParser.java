@@ -85,15 +85,19 @@ public class HeadOfficeDaisoReceiptParser extends BaseReceiptParser {
 
         /* ========================= 3) 금액(과세/부가세/합계) ========================= */
         // 금액은 라벨 기준으로 우선 추출하고, 누락 시 합계/부가세 관계식으로 보정한다.
+        DaisoSummaryAmounts stackedSummary = findDaisoStackedSummary(lines);
         Integer taxable = firstNonNullInt(
+                stackedSummary.taxable,
                 findAmountByLabel(lines, "과\\s*세\\s*합\\s*계"),
                 findAmountByLabel(lines, "공급가액")
         );
         Integer vat = firstNonNullInt(
+                stackedSummary.vat,
                 findAmountByLabel(lines, "부\\s*가\\s*가\\s*치\\s*세"),
                 findAmountByLabel(lines, "부\\s*가\\s*세(?:\\s*액)?")
         );
         Integer total = firstNonNullInt(
+                stackedSummary.total,
                 findAmountByLabel(lines, "판\\s*매\\s*합\\s*계"),
                 findAmountByLabel(lines, "신용카드"),
                 findAmountByLabel(lines, "승인금액")
@@ -491,6 +495,75 @@ public class HeadOfficeDaisoReceiptParser extends BaseReceiptParser {
             }
         }
         return null;
+    }
+
+    // 다이소 합계 영역은 라벨 3줄 뒤에 금액 3줄이 이어지는 경우가 있어 순서대로 금액을 매핑한다.
+    private DaisoSummaryAmounts findDaisoStackedSummary(List<String> lines) {
+        DaisoSummaryAmounts summary = new DaisoSummaryAmounts();
+        if (lines == null || lines.isEmpty()) return summary;
+
+        for (int i = 0; i < lines.size(); i++) {
+            String line = cleanField(lines.get(i));
+            if (!notEmpty(line)) continue;
+
+            String compact = line.replaceAll("\\s+", "");
+            if (!compact.contains("과세합계")) continue;
+
+            boolean hasVatLabel = false;
+            boolean hasTotalLabel = false;
+            List<Integer> amounts = new ArrayList<>();
+
+            for (int j = i; j < lines.size() && j <= i + 14; j++) {
+                String next = cleanField(lines.get(j));
+                if (!notEmpty(next)) continue;
+
+                String nextCompact = next.replaceAll("\\s+", "");
+                if (nextCompact.contains("부가세")) {
+                    hasVatLabel = true;
+                }
+                if (nextCompact.contains("판매합계")) {
+                    hasTotalLabel = true;
+                }
+                if (nextCompact.contains("다이소멤버십") || nextCompact.contains("적립대상결제금액")) {
+                    break;
+                }
+
+                Integer amount = moneyOnlyLine(next);
+                if (amount != null) {
+                    amounts.add(amount);
+                    if (amounts.size() >= 3) {
+                        break;
+                    }
+                }
+            }
+
+            if (hasVatLabel && hasTotalLabel && amounts.size() >= 3) {
+                summary.taxable = amounts.get(0);
+                summary.vat = amounts.get(1);
+                summary.total = amounts.get(2);
+                return summary;
+            }
+        }
+
+        return summary;
+    }
+
+    // 금액만 있는 라인을 읽는다. OCR이 "12, 200"처럼 쉼표 뒤에 공백을 넣는 경우도 함께 보정한다.
+    private Integer moneyOnlyLine(String line) {
+        String x = cleanField(line);
+        if (!notEmpty(x)) return null;
+
+        String compact = x.replaceAll("\\s+", "");
+        if (!compact.matches("[0-9]{1,3}(?:,[0-9]{3})*|[0-9]+")) {
+            return null;
+        }
+        return toInt(compact);
+    }
+
+    private static class DaisoSummaryAmounts {
+        Integer taxable;
+        Integer vat;
+        Integer total;
     }
 
     /**
