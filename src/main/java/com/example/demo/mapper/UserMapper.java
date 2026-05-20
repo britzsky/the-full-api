@@ -25,5 +25,11 @@ public interface UserMapper {
 	List<Map<String, Object>> UserManageList(Map<String, Object> paramMap);
 	List<Map<String, Object>> ContractEndAccountList();
 	List<Map<String, Object>> BirthdayMemberList();
+	List<Map<String, Object>> UserBookmarkList(Map<String, Object> paramMap);
+	int UserBookmarkSave(Map<String, Object> paramMap);
+	int UserBookmarkDelete(Map<String, Object> paramMap);
+	List<Map<String, Object>> UserTodoList(Map<String, Object> paramMap);
+	int UserTodoSave(Map<String, Object> paramMap);
+	int UserTodoDelete(Map<String, Object> paramMap);
 
 }

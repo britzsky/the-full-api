@@ -1109,6 +1109,54 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : AnnualLeaveDelete
+     * comment : 현장관리 -> 근태관리 -> 연차 항목 삭제
+     */
+    @PostMapping("Operate/AnnualLeaveDelete")
+    public String AnnualLeaveDelete(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            int iResult = operateService.AnnualLeaveDelete(paramMap);
+            if (iResult > 0) {
+                result.put("code", 200);
+                result.put("message", "삭제되었습니다.");
+            } else {
+                result.put("code", 400);
+                result.put("message", "삭제 대상이 없습니다.");
+            }
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : OverTimeDelete
+     * comment : 현장관리 -> 근태관리 -> 시간외근무 항목 삭제
+     */
+    @PostMapping("Operate/OverTimeDelete")
+    public String OverTimeDelete(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            int iResult = operateService.OverTimeDelete(paramMap);
+            if (iResult > 0) {
+                result.put("code", 200);
+                result.put("message", "삭제되었습니다.");
+            } else {
+                result.put("code", 400);
+                result.put("message", "삭제 대상이 없습니다.");
+            }
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
      * method : MealsNumberList
      * comment : 현장관리 -> 근태관리 -> 초과근무 조회
      */

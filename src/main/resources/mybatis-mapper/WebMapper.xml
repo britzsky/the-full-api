@@ -41,8 +41,8 @@
             u.user_name,
             u.department,
             am.position_type
-        FROM tb_user u
-        LEFT JOIN tb_account_members am
+        FROM the_full.tb_user u
+        LEFT JOIN the_full.tb_account_members am
             ON am.user_id = u.user_id
             AND IFNULL(am.del_yn, 'N') = 'N'
             AND am.position_type IS NOT NULL

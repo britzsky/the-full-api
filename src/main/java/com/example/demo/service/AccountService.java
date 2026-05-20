@@ -442,10 +442,24 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 거래처 -> 출근부 -> 연차대장 기존 데이터 삭제 (member_id + ledger_dt 기준)
+	public int AccountAnnualLeaveLedgerDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountAnnualLeaveLedgerDelete(paramMap);
+		return iResult;
+	}
+
 	// 거래처 -> 출근부 -> 연차대장 저장
 	public int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = accountMapper.AccountAnnualLeaveLedgerSave(paramMap);
+		return iResult;
+	}
+
+	// 거래처 -> 출근부 -> 초과대장 기존 데이터 삭제 (member_id + over_dt 기준)
+	public int AccountOverTimeLedgerDelete(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountOverTimeLedgerDelete(paramMap);
 		return iResult;
 	}
 

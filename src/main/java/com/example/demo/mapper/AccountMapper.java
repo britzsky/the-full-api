@@ -58,7 +58,9 @@ public interface AccountMapper {
 	int AccountCommunicationUpdate(Map<String, Object> paramMap);										// 운영,영업 -> 마감이슈, 고객사이슈 업데이트
 	// 배치성 데이터
 	List<Map<String, Object>> BatchForPayBack(Map<String, Object> paramMap); 							// 본사 -> 관리표 -> 손익표 (판장금)
+	int AccountAnnualLeaveLedgerDelete(Map<String, Object> paramMap);									// 출근부 -> 연차관리 기존 데이터 삭제
 	int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 연차관리 저장
+	int AccountOverTimeLedgerDelete(Map<String, Object> paramMap);										// 출근부 -> 초과관리 기존 데이터 삭제
 	int AccountOverTimeLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 초과관리 저장
 	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장

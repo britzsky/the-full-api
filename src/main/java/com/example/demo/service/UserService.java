@@ -151,4 +151,34 @@ public class UserService {
 	public List<Map<String, Object>> BirthdayMemberList() {
 		return userMapper.BirthdayMemberList();
 	}
+
+	// 사용자별 대시보드 북마크 목록 조회
+	public List<Map<String, Object>> UserBookmarkList(Map<String, Object> paramMap) {
+		return userMapper.UserBookmarkList(paramMap);
+	}
+
+	// 사용자별 대시보드 북마크 저장
+	public int UserBookmarkSave(Map<String, Object> paramMap) {
+		return userMapper.UserBookmarkSave(paramMap);
+	}
+
+	// 사용자별 대시보드 북마크 삭제 처리
+	public int UserBookmarkDelete(Map<String, Object> paramMap) {
+		return userMapper.UserBookmarkDelete(paramMap);
+	}
+
+	// 사용자별 대시보드 할 일 목록 조회
+	public List<Map<String, Object>> UserTodoList(Map<String, Object> paramMap) {
+		return userMapper.UserTodoList(paramMap);
+	}
+
+	// 사용자별 대시보드 할 일 저장
+	public int UserTodoSave(Map<String, Object> paramMap) {
+		return userMapper.UserTodoSave(paramMap);
+	}
+
+	// 사용자별 대시보드 할 일 삭제 처리
+	public int UserTodoDelete(Map<String, Object> paramMap) {
+		return userMapper.UserTodoDelete(paramMap);
+	}
 }

@@ -398,4 +398,127 @@
             am.name
     </select>
 
+    <!-- 대시보드 사용자별 북마크 목록 조회-->
+    <select id="UserBookmarkList" parameterType="map" resultType="hashmap">
+        SELECT
+            idx,
+            user_id,
+            type,
+            title,
+            title AS content,
+            route,
+            DATE_FORMAT(reg_dt, '%Y-%m-%d') AS date,
+            del_yn
+        FROM tb_user_bookmark
+        WHERE user_id = #{user_id}
+            AND IFNULL(del_yn, 'N') = 'N'
+        ORDER BY idx DESC
+    </select>
+
+    <!-- 대시보드 사용자별 북마크 저장 -->
+    <insert id="UserBookmarkSave" parameterType="map">
+        INSERT INTO tb_user_bookmark (
+            idx,
+            user_id,
+            type,
+            title,
+            route
+        )
+        VALUES (
+            #{idx},
+            #{user_id},
+            COALESCE(#{type}, 1),
+            #{title},
+            #{route}
+        )
+        ON DUPLICATE KEY UPDATE
+        <trim suffixOverrides=",">
+            user_id = #{user_id},
+            type = COALESCE(#{type}, type),
+            title = #{title},
+            route = #{route},
+            del_yn = 'N'
+        </trim>
+    </insert>
+
+    <!-- 대시보드 사용자별 북마크 삭제 -->
+    <update id="UserBookmarkDelete" parameterType="map">
+        UPDATE tb_user_bookmark
+        SET del_yn = 'Y'
+        WHERE idx = #{idx}
+            AND user_id = #{user_id}
+            AND IFNULL(del_yn, 'N') = 'N'
+    </update>
+
+    <!-- 대시보드 사용자별 할 일 목록 조회 -->
+    <select id="UserTodoList" parameterType="map" resultType="hashmap">
+        SELECT
+            idx,
+            user_id,
+            title,
+            title AS content,
+            DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date,
+            DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date,
+            DATE_FORMAT(IFNULL(end_date, start_date), '%Y-%m-%d') AS date,
+            complete_yn,
+            del_yn
+        FROM tb_user_todo
+        WHERE user_id = #{user_id}
+            AND IFNULL(del_yn, 'N') = 'N'
+        ORDER BY
+            CASE WHEN end_date IS NULL THEN 1 ELSE 0 END,
+            end_date,
+            idx DESC
+    </select>
+
+    <!-- 대시보드 사용자별 할 일 저장 -->
+    <insert id="UserTodoSave" parameterType="map">
+        INSERT INTO tb_user_todo (
+            idx,
+            user_id,
+            title,
+            start_date,
+            end_date,
+            complete_yn
+        )
+        VALUES (
+            #{idx},
+            #{user_id},
+            #{title},
+            CASE
+                WHEN #{start_date} IS NULL OR #{start_date} = '' THEN NULL
+                ELSE STR_TO_DATE(#{start_date}, '%Y-%m-%d')
+            END,
+            CASE
+                WHEN #{end_date} IS NULL OR #{end_date} = '' THEN NULL
+                ELSE STR_TO_DATE(#{end_date}, '%Y-%m-%d')
+            END,
+            COALESCE(#{complete_yn}, 'N')
+        )
+        ON DUPLICATE KEY UPDATE
+        <trim suffixOverrides=",">
+            user_id = #{user_id},
+            title = #{title},
+            start_date = CASE
+                WHEN #{start_date} IS NULL OR #{start_date} = '' THEN NULL
+                ELSE STR_TO_DATE(#{start_date}, '%Y-%m-%d')
+            END,
+            end_date = CASE
+                WHEN #{end_date} IS NULL OR #{end_date} = '' THEN NULL
+                ELSE STR_TO_DATE(#{end_date}, '%Y-%m-%d')
+            END,
+            complete_yn = COALESCE(#{complete_yn}, complete_yn),
+            del_yn = 'N'
+        </trim>
+    </insert>
+
+    <!-- 대시보드 사용자별 할 일 삭제 -->
+    <update id="UserTodoDelete" parameterType="map">
+        UPDATE tb_user_todo
+        SET del_yn = 'Y'
+        WHERE idx = #{idx}
+            AND user_id = #{user_id}
+            AND IFNULL(del_yn, 'N') = 'N'
+    </update>
+
 </mapper>

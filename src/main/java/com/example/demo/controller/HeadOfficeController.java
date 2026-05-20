@@ -748,7 +748,213 @@ public class HeadOfficeController {
 		return new Gson().toJson(resultList);
 	}
 
-	/* 
+	/*
+	 * part		: 본사
+	 * method 	: NoticeList
+	 * comment 	: 본사 -> 공지사항 -> 목록 조회
+	 */
+	@GetMapping("HeadOffice/NoticeList")
+	public String NoticeList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.NoticeList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeDetail
+	 * comment 	: 본사 -> 공지사항 -> 상세 조회
+	 */
+	@GetMapping("HeadOffice/NoticeDetail")
+	public String NoticeDetail(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = headOfficeService.NoticeDetail(paramMap);
+		return new Gson().toJson(result);
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeSave
+	 * comment 	: 본사 -> 공지사항 -> 등록/수정 (upsert)
+	 */
+	@PostMapping("HeadOffice/NoticeSave")
+	public String NoticeSave(@RequestBody Map<String, Object> paramMap) {
+		int iResult = headOfficeService.NoticeSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+			// useGeneratedKeys로 채워진 idx (신규 등록 시 생성된 PK, 수정 시 기존 idx)
+			Object idxVal = paramMap.get("idx");
+			if (idxVal != null) {
+				obj.addProperty("idx", asText(idxVal));
+			}
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeDelete
+	 * comment 	: 본사 -> 공지사항 -> 삭제
+	 */
+	@PostMapping("HeadOffice/NoticeDelete")
+	public String NoticeDelete(@RequestBody Map<String, Object> paramMap) {
+		int iResult = headOfficeService.NoticeDelete(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeFileList
+	 * comment 	: 본사 -> 공지사항 -> 첨부파일 목록 조회
+	 */
+	@GetMapping("HeadOffice/NoticeFileList")
+	public String NoticeFileList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.NoticeFileList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeFilesUpload
+	 * comment 	: 본사 -> 공지사항 -> 첨부파일 업로드
+	 */
+	@PostMapping("HeadOffice/NoticeFilesUpload")
+	public String NoticeFilesUpload(
+		@RequestParam("notice_idx") String noticeIdx,
+		@RequestParam("files") MultipartFile[] files
+	) {
+		JsonObject obj = new JsonObject();
+		try {
+			String noticeIdxText = asText(noticeIdx);
+			if (noticeIdxText.isEmpty() || files == null || files.length == 0) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "notice_idx 또는 files 파라미터가 비어있습니다.");
+				return obj.toString();
+			}
+
+			int noticeIdxInt;
+			try { noticeIdxInt = Integer.parseInt(noticeIdxText); } catch (Exception e) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "notice_idx가 유효하지 않습니다.");
+				return obj.toString();
+			}
+
+			Map<String, Object> listParam = new HashMap<>();
+			listParam.put("notice_idx", noticeIdxText);
+			List<Map<String, Object>> existingFiles = headOfficeService.NoticeFileList(listParam);
+			int currentCount = existingFiles == null ? 0 : existingFiles.size();
+			if (currentCount >= MAX_HEADOFFICE_DOCUMENT_FILE_COUNT) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "첨부 파일은 최대 10개까지 등록 가능합니다.");
+				return obj.toString();
+			}
+
+			Path noticeDirPath = resolveNoticeDirPath(noticeIdxText);
+			Files.createDirectories(noticeDirPath);
+
+			int nextOrder = headOfficeService.GetNextNoticeFileOrder(noticeIdxInt);
+			int availableCount = MAX_HEADOFFICE_DOCUMENT_FILE_COUNT - currentCount;
+			List<Map<String, Object>> insertedFiles = new ArrayList<>();
+
+			for (MultipartFile file : files) {
+				if (insertedFiles.size() >= availableCount) break;
+				if (file == null || file.isEmpty()) continue;
+
+				String originalFileName = asText(file.getOriginalFilename());
+				if (originalFileName.isEmpty()) originalFileName = "file";
+				String safeFileName = Paths.get(originalFileName).getFileName().toString();
+				String uniqueFileName = UUID.randomUUID() + "_" + safeFileName;
+
+				Path filePath = noticeDirPath.resolve(uniqueFileName).normalize();
+				if (!filePath.startsWith(noticeDirPath)) continue;
+				file.transferTo(filePath.toFile());
+
+				String imagePath = "/image/notice/" + noticeIdxText + "/" + uniqueFileName;
+
+				Map<String, Object> saveParam = new HashMap<>();
+				saveParam.put("notice_idx", noticeIdxInt);
+				saveParam.put("image_order", nextOrder++);
+				saveParam.put("image_path", imagePath);
+				saveParam.put("image_name", safeFileName);
+
+				headOfficeService.NoticeFileSave(saveParam);
+				insertedFiles.add(saveParam);
+			}
+
+			if (insertedFiles.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "업로드 가능한 첨부 파일이 없습니다.");
+				return obj.toString();
+			}
+
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "업로드 성공");
+			obj.add("files", new Gson().toJsonTree(insertedFiles));
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "업로드 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 본사
+	 * method 	: NoticeFileDelete
+	 * comment 	: 본사 -> 공지사항 -> 첨부파일 삭제
+	 */
+	@DeleteMapping("HeadOffice/NoticeFileDelete")
+	public String NoticeFileDelete(@RequestParam Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			String noticeIdxText = asText(paramMap.get("notice_idx"));
+			String imagePathText = asText(paramMap.get("image_path"));
+			String imageOrderText = asText(paramMap.get("image_order"));
+			if (noticeIdxText.isEmpty() || imageOrderText.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "notice_idx/image_order 파라미터가 필요합니다.");
+				return obj.toString();
+			}
+
+			if (!imagePathText.isEmpty()) {
+				String targetFileName = Paths.get(imagePathText).getFileName().toString();
+				if (!targetFileName.isEmpty()) {
+					Path noticeDirPath = resolveNoticeDirPath(noticeIdxText);
+					Path targetPath = noticeDirPath.resolve(targetFileName).normalize();
+					if (targetPath.startsWith(noticeDirPath)) {
+						Files.deleteIfExists(targetPath);
+					}
+				}
+			}
+
+			headOfficeService.NoticeFileDelete(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "삭제 성공");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	private Path resolveNoticeDirPath(String noticeIdxText) {
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		return Paths.get(staticPath, "notice", noticeIdxText).normalize();
+	}
+
+	/*
 	 * part		: 본사
      * method 	: getMainPayload
      * comment 	: 본사 -> 전자결재 관리 -> 요청 payload에서 메인 데이터 추출

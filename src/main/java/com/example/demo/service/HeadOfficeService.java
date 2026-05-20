@@ -268,4 +268,47 @@ public class HeadOfficeService {
 	public List<Map<String, Object>> HeadOfficeScheduleList(Map<String, Object> paramMap) {
 		return headOfficeMapper.HeadOfficeScheduleList(paramMap);
 	}
+
+	// 본사 -> 공지사항 -> 목록 조회
+	public List<Map<String, Object>> NoticeList(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeList(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 상세 조회
+	public Map<String, Object> NoticeDetail(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeDetail(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 등록/수정 (upsert)
+	public int NoticeSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeSave(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 삭제
+	public int NoticeDelete(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeDelete(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 첨부파일 목록 조회
+	public List<Map<String, Object>> NoticeFileList(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeFileList(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 첨부파일 저장
+	public void NoticeFileSave(Map<String, Object> paramMap) {
+		headOfficeMapper.NoticeFileSave(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 첨부파일 삭제
+	public int NoticeFileDelete(Map<String, Object> paramMap) {
+		return headOfficeMapper.NoticeFileDelete(paramMap);
+	}
+
+	// 본사 -> 공지사항 -> 첨부파일 image_order 최대값+1 반환
+	public int GetNextNoticeFileOrder(int noticeIdx) {
+		Map<String, Object> paramMap = new java.util.HashMap<>();
+		paramMap.put("notice_idx", noticeIdx);
+		Integer maxOrder = headOfficeMapper.GetMaxNoticeFileOrder(paramMap);
+		return maxOrder == null ? 1 : maxOrder + 1;
+	}
 }

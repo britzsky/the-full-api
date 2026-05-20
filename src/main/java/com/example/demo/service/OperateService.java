@@ -327,6 +327,14 @@ public class OperateService {
 		resultList = operateMapper.AnnualLeaveList(paramMap);
 		return resultList;
 	}
+	// 현장관리 -> 근태관리 -> 연차 항목 삭제
+	public int AnnualLeaveDelete(Map<String, Object> paramMap) {
+		return operateMapper.AnnualLeaveDelete(paramMap);
+	}
+	// 현장관리 -> 근태관리 -> 시간외근무 항목 삭제
+	public int OverTimeDelete(Map<String, Object> paramMap) {
+		return operateMapper.OverTimeDelete(paramMap);
+	}
 	// 현장관리 -> 근태관리 -> 초과근무 조회
 	public List<Map<String, Object>> OverTimeList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

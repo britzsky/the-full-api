@@ -2399,6 +2399,158 @@
 		ORDER BY position ASC
 	</select>
 
+	<!-- 본사 -> 공지사항 -> 목록 조회 -->
+	<select id="NoticeList" parameterType="map" resultType="hashmap">
+		SELECT n.idx,
+		       n.title,
+		       n.large_type,
+		       n.middle_type,
+		       CASE n.large_type
+		         WHEN 1 THEN '회사소식'
+		         WHEN 2 THEN '업무표준화'
+		         WHEN 3 THEN '커뮤니티'
+		         WHEN 4 THEN '업무협조'
+		         WHEN 5 THEN '영업&amp;마케팅'
+		         ELSE ''
+		       END AS large_type_nm,
+		       CASE n.middle_type
+		         WHEN 11 THEN '전사공지'
+		         WHEN 12 THEN '회사규정'
+		         WHEN 13 THEN '계정관리'
+		         WHEN 21 THEN '본사회의록'
+		         WHEN 22 THEN '내부사용양식'
+		         WHEN 23 THEN '오리엔테이션'
+		         WHEN 31 THEN '아이디어 공유'
+		         WHEN 32 THEN '업무노하우'
+		         WHEN 33 THEN '지식정보공유'
+		         WHEN 41 THEN '기획'
+		         WHEN 42 THEN '관리'
+		         WHEN 43 THEN '영업'
+		         WHEN 51 THEN '신규영업정보'
+		         WHEN 52 THEN '마케팅활동'
+		         ELSE ''
+		       END AS middle_type_nm,
+		       DATE_FORMAT(n.expire_dt, '%Y-%m-%d') AS expire_dt,
+		       n.user_id,
+		       u.user_name,
+		       CASE
+		         WHEN u.position = 0 THEN '대표'
+		         WHEN u.position = 1 THEN '팀장'
+		         WHEN u.position = 2 THEN '파트장'
+		         WHEN u.position BETWEEN 3 AND 7 THEN '매니저'
+		         WHEN u.position = 8 THEN '영양사'
+		         ELSE ''
+		       END AS position_name,
+		       DATE_FORMAT(n.reg_dt, '%Y-%m-%d %H:%i:%s') AS reg_dt,
+		       (SELECT COUNT(*) FROM tb_headoffice_notice_file f WHERE f.notice_idx = n.idx) AS file_cnt
+		FROM tb_headoffice_notice n
+		JOIN tb_user u ON u.user_id = n.user_id
+		WHERE n.del_yn = 'N'
+		ORDER BY n.idx DESC
+	</select>
+
+	<!-- 본사 -> 공지사항 -> 상세 조회 -->
+	<select id="NoticeDetail" parameterType="map" resultType="hashmap">
+		SELECT n.idx,
+		       n.title,
+		       n.content,
+		       n.large_type,
+		       n.middle_type,
+		       CASE n.large_type
+		         WHEN 1 THEN '회사소식'
+		         WHEN 2 THEN '업무표준화'
+		         WHEN 3 THEN '커뮤니티'
+		         WHEN 4 THEN '업무협조'
+		         WHEN 5 THEN '영업&amp;마케팅'
+		         ELSE ''
+		       END AS large_type_nm,
+		       CASE n.middle_type
+		         WHEN 11 THEN '전사공지'
+		         WHEN 12 THEN '회사규정'
+		         WHEN 13 THEN '계정관리'
+		         WHEN 21 THEN '본사회의록'
+		         WHEN 22 THEN '내부사용양식'
+		         WHEN 23 THEN '오리엔테이션'
+		         WHEN 31 THEN '아이디어 공유'
+		         WHEN 32 THEN '업무노하우'
+		         WHEN 33 THEN '지식정보공유'
+		         WHEN 41 THEN '기획'
+		         WHEN 42 THEN '관리'
+		         WHEN 43 THEN '영업'
+		         WHEN 51 THEN '신규영업정보'
+		         WHEN 52 THEN '마케팅활동'
+		         ELSE ''
+		       END AS middle_type_nm,
+		       DATE_FORMAT(n.expire_dt, '%Y-%m-%d') AS expire_dt,
+		       n.user_id,
+		       u.user_name,
+		       CASE
+		         WHEN u.position = 0 THEN '대표'
+		         WHEN u.position = 1 THEN '팀장'
+		         WHEN u.position = 2 THEN '파트장'
+		         WHEN u.position BETWEEN 3 AND 7 THEN '매니저'
+		         WHEN u.position = 8 THEN '영양사'
+		         ELSE ''
+		       END AS position_name,
+		       DATE_FORMAT(n.reg_dt, '%Y-%m-%d %H:%i:%s') AS reg_dt
+		FROM tb_headoffice_notice n
+		JOIN tb_user u ON u.user_id = n.user_id
+		WHERE n.idx = #{idx}
+		  AND n.del_yn = 'N'
+	</select>
+
+	<!-- 본사 -> 공지사항 -> 등록/수정 (upsert) -->
+	<insert id="NoticeSave" parameterType="map" useGeneratedKeys="true" keyProperty="idx">
+		INSERT INTO tb_headoffice_notice 
+		
+		<trim prefix="(" suffix=")" suffixOverrides=",">
+	        idx, 
+			title, 
+			content, 
+			large_type, 
+			middle_type, 
+			expire_dt, 
+			user_id, 
+			reg_dt, 
+			update_dt, 
+			del_yn,
+	    </trim>
+	    
+	    VALUES
+	    	
+	    <trim prefix="(" suffix=")" suffixOverrides=",">
+		
+			#{idx}, 
+			#{title}, 
+			#{content}, 
+			#{large_type}, 
+			#{middle_type},
+			STR_TO_DATE(#{expire_dt}, '%Y-%m-%d'),
+			#{user_id}, 
+			NOW(), 
+			NOW(), 
+			'N',
+	    </trim>
+		
+	    ON DUPLICATE KEY UPDATE
+	    <trim suffixOverrides=",">
+	    	title=#{title},
+	    	 content=#{content},
+	        large_type=#{large_type},
+	        middle_type=#{middle_type},
+			expire_dt=DATE_FORMAT(#{expire_dt}, '%Y-%m-%d'),
+			update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	    </trim>
+	</insert>
+
+	<!-- 본사 -> 공지사항 -> 삭제 (소프트 삭제) -->
+	<update id="NoticeDelete" parameterType="map">
+		UPDATE tb_headoffice_notice
+		SET del_yn    = 'Y',
+		    update_dt = NOW()
+		WHERE idx = #{idx}
+	</update>
+
 	<!-- 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회 (UNION ALL) -->
 	<!-- 본사 -> 일정관리 -> 영업(1)/운영(2)/급식사업부(3) 통합 조회 (tb_business_calendar 단일 테이블) -->
 	<select id="HeadOfficeScheduleList" parameterType="map" resultType="hashmap">
@@ -2424,5 +2576,32 @@
 		  AND DATE_FORMAT(bc.end_date,   '%Y-%m') = CONCAT(#{year}, '-', #{month})
 		ORDER BY bc.start_date ASC
 	</select>
+
+	<!-- 본사 -> 공지사항 -> 첨부파일 목록 조회 -->
+	<select id="NoticeFileList" parameterType="map" resultType="hashmap">
+		SELECT notice_idx, image_order, image_name, image_path,
+		       DATE_FORMAT(reg_dt, '%Y-%m-%d %H:%i:%s') AS reg_dt
+		FROM tb_headoffice_notice_file
+		WHERE notice_idx = #{notice_idx}
+		ORDER BY image_order ASC
+	</select>
+
+	<!-- 본사 -> 공지사항 -> 첨부파일 저장 -->
+	<insert id="NoticeFileSave" parameterType="map">
+		INSERT INTO tb_headoffice_notice_file (notice_idx, image_order, image_name, image_path, reg_dt)
+		VALUES (#{notice_idx}, #{image_order}, #{image_name}, #{image_path}, NOW())
+	</insert>
+
+	<!-- 본사 -> 공지사항 -> 첨부파일 삭제 -->
+	<delete id="NoticeFileDelete" parameterType="map">
+		DELETE FROM tb_headoffice_notice_file
+		WHERE notice_idx = #{notice_idx} AND image_order = #{image_order}
+	</delete>
+
+	<!-- 본사 -> 공지사항 -> 첨부파일 image_order 최대값 조회 -->
+	<select id="GetMaxNoticeFileOrder" parameterType="map" resultType="java.lang.Integer">
+		SELECT MAX(image_order) FROM tb_headoffice_notice_file WHERE notice_idx = #{notice_idx}
+	</select>
+
 </mapper>
 

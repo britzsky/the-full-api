@@ -51,5 +51,13 @@ public interface HeadOfficeMapper {
 	List<Map<String, Object>> HeadOfficeDepartmentList(Map<String, Object> paramMap); 				// 본사 -> 전자결재 관리 -> 부서목록 조회
 	List<Map<String, Object>> HeadOfficeUserListByDepartment(Map<String, Object> paramMap); 		// 본사 -> 전자결재 관리 -> 부서목록 선택 시, 부서 직원 조회
 	List<Map<String, Object>> HeadOfficeScheduleList(Map<String, Object> paramMap);				// 본사 -> 일정관리 -> 운영팀/영업팀/급식사업부 통합 조회
+	List<Map<String, Object>> NoticeList(Map<String, Object> paramMap);							// 본사 -> 공지사항 -> 목록 조회
+	Map<String, Object> NoticeDetail(Map<String, Object> paramMap);								// 본사 -> 공지사항 -> 상세 조회
+	int NoticeSave(Map<String, Object> paramMap);												// 본사 -> 공지사항 -> 등록/수정 (upsert)
+	int NoticeDelete(Map<String, Object> paramMap);												// 본사 -> 공지사항 -> 삭제
+	List<Map<String, Object>> NoticeFileList(Map<String, Object> paramMap);						// 본사 -> 공지사항 -> 첨부파일 목록 조회
+	void NoticeFileSave(Map<String, Object> paramMap);											// 본사 -> 공지사항 -> 첨부파일 저장
+	int NoticeFileDelete(Map<String, Object> paramMap);											// 본사 -> 공지사항 -> 첨부파일 삭제
+	Integer GetMaxNoticeFileOrder(Map<String, Object> paramMap);								// 본사 -> 공지사항 -> 첨부파일 image_order 최대값 조회
 }
 	

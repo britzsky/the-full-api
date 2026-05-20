@@ -2028,12 +2028,18 @@
 			   reason
 		FROM tb_account_annual_leave_ledger
 		WHERE member_id = #{member_id}
-		ORDER BY ledger_dt DESC, 
+		ORDER BY ledger_dt DESC,
 					CASE WHEN type = 'G' THEN 1
 						 WHEN type = 'U' THEN 2
 						 WHEN type = 'N' THEN 3
 						 ELSE 4 END
 	</select>
+
+	<!-- 연차 항목 삭제: ledger_id로 특정 행 삭제 -->
+	<delete id="AnnualLeaveDelete" parameterType="map">
+		DELETE FROM tb_account_annual_leave_ledger
+		WHERE ledger_id = #{ledger_id}
+	</delete>
 	
 	<select id="OverTimeList" parameterType="map" resultType="map">
 		SELECT over_id,
@@ -2044,12 +2050,18 @@
 			   reason
 		FROM tb_account_overtime_ledger
 		WHERE member_id = #{member_id}
-		ORDER BY over_dt DESC, 
+		ORDER BY over_dt DESC,
 					CASE WHEN type = 'G' THEN 1
 						 WHEN type = 'U' THEN 2
 						 WHEN type = 'N' THEN 3
 						 ELSE 4 END
 	</select>
+
+	<!-- 시간외근무 항목 삭제: over_id로 특정 행 삭제 -->
+	<delete id="OverTimeDelete" parameterType="map">
+		DELETE FROM tb_account_overtime_ledger
+		WHERE over_id = #{over_id}
+	</delete>
 	
     
     <insert id="AccountRecordSetRecRecordDataSave" parameterType="map">

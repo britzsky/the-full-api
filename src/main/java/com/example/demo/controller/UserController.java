@@ -525,4 +525,104 @@ public class UserController {
 		List<Map<String, Object>> resultList = userService.BirthdayMemberList();
 		return new Gson().toJson(resultList);
 	}
+
+	/*
+	 * method : UserBookmarkList
+	 * comment : 대시보드 사용자별 북마크 목록 조회
+	 */
+	@GetMapping("/User/Bookmarks")
+	public String UserBookmarkList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = userService.UserBookmarkList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : UserBookmarkSave
+	 * comment : 대시보드 사용자별 북마크 저장
+	 */
+	@PostMapping("/User/BookmarkAdd")
+	public String UserBookmarkSave(@RequestBody Map<String, Object> paramMap) {
+		int iResult = userService.UserBookmarkSave(paramMap);
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * method : UserBookmarkDelete
+	 * comment : 대시보드 사용자별 북마크 삭제 처리
+	 */
+	@PostMapping("/User/BookmarkDelete")
+	public String UserBookmarkDelete(@RequestBody Map<String, Object> paramMap) {
+		int iResult = userService.UserBookmarkDelete(paramMap);
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * method : UserTodoList
+	 * comment : 대시보드 사용자별 할 일 목록 조회
+	 */
+	@GetMapping("/User/Todos")
+	public String UserTodoList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = userService.UserTodoList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : UserTodoSave
+	 * comment : 대시보드 사용자별 할 일 저장
+	 */
+	@PostMapping("/User/TodoAdd")
+	public String UserTodoSave(@RequestBody Map<String, Object> paramMap) {
+		int iResult = userService.UserTodoSave(paramMap);
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * method : UserTodoDelete
+	 * comment : 대시보드 사용자별 할 일 삭제 처리
+	 */
+	@PostMapping("/User/TodoDelete")
+	public String UserTodoDelete(@RequestBody Map<String, Object> paramMap) {
+		int iResult = userService.UserTodoDelete(paramMap);
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
 }

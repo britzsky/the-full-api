@@ -9,34 +9,37 @@
 	</select>
 	
 	<select id="AccountList" parameterType="map" resultType="hashmap">
-		SELECT account_id, 
-			   account_name, 
-			   concat(ifnull(account_address,''), ' ', ifnull(account_address_detail,'')) as account_address,
-			   case account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
-			   account_rqd_member,
-			   account_headcount,
-			   meal_type,
-			   del_yn
-		FROM tb_account
+		SELECT T.account_id,
+			   T.account_name,
+			   concat(ifnull(T.account_address,''), ' ', ifnull(T.account_address_detail,'')) as account_address,
+			   case T.account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type,
+			   T.account_rqd_member,
+			   T.account_headcount,
+			   T.meal_type,
+			   T.del_yn,
+			   TM.daycare_id
+		FROM tb_account T
+		LEFT OUTER JOIN tb_account_daycare_mapping TM
+		ON T.account_id = TM.account_id
 		<choose>
 			<when test="del_yn != null and ('Y'.equals(del_yn.toString()) or 'N'.equals(del_yn.toString()))">
-				WHERE del_yn = #{del_yn}
+				WHERE T.del_yn = #{del_yn}
 			</when>
 			<when test="del_yn != null and 'ALL'.equals(del_yn.toString())">
 				WHERE 1=1
 			</when>
 			<otherwise>
-				WHERE del_yn = 'N'
+				WHERE T.del_yn = 'N'
 			</otherwise>
 		</choose>
 		
 		<if test='account_type == 0'>
-			AND account_type in (1,2,4,5)
+			AND T.account_type in (1,2,4,5)
  		</if>
  		<if test='account_type != 0'>
-			AND account_type = #{account_type}
+			AND T.account_type = #{account_type}
  		</if>
- 		AND account_id not in 
+ 		AND T.account_id not in
  		(
  			20260122065002,
 			20260122071337,
@@ -56,10 +59,10 @@
 	</select>
 	
 	<select id="AccountListV2" parameterType="map" resultType="hashmap">
-		SELECT T.account_id, 
-			   T.account_name, 
+		SELECT T.account_id,
+			   T.account_name,
 			   concat(ifnull(T.account_address,''), ' ', ifnull(T.account_address_detail,'')) as account_address,
-			   case T.account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type, 
+			   case T.account_type when 1 then '요양원' when 2 then '도소매' when 3 then '프랜차이즈' when 4 then '산업체' else '학교' end as account_type,
 			   T.account_rqd_member,
 			   T.account_headcount,
 			   T.meal_type,
@@ -68,10 +71,13 @@
 			   T2.diet_price,
 			   T2.normal,
 			   DATE_FORMAT(T2.contract_start, '%Y-%m-%d') as contract_start,
-        	   	   DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end
+        	   	   DATE_FORMAT(T2.contract_end, '%Y-%m-%d') as contract_end,
+			   TM.daycare_id
 		FROM tb_account T
 		LEFT OUTER JOIN tb_account_info T2
 		ON T.account_id = T2.account_id
+		LEFT OUTER JOIN tb_account_daycare_mapping TM
+		ON T.account_id = TM.account_id
 		<choose>
 			<when test="del_yn != null and ('Y'.equals(del_yn.toString()) or 'N'.equals(del_yn.toString()))">
 				WHERE T.del_yn = #{del_yn}
@@ -886,6 +892,14 @@
 		        T2.water_puri,
 		        T2.water_puri_cnt,
 		        T2.utility_bills,
+		        T2.full_room_daycare,
+		        T2.basic_ceremony,
+		        T2.eat_snack_count,
+		        T2.eat_employ_lunch,
+		        T2.dishwasher_process_type,
+		        T2.cesco_process_type,
+		        T2.water_puri_process_type,
+		        T2.utility_bills_process_type,
 		        T.account_type,
 		        T2.industry_note,
 		        T2.expenses_note,
@@ -922,18 +936,18 @@
 		          ) AS CHAR(255) CHARACTER SET utf8mb4
 		        ) AS members,
 		        REPLACE(GROUP_CONCAT(DISTINCT subquery3.work_system, " : ", subquery3.work_cnt, "명 \n"), ',', '') as work_system,
-		        subquery.breakfast_time, subquery.lunch_time, subquery.dinner_time, subquery.snack_time
+		        subquery.breakfast_time, subquery.lunch_time, subquery.dinner_time, subquery.snack_time, subquery.snack_time2, subquery.snack_time3
 		FROM (
 		    SELECT
 		        T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note,
-		        T1.breakfast_time, T1.lunch_time, T1.dinner_time, T1.snack_time
+		        T1.breakfast_time, T1.lunch_time, T1.dinner_time, T1.snack_time, T1.snack_time2, T1.snack_time3
 		    FROM tb_account T
 		    LEFT JOIN tb_account_info AS T1 ON T1.account_id = T.account_id
 		    LEFT JOIN tb_account_members AS T2 ON T2.account_id = T1.account_id 
 		    AND T2.del_yn = 'N'
 		    AND T2.position_type = 1
 		    WHERE T.account_id = #{account_id}
-		    GROUP BY T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note
+		    GROUP BY T.account_id, T1.setting_item, T1.cuisine, T1.cuisine_note, T2.name, T1.budget_note, T1.snack_time2, T1.snack_time3
 		) AS subquery
 		JOIN (
 		    -- 이 부분에서 position_type별 카운트를 한 행으로 합칩니다 (Pivot)
@@ -1079,9 +1093,19 @@
 	        breakfast_time,
 	        lunch_time,
 	        dinner_time,
-	        snack_time
+	        snack_time,
+	        snack_time2,
+	        snack_time3,
+	        full_room_daycare,
+	        basic_ceremony,
+	        eat_snack_count,
+	        eat_employ_lunch,
+	        dishwasher_process_type,
+	        cesco_process_type,
+	        water_puri_process_type,
+	        utility_bills_process_type
 	    </trim>
-	    
+
 	    VALUES
 	    
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1168,7 +1192,17 @@
 	        #{breakfast_time},
 	        #{lunch_time},
 	        #{dinner_time},
-	        #{snack_time}
+	        #{snack_time},
+	        #{snack_time2},
+	        #{snack_time3},
+	        #{full_room_daycare},
+	        #{basic_ceremony},
+	        #{eat_snack_count},
+	        #{eat_employ_lunch},
+	        #{dishwasher_process_type},
+	        #{cesco_process_type},
+	        #{water_puri_process_type},
+	        #{utility_bills_process_type}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1255,7 +1289,17 @@
 	        breakfast_time=#{breakfast_time},
 	        lunch_time=#{lunch_time},
 	        dinner_time=#{dinner_time},
-	        snack_time=#{snack_time}
+	        snack_time=#{snack_time},
+	        snack_time2=#{snack_time2},
+	        snack_time3=#{snack_time3},
+	        full_room_daycare=#{full_room_daycare},
+	        basic_ceremony=#{basic_ceremony},
+	        eat_snack_count=#{eat_snack_count},
+	        eat_employ_lunch=#{eat_employ_lunch},
+	        dishwasher_process_type=#{dishwasher_process_type},
+	        cesco_process_type=#{cesco_process_type},
+	        water_puri_process_type=#{water_puri_process_type},
+	        utility_bills_process_type=#{utility_bills_process_type}
 	    </trim>
 	</insert>
 	
@@ -1857,6 +1901,13 @@
 		) AS t
 	</select>
 	
+	<!-- 인사 -> 현장 근태관리 -> 연차대장 기존 데이터 삭제 (member_id + ledger_dt 기준) -->
+	<delete id="AccountAnnualLeaveLedgerDelete" parameterType="map">
+		DELETE FROM tb_account_annual_leave_ledger
+		WHERE member_id = #{member_id}
+		AND ledger_dt = #{ledger_dt}
+	</delete>
+
 	<insert id="AccountAnnualLeaveLedgerSave" parameterType="map">
 		INSERT INTO tb_account_annual_leave_ledger
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -1875,7 +1926,14 @@
 	        #{reason},
 	    </trim>
 	</insert>
-	
+
+	<!-- 인사 -> 현장 근태관리 -> 초과대장 기존 데이터 삭제 (member_id + over_dt 기준) -->
+	<delete id="AccountOverTimeLedgerDelete" parameterType="map">
+		DELETE FROM tb_account_overtime_ledger
+		WHERE member_id = #{member_id}
+		AND over_dt = #{over_dt}
+	</delete>
+
 	<insert id="AccountOverTimeLedgerSave" parameterType="map">
 		INSERT INTO tb_account_overtime_ledger
 	    <trim prefix="(" suffix=")" suffixOverrides=",">

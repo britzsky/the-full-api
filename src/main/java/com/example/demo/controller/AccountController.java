@@ -369,6 +369,15 @@ public class AccountController {
 				String ledgerMonth = date.format(formatter2); // 대체근무 연차 부여 사용 기한.
 				String position = row.get("position").toString(); // 초과 일 때, 영양사만 지급.
 
+				// 타입이 annualMap/overMap을 안 타는 타입으로 바뀐 경우에도 기존 대장 데이터가 남지 않도록
+				// annualMap/overMap 빌드 전에 무조건 삭제 먼저 처리
+				Map<String, Object> deleteKeyMap = new HashMap<String, Object>();
+				deleteKeyMap.put("member_id", row.get("member_id"));
+				deleteKeyMap.put("ledger_dt", ledgerDt);
+				deleteKeyMap.put("over_dt", ledgerDt);
+				accountService.AccountAnnualLeaveLedgerDelete(deleteKeyMap);
+				accountService.AccountOverTimeLedgerDelete(deleteKeyMap);
+
 				// 초과근무 시간 사용이 있는 지 체크.
 				if (iType == 1) {
 					if (position.equals("영양사") || iPositionType == 1) {
@@ -447,10 +456,10 @@ public class AccountController {
 				// 대체휴무
 				if (iType == 11) {
 					annualMap.put("member_id", row.get("member_id"));
-					annualMap.put("days", 0);
+					annualMap.put("days", -1);
 					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
-					annualMap.put("reason", row.get("note").toString());
+					annualMap.put("reason", "대체휴무로 인한 연차 차감");
 				}
 				// 병가
 				if (iType == 12) {
@@ -484,6 +493,36 @@ public class AccountController {
 					annualMap.put("ledger_dt", ledgerDt);
 					annualMap.put("reason", "하계휴가");
 				}
+				// 업장휴무
+				if (iType == 16) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "업장휴무");
+				}
+				// 초과근무
+//				if (iType == 17) {
+//					if (position.equals("영양사") || iPositionType == 1) {
+//
+//						// 초과근무시간 추출.
+//						double dOver = Double.parseDouble(row.get("note").toString());
+//
+//						overMap.put("member_id", row.get("member_id"));
+//						overMap.put("times", dOver);
+//						overMap.put("type", "G");
+//						overMap.put("over_dt", ledgerDt);
+//						overMap.put("reason", "초과근무로 보상시간 부여");
+//					}
+				// 경조사
+				if (iType == 18) {
+					annualMap.put("member_id", row.get("member_id"));
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
+					annualMap.put("ledger_dt", ledgerDt);
+					annualMap.put("reason", "경조사");
+				}				
+				
 				if (!annualMap.isEmpty()) {
 					iResult += accountService.AccountAnnualLeaveLedgerSave(annualMap);
 				}
