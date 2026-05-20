@@ -68,6 +68,7 @@
 			   T.meal_type,
 			   T.del_yn,
 			   T2.full_room,
+			   T2.full_room_daycare,
 			   T2.diet_price,
 			   T2.basic_ceremony,
 			   T2.basic,
@@ -81,6 +82,8 @@
 		ON T.account_id = T2.account_id
 		LEFT OUTER JOIN tb_account_daycare_mapping TM
 		ON T.account_id = TM.account_id
+		LEFT OUTER JOIN tb_account_info T3
+		ON T3.account_id = TM.daycare_id
 		<choose>
 			<when test="del_yn != null and ('Y'.equals(del_yn.toString()) or 'N'.equals(del_yn.toString()))">
 				WHERE T.del_yn = #{del_yn}
@@ -899,6 +902,7 @@
 		        T2.basic_ceremony,
 		        T2.eat_snack_count,
 		        T2.eat_employ_lunch,
+		        T2.eat_employ_dinner,
 		        T2.dishwasher_process_type,
 		        T2.cesco_process_type,
 		        T2.water_puri_process_type,
@@ -1103,6 +1107,7 @@
 	        basic_ceremony,
 	        eat_snack_count,
 	        eat_employ_lunch,
+	        eat_employ_dinner,
 	        dishwasher_process_type,
 	        cesco_process_type,
 	        water_puri_process_type,
@@ -1202,6 +1207,7 @@
 	        #{basic_ceremony},
 	        #{eat_snack_count},
 	        #{eat_employ_lunch},
+	        #{eat_employ_dinner},
 	        #{dishwasher_process_type},
 	        #{cesco_process_type},
 	        #{water_puri_process_type},
@@ -1299,6 +1305,7 @@
 	        basic_ceremony=#{basic_ceremony},
 	        eat_snack_count=#{eat_snack_count},
 	        eat_employ_lunch=#{eat_employ_lunch},
+	        eat_employ_dinner=#{eat_employ_dinner},
 	        dishwasher_process_type=#{dishwasher_process_type},
 	        cesco_process_type=#{cesco_process_type},
 	        water_puri_process_type=#{water_puri_process_type},
