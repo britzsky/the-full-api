@@ -209,6 +209,10 @@ public class OperateService {
 		iResult = operateMapper.AccountMemberWorkSystemSave(paramMap);
 		return iResult;
 	}
+	// 운영/인사 근무형태 삭제(del_yn=Y)
+	public int AccountMemberWorkSystemDelete(Map<String, Object> paramMap) {
+		return operateMapper.AccountMemberWorkSystemDelete(paramMap);
+	}
 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 인사기록카드 조회
 	public List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

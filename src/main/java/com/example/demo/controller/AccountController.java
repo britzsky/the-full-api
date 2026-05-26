@@ -340,6 +340,16 @@ public class AccountController {
 
 			System.out.println("==================  salary  + " + row.get("salary"));
 
+			// 업장휴무는 화면에서 시간 입력칸을 열지 않으므로 직원의 기본 근무시간으로 저장한다.
+			if (row.get("type") != null && "16".equals(String.valueOf(row.get("type")))) {
+				if (row.get("start_time") == null || row.get("start_time").toString().trim().isEmpty()) {
+					row.put("start_time", row.get("org_start_time"));
+				}
+				if (row.get("end_time") == null || row.get("end_time").toString().trim().isEmpty()) {
+					row.put("end_time", row.get("org_end_time"));
+				}
+			}
+
 			if (bType) {
 				iResult += accountService.AccountMemberRecordSave(row);
 				iResult += accountService.processProfitLossV2(row);
@@ -417,25 +427,20 @@ public class AccountController {
 
 				// 초과
 				if (iType == 3) {
-					if (position.equals("영양사") || iPositionType == 1) {
-
-						// 초과근무시간 추출.
-						double dOver = Double.parseDouble(row.get("note").toString());
-
-						overMap.put("member_id", row.get("member_id"));
-						overMap.put("times", dOver);
-						overMap.put("type", "G");
-						overMap.put("over_dt", ledgerDt);
-						overMap.put("reason", "초과근무로 보상시간 부여");
-					}
+					overMap.put("member_id", row.get("member_id"));
+					overMap.put("times", 0);
+					overMap.put("type", "U");
+					overMap.put("over_dt", ledgerDt);
+					overMap.put("reason", "초과근무");
+					
 				}
 				// 대체근무
 				if (iType == 8) {
 					annualMap.put("member_id", row.get("member_id"));
-					annualMap.put("days", 1);
-					annualMap.put("type", "G");
+					annualMap.put("days", 0);
+					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
-					annualMap.put("reason", "대체근무로 인한 연차 부여 " + ledgerMonth);
+					annualMap.put("reason", "대체근무");
 				}
 				// 연차
 				if (iType == 9) {
@@ -456,15 +461,15 @@ public class AccountController {
 				// 대체휴무
 				if (iType == 11) {
 					annualMap.put("member_id", row.get("member_id"));
-					annualMap.put("days", -1);
+					annualMap.put("days", 0);
 					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
-					annualMap.put("reason", "대체휴무로 인한 연차 차감");
+					annualMap.put("reason", "대체휴무");
 				}
 				// 병가
 				if (iType == 12) {
 					annualMap.put("member_id", row.get("member_id"));
-					annualMap.put("days", -1);
+					annualMap.put("days", 0);
 					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
 					annualMap.put("reason", "개인사정으로 인한 반차 사용");
@@ -501,19 +506,6 @@ public class AccountController {
 					annualMap.put("ledger_dt", ledgerDt);
 					annualMap.put("reason", "업장휴무");
 				}
-				// 초과근무
-//				if (iType == 17) {
-//					if (position.equals("영양사") || iPositionType == 1) {
-//
-//						// 초과근무시간 추출.
-//						double dOver = Double.parseDouble(row.get("note").toString());
-//
-//						overMap.put("member_id", row.get("member_id"));
-//						overMap.put("times", dOver);
-//						overMap.put("type", "G");
-//						overMap.put("over_dt", ledgerDt);
-//						overMap.put("reason", "초과근무로 보상시간 부여");
-//					}
 				// 경조사
 				if (iType == 18) {
 					annualMap.put("member_id", row.get("member_id"));

@@ -36,6 +36,7 @@ public interface OperateMapper {
 	int AccountSubRestaurantSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 저장
 	List<Map<String, Object>> AccountMemberWorkSystemList(); 									// 운영/인사 근무형태 조회
 	int AccountMemberWorkSystemSave(Map<String, Object> paramMap);								// 운영/인사 근무형태 저장
+	int AccountMemberWorkSystemDelete(Map<String, Object> paramMap);							// 운영/인사 근무형태 삭제(del_yn=Y)
 	List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap); 			// 급식사업부 -> 운영관리 -> 고객사관리 -> 인사기록카드 조회
 	List<Map<String, Object>> AccountMemberAllList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 조회
 	List<Map<String, Object>> AccountMemberAllListExcel(Map<String, Object> paramMap);       	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 전체엑셀 조회

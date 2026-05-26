@@ -734,6 +734,26 @@ public class OperateController {
     }
 
     /*
+     * part : 운영/인사
+     * method : AccountMemberWorkSystemDelete
+     * comment : 급식사업부 -> 근무형태 삭제(del_yn=Y)
+     */
+    @PostMapping("Operate/AccountMemberWorkSystemDelete")
+    public String AccountMemberWorkSystemDelete(@RequestBody Map<String, Object> paramMap) {
+        int iResult = operateService.AccountMemberWorkSystemDelete(paramMap);
+
+        JsonObject obj = new JsonObject();
+        if (iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "삭제 완료");
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "삭제 실패");
+        }
+        return obj.toString();
+    }
+
+    /*
      * part : 운영
      * method : AccountRecordMemberList
      * comment : 급식사업부 -> 운영관리 -> 고객사관리 -> 인사기록카드 조회
@@ -1134,7 +1154,7 @@ public class OperateController {
     /*
      * part : 운영
      * method : OverTimeDelete
-     * comment : 현장관리 -> 근태관리 -> 시간외근무 항목 삭제
+     * comment : 현장관리 -> 근태관리 -> 시간 외 근무 항목 삭제
      */
     @PostMapping("Operate/OverTimeDelete")
     public String OverTimeDelete(@RequestBody Map<String, Object> paramMap) {

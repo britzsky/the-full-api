@@ -909,6 +909,13 @@
 		WHERE del_yn = 'N'
 	</select>
 	
+	<update id="AccountMemberWorkSystemDelete" parameterType="map">
+		UPDATE tb_account_member_work_system
+		SET del_yn = 'Y',
+		    mod_dt = DATE_FORMAT(now(), '%Y-%m-%d')
+		WHERE idx = #{idx}
+	</update>
+
 	<insert id="AccountMemberWorkSystemSave" parameterType="map">
 	    INSERT INTO tb_account_member_work_system
 	    (idx, work_system, start_time, end_time, del_yn, reg_dt, mod_dt, user_id)
