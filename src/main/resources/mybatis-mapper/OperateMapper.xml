@@ -1064,7 +1064,8 @@
 			T.subsidy,
 			T.headoffice_note,
 			T.id,
-			T.bankbook
+			T.bankbook,
+			IFNULL(T.ledger_yn, 'Y') AS ledger_yn
 		  FROM tb_account_members T
 		  JOIN tb_account T2 ON T.account_id = T2.account_id
 		  WHERE 1=1
@@ -1141,7 +1142,8 @@
 			A.subsidy,
 			A.headoffice_note,
 			A.id,
-			A.bankbook
+			A.bankbook,
+			IFNULL(A.ledger_yn, 'Y') AS ledger_yn
 		  FROM tb_account_util_member_mapping M
 		  JOIN tb_account_members A ON M.member_id = A.member_id
 		  JOIN tb_account B ON M.account_id = B.account_id
@@ -2032,7 +2034,8 @@
 			   DATE_FORMAT(ledger_dt, '%Y-%m-%d') AS ledger_dt,
 			   type,
 			   days,
-			   reason
+			   reason,
+			   source
 		FROM tb_account_annual_leave_ledger
 		WHERE member_id = #{member_id}
 		ORDER BY ledger_dt DESC,
@@ -2042,12 +2045,59 @@
 						 ELSE 4 END
 	</select>
 
+	<!-- 연차 항목 저장 upsert -->
+	<insert id="AnnualLeaveSave" parameterType="map">
+		INSERT INTO tb_account_annual_leave_ledger (
+			<if test="ledger_id != null and ledger_id != ''">ledger_id,</if>
+			member_id,
+			ledger_dt,
+			type,
+			days,
+			reason,
+			source
+		) VALUES (
+			<if test="ledger_id != null and ledger_id != ''">#{ledger_id},</if>
+			#{member_id},
+			<choose>
+				<when test="ledger_dt != null and ledger_dt != ''">DATE_FORMAT(#{ledger_dt}, '%Y-%m-%d'),</when>
+				<otherwise>null,</otherwise>
+			</choose>
+			#{type},
+			#{days},
+			#{reason},
+			'M'
+		)
+		ON DUPLICATE KEY UPDATE
+			member_id = #{member_id},
+			ledger_dt = <choose>
+				<when test="ledger_dt != null and ledger_dt != ''">DATE_FORMAT(#{ledger_dt}, '%Y-%m-%d')</when>
+				<otherwise>null</otherwise>
+			</choose>,
+			type = #{type},
+			days = #{days},
+			reason = #{reason}
+	</insert>
+
 	<!-- 연차 항목 삭제: ledger_id로 특정 행 삭제 -->
 	<delete id="AnnualLeaveDelete" parameterType="map">
 		DELETE FROM tb_account_annual_leave_ledger
 		WHERE ledger_id = #{ledger_id}
 	</delete>
-	
+
+	<!-- 프로시저로 자동 생성된 연차 레코드 삭제 (source = 'P'인 것만 삭제) -->
+	<delete id="AnnualLeaveDeleteProcedureRecords" parameterType="map">
+		DELETE FROM tb_account_annual_leave_ledger
+		WHERE member_id = #{member_id}
+		AND source = 'P'
+	</delete>
+
+	<!-- 연차부여여부 저장: 직원 테이블의 ledger_yn 업데이트 -->
+	<update id="AnnualLeaveLedgerYnSave" parameterType="map">
+		UPDATE tb_account_members
+		SET ledger_yn = #{ledger_yn}
+		WHERE member_id = #{member_id}
+	</update>
+
 	<select id="OverTimeList" parameterType="map" resultType="map">
 		SELECT over_id,
 			   member_id,

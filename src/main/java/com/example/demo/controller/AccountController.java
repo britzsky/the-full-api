@@ -432,7 +432,7 @@ public class AccountController {
 					overMap.put("type", "U");
 					overMap.put("over_dt", ledgerDt);
 					overMap.put("reason", "초과근무");
-					
+
 				}
 				// 대체근무
 				if (iType == 8) {
@@ -513,8 +513,8 @@ public class AccountController {
 					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
 					annualMap.put("reason", "경조사");
-				}				
-				
+				}
+
 				if (!annualMap.isEmpty()) {
 					iResult += accountService.AccountAnnualLeaveLedgerSave(annualMap);
 				}
@@ -1664,7 +1664,7 @@ public class AccountController {
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseDetailSave
-	 * comment : 회계 -> 매입집계 저장
+	 * comment : 회계 -> 거래처 자료 입력 저장
 	 */
 	@PostMapping("Account/AccountPurchaseDetailSave")
 	private String AccountPurchaseDetailSave(@RequestBody List<Map<String, Object>> paramList) {
@@ -1687,7 +1687,7 @@ public class AccountController {
 
 		return obj.toString();
 	}
-	
+
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseTallyDelete
@@ -1695,17 +1695,17 @@ public class AccountController {
 	 */
 	@PostMapping("Account/AccountPurchaseTallyDelete")
 	private String AccountPurchaseTallyDelete(@RequestBody Map<String, Object> params) {
-		
+
 		System.out.println(params);
-		
+
 		int iResult = 0;
 		iResult += accountService.AccountPurchaseTallyDelete(params);
-		
+
 		LocalDate date;
 		int year = 0;
 		int month = 0;
 		int day = 0;
-		
+
 		date = DateUtils.parseFlexibleDate(params.get("saleDate").toString());
 		year = date.getYear(); // 2026
 		month = date.getMonthValue(); // 1~12
@@ -1716,7 +1716,51 @@ public class AccountController {
 		params.put("month", month);
 		params.put("day", day);
 		params.put("status_yn", "N");
-		
+
+		iResult += accountService.TallySheetPaymentSave(params);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountPurchaseTallyDetailDelete
+	 * comment : 회계 -> 매입집계 삭제
+	 */
+	@PostMapping("Account/AccountPurchaseTallyDetailDelete")
+	private String AccountPurchaseTallyDetailDelete(@RequestBody Map<String, Object> params) {
+
+		System.out.println(params);
+
+		int iResult = 0;
+		iResult += accountService.AccountPurchaseTallyDetailDelete(params);
+
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+
+		date = DateUtils.parseFlexibleDate(params.get("saleDate").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+
 		iResult += accountService.TallySheetPaymentSave(params);
 
 		JsonObject obj = new JsonObject();
@@ -1921,7 +1965,7 @@ public class AccountController {
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseTallyForTallyTab
-	 * comment : 회계 -> 매입집계(TallyTab) 조회
+	 * comment : 회계 -> 거래처 자료 입력(TallyTab) 조회
 	 */
 	@GetMapping("Account/AccountPurchaseTallyForTallyTab")
 	public String AccountPurchaseTallyForTallyTab(@RequestParam Map<String, Object> paramMap) {
@@ -1935,7 +1979,7 @@ public class AccountController {
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseTallyList
-	 * comment : 회계 -> 매입 -> 매입집계 조회
+	 * comment : 회계 -> 매입 -> 거래처 자료 입력 조회
 	 */
 	@GetMapping("Account/AccountPurchaseDetailList")
 	public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
@@ -1949,7 +1993,7 @@ public class AccountController {
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseTallyList_tmp
-	 * comment : 회계 -> 매입 -> 매입집계(임시) 조회
+	 * comment : 회계 -> 매입 -> 거래처 자료 입력(임시) 조회
 	 */
 	@GetMapping("Account/AccountPurchaseDetailList_tmp")
 	public String AccountPurchaseTallyList_tmp(@RequestParam Map<String, Object> paramMap) {
@@ -2135,7 +2179,7 @@ public class AccountController {
 
 		return new Gson().toJson(resultList);
 	}
-	
+
 	/*
 	 * part : 회계
 	 * method : HeadOfficeCorporateCardPaymentDelete
@@ -2143,15 +2187,15 @@ public class AccountController {
 	 */
 	@PostMapping("Account/HeadOfficeCorporateCardPaymentDelete")
 	private String HeadOfficeCorporateCardPaymentDelete(@RequestBody Map<String, Object> params) {
-		
+
 		int iResult = 0;
 		iResult += accountService.HeadOfficeCorporateCardPaymentDelete(params);
-		
+
 		LocalDate date;
 		int year = 0;
 		int month = 0;
 		int day = 0;
-		
+
 		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
 		year = date.getYear(); // 2026
 		month = date.getMonthValue(); // 1~12
@@ -2162,7 +2206,49 @@ public class AccountController {
 		params.put("month", month);
 		params.put("day", day);
 		params.put("status_yn", "N");
-		
+
+		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(params);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentDetailDelete
+	 * comment : 회계 -> 본사 법인카드 결제내역 삭제
+	 */
+	@PostMapping("Account/HeadOfficeCorporateCardPaymentDetailDelete")
+	private String HeadOfficeCorporateCardPaymentDetailDelete(@RequestBody Map<String, Object> params) {
+
+		int iResult = 0;
+		iResult += accountService.HeadOfficeCorporateCardPaymentDetailDelete(params);
+
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+
+		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+
 		iResult += accountService.TallySheetCorporateCardPaymentSaveV2(params);
 
 		JsonObject obj = new JsonObject();
@@ -2236,7 +2322,8 @@ public class AccountController {
 					Map<String, Object> queryMap = new HashMap<>();
 					queryMap.put("sale_id", saleId);
 					String existingDt = accountService.HeadOfficeCorporateCardPaymentDtBySaleId(queryMap);
-					if (existingDt != null && !existingDt.trim().isEmpty() && !existingDt.trim().equals(paymentDate.trim())) {
+					if (existingDt != null && !existingDt.trim().isEmpty()
+							&& !existingDt.trim().equals(paymentDate.trim())) {
 						Map<String, Object> orgPaymentMap = new HashMap<>(mainMap);
 						LocalDate orgPayDate = LocalDate.parse(existingDt.trim());
 						orgPaymentMap.put("payment_dt", existingDt.trim());
@@ -2405,7 +2492,7 @@ public class AccountController {
 
 		return obj.toString();
 	}
-	
+
 	/*
 	 * part : 회계
 	 * method : AccountCorporateCardPaymentDelete
@@ -2413,15 +2500,15 @@ public class AccountController {
 	 */
 	@PostMapping("Account/AccountCorporateCardPaymentDelete")
 	private String AccountCorporateCardPaymentDelete(@RequestBody Map<String, Object> params) {
-		
+
 		int iResult = 0;
 		iResult += accountService.AccountCorporateCardPaymentDelete(params);
-		
+
 		LocalDate date;
 		int year = 0;
 		int month = 0;
 		int day = 0;
-		
+
 		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
 		year = date.getYear(); // 2026
 		month = date.getMonthValue(); // 1~12
@@ -2432,7 +2519,49 @@ public class AccountController {
 		params.put("month", month);
 		params.put("day", day);
 		params.put("status_yn", "N");
-		
+
+		iResult += accountService.TallySheetCorporateCardPaymentSave(params);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentDetailDelete
+	 * comment : 회계 -> 현장 법인카드 결제내역 삭제
+	 */
+	@PostMapping("Account/AccountCorporateCardPaymentDetailDelete")
+	private String AccountCorporateCardPaymentDetailDelete(@RequestBody Map<String, Object> params) {
+
+		int iResult = 0;
+		iResult += accountService.AccountCorporateCardPaymentDetailDelete(params);
+
+		LocalDate date;
+		int year = 0;
+		int month = 0;
+		int day = 0;
+
+		date = DateUtils.parseFlexibleDate(params.get("payment_dt").toString());
+		year = date.getYear(); // 2026
+		month = date.getMonthValue(); // 1~12
+		day = date.getDayOfMonth();
+
+		// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
+		params.put("year", year);
+		params.put("month", month);
+		params.put("day", day);
+		params.put("status_yn", "N");
+
 		iResult += accountService.TallySheetCorporateCardPaymentSave(params);
 
 		JsonObject obj = new JsonObject();
@@ -2491,7 +2620,8 @@ public class AccountController {
 					Map<String, Object> existing = accountService.AccountPurchaseTallyTotalBySaleId(queryMap);
 					if (existing != null) {
 						String existingDt = String.valueOf(existing.getOrDefault("saleDate", "")).trim();
-						if (!existingDt.isEmpty() && !existingDt.equalsIgnoreCase("null") && !existingDt.equals(paymentDate.trim())) {
+						if (!existingDt.isEmpty() && !existingDt.equalsIgnoreCase("null")
+								&& !existingDt.equals(paymentDate.trim())) {
 							Map<String, Object> orgPaymentMap = new HashMap<>(mainMap);
 							LocalDate orgPayDate = LocalDate.parse(existingDt);
 							orgPaymentMap.put("payment_dt", existingDt);
@@ -2746,16 +2876,21 @@ public class AccountController {
 
 	// 과세구분 값을 저장 계산용 코드로 변환
 	private int parseHeadOfficeCorporateCardTaxType(Object value) {
-		if (value == null) return 0;
+		if (value == null)
+			return 0;
 		String text = String.valueOf(value).trim();
-		if (text.isEmpty()) return 0;
+		if (text.isEmpty())
+			return 0;
 		try {
 			return Integer.parseInt(text);
 		} catch (NumberFormatException e) {
 			String lower = text.toLowerCase();
-			if (lower.contains("면세") || lower.contains("taxfree") || lower.contains("tax_free")) return 2;
-			if (lower.contains("과세") || lower.contains("taxable") || "tax".equals(lower)) return 1;
-			if (lower.contains("알수") || lower.contains("unknown")) return 3;
+			if (lower.contains("면세") || lower.contains("taxfree") || lower.contains("tax_free"))
+				return 2;
+			if (lower.contains("과세") || lower.contains("taxable") || "tax".equals(lower))
+				return 1;
+			if (lower.contains("알수") || lower.contains("unknown"))
+				return 3;
 			return 0;
 		}
 	}
@@ -2763,7 +2898,7 @@ public class AccountController {
 	/*
 	 * part : 회계
 	 * method : AccountPurchaseTallyV2Delete
-	 * comment : 매입집계 삭제
+	 * comment : 거래처 자료 입력 삭제
 	 */
 	@PostMapping("Account/AccountPurchaseTallyV2Delete")
 	public String AccountPurchaseTallyV2Delete(@RequestBody Map<String, Object> paramMap) {

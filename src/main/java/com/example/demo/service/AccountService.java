@@ -854,7 +854,7 @@ public class AccountService {
 		return iResult;
 	}
 	
-	// 회계 -> 매입집계 삭제
+	// 회계 -> 거래처 자료 입력 삭제
 	public int AccountPurchaseTallyDelete(Map<String, Object> paramMap) {
 		
 		int result = 0;
@@ -870,6 +870,11 @@ public class AccountService {
 		return result;
 	}
 
+	// 회계 -> 거래처 자료 입력 상세 삭제
+	public int AccountPurchaseTallyDetailDelete(Map<String, Object> paramMap) {
+		return accountMapper.AccountPurchaseTallyDetailDelete(paramMap);
+	}
+	
 	// 회계 -> 매입마감 sale_id 기준 기존 결제일자 조회
 	public Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap) {
 		return accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
@@ -986,6 +991,11 @@ public class AccountService {
 		return result;
 	}
 	
+	// 회계 -> 본사 법인카드 결제내역 상세 삭제
+	public int HeadOfficeCorporateCardPaymentDetailDelete(Map<String, Object> paramMap) {
+		return accountMapper.HeadOfficeCorporateCardPaymentDetailDelete(paramMap);
+	}
+	
 	// 회계 -> 본사 법인카드 상세내역 저장
 	public int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -1046,6 +1056,11 @@ public class AccountService {
 		}
 		
 		return result;
+	}
+	
+	// 회계 -> 현장 법인카드 결제내역 상세 삭제
+	public int AccountCorporateCardPaymentDetailDelete(Map<String, Object> paramMap) {
+		return accountMapper.AccountCorporateCardPaymentDetailDelete(paramMap);
 	}
 
 	// 회계 -> 본사 법인카드 상세내역 저장

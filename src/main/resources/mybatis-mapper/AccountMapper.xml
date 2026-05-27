@@ -3549,6 +3549,24 @@
 	    ) }
 	</select>
 	
+	<delete id="AccountPurchaseTallyDetailDelete" parameterType="map">
+		DELETE FROM tb_account_purchase_tally_detail 
+		WHERE item_id = #{item_id} 
+		  AND sale_id = #{sale_id};
+	</delete>
+	
+	<delete id="HeadOfficeCorporateCardPaymentDetailDelete" parameterType="map">
+		DELETE FROM tb_headoffice_corporate_card_payment_detail_list 
+		WHERE idx = #{idx}
+		  AND sale_id = #{sale_id};
+	</delete>
+		
+	<delete id="AccountCorporateCardPaymentDetailDelete" parameterType="map">
+		DELETE FROM tb_account_corporate_card_payment_detail_list 
+		WHERE idx = #{idx} 
+		  AND sale_id = #{sale_id};
+	</delete>	
+	
 	<delete id="AccountDispatchMemberDelete" parameterType="map">
 		DELETE FROM tb_account_members_dispatch
 		WHERE account_id = #{account_id}

@@ -955,6 +955,207 @@ public class HeadOfficeController {
 	}
 
 	/*
+	 * part		: 인사
+	 * method 	: EducationList
+	 * comment 	: 인사 -> 교육 -> 목록 조회
+	 */
+	@GetMapping("Education/EducationList")
+	public String EducationList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.EducationList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationDetail
+	 * comment 	: 인사 -> 교육 -> 상세 조회
+	 */
+	@GetMapping("Education/EducationDetail")
+	public String EducationDetail(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = headOfficeService.EducationDetail(paramMap);
+		return new Gson().toJson(result);
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationSave
+	 * comment 	: 인사 -> 교육 -> 등록/수정 (upsert)
+	 */
+	@PostMapping("Education/EducationSave")
+	public String EducationSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EducationSave(paramMap);
+			Object idxObj = paramMap.get("idx");
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "저장 성공");
+			obj.addProperty("idx", idxObj != null ? idxObj.toString() : "");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "저장 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationDelete
+	 * comment 	: 인사 -> 교육 -> 삭제 (소프트 삭제)
+	 */
+	@PostMapping("Education/EducationDelete")
+	public String EducationDelete(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EducationDelete(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "삭제 성공");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationFileList
+	 * comment 	: 인사 -> 교육 -> 첨부파일 목록 조회
+	 */
+	@GetMapping("Education/EducationFileList")
+	public String EducationFileList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.EducationFileList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationFilesUpload
+	 * comment 	: 인사 -> 교육 -> 첨부파일 업로드
+	 */
+	@PostMapping("Education/EducationFilesUpload")
+	public String EducationFilesUpload(
+		@RequestParam("education_idx") String educationIdx,
+		@RequestParam("files") MultipartFile[] files
+	) {
+		JsonObject obj = new JsonObject();
+		try {
+			String educationIdxText = asText(educationIdx);
+			if (educationIdxText.isEmpty() || files == null || files.length == 0) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "education_idx 또는 files 파라미터가 비어있습니다.");
+				return obj.toString();
+			}
+
+			int educationIdxInt;
+			try { educationIdxInt = Integer.parseInt(educationIdxText); } catch (Exception e) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "education_idx가 유효하지 않습니다.");
+				return obj.toString();
+			}
+
+			Map<String, Object> listParam = new HashMap<>();
+			listParam.put("education_idx", educationIdxText);
+			List<Map<String, Object>> existingFiles = headOfficeService.EducationFileList(listParam);
+			int currentCount = existingFiles == null ? 0 : existingFiles.size();
+			if (currentCount >= MAX_HEADOFFICE_DOCUMENT_FILE_COUNT) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "첨부 파일은 최대 10개까지 등록 가능합니다.");
+				return obj.toString();
+			}
+
+			Path educationDirPath = resolveEducationDirPath(educationIdxText);
+			Files.createDirectories(educationDirPath);
+
+			int nextOrder = headOfficeService.GetNextEducationFileOrder(educationIdxInt);
+			int availableCount = MAX_HEADOFFICE_DOCUMENT_FILE_COUNT - currentCount;
+			List<Map<String, Object>> insertedFiles = new ArrayList<>();
+
+			for (MultipartFile file : files) {
+				if (insertedFiles.size() >= availableCount) break;
+				if (file == null || file.isEmpty()) continue;
+
+				String originalFileName = asText(file.getOriginalFilename());
+				if (originalFileName.isEmpty()) originalFileName = "file";
+				String safeFileName = Paths.get(originalFileName).getFileName().toString();
+				String uniqueFileName = UUID.randomUUID() + "_" + safeFileName;
+
+				Path filePath = educationDirPath.resolve(uniqueFileName).normalize();
+				if (!filePath.startsWith(educationDirPath)) continue;
+				file.transferTo(filePath.toFile());
+
+				String imagePath = "/image/education/" + educationIdxText + "/" + uniqueFileName;
+
+				Map<String, Object> saveParam = new HashMap<>();
+				saveParam.put("education_idx", educationIdxInt);
+				saveParam.put("image_order", nextOrder++);
+				saveParam.put("image_path", imagePath);
+				saveParam.put("image_name", safeFileName);
+
+				headOfficeService.EducationFileSave(saveParam);
+				insertedFiles.add(saveParam);
+			}
+
+			if (insertedFiles.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "업로드 가능한 첨부 파일이 없습니다.");
+				return obj.toString();
+			}
+
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "업로드 성공");
+			obj.add("files", new Gson().toJsonTree(insertedFiles));
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "업로드 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part		: 인사
+	 * method 	: EducationFileDelete
+	 * comment 	: 인사 -> 교육 -> 첨부파일 삭제
+	 */
+	@DeleteMapping("Education/EducationFileDelete")
+	public String EducationFileDelete(@RequestParam Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			String educationIdxText = asText(paramMap.get("education_idx"));
+			String imagePathText = asText(paramMap.get("image_path"));
+			String imageOrderText = asText(paramMap.get("image_order"));
+			if (educationIdxText.isEmpty() || imageOrderText.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "education_idx/image_order 파라미터가 필요합니다.");
+				return obj.toString();
+			}
+
+			if (!imagePathText.isEmpty()) {
+				String targetFileName = Paths.get(imagePathText).getFileName().toString();
+				if (!targetFileName.isEmpty()) {
+					Path educationDirPath = resolveEducationDirPath(educationIdxText);
+					Path targetPath = educationDirPath.resolve(targetFileName).normalize();
+					if (targetPath.startsWith(educationDirPath)) {
+						Files.deleteIfExists(targetPath);
+					}
+				}
+			}
+
+			headOfficeService.EducationFileDelete(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "삭제 성공");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	private Path resolveEducationDirPath(String educationIdxText) {
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		return Paths.get(staticPath, "education", educationIdxText).normalize();
+	}
+
+	/*
 	 * part		: 본사
      * method 	: getMainPayload
      * comment 	: 본사 -> 전자결재 관리 -> 요청 payload에서 메인 데이터 추출

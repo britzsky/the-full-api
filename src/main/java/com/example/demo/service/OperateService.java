@@ -335,6 +335,18 @@ public class OperateService {
 	public int AnnualLeaveDelete(Map<String, Object> paramMap) {
 		return operateMapper.AnnualLeaveDelete(paramMap);
 	}
+	// 현장관리 -> 근태관리 -> 프로시저 생성 연차 레코드 일괄 삭제
+	public int AnnualLeaveDeleteProcedureRecords(Map<String, Object> paramMap) {
+		return operateMapper.AnnualLeaveDeleteProcedureRecords(paramMap);
+	}
+	// 현장관리 -> 근태관리 -> 연차 항목 저장(INSERT/UPDATE)
+	public int AnnualLeaveSave(Map<String, Object> paramMap) {
+		return operateMapper.AnnualLeaveSave(paramMap);
+	}
+	// 현장관리 -> 근태관리 -> 연차부여여부 저장
+	public int AnnualLeaveLedgerYnSave(Map<String, Object> paramMap) {
+		return operateMapper.AnnualLeaveLedgerYnSave(paramMap);
+	}
 	// 현장관리 -> 근태관리 -> 시간외근무 항목 삭제
 	public int OverTimeDelete(Map<String, Object> paramMap) {
 		return operateMapper.OverTimeDelete(paramMap);

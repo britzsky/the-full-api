@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -38,6 +39,7 @@ public class OperateController {
     private final AccountService accountService;
     private final OperateService operateService;
     private final AccountMapper accountMapper;
+    private final JdbcTemplate jdbcTemplate;
     private final String uploadDir;
 
     @Autowired
@@ -45,11 +47,13 @@ public class OperateController {
             OperateService operateService,
             AccountService accountService,
             AccountMapper accountMapper,
+            JdbcTemplate jdbcTemplate,
             WebConfig webConfig,
             @Value("${file.upload-dir}") String uploadDir) {
         this.accountService = accountService;
         this.operateService = operateService;
         this.accountMapper = accountMapper;
+        this.jdbcTemplate = jdbcTemplate;
         this.uploadDir = uploadDir;
     }
 
@@ -1129,6 +1133,36 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : AnnualLeaveSave
+     * comment : 현장관리 -> 근태관리 -> 연차 항목 저장(INSERT/UPDATE)
+     */
+    @PostMapping("Operate/AnnualLeaveSave")
+    public String AnnualLeaveSave(@RequestBody Map<String, Object> paramMap) {
+        List<Map<String, Object>> list = (List<Map<String, Object>>) paramMap.get("list");
+        int iResult = 0;
+        try {
+            for (Map<String, Object> row : list) {
+                iResult += operateService.AnnualLeaveSave(row);
+            }
+            JsonObject obj = new JsonObject();
+            if (iResult > 0) {
+                obj.addProperty("code", 200);
+                obj.addProperty("message", "저장되었습니다.");
+            } else {
+                obj.addProperty("code", 400);
+                obj.addProperty("message", "저장 실패");
+            }
+            return obj.toString();
+        } catch (Exception e) {
+            JsonObject obj = new JsonObject();
+            obj.addProperty("code", 500);
+            obj.addProperty("message", e.getMessage());
+            return obj.toString();
+        }
+    }
+
+    /*
+     * part : 운영
      * method : AnnualLeaveDelete
      * comment : 현장관리 -> 근태관리 -> 연차 항목 삭제
      */
@@ -1144,6 +1178,63 @@ public class OperateController {
                 result.put("code", 400);
                 result.put("message", "삭제 대상이 없습니다.");
             }
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : AnnualLeaveDeleteProcedureRecords
+     * comment : 현장관리 -> 근태관리 -> 프로시저로 자동 생성된 연차 레코드 일괄 삭제 (사용 기록 등 수동 등록 데이터는 제외)
+     */
+    @PostMapping("Operate/AnnualLeaveDeleteProcedureRecords")
+    public String AnnualLeaveDeleteProcedureRecords(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            operateService.AnnualLeaveDeleteProcedureRecords(paramMap);
+            result.put("code", 200);
+            result.put("message", "삭제되었습니다.");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : AnnualLeaveLedgerYnSave
+     * comment : 현장관리 -> 근태관리 -> 연차부여여부 저장
+     */
+    @PostMapping("Operate/AnnualLeaveLedgerYnSave")
+    public String AnnualLeaveLedgerYnSave(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            operateService.AnnualLeaveLedgerYnSave(paramMap);
+            result.put("code", 200);
+            result.put("message", "저장되었습니다.");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : AnnualLeaveRunProcedure
+     * comment : 현장관리 -> 근태관리 -> 연차부여여부 Y 복구 시 프로시저 수동 실행
+     */
+    @PostMapping("Operate/AnnualLeaveRunProcedure")
+    public String AnnualLeaveRunProcedure() {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            jdbcTemplate.update("CALL AnnualLeaveDailyJob()");
+            result.put("code", 200);
+            result.put("message", "프로시저가 실행되었습니다.");
         } catch (Exception e) {
             result.put("code", 500);
             result.put("message", e.getMessage());

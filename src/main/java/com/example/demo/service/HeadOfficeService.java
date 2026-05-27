@@ -311,4 +311,47 @@ public class HeadOfficeService {
 		Integer maxOrder = headOfficeMapper.GetMaxNoticeFileOrder(paramMap);
 		return maxOrder == null ? 1 : maxOrder + 1;
 	}
+
+	// 인사 -> 교육 -> 목록 조회
+	public List<Map<String, Object>> EducationList(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationList(paramMap);
+	}
+
+	// 인사 -> 교육 -> 상세 조회
+	public Map<String, Object> EducationDetail(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationDetail(paramMap);
+	}
+
+	// 인사 -> 교육 -> 등록/수정 (upsert)
+	public int EducationSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationSave(paramMap);
+	}
+
+	// 인사 -> 교육 -> 삭제
+	public int EducationDelete(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationDelete(paramMap);
+	}
+
+	// 인사 -> 교육 -> 첨부파일 목록 조회
+	public List<Map<String, Object>> EducationFileList(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationFileList(paramMap);
+	}
+
+	// 인사 -> 교육 -> 첨부파일 저장
+	public void EducationFileSave(Map<String, Object> paramMap) {
+		headOfficeMapper.EducationFileSave(paramMap);
+	}
+
+	// 인사 -> 교육 -> 첨부파일 삭제
+	public int EducationFileDelete(Map<String, Object> paramMap) {
+		return headOfficeMapper.EducationFileDelete(paramMap);
+	}
+
+	// 인사 -> 교육 -> 첨부파일 image_order 최대값+1 반환
+	public int GetNextEducationFileOrder(int educationIdx) {
+		Map<String, Object> paramMap = new java.util.HashMap<>();
+		paramMap.put("education_idx", educationIdx);
+		Integer maxOrder = headOfficeMapper.GetMaxEducationFileOrder(paramMap);
+		return maxOrder == null ? 1 : maxOrder + 1;
+	}
 }

@@ -59,5 +59,14 @@ public interface HeadOfficeMapper {
 	void NoticeFileSave(Map<String, Object> paramMap);											// 본사 -> 공지사항 -> 첨부파일 저장
 	int NoticeFileDelete(Map<String, Object> paramMap);											// 본사 -> 공지사항 -> 첨부파일 삭제
 	Integer GetMaxNoticeFileOrder(Map<String, Object> paramMap);								// 본사 -> 공지사항 -> 첨부파일 image_order 최대값 조회
+
+	List<Map<String, Object>> EducationList(Map<String, Object> paramMap);					// 인사 -> 교육 -> 목록 조회
+	Map<String, Object> EducationDetail(Map<String, Object> paramMap);						// 인사 -> 교육 -> 상세 조회
+	int EducationSave(Map<String, Object> paramMap);										// 인사 -> 교육 -> 등록/수정 (upsert)
+	int EducationDelete(Map<String, Object> paramMap);										// 인사 -> 교육 -> 삭제
+	List<Map<String, Object>> EducationFileList(Map<String, Object> paramMap);				// 인사 -> 교육 -> 첨부파일 목록 조회
+	void EducationFileSave(Map<String, Object> paramMap);									// 인사 -> 교육 -> 첨부파일 저장
+	int EducationFileDelete(Map<String, Object> paramMap);									// 인사 -> 교육 -> 첨부파일 삭제
+	Integer GetMaxEducationFileOrder(Map<String, Object> paramMap);							// 인사 -> 교육 -> 첨부파일 image_order 최대값 조회
 }
 	
