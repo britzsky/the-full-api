@@ -472,7 +472,7 @@ public class AccountController {
 					annualMap.put("days", 0);
 					annualMap.put("type", "U");
 					annualMap.put("ledger_dt", ledgerDt);
-					annualMap.put("reason", "개인사정으로 인한 반차 사용");
+					annualMap.put("reason", "병가");
 				}
 				// 출산휴가
 				if (iType == 13) {

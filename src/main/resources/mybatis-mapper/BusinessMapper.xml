@@ -141,7 +141,7 @@
 	<insert id="CarNewSave" parameterType="map">
 		INSERT INTO tb_thefull_car_list(car_number,reg_dt,car_name)
 		VALUES
-		(#{car_number},DATE_FORMAT(now(), '%Y-%m-%d'),#{car_name})
+		(#{car_number},DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),#{car_name})
 		ON DUPLICATE KEY UPDATE
 		car_name = VALUES(car_name)
 	</insert>
@@ -488,8 +488,8 @@
 			#{content},
 			#{type},
 			#{team_code},
-			DATE_FORMAT(now(), '%Y-%m-%d'),
-			IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(now(), '%Y-%m-%d')),
+			DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
+			IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')),
 			#{del_yn},
 			#{user_id},
 			#{account_id},
@@ -501,7 +501,7 @@
 			content      = #{content},
 			type         = #{type},
 			team_code    = #{team_code},
-			update_dt    = DATE_FORMAT(now(), '%Y-%m-%d'),
+			update_dt    = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 			reg_dt       = IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
 			del_yn       = #{del_yn},
 			user_id      = #{user_id},

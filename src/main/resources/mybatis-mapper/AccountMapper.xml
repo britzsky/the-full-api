@@ -1004,6 +1004,7 @@
 			   ifnull(T1.hygiene_note, '') as hygiene_note,
 			   ifnull(T1.event_note, '') as event_note,
 			   ifnull(T1.birthday_note, '') as birthday_note,
+			   ifnull(T1.hygiene_manager, '') as hygiene_manager,
 			   ifnull(T1.group_feed_yn, '') as group_feed_yn,
 			   ifnull(T1.nutritionist_room_yn, '') as nutritionist_room_yn,
 			   ifnull(T1.chef_lounge_yn, '') as chef_lounge_yn
@@ -1065,6 +1066,7 @@
 	        hygiene_note,
 	        event_note,
 	        industry_note,
+	        hygiene_manager,
 	        <if test="business_report != null and business_report != ''">
 	        	business_report,
 	        </if>
@@ -1165,6 +1167,7 @@
 	        #{hygiene_note},
 	        #{event_note},
 	        #{industry_note},
+	        #{hygiene_manager},
 	        <if test="business_report != null and business_report != ''">
 	        	#{business_report},
 	        </if>
@@ -1175,7 +1178,7 @@
 	        	#{kitchen_drawing},
 	        </if>
 	        #{expenses_note},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{extra_diet1_price},
 	        #{extra_diet2_price},
 	        #{extra_diet3_price},
@@ -1263,6 +1266,7 @@
 	        hygiene_note=#{hygiene_note},
 	        event_note=#{event_note},
 	        industry_note=#{industry_note},
+	        hygiene_manager=#{hygiene_manager},
 	        <if test="business_report != null and business_report != ''">
 	        	business_report=#{business_report},
 	        </if>
@@ -1273,7 +1277,7 @@
 	        	kitchen_drawing=#{kitchen_drawing},
 	        </if>
 	        expenses_note=#{expenses_note},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        update_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        extra_diet1_price=#{extra_diet1_price},
 	        extra_diet2_price=#{extra_diet2_price},
 	        extra_diet3_price=#{extra_diet3_price},
@@ -1340,7 +1344,7 @@
 		INSERT INTO tb_account_dietprice_history
 		(account_id,diet_price,before_diet_price,mod_dt,user_id)
 		VALUES
-		(#{account_id},#{diet_price},#{before_diet_price},DATE_FORMAT(now(), '%Y-%m-%d'),#{user_id})
+		(#{account_id},#{diet_price},#{before_diet_price},DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),#{user_id})
 	</insert>
 	
 	<select id="AccountDietPriceHistoryList" parameterType="map" resultType="hashmap">
@@ -1479,7 +1483,7 @@
 	        #{employ_cost},
 	        #{integrity_cost},
 	        #{input_exp},
-	        DATE_FORMAT(now(), '%Y-%m-%d')
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -1510,14 +1514,14 @@
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        #{account_id},
 	        #{balance_price},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{before_price},
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	        account_id=#{account_id},
 	        balance_price=#{balance_price},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        update_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        before_price=#{before_price},
 	    </trim>
 	</insert>

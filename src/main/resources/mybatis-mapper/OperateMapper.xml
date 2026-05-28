@@ -668,12 +668,12 @@
 	        #{account_id}
 	        , #{type}
 	        , <choose>
-	            <when test='del_yn == "N"'>DATE_FORMAT(now(), '%Y-%m-%d')</when>
+	            <when test='del_yn == "N"'>DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</when>
 	            <otherwise>NULL</otherwise>
 	        </choose>
 	        
 	        , <choose>
-	            <when test='del_yn == "Y"'>DATE_FORMAT(now(), '%Y-%m-%d')</when>
+	            <when test='del_yn == "Y"'>DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</when>
 	            <otherwise>NULL</otherwise>
 	        </choose>
 	        
@@ -684,11 +684,11 @@
 	    account_id = #{account_id}, 
 	    type = #{type}, 
 	    <if test='del_yn == "N"'>
-	        reg_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	        reg_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        del_dt = NULL,
 	    </if>
 	    <if test='del_yn == "Y"'>
-	        del_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	        del_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        reg_dt = reg_dt,
 	    </if>
 	    del_yn = #{del_yn, jdbcType=CHAR}
@@ -818,7 +818,7 @@
 	        #{file_path},
 	        #{issue_dt},
 	        #{expiry_dt},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{note}
 	    )
@@ -828,7 +828,7 @@
 	    file_path = #{file_path},
 	    issue_dt = #{issue_dt},
 	    expiry_dt = #{expiry_dt},
-	    update_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	    update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	    user_id = #{user_id},
 	    note = #{note}
 	</insert>
@@ -880,7 +880,7 @@
 	        #{sub_restaurant4},
 	        #{sub_restaurant4_tel},
 	        #{sub_restaurant4_note},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id}
 	    )
 	    ON DUPLICATE KEY UPDATE
@@ -899,7 +899,7 @@
         sub_restaurant4 = #{sub_restaurant4},
         sub_restaurant4_tel = #{sub_restaurant4_tel},
         sub_restaurant4_note = #{sub_restaurant4_note},
-	    update_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+	    update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	    user_id = #{user_id}
 	</insert>
 	
@@ -912,7 +912,7 @@
 	<update id="AccountMemberWorkSystemDelete" parameterType="map">
 		UPDATE tb_account_member_work_system
 		SET del_yn = 'Y',
-		    mod_dt = DATE_FORMAT(now(), '%Y-%m-%d')
+		    mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 		WHERE idx = #{idx}
 	</update>
 
@@ -926,7 +926,7 @@
 	        #{start_time},
 	        #{end_time},
 	        'N',
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        null,
 	        #{user_id}
 	    )
@@ -936,7 +936,7 @@
         start_time = #{start_time},
         end_time = #{end_time},
         del_yn = #{del_yn},
-        mod_dt = DATE_FORMAT(now(), '%Y-%m-%d'),
+        mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
         user_id = #{user_id}
 	</insert>
 	

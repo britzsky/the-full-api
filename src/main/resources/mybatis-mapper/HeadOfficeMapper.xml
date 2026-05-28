@@ -25,7 +25,7 @@
 	    	DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
 	        #{content},
 	        #{type},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
 	        #{del_yn},
 	        #{user_id},
@@ -37,7 +37,7 @@
 	        menu_date=DATE_FORMAT(#{menu_date}, '%Y-%m-%d'),
 	        content=#{content},
 	        type=#{type},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        update_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        reg_dt=DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),
 	        del_yn=#{del_yn},
 	        user_id=#{user_id},
@@ -97,7 +97,7 @@
 	    	DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
 	        #{content},
 	        #{type},
-	        DATE_FORMAT(now(), '%Y-%m-%d'),
+	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{del_yn},
 	        #{user_id},
 	        #{account_id},
@@ -110,7 +110,7 @@
 	        end_date=DATE_FORMAT(#{end_date}, '%Y-%m-%d'),
 	        content=#{content},
 	        type=#{type},
-	        update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+	        update_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        del_yn=#{del_yn},
 	        user_id=#{user_id},
 	        account_id=#{account_id},
@@ -2527,8 +2527,8 @@
 			#{middle_type},
 			STR_TO_DATE(#{expire_dt}, '%Y-%m-%d'),
 			#{user_id}, 
-			NOW(), 
-			NOW(), 
+			DATE_ADD(NOW(), INTERVAL 9 HOUR), 
+			DATE_ADD(NOW(), INTERVAL 9 HOUR), 
 			'N',
 	    </trim>
 		
@@ -2539,7 +2539,7 @@
 	        large_type=#{large_type},
 	        middle_type=#{middle_type},
 			expire_dt=DATE_FORMAT(#{expire_dt}, '%Y-%m-%d'),
-			update_dt=DATE_FORMAT(now(), '%Y-%m-%d'),
+			update_dt=DATE_ADD(NOW(), INTERVAL 9 HOUR),
 	    </trim>
 	</insert>
 
@@ -2547,7 +2547,7 @@
 	<update id="NoticeDelete" parameterType="map">
 		UPDATE tb_headoffice_notice
 		SET del_yn    = 'Y',
-		    update_dt = NOW()
+		    update_dt = DATE_ADD(NOW(), INTERVAL 9 HOUR)
 		WHERE idx = #{idx}
 	</update>
 
@@ -2591,7 +2591,7 @@
 		INSERT INTO tb_headoffice_notice_file 
 			(notice_idx, image_order, image_name, image_path, reg_dt)
 		VALUES 
-			(#{notice_idx}, #{image_order}, #{image_name}, #{image_path}, NOW())
+			(#{notice_idx}, #{image_order}, #{image_name}, #{image_path}, DATE_ADD(NOW(), INTERVAL 9 HOUR))
 	</insert>
 
 	<!-- 본사 -> 공지사항 -> 첨부파일 삭제 -->
@@ -2690,22 +2690,22 @@
 			#{title}, 
 			#{content}, 
 			#{user_id}, 
-			NOW(), 
-			NOW(), 
+			DATE_ADD(NOW(), INTERVAL 9 HOUR), 
+			DATE_ADD(NOW(), INTERVAL 9 HOUR), 
 			'N',
 		</trim>
 		ON DUPLICATE KEY UPDATE
 		    large_type = #{large_type},
 		    title      = #{title},
 		    content    = #{content},
-		    update_dt  = NOW()
+		    update_dt  = DATE_ADD(NOW(), INTERVAL 9 HOUR)
 	</insert>
 
 	<!-- 인사 -> 교육 -> 삭제 (소프트 삭제) -->
 	<update id="EducationDelete" parameterType="map">
 		UPDATE tb_hr_education
 		SET del_yn    = 'Y',
-		    update_dt = NOW()
+		    update_dt = DATE_ADD(NOW(), INTERVAL 9 HOUR)
 		WHERE idx = #{idx}
 	</update>
 
@@ -2726,7 +2726,7 @@
 		INSERT INTO tb_hr_education_file 
 			(idx, image_order, image_name, image_path, reg_dt)
 		VALUES 
-			(#{education_idx}, #{image_order}, #{image_name}, #{image_path}, NOW())
+			(#{education_idx}, #{image_order}, #{image_name}, #{image_path}, DATE_ADD(NOW(), INTERVAL 9 HOUR))
 	</insert>
 
 	<!-- 인사 -> 교육 -> 첨부파일 삭제 -->

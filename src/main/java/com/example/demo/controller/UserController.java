@@ -442,7 +442,7 @@ public class UserController {
 	 * method : UserBookmarkList
 	 * comment : 대시보드 사용자별 북마크 목록 조회
 	 */
-	@GetMapping("/User/Bookmarks")
+	@GetMapping("/User/Bookmarklist")
 	public String UserBookmarkList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserBookmarkList(paramMap);
 		return new Gson().toJson(resultList);
@@ -492,7 +492,7 @@ public class UserController {
 	 * method : UserTodoList
 	 * comment : 대시보드 사용자별 할 일 목록 조회
 	 */
-	@GetMapping("/User/Todos")
+	@GetMapping("/User/Todoslist")
 	public String UserTodoList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = userService.UserTodoList(paramMap);
 		return new Gson().toJson(resultList);
