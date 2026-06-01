@@ -72,10 +72,10 @@ public class UserController {
 		if ("ceo".equals(userId)) {
 			obj.addProperty("position_name", "CEO");
 		} else if ("britzsky".equals(userId) || "hh2".equals(userId) || "mh2".equals(userId) || "bh4".equals(userId)
-				|| "yh2".equals(userId)) {
+				|| "yh2".equals(userId) || "jr1".equals(userId) || "hj9".equals(userId)) {
 			obj.addProperty("position_name", "Team Leader");
-		} else if ("sy7".equals(userId) || "jr1".equals(userId)) {
-			obj.addProperty("position_name", "Part Leader");
+//		} else if ("sy7".equals(userId)) {
+//			obj.addProperty("position_name", "Part Leader");
 		} else if (position == 8) {
 			obj.addProperty("position_name", "Dietitian");
 		} else {
