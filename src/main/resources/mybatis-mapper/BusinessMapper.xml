@@ -411,6 +411,8 @@
 				<when test="team_code == 1 or team_code == '1'">4</when>
 				<when test="team_code == 2 or team_code == '2'">5</when>
 				<when test="team_code == 3 or team_code == '3'">8</when>
+				<when test="team_code == 4 or team_code == '4'">6</when>
+				<when test="team_code == 5 or team_code == '5'">9</when>
 				<otherwise>u.department</otherwise>
 			</choose>
 		</if>

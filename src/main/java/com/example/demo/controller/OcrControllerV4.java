@@ -126,7 +126,8 @@ public class OcrControllerV4 {
             @RequestParam(value = "user_id", required = false) String user_id,
             @RequestParam(value = "cash_receipt_type", required = false) String cash_receipt_type,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
-            @RequestParam(value = "use_name", required = false) String use_name) {
+            @RequestParam(value = "use_name", required = false) String use_name,
+            @RequestParam(value = "skip_date_mismatch_check", required = false) String skipDateMismatchCheckParam) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -276,7 +277,9 @@ public class OcrControllerV4 {
             purchase.put("cashReceiptType", cash_receipt_type); 	// cashReceiptType 세팅.
 
             // 집계표 일자와 영수증 거래일자 미일치 시, 리턴.
-            boolean skipDateMismatchCheck = type == 45 && cell_date != null && !cell_date.isBlank();
+            boolean skipDateMismatchCheck =
+                    (type == 45 && cell_date != null && !cell_date.isBlank())
+                            || "Y".equalsIgnoreCase(String.valueOf(skipDateMismatchCheckParam));
             if (!skipDateMismatchCheck && !receiptDate.equals(cell_date)) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("code", 400);

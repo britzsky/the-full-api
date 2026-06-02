@@ -127,7 +127,8 @@ public class OcrControllerV3 {
             @RequestParam(value = "cell_date", required = false) String cell_date,
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "card_brand", required = false) String card_brand,
-            @RequestParam(value = "card_no", required = false) String card_no) {
+            @RequestParam(value = "card_no", required = false) String card_no,
+            @RequestParam(value = "skip_date_mismatch_check", required = false) String skipDateMismatchCheckParam) {
 
         // 다중 업로드 요청(files)과 단일 업로드 요청(file)을 모두 수용한다.
         List<MultipartFile> uploadFiles = new ArrayList<>();
@@ -231,7 +232,9 @@ public class OcrControllerV3 {
             // 원하는 형식으로 출력 (예: 20251009152744)
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String receiptDate = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
-            boolean skipDateMismatchCheck = useCellDateForType45;
+            boolean skipDateMismatchCheck =
+                    useCellDateForType45
+                            || "Y".equalsIgnoreCase(String.valueOf(skipDateMismatchCheckParam));
 
             // tally sheet 테이블 저장을 위한 연,월 세팅.
             String yearStr = date.format(DateTimeFormatter.ofPattern("yyyy"));
