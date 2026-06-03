@@ -29,7 +29,10 @@ public class WebConfig implements WebMvcConfigurer {
 						"http://thefull.kr",
 						"http://thefull.kr:8080",
 						"http://localhost:8081",
-						"http://172.30.1.48:8081")
+						"http://172.30.1.48:8081",
+						"http://remote.thefull.kr",
+				        "https://remote.thefull.kr",
+				        "http://localhost:5173")
 				.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 				.allowedHeaders("Authorization", "x-refresh-token", "Content-Type")
 				.exposedHeaders("Authorization", "x-refresh-token")
