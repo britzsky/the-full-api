@@ -12,11 +12,12 @@ public class WebConfig implements WebMvcConfigurer {
 	final static String REAL_PATH = "file:///opt/thefull/uploads/image/";
 
 	final static String DEV_HANDLE = "/image/**";
-	final static String DEV_PATH = "file:///C:/Users/user/Desktop/image/";
+	final static String DEV_PATH = "file:///C:/Users/93827/Desktop/image/";
 
 	final static String LOCAL_HANDLE = "/image/**";
 	final static String LOCAL_PATH = "file:///C:/Users/손경원/git/the-full-api/src/main/resources/static/image/";
-	// final static String LOCAL_PATH = "file:///C:/Users/wonu/git/the-full-api/src/main/resources/static/image/";
+	// final static String LOCAL_PATH =
+	// "file:///C:/Users/93827/.git/the-full-api/src/main/resources/static/image/";
 
 	@Override
 	public void addCorsMappings(CorsRegistry registry) {
@@ -26,13 +27,17 @@ public class WebConfig implements WebMvcConfigurer {
 						"http://172.30.1.48:8080",
 						"http://52.64.151.137",
 						"http://52.64.151.137:8080",
+						"http://192.168.0.6:8080",
+						"http://192.168.0.6",
 						"http://thefull.kr",
 						"http://thefull.kr:8080",
 						"http://localhost:8081",
 						"http://172.30.1.48:8081",
+						"http://192.168.0.6:8081",
+						"http://192.168.0.6",
 						"http://remote.thefull.kr",
-				        "https://remote.thefull.kr",
-				        "http://localhost:5173")
+						"https://remote.thefull.kr",
+						"http://localhost:5173")
 				.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 				.allowedHeaders("Authorization", "x-refresh-token", "Content-Type")
 				.exposedHeaders("Authorization", "x-refresh-token")
@@ -42,7 +47,7 @@ public class WebConfig implements WebMvcConfigurer {
 
 	@Override
 	public void addResourceHandlers(ResourceHandlerRegistry registry) {
-		registry.addResourceHandler(REAL_HANDLE)
-				.addResourceLocations(REAL_PATH);
+		registry.addResourceHandler(DEV_HANDLE)
+				.addResourceLocations(DEV_PATH);
 	}
 }
