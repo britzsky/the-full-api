@@ -27,7 +27,7 @@ public class WebConfig implements WebMvcConfigurer {
 						"http://172.30.1.48:8080",
 						"http://52.64.151.137",
 						"http://52.64.151.137:8080",
-						"http://192.168.0.6:8080",
+						"http://192.168.0.6:8082",
 						"http://192.168.0.6",
 						"http://thefull.kr",
 						"http://thefull.kr:8080",
