@@ -50,4 +50,4 @@ public class WebConfig implements WebMvcConfigurer {
 				.addResourceLocations(REAL_PATH);
 	}
 }
-}
+
