@@ -269,6 +269,11 @@ public class HeadOfficeService {
 		return headOfficeMapper.HeadOfficeScheduleList(paramMap);
 	}
 
+	// 본사 -> 일정관리 -> user_ids 배열로 이름 목록 조회
+	public String SelectMultiUserNames(String[] userIds) {
+		return headOfficeMapper.SelectMultiUserNames(userIds);
+	}
+
 	// 본사 -> 공지사항 -> 목록 조회
 	public List<Map<String, Object>> NoticeList(Map<String, Object> paramMap) {
 		return headOfficeMapper.NoticeList(paramMap);

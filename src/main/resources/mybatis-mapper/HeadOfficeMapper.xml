@@ -706,101 +706,103 @@
 					ORDER BY year ASC, month ASC
 		        </when>
 		        <otherwise>
-		            SELECT account_id,
-				    year,
-				    month,
-				    ifnull(living_estimate,0) as living_estimate,
-				    ifnull(living_estimate_ratio,0) as living_estimate_ratio,
-				    ifnull(basic_estimate,0) as basic_estimate,
-				    ifnull(basic_estimate_ratio,0) as basic_estimate_ratio,
-				    ifnull(living_cost,0) as living_cost,
-				    ifnull(living_ratio,0) as living_ratio,
-				    ifnull(basic_cost,0) as basic_cost,
-				    ifnull(basic_ratio,0) as basic_ratio,
-				    ifnull(employ_cost,0) as employ_cost,
-				    ifnull(employ_ratio,0) as employ_ratio,
-				    
-				    ifnull(living_cost2,0) as living_cost2,
-				    ifnull(living_ratio2,0) as living_ratio2,
-				    ifnull(basic_cost2,0) as basic_cost2,
-				    ifnull(basic_ratio2,0) as basic_ratio2,
-				    ifnull(employ_cost2,0) as employ_cost2,
-				    ifnull(employ_ratio2,0) as employ_ratio2,
-				    
-				    ifnull(daycare_cost,0) as daycare_cost,
-				    ifnull(daycare_ratio,0) as daycare_ratio,
-				    ifnull(daycare_emp_cost,0) as daycare_emp_cost,
-				    ifnull(daycare_emp_ratio,0) as daycare_emp_ratio,
-				    ifnull(payback_price,0) as payback_price,
-				    ifnull(payback_ratio,0) as payback_ratio,
-				    ifnull(duty_secure,0) as duty_secure,
-				    ifnull(duty_secure_ratio,0) as duty_secure_ratio,
-				    ifnull(food_process,0) as food_process,
-				    ifnull(food_trash_ratio,0) as food_trash_ratio,
-				    ifnull(dishwasher,0) as dishwasher,
-				    ifnull(dishwasher_ratio,0) as dishwasher_ratio,
-				    ifnull(cesco,0) as cesco,
-				    ifnull(cesco_ratio,0) as cesco_ratio,
-				    ifnull(water_puri,0) as water_puri,
-				    ifnull(water_ratio,0) as water_ratio,
-				    ifnull(utility_bills,0) as utility_bills,
-				    ifnull(utility_ratio,0) as utility_ratio,
-				    utility_bills_note,
-				    ifnull(food_cost,0) as food_cost,
-				    ifnull(food_ratio,0) as food_ratio,
-				    ifnull(etc_cost,0) as etc_cost,
-				    ifnull(etc_ratio,0) as etc_ratio,
-				    ifnull(estimate_total,0) as estimate_total,
-				    ifnull(estimate_total_ratio,0) as estimate_total_ratio,
-				    ifnull(dispatch_cost,0) as dispatch_cost,
-				    ifnull(dispatch_ratio,0) as dispatch_ratio,
-				    ifnull(person_cost,0) as person_cost,
-				    ifnull(person_ratio,0) as person_ratio,
-				    ifnull(sales_total,0) as sales_total,
-				    ifnull(sales_total_ratio,0) as sales_total_ratio,
-				    ifnull(purchase_total,0) as purchase_total,
-				    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
-				    ifnull(person_total,0) as person_total,
-				    ifnull(person_total_ratio,0) as person_total_ratio,
-				    ifnull(indirect_total,0) as indirect_total,
-				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
-				    ifnull(business_profit,0) as business_profit,
-				    ifnull(business_profit_ratio,0) as business_profit_ratio,
-				    ifnull(total_business_profit,0) as total_business_profit,
-				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
-				    ifnull(event_cost,0) as event_cost,
-				    ifnull(event_ratio,0) as event_ratio,
-				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
-				    ifnull(not_budget_cost,0) as not_budget_cost,
-				    ifnull(not_budget_ratio,0) as not_budget_ratio,
-				    ifnull(etc_indirect_cost,0) as etc_indirect_cost,
-				    ifnull(etc_indirect_ratio,0) as etc_indirect_ratio,
-				    ifnull(integrity_cost,0) as integrity_cost,
-				    ifnull(integrity_ratio,0) as integrity_ratio,
-				    ifnull(return_cost,0) as return_cost,
-				    ifnull(return_ratio,0) as return_ratio
-				FROM the_full.tb_account_managerment_table
-				WHERE year = #{year}
-				<if test="month != ''">
-		            AND month = #{month}
-		        </if>
-		        <if test="account_id != 'ALL'">
-		            AND account_id = #{account_id}
-		        </if>
-		        AND account_id not in (
-				        	20260122065002,		-- 한결 주간보호
-							20260122071337,		-- 어르신사랑 주간보호
-							20260122071857,		-- 청평설악 주간보호
-							20260122072114,		-- 늘사랑(부천) 주간보호
-							20260122072245,		-- 지안 주간보호
-							20260122072732,		-- 사랑의 주간보호
-							20260219024021,		-- 사랑복지센터
-							20260122072529		-- 인천강남
-                            -- 20260210044430,		 KDB생명 데이케어센터 고양
-                            -- 20250819193617,		 참인지재활주간보호
-                            -- 20250819193613,		 대교뉴이프(마음고향2호점)
-                            -- 20250819193535		 마음고향
-                        )
+		            SELECT 
+		            	account_id,
+					    year,
+					    month,
+					    ifnull(living_estimate,0) as living_estimate,
+					    ifnull(living_estimate_ratio,0) as living_estimate_ratio,
+					    ifnull(basic_estimate,0) as basic_estimate,
+					    ifnull(basic_estimate_ratio,0) as basic_estimate_ratio,
+					    ifnull(living_cost,0) as living_cost,
+					    ifnull(living_ratio,0) as living_ratio,
+					    ifnull(basic_cost,0) as basic_cost,
+					    ifnull(basic_ratio,0) as basic_ratio,
+					    ifnull(employ_cost,0) as employ_cost,
+					    ifnull(employ_ratio,0) as employ_ratio,
+					    
+					    ifnull(living_cost2,0) as living_cost2,
+					    ifnull(living_ratio2,0) as living_ratio2,
+					    ifnull(basic_cost2,0) as basic_cost2,
+					    ifnull(basic_ratio2,0) as basic_ratio2,
+					    ifnull(employ_cost2,0) as employ_cost2,
+					    ifnull(employ_ratio2,0) as employ_ratio2,
+					    
+					    ifnull(daycare_cost,0) as daycare_cost,
+					    ifnull(daycare_ratio,0) as daycare_ratio,
+					    ifnull(daycare_emp_cost,0) as daycare_emp_cost,
+					    ifnull(daycare_emp_ratio,0) as daycare_emp_ratio,
+					    ifnull(payback_price,0) as payback_price,
+					    ifnull(payback_ratio,0) as payback_ratio,
+					    ifnull(duty_secure,0) as duty_secure,
+					    ifnull(duty_secure_ratio,0) as duty_secure_ratio,
+					    ifnull(food_process,0) as food_process,
+					    ifnull(food_trash_ratio,0) as food_trash_ratio,
+					    ifnull(dishwasher,0) as dishwasher,
+					    ifnull(dishwasher_ratio,0) as dishwasher_ratio,
+					    ifnull(cesco,0) as cesco,
+					    ifnull(cesco_ratio,0) as cesco_ratio,
+					    ifnull(water_puri,0) as water_puri,
+					    ifnull(water_ratio,0) as water_ratio,
+					    ifnull(utility_bills,0) as utility_bills,
+					    ifnull(utility_ratio,0) as utility_ratio,
+					    utility_bills_note,
+					    ifnull(food_cost,0) as food_cost,
+					    ifnull(food_ratio,0) as food_ratio,
+					    ifnull(etc_cost,0) as etc_cost,
+					    ifnull(etc_ratio,0) as etc_ratio,
+					    ifnull(estimate_total,0) as estimate_total,
+					    ifnull(estimate_total_ratio,0) as estimate_total_ratio,
+					    ifnull(dispatch_cost,0) as dispatch_cost,
+					    ifnull(dispatch_ratio,0) as dispatch_ratio,
+					    ifnull(person_cost,0) as person_cost,
+					    ifnull(person_ratio,0) as person_ratio,
+					    ifnull(sales_total,0) as sales_total,
+					    ifnull(sales_total_ratio,0) as sales_total_ratio,
+					    ifnull(purchase_total,0) as purchase_total,
+					    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
+					    ifnull(person_total,0) as person_total,
+					    ifnull(person_total_ratio,0) as person_total_ratio,
+					    ifnull(indirect_total,0) as indirect_total,
+					    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
+					    ifnull(business_profit,0) as business_profit,
+					    ifnull(business_profit_ratio,0) as business_profit_ratio,
+					    ifnull(total_business_profit,0) as total_business_profit,
+					    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
+					    ifnull(event_cost,0) as event_cost,
+					    ifnull(event_ratio,0) as event_ratio,
+					    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
+					    ifnull(not_budget_cost,0) as not_budget_cost,
+					    ifnull(not_budget_ratio,0) as not_budget_ratio,
+					    ifnull(etc_indirect_cost,0) as etc_indirect_cost,
+					    ifnull(etc_indirect_ratio,0) as etc_indirect_ratio,
+					    ifnull(integrity_cost,0) as integrity_cost,
+					    ifnull(integrity_ratio,0) as integrity_ratio,
+					    ifnull(return_cost,0) as return_cost,
+					    ifnull(return_ratio,0) as return_ratio
+					FROM the_full.tb_account_managerment_table
+					WHERE 
+						year = #{year}
+						<if test="month != ''">
+		            		AND month = #{month}
+		        		</if>
+				        <if test="account_id != 'ALL'">
+				            AND account_id = #{account_id}
+				        </if>
+		        	  AND account_id not in (
+		        	  	20260122065002,		-- 한결 주간보호
+						20260122071337,		-- 어르신사랑 주간보호
+						20260122071857,		-- 청평설악 주간보호
+						20260122072114,		-- 늘사랑(부천) 주간보호
+						20260122072245,		-- 지안 주간보호
+						20260122072732,		-- 사랑의 주간보호
+						20260219024021,		-- 사랑복지센터
+						20260122072529		-- 인천강남
+                        -- 20260210044430,		 KDB생명 데이케어센터 고양
+                        -- 20250819193617,		 참인지재활주간보호
+                        -- 20250819193613,		 대교뉴이프(마음고향2호점)
+                        -- 20250819193535		 마음고향
+                     	)
 		        </otherwise>
 		    </choose>
     </select>
@@ -1062,7 +1064,7 @@
 		        <if test="account_id != 'ALL'">
 		            AND T.account_id = #{account_id}
 		        </if>
-		        AND T.account_id not in
+		          AND T.account_id not in
 		        (
 					20260122065002,		-- 한결 주간보호
 					20260122071337,		-- 어르신사랑 주간보호
@@ -1084,7 +1086,7 @@
     <select id="ExcelDownProfitLossTableList" parameterType="map" resultType="HashMap">
 		SELECT
 		    T.account_id,
-                     T.account_name,
+            T.account_name,
 		    -- year,
 		    -- month,
 		    -- [1. 식수 추정치 및 비율]
@@ -2564,6 +2566,7 @@
 		       bc.update_dt,
 		       DATE_FORMAT(bc.reg_dt, '%Y-%m-%d') AS reg_dt,
 		       bc.user_id,
+		       bc.user_ids,
 		       bc.account_id,
 		       IFNULL(a.account_name, '') AS account_name,
 		       bc.reg_user_id,
@@ -2575,6 +2578,16 @@
 		WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year}, '-', #{month})
 		  AND DATE_FORMAT(bc.end_date,   '%Y-%m') = CONCAT(#{year}, '-', #{month})
 		ORDER BY bc.start_date ASC
+	</select>
+
+	<!-- 본사 -> 일정관리 -> user_ids 배열로 이름 목록 조회 -->
+	<select id="SelectMultiUserNames" resultType="String">
+		SELECT GROUP_CONCAT(user_name SEPARATOR ', ')
+		FROM tb_user
+		WHERE user_id IN
+		<foreach item="id" collection="userIds" open="(" separator="," close=")">
+			#{id}
+		</foreach>
 	</select>
 
 	<!-- 본사 -> 공지사항 -> 첨부파일 목록 조회 -->

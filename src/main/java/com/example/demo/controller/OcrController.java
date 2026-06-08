@@ -195,7 +195,7 @@ public class OcrController {
 
             if (receiptType == null || receiptType.isEmpty()) {
                 if (aiAnalyzer != null) {
-                    resolvedReceiptType = aiAnalyzer.detectType(doc);
+                    resolvedReceiptType = aiAnalyzer.detectType(doc); 
                 } else {
                     resolvedReceiptType = "MART_ITEMIZED";
                 }

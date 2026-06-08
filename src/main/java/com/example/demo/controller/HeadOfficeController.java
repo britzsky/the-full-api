@@ -243,7 +243,7 @@ public class HeadOfficeController {
 	/* 
 	 * part		: 본사
 	 * method 	: ExcelDownProfitLossTableList
-     * comment 	: 본사 -> 관리표 -> 손익표 엑섹다운
+     * comment 	: 본사 -> 관리표 -> 손익표 엑셀다운
      */
 	@GetMapping("HeadOffice/ExcelDownProfitLossTableList")
 	public String ExcelDownProfitLossTableList(@RequestParam Map<String, Object> paramMap) {
@@ -745,6 +745,17 @@ public class HeadOfficeController {
 	@GetMapping("HeadOffice/HeadOfficeScheduleList")
 	public String HeadOfficeScheduleList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.HeadOfficeScheduleList(paramMap);
+		for (Map<String, Object> a : resultList) {
+			String userIdsStr = a.get("user_ids") != null ? a.get("user_ids").toString().trim() : "";
+			if (!userIdsStr.isEmpty()) {
+				String[] userIdsArr = userIdsStr.split(",");
+				String userNames = headOfficeService.SelectMultiUserNames(userIdsArr);
+				a.put("user_names", userNames != null ? userNames : "");
+			} else {
+				Object userName = a.get("user_name");
+				a.put("user_names", userName != null ? userName.toString() : "");
+			}
+		}
 		return new Gson().toJson(resultList);
 	}
 

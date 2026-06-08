@@ -408,11 +408,16 @@
 		<if test="team_code != null and team_code != ''">
 			AND u.department =
 			<choose>
+				<!-- 영업팀 -->
 				<when test="team_code == 1 or team_code == '1'">4</when>
+				<!-- 운영팀 -->
 				<when test="team_code == 2 or team_code == '2'">5</when>
+				<!-- 급식사업부 -->
 				<when test="team_code == 3 or team_code == '3'">8</when>
+				<!-- 개발팀 -->
 				<when test="team_code == 4 or team_code == '4'">6</when>
-				<when test="team_code == 5 or team_code == '5'">9</when>
+				<!-- 기획팀 -->
+				<when test="team_code == 5 or team_code == '5'">9</when> 
 				<otherwise>u.department</otherwise>
 			</choose>
 		</if>
@@ -482,7 +487,7 @@
 	<!-- 일정 저장/수정 -->
 	<insert id="BusinessScheduleSave" parameterType="map">
 		INSERT INTO tb_business_calendar
-		(idx, start_date, end_date, content, type, team_code, update_dt, reg_dt, del_yn, user_id, account_id, reg_user_id)
+		(idx, start_date, end_date, content, type, team_code, update_dt, reg_dt, del_yn, user_id, user_ids, account_id, reg_user_id)
 		VALUES (
 			#{idx},
 			DATE_FORMAT(#{start_date}, '%Y-%m-%d'),
@@ -494,6 +499,7 @@
 			IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')),
 			#{del_yn},
 			#{user_id},
+			#{user_ids},
 			#{account_id},
 			#{reg_user_id}
 		)
@@ -507,6 +513,7 @@
 			reg_dt       = IFNULL(DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'), reg_dt),
 			del_yn       = #{del_yn},
 			user_id      = #{user_id},
+			user_ids     = #{user_ids},
 			account_id   = #{account_id},
 			reg_user_id  = #{reg_user_id}
 	</insert>
