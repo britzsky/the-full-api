@@ -48,6 +48,10 @@ public class HeadOfficeService {
 	public int ProfitLossTableSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.ProfitLossTableSave(paramMap);
 	}
+	// 본사 -> 관리표 -> 인건비 엑셀 업로드 저장
+	public int PersonCostExcelSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.PersonCostExcelSave(paramMap);
+	}
 	// 본사 -> 관리표 -> 손익표 인건비 조회
 	public Map<String, Object> getProfitLossPersonCost(Map<String, Object> paramMap) {
 		return headOfficeMapper.getProfitLossPersonCost(paramMap);

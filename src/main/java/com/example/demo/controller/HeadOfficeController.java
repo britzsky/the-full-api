@@ -33,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.demo.WebConfig;
 import com.example.demo.service.HeadOfficeService;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 @RestController
@@ -228,7 +229,80 @@ public class HeadOfficeController {
     	return obj.toString();
 	}
 	
-	/* 
+	/*
+	 * part		: 본사
+     * method 	: PersonCostExcelSave
+     * comment 	: 본사 -> 관리표 -> 인건비 엑셀 업로드 저장
+     */
+	@PostMapping("HeadOffice/PersonCostExcelSave")
+	public String PersonCostExcelSave(@RequestBody Map<String, Object> payload) {
+
+		// payload에서 rows만 꺼냄 (account_id, year, month, person_cost, update_id 포함)
+		List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
+
+		int iResult = 0;
+		List<String> savedIds   = new java.util.ArrayList<>();	// 등록 성공한 account_id 목록
+		List<String> skippedIds = new java.util.ArrayList<>();	// 기존 데이터 존재로 미등록된 account_id 목록
+		List<Map<String, Object>> savedRows = new java.util.ArrayList<>();	// 재계산 대상 rows
+
+		// 거래처별 인건비 저장 (기존 인건비가 0이 아니면 스킵)
+		for (Map<String, Object> paramMap : rows) {
+
+			Map<String, Object> existing = headOfficeService.getProfitLossPersonCost(paramMap);	// DB 기존 인건비 조회
+			Object orgPriceObj = (existing != null) ? existing.get("person_cost") : null;
+			Object newPriceObj = paramMap.get("person_cost");
+
+			long orgPrice = (orgPriceObj != null) ? ((Number) orgPriceObj).longValue() : 0L;	// 기존 금액
+			long newPrice = (newPriceObj != null) ? ((Number) newPriceObj).longValue() : 0L;	// 변경 금액
+
+			String accountId = String.valueOf(paramMap.get("account_id"));
+
+			// 기존 인건비가 0이 아닌 경우 → 덮어쓰지 않고 스킵
+			if (orgPrice != 0L) {
+				skippedIds.add(accountId);
+				continue;
+			}
+
+			if (orgPrice != newPrice) {	// 금액 변경 시에만 히스토리 저장
+				Map<String, Object> histParam = new java.util.HashMap<>();
+				histParam.put("account_id", paramMap.get("account_id"));	// 업장 아이디
+				histParam.put("year", paramMap.get("year"));				// 년도
+				histParam.put("month", paramMap.get("month"));				// 월
+				histParam.put("mod_id", paramMap.get("update_id"));			// 수정자 아이디
+				histParam.put("org_price", orgPrice);						// 기존 인건비
+				histParam.put("mod_price", newPrice);						// 변경 인건비
+				headOfficeService.savePersonCostHistory(histParam);
+			}
+
+			// person_cost INSERT (행 없으면 INSERT, 있으면 person_cost만 덮어씀)
+			iResult += headOfficeService.PersonCostExcelSave(paramMap);
+			savedIds.add(accountId);
+			savedRows.add(paramMap);
+		}
+
+		// 등록 성공 시 손익표 합계·비율 재계산 (손익표 프로시저 + 예산 프로시저)
+		if (iResult > 0) {
+			for (Map<String, Object> paramMap : savedRows) {
+				iResult += headOfficeService.processProfitLoss(paramMap);
+			}
+		}
+
+		// 등록된 account_id 목록, 미등록 account_id 목록을 함께 반환
+		JsonArray savedArr = new JsonArray();
+		savedIds.forEach(savedArr::add);
+		JsonArray skippedArr = new JsonArray();
+		skippedIds.forEach(skippedArr::add);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", savedIds.isEmpty() && skippedIds.isEmpty() ? 400 : 200);
+		obj.addProperty("message", savedIds.isEmpty() && skippedIds.isEmpty() ? "실패" : "성공");
+		obj.add("saved", savedArr);
+		obj.add("skipped", skippedArr);
+
+		return obj.toString();
+	}
+
+	/*
 	 * part		: 본사
      * method 	: ProfitLossTableList
      * comment 	: 본사 -> 관리표 -> 손익표 조회

@@ -504,6 +504,28 @@
 		</trim>
     </insert>
 
+    <insert id="PersonCostExcelSave" parameterType="map">
+        INSERT INTO tb_account_managerment_table (
+            account_id,
+            year,
+            month,
+            person_cost,
+            update_dt,
+            update_id
+        ) VALUES (
+            #{account_id},
+            #{year},
+            #{month},
+            #{person_cost},
+            DATE_ADD(NOW(), INTERVAL 9 HOUR),
+            #{update_id}
+        )
+        ON DUPLICATE KEY UPDATE
+            person_cost = #{person_cost},
+            update_dt   = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+            update_id   = #{update_id}
+    </insert>
+
     <select id="getProfitLossPersonCost" parameterType="map" resultType="hashmap">
         SELECT person_cost
         FROM tb_account_managerment_table
