@@ -395,11 +395,18 @@ public class OcrControllerV3 {
             }
 
             if (!accountMap.isEmpty()) {
-                Map<String, Object> imageParam = new HashMap<>();
-                imageParam.put("sale_id", accountMap.get("sale_id"));
-                imageParam.put("account_id", account_id);
-                Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
-                List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+                // sale_id가 클라이언트에서 전달된 경우(수정 모드)는 항상 slot1부터 덮어쓴다.
+                // sale_id가 없는 경우(신규 등록)는 빈 슬롯을 찾아서 저장한다.
+                List<String> availableKeys;
+                if (sale_id != null && !sale_id.isBlank()) {
+                    availableKeys = new ArrayList<>(Arrays.asList("receipt_image", "receipt_image2", "receipt_image3"));
+                } else {
+                    Map<String, Object> imageParam = new HashMap<>();
+                    imageParam.put("sale_id", accountMap.get("sale_id"));
+                    imageParam.put("account_id", account_id);
+                    Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+                    availableKeys = resolveNextReceiptImageKeys(existingImages);
+                }
                 if (availableKeys.isEmpty()) {
                     Map<String, Object> error = new HashMap<>();
                     error.put("code", 400);
@@ -534,11 +541,17 @@ public class OcrControllerV3 {
             accountMap.put("totalCash", 0);
         }
 
-        Map<String, Object> imageParam = new HashMap<>();
-        imageParam.put("sale_id", saleId);
-        imageParam.put("account_id", accountId);
-        Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
-        List<String> availableKeys = resolveNextReceiptImageKeys(existingImages);
+        // sale_id가 클라이언트에서 전달된 경우(수정 모드)는 항상 slot1부터 덮어쓴다.
+        List<String> availableKeys;
+        if (saleIdParam != null && !saleIdParam.isBlank()) {
+            availableKeys = new ArrayList<>(Arrays.asList("receipt_image", "receipt_image2", "receipt_image3"));
+        } else {
+            Map<String, Object> imageParam = new HashMap<>();
+            imageParam.put("sale_id", saleId);
+            imageParam.put("account_id", accountId);
+            Map<String, Object> existingImages = accountService.AccountPurchaseReceiptImagesBySaleId(imageParam);
+            availableKeys = resolveNextReceiptImageKeys(existingImages);
+        }
         if (availableKeys.isEmpty()) {
             throw new IllegalStateException("영수증 이미지는 최대 3장까지 등록할 수 있습니다.");
         }

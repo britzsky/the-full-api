@@ -2785,6 +2785,7 @@
 		       DATE_FORMAT(end_time,   '%Y-%m-%dT%H:%i') AS end_time
 		FROM tb_hr_evaluation_type
 		WHERE del_yn = 'N'
+		  AND use_yn = 'Y'
 		ORDER BY doc_id ASC
 	</select>
 
