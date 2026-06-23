@@ -1,4 +1,4 @@
-﻿package com.example.demo.service;
+package com.example.demo.service;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,135 +12,153 @@ import com.example.demo.mapper.OperateMapper;
 
 @Service
 public class HeadOfficeService {
-	
+
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
 
 	public HeadOfficeService(HeadOfficeMapper userMapper, OperateMapper operateMapper) {
-        this.headOfficeMapper = userMapper;
-        this.operateMapper = operateMapper;
-    }
+		this.headOfficeMapper = userMapper;
+		this.operateMapper = operateMapper;
+	}
+
 	// 본사 -> 주간식단 저장
 	public int WeekMenuSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.WeekMenuSave(paramMap);
 	};
+
 	// 본사 -> 주간식단 목록 조회
 	public List<Map<String, Object>> WeekMenuList(Map<String, Object> paramMap) {
 		return headOfficeMapper.WeekMenuList(paramMap);
 	}
+
 	// 본사 -> 주간식단 오늘 조회
 	public List<Map<String, Object>> WeekMenuTodayList(Map<String, Object> paramMap) {
 		return headOfficeMapper.WeekMenuTodayList(paramMap);
 	}
+
 	// 본사 -> 이벤트 저장
 	public int EventSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.EventSave(paramMap);
 	};
+
 	// 본사 -> 이벤트 목록 조회
 	public List<Map<String, Object>> EventList(Map<String, Object> paramMap) {
 		return headOfficeMapper.EventList(paramMap);
 	}
+
 	// 본사 -> 인원카운팅 목록 조회
 	public List<Map<String, Object>> PeopleCountingList(Map<String, Object> paramMap) {
 		return headOfficeMapper.PeopleCountingList(paramMap);
 	}
+
 	// 본사 -> 손익표 저장
 	public int ProfitLossTableSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.ProfitLossTableSave(paramMap);
 	}
+
 	// 본사 -> 인건비 엑셀 일괄 저장
 	public int PersonCostExcelSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.PersonCostExcelSave(paramMap);
 	}
+
 	// 본사 -> 손익표 인건비 조회
 	public Map<String, Object> getProfitLossPersonCost(Map<String, Object> paramMap) {
 		return headOfficeMapper.getProfitLossPersonCost(paramMap);
 	}
+
 	// 본사 -> 인건비 변경 히스토리 저장
 	public int savePersonCostHistory(Map<String, Object> paramMap) {
 		return headOfficeMapper.savePersonCostHistory(paramMap);
 	}
+
 	// 본사 -> 손익표 목록 조회
 	public List<Map<String, Object>> ProfitLossTableList(Map<String, Object> paramMap) {
 		return headOfficeMapper.ProfitLossTableList(paramMap);
 	}
+
 	// 본사 -> 손익표 엑셀 다운
 	public List<Map<String, Object>> ExcelDownProfitLossTableList(Map<String, Object> paramMap) {
 		return headOfficeMapper.ExcelDownProfitLossTableList(paramMap);
 	}
+
 	// 본사 -> 손익표 월별 엑셀 다운
 	public List<Map<String, Object>> ExcelDownMonthProfitLossTableList(Map<String, Object> paramMap) {
 		return headOfficeMapper.ExcelDownMonthProfitLossTableList(paramMap);
 	}
+
 	// 본사 -> 손익표 합계 저장
 	public void ProfitLossTotalSave(Map<String, Object> paramMap) {
 		headOfficeMapper.ProfitLossTotalSave(paramMap);
-	}	
+	}
+
 	// 본사 -> 회계관리 목록 조회
-	public List<Map<String, Object>> AccountManagermentTableList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> AccountManagermentTableList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.AccountManagermentTableList(paramMap);
 		return resultList;
 	}
-	@Transactional(rollbackFor = Exception.class)  // 전체 업무 트랜잭션 관리
-    public int processProfitLoss(Map<String, Object> param) {
 
-        int result = 0;
+	@Transactional(rollbackFor = Exception.class) // 전체 업무 트랜잭션 관리
+	public int processProfitLoss(Map<String, Object> param) {
 
-        // 손익표 합계 + 예산 동시 저장 호출
-        param.put("result", 0); // OUT 값 초기화
-        headOfficeMapper.ProfitLossTotalSave(param);
+		int result = 0;
 
-        // OUT 값 확인
-        result = (int) param.get("result");
-        if (result != 1) {
-            throw new RuntimeException("ProfitLossTotalSave 저장 실패");
-        }
-        
-        // 예산 합계 저장 호출
-        param.put("result", 0); // OUT 값 초기화
-        operateMapper.BudgetTotalSave(param);
+		// 손익표 합계 + 예산 동시 저장 호출
+		param.put("result", 0); // OUT 값 초기화
+		headOfficeMapper.ProfitLossTotalSave(param);
 
-        // OUT 값 확인
-        result = (int) param.get("result");
-        if (result != 1) {
-            throw new RuntimeException("BudgetTotalSave 저장 실패");
-        }
-        
-        return 1; // 전체 성공
-    }
+		// OUT 값 확인
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("ProfitLossTotalSave 저장 실패");
+		}
+
+		// 예산 합계 저장 호출
+		param.put("result", 0); // OUT 값 초기화
+		operateMapper.BudgetTotalSave(param);
+
+		// OUT 값 확인
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("BudgetTotalSave 저장 실패");
+		}
+
+		return 1; // 전체 성공
+	}
+
 	// 본사 -> 회계관리 -> 구매맵핑
-	public List<Map<String, Object>> AccountMappingPurchaseList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> AccountMappingPurchaseList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.AccountMappingPurchaseList(paramMap);
 		return resultList;
 	}
+
 	// 본사 -> 회계관리 -> 구매맵핑(날짜별 상세)
-	public List<Map<String, Object>> AccountMappingPurchaseDetailList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> AccountMappingPurchaseDetailList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.AccountMappingPurchaseDetailList(paramMap);
 		return resultList;
 	}
-	
+
 	// 본사 -> 전자결재 관리 -> 전자결재 문서타입 목록 조회
-	public List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.HeadOfficeElectronicPaymentTypeList(paramMap);
 		return resultList;
 	}
-	
+
 	// 본사 -> 전자결재 관리 -> 결재 문서 목록 조회
-	public List<Map<String, Object>> HeadOfficeElectronicPaymentList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> HeadOfficeElectronicPaymentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.HeadOfficeElectronicPaymentList(paramMap);
 		return resultList;
 	}
-	
+
 	// 본사 -> 전자결재 관리 -> 구매요청 품의서 메인 저장(전자결재 main table)
 	public int HeadOfficeElectronicPaymentSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.HeadOfficeElectronicPaymentSave(paramMap);
 	};
-	
+
 	// 본사 -> 전자결재 관리 -> 구매요청 품의서 품목 저장(구매요청 item table)
 	public int HeadOfficePurchaseRequestSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.HeadOfficePurchaseRequestSave(paramMap);
@@ -228,10 +246,12 @@ public class HeadOfficeService {
 	// 본사 -> 전자결재 관리 -> 결재/반려 저장 (팀장→결재자→대표 순으로 시도)
 	public int ElectronicPaymentManageSignSave(Map<String, Object> paramMap) {
 		int iResult = headOfficeMapper.ElectronicPaymentManageTmSignSave(paramMap);
-		if (iResult > 0) return iResult;
+		if (iResult > 0)
+			return iResult;
 
 		iResult = headOfficeMapper.ElectronicPaymentManageCeoSignSave(paramMap);
-		if (iResult > 0) return iResult;
+		if (iResult > 0)
+			return iResult;
 
 		iResult = headOfficeMapper.ElectronicPaymentManagePayerSignSave(paramMap);
 		return iResult;
@@ -253,16 +273,16 @@ public class HeadOfficeService {
 	public int ElectronicPaymentNotificationReadSave(Map<String, Object> paramMap) {
 		return headOfficeMapper.ElectronicPaymentNotificationReadSave(paramMap);
 	}
-	
+
 	// 본사 -> 전자결재 관리 -> 부서별 목록 조회
-	public List<Map<String, Object>> HeadOfficeDepartmentList (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> HeadOfficeDepartmentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.HeadOfficeDepartmentList(paramMap);
 		return resultList;
 	}
-	
+
 	// 본사 -> 전자결재 관리 -> 부서별 전체 사용자 조회
-	public List<Map<String, Object>> HeadOfficeUserListByDepartment (Map<String, Object> paramMap) {
+	public List<Map<String, Object>> HeadOfficeUserListByDepartment(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = headOfficeMapper.HeadOfficeUserListByDepartment(paramMap);
 		return resultList;
@@ -382,7 +402,8 @@ public class HeadOfficeService {
 
 	public int EvaluationTypeSave(Map<String, Object> paramMap) {
 		String docId = String.valueOf(paramMap.getOrDefault("doc_id", "")).trim();
-		if (docId.isEmpty()) return headOfficeMapper.EvaluationTypeInsert(paramMap);
+		if (docId.isEmpty())
+			return headOfficeMapper.EvaluationTypeInsert(paramMap);
 		return headOfficeMapper.EvaluationTypeUpdate(paramMap);
 	}
 
@@ -453,7 +474,8 @@ public class HeadOfficeService {
 	public void EvaluationPerformanceUpdate(Map<String, Object> paramMap) {
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> items = (List<Map<String, Object>>) paramMap.get("items");
-		if (items == null) return;
+		if (items == null)
+			return;
 		for (Map<String, Object> item : items) {
 			headOfficeMapper.EvaluationPerformanceUpdate(item);
 		}
