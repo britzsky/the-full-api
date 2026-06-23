@@ -4,9 +4,22 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 
 import com.example.demo.mapper.HeadOfficeMapper;
 import com.example.demo.mapper.OperateMapper;
@@ -16,45 +29,56 @@ public class OperateService {
 
 	OperateMapper operateMapper;
 	HeadOfficeMapper headOfficeMapper;
-	
+	private final RestTemplate restTemplate = new RestTemplate();
+
+	@Value("${public-data.holiday.service-key:}")
+	private String holidayServiceKey;
+
 	public OperateService(OperateMapper operateMapper, HeadOfficeMapper headOfficeMapper) {
 		this.operateMapper = operateMapper;
 		this.headOfficeMapper = headOfficeMapper;
 	}
+
 	public String NowDateKey() {
 		String accountKey = operateMapper.NowDateKey();
 		return accountKey;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 조회
 	public List<Map<String, Object>> TallySheetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.TallySheetList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 전체 업장 조회 (엑셀 다운로드 전용)
 	public List<Map<String, Object>> TallySheetAllList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.TallySheetAllList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 메모 조회
 	public Map<String, Object> TallySheetNote(Map<String, Object> paramMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();
 		resultMap = operateMapper.TallySheetNote(paramMap);
 		return resultMap;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표(본월) 저장
-	public int TallyNowMonthSave (Map<String, Object> paramMap) {
+	public int TallyNowMonthSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallyNowMonthSave(paramMap);
 		return iResult;
-	}	
+	}
+
 	// 급식사업부 -> 운영관리 -> 집계표(이월) 저장
-	public int TallyBeforeMonthSave (Map<String, Object> paramMap) {
+	public int TallyBeforeMonthSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallyBeforeMonthSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 메모 저장
 	public int TallySheetNoteSave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -64,108 +88,120 @@ public class OperateService {
 		}
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 기물리스트 저장
 	public int PropertiesSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.PropertiesSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 기물리스트 조회
 	public List<Map<String, Object>> PropertiesList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.PropertiesList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 위생관리 조회
 	public List<Map<String, Object>> HygieneList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.HygieneList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 위생관리 저장
 	public int HygieneSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.HygieneSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 인수인계서 조회
 	public Map<String, Object> HandOverSearch(Map<String, Object> paramMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();
 		resultMap = operateMapper.HandOverSearch(paramMap);
 		return resultMap;
 	}
+
 	// 급식사업부 -> 운영관리 -> 인수인계서 저장
 	public int HandOverSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.HandOverSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 조회 V2
 	public List<Map<String, Object>> AccountMappingList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountMappingList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 조회 V2
 	public List<Map<String, Object>> AccountMappingV2List(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountMappingV2List(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 저장
 	public int AccountMappingSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountMappingSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 저장
 	public int AccountRetailBusinessSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountRetailBusinessSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 거래처관리 조회
 	public List<Map<String, Object>> AccountRetailBusinessList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountRetailBusinessList(paramMap);
 		return resultList;
 	}
-	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
-    public int processProfitLoss(Map<String, Object> param) {
-		
+
+	@Transactional(rollbackFor = Exception.class) // ✅ 전체 작업 트랜잭션
+	public int processProfitLoss(Map<String, Object> param) {
+
 		param.put("month", param.get("count_month"));
 		param.put("year", param.get("count_year"));
-		
-        int result = 0;
-        
-        // ③ 손익표 합계 + 비율 저장 프로시저 호출
-        param.put("result", 0); // OUT 값 초기화
-        headOfficeMapper.ProfitLossTotalSave(param);
 
-        // OUT 값 확인
-        result = (int) param.get("result");
-        if (result != 1) {
-            throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
-        }
-        
-        // 예산 저장 프로시저 호출
-        param.put("result", 0); // OUT 값 초기화
-        operateMapper.BudgetTotalSave(param);
+		int result = 0;
 
-        // OUT 값 확인
-        result = (int) param.get("result");
-        if (result != 1) {
-            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
-        }
+		// ③ 손익표 합계 + 비율 저장 프로시저 호출
+		param.put("result", 0); // OUT 값 초기화
+		headOfficeMapper.ProfitLossTotalSave(param);
 
-        return 1; // ✅ 전체 성공
-    }
+		// OUT 값 확인
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+		}
 
-    // ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
-    public void callProfitLossTotalSave(Map<String, Object> param) {
-        param.put("result", 0);
-        headOfficeMapper.ProfitLossTotalSave(param);
-    }
+		// 예산 저장 프로시저 호출
+		param.put("result", 0); // OUT 값 초기화
+		operateMapper.BudgetTotalSave(param);
+
+		// OUT 값 확인
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+		}
+
+		return 1; // ✅ 전체 성공
+	}
+
+	// ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
+	public void callProfitLossTotalSave(Map<String, Object> param) {
+		param.put("result", 0);
+		headOfficeMapper.ProfitLossTotalSave(param);
+	}
 
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 조회
 	public List<Map<String, Object>> AccountMembersFilesList(Map<String, Object> paramMap) {
@@ -173,302 +209,435 @@ public class OperateService {
 		resultList = operateMapper.AccountMembersFilesList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 타입별 조회
 	public List<Map<String, Object>> AccountTypeForFileList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountTypeForFileList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 저장
 	public int AccountMembersFilesSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountMembersFilesSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 조회
 	public List<Map<String, Object>> AccountSubRestaurantList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountSubRestaurantList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 대체업체 저장
 	public int AccountSubRestaurantSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountSubRestaurantSave(paramMap);
 		return iResult;
 	}
-	// 운영/인사 근무형태 조회 
+
+	// 운영/인사 근무형태 조회
 	public List<Map<String, Object>> AccountMemberWorkSystemList() {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountMemberWorkSystemList();
 		return resultList;
 	}
+
 	// 운영/인사 근무형태 저장
 	public int AccountMemberWorkSystemSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountMemberWorkSystemSave(paramMap);
 		return iResult;
 	}
+
 	// 운영/인사 근무형태 삭제(del_yn=Y)
 	public int AccountMemberWorkSystemDelete(Map<String, Object> paramMap) {
 		return operateMapper.AccountMemberWorkSystemDelete(paramMap);
 	}
+
 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 인사기록카드 조회
 	public List<Map<String, Object>> AccountMemberSheetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountMemberSheetList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 조회
 	public List<Map<String, Object>> AccountMemberAllList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountMemberAllList(paramMap);
 		return resultList;
 	}
-	 // 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 전체 엑셀 조회
-   public List<Map<String, Object>> AccountMemberAllListExcel(Map<String, Object> paramMap) {
-      List<Map<String, Object>> resultList = new ArrayList<>();
-      resultList = operateMapper.AccountMemberAllListExcel(paramMap);
-      return resultList;
-   }
+
+	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 전체 엑셀 조회
+	public List<Map<String, Object>> AccountMemberAllListExcel(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.AccountMemberAllListExcel(paramMap);
+		return resultList;
+	}
+
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 직원관리 저장
 	public int AccountMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountMembersSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영->현장관리 채용확정 시, 출근부 적용
 	public int AccountRecordSetRecRecordDataSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountRecordSetRecRecordDataSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영->현장관리 채용확정 또는 채용취소 시, 채용현황 출근부 삭제 적용
 	public int AccountRecRecordDataDelete(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountRecRecordDataDelete(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영 -> 채용관리 -> 현장 채용현황 조회
 	public List<Map<String, Object>> AccountRecMemberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountRecMemberList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영 -> 채용관리 -> 현장 채용현황 저장
 	public int AccountRecMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountRecMembersSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 조회
 	public List<Map<String, Object>> AccountDispatchMemberAllList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountDispatchMemberAllList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영->현장관리, 인사->현장관리 -> 파출관리 저장
 	public int AccountDispatchMembersSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountDispatchMembersSave(paramMap);
 		return iResult;
 	}
-	
+
 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황 조회
 	public List<Map<String, Object>> AccountDinnersNumberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountDinnersNumberList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 거래처관리 -> 식수현황 저장
 	public int AccountDinnersNumberSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountDinnersNumberSave(paramMap);
 		return iResult;
 	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리 조회
 	public List<Map<String, Object>> BudgetManageMentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.BudgetManageMentList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
 	public List<Map<String, Object>> BudgetStandardList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.BudgetStandardList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 	public List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.MealsNumberList(paramMap);
 		return resultList;
 	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리 저장
 	public int BudgetTableSave(Map<String, Object> paramMap) {
 		return operateMapper.BudgetTableSave(paramMap);
 	}
-	@Transactional(rollbackFor = Exception.class)  // ✅ 전체 작업 트랜잭션
-    public int BudgetTotalSave(Map<String, Object> param) {
 
-        int result = 0;
-        
-        // 예산 저장 프로시저 호출
-        param.put("result", 0); // OUT 값 초기화
-        operateMapper.BudgetTotalSave(param);
+	@Transactional(rollbackFor = Exception.class) // ✅ 전체 작업 트랜잭션
+	public int BudgetTotalSave(Map<String, Object> param) {
 
-        // OUT 값 확인
-        result = (int) param.get("result");
-        if (result != 1) {
-            throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
-        }
-        
-        return 1; // ✅ 전체 성공
-    }
+		int result = 0;
+
+		// 예산 저장 프로시저 호출
+		param.put("result", 0); // OUT 값 초기화
+		operateMapper.BudgetTotalSave(param);
+
+		// OUT 값 확인
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+		}
+
+		return 1; // ✅ 전체 성공
+	}
+
 	// 현장관리 -> 근태관리 -> 연차 정보 조회
 	public List<Map<String, Object>> AnnualLeaveList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AnnualLeaveList(paramMap);
 		return resultList;
 	}
+
 	// 현장관리 -> 근태관리 -> 연차 항목 삭제
 	public int AnnualLeaveDelete(Map<String, Object> paramMap) {
 		return operateMapper.AnnualLeaveDelete(paramMap);
 	}
+
 	// 현장관리 -> 근태관리 -> 프로시저 생성 연차 레코드 일괄 삭제
 	public int AnnualLeaveDeleteProcedureRecords(Map<String, Object> paramMap) {
 		return operateMapper.AnnualLeaveDeleteProcedureRecords(paramMap);
 	}
+
 	// 현장관리 -> 근태관리 -> 연차 항목 저장(INSERT/UPDATE)
 	public int AnnualLeaveSave(Map<String, Object> paramMap) {
 		return operateMapper.AnnualLeaveSave(paramMap);
 	}
+
 	// 현장관리 -> 근태관리 -> 연차부여여부 저장
 	public int AnnualLeaveLedgerYnSave(Map<String, Object> paramMap) {
 		return operateMapper.AnnualLeaveLedgerYnSave(paramMap);
 	}
+
 	// 현장관리 -> 근태관리 -> 시간외근무 항목 삭제
 	public int OverTimeDelete(Map<String, Object> paramMap) {
 		return operateMapper.OverTimeDelete(paramMap);
 	}
+
 	// 현장관리 -> 근태관리 -> 초과근무 조회
 	public List<Map<String, Object>> OverTimeList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.OverTimeList(paramMap);
 		return resultList;
 	}
+
 	// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 조회
 	public List<Map<String, Object>> AccountRecordStandardList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.AccountRecordStandardList(paramMap);
 		return resultList;
 	}
+
 	// 운영 -> 긴급인력 -> 업장별 요일 인력 기준 저장
-	public int AccountRecordStandardSave (Map<String, Object> paramMap) {
+	public int AccountRecordStandardSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.AccountRecordStandardSave(paramMap);
 		return iResult;
 	}
+
 	// 집계표 -> 셀 포인트 조회
 	public List<Map<String, Object>> TallySheetPointList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.TallySheetPointList(paramMap);
 		return resultList;
 	}
+
 	// 집계표 -> 셀 포인트 저장
-	public int TallySheetPointSave (Map<String, Object> paramMap) {
+	public int TallySheetPointSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallySheetPointSave(paramMap);
 		return iResult;
 	}
+
 	// 집계표 -> type 입력가능여부 조회
 	public List<Map<String, Object>> TallySheetUseList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.TallySheetUseList(paramMap);
 		return resultList;
 	}
+
 	// 집계표 -> type 입력가능여부 저장
-	public int TallySheetUseSave (Map<String, Object> paramMap) {
+	public int TallySheetUseSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.TallySheetUseSave(paramMap);
 		return iResult;
 	}
+
 	// 긴급인력관리 -> 근무가능지역 관리 -> 시도 조회
 	public List<Map<String, Object>> SidoList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.SidoList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 근무가능지역 관리 -> 시군구 조회
 	public List<Map<String, Object>> SigunguList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.SigunguList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 근무가능지역 관리 -> 읍면동 조회
 	public List<Map<String, Object>> EupmyeondongList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.EupmyeondongList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 조회
 	public List<Map<String, Object>> RootList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.RootList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 근무가능지역 관리 -> 권역루트 저장
-	public int RootSave (Map<String, Object> paramMap) {
+	public int RootSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.RootSave(paramMap);
 		return iResult;
 	}
+
 	// 긴급인력관리 -> 현재 출근부 현황 조회
 	public List<Map<String, Object>> RecordSituationList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.RecordSituationList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 필수인력 조회
 	public List<Map<String, Object>> RecordStandardList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.RecordStandardList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 인력정보 조회
 	public List<Map<String, Object>> FieldPersonMasterList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.FieldPersonMasterList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 인력, 루트 매핑 조회
 	public List<Map<String, Object>> PersonToRootList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.PersonToRootList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 긴급인력 조회
 	public List<Map<String, Object>> EmergencyPersonList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.EmergencyPersonList(paramMap);
 		return resultList;
 	}
+
 	// 긴급인력관리 -> 인력, 근무가능지역 매핑 저장
-	public int PersonToRootSave (Map<String, Object> paramMap) {
+	public int PersonToRootSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.PersonToRootSave(paramMap);
 		return iResult;
 	}
+
 	// 긴급인력관리 -> 인력정보 저장
-	public int FieldPersonSave (Map<String, Object> paramMap) {
+	public int FieldPersonSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.FieldPersonSave(paramMap);
 		return iResult;
 	}
+
 	// 긴급인력관리 -> 긴급인력 채용정보 저장
-	public int EmergencyPersonEmployment (Map<String, Object> paramMap) {
+	public int EmergencyPersonEmployment(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = operateMapper.EmergencyPersonEmployment(paramMap);
 		return iResult;
+	}
+
+	// 긴급인력관리 -> 연락 이력 저장
+	public int SaveCallHistory(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.SaveCallHistory(paramMap);
+		return iResult;
+	}
+
+	// 현재 연도와 다음 연도의 한국 공휴일 정보 저장
+	public int KoreaHolidaySync() {
+		int iResult = 0;
+		if (holidayServiceKey == null || holidayServiceKey.isBlank()) {
+			return iResult;
+		}
+
+		int currentYear = LocalDate.now().getYear();
+		for (int year = currentYear; year <= currentYear + 1; year++) {
+			for (int month = 1; month <= 12; month++) {
+				iResult += KoreaHolidaySync(year, month);
+			}
+		}
+		return iResult;
+	}
+
+	// 한국천문연구원 공휴일 정보를 연월 단위로 조회
+	private int KoreaHolidaySync(int year, int month) {
+		int iResult = 0;
+		String url = UriComponentsBuilder
+				.fromHttpUrl("http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo")
+				.queryParam("ServiceKey", holidayServiceKey)
+				.queryParam("solYear", year)
+				.queryParam("solMonth", String.format("%02d", month))
+				.queryParam("numOfRows", 100)
+				.build(false)
+				.toUriString();
+
+		byte[] responseBytes = restTemplate.getForObject(url, byte[].class);
+		if (responseBytes == null || responseBytes.length == 0) {
+			return iResult;
+		}
+		String responseText = new String(responseBytes, StandardCharsets.UTF_8);
+
+		NodeList itemList = getXmlDocument(responseText).getElementsByTagName("item");
+		for (int i = 0; i < itemList.getLength(); i++) {
+			Element item = (Element) itemList.item(i);
+			if ("Y".equals(getXmlValue(item, "isHoliday"))) {
+				iResult += HolidaySave(item);
+			}
+		}
+
+		return iResult;
+	}
+
+	// 공공데이터 공휴일 항목을 DB 저장 형식으로 변환하는 메서드
+	private int HolidaySave(Element item) {
+		Map<String, Object> paramMap = new HashMap<String, Object>();
+		paramMap.put("holiday_date", getXmlValue(item, "locdate"));
+		paramMap.put("country_code", "KR");
+		paramMap.put("country_name", "대한민국");
+		paramMap.put("holiday_name", getXmlValue(item, "dateName"));
+		paramMap.put("holiday_sn", getXmlValue(item, "seq"));
+
+		return operateMapper.HolidaySave(paramMap);
+	}
+
+	// 공공데이터 XML 응답을 문서 객체로 변환하는 메서드
+	private Document getXmlDocument(String responseText) {
+		try {
+			DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+			DocumentBuilder builder = factory.newDocumentBuilder();
+			return builder.parse(new InputSource(new StringReader(responseText)));
+		} catch (Exception e) {
+			throw new IllegalStateException("공공데이터 공휴일 XML 응답 파싱 오류", e);
+		}
+	}
+
+	// 공공데이터 XML 항목 태그 값 조회
+	private String getXmlValue(Element item, String tagName) {
+		if (item == null || item.getElementsByTagName(tagName).getLength() == 0) {
+			return "";
+		}
+
+		return item.getElementsByTagName(tagName).item(0).getTextContent();
 	}
 }

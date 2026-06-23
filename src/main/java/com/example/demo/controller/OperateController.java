@@ -1623,10 +1623,25 @@ public class OperateController {
             paramMap.put("member_id", memberId);
         }
 
-        // 어쨋든 채용여부 테이블 저장.
-        iResult += operateService.EmergencyPersonEmployment(paramMap);
+        // 채용여부가 선택된 경우에만 employment 테이블 저장
+        if (objUseYn != null && !String.valueOf(objUseYn).trim().isEmpty()) {
+            iResult += operateService.EmergencyPersonEmployment(paramMap);
+        }
 
-        if (objUseYn != null) {
+        // 연락 이력 저장 — call_status가 있을 때만, call_dt 미입력 시 오늘 날짜 자동 세팅
+        Object callStatusObj = paramMap.get("call_status");
+        String callStatusStr = callStatusObj == null ? "" : String.valueOf(callStatusObj).trim();
+        if (!callStatusStr.isEmpty()) {
+            Object callDtObj = paramMap.get("call_dt");
+            String callDt = callDtObj == null ? "" : String.valueOf(callDtObj).trim();
+            if (callDt.isEmpty()) {
+                paramMap.put("call_dt", LocalDate.now().toString());
+            }
+            paramMap.put("person_idx", paramMap.get("idx"));
+            iResult += operateService.SaveCallHistory(paramMap);
+        }
+
+        if (objUseYn != null && !String.valueOf(objUseYn).trim().isEmpty()) {
             String strUseYn = objUseYn.toString();
             int iUseYn = Integer.parseInt(strUseYn);
             if (iUseYn == 3) {

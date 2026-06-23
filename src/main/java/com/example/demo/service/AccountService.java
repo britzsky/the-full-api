@@ -603,6 +603,23 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 회계 -> 미납 품목 전용 마감잔액 범위 조회
+	public List<Map<String, Object>> AccountDeadlineBalanceListBulk(Map<String, Object> paramMap) {
+		return accountMapper.AccountDeadlineBalanceListBulk(paramMap);
+	}
+
+	// 회계 -> 미납 품목 전용 입금내역 범위 조회
+	public List<Map<String, Object>> AccountDepositHistoryListBulk(Map<String, Object> paramMap) {
+		return accountMapper.AccountDepositHistoryListBulk(paramMap);
+	}
+
+	// 회계 -> 매출마감/미수잔액 입금내역 수정(입금일자, 비고)
+	public int AccountDepositHistoryUpdate(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountDepositHistoryUpdate(paramMap);
+		return iResult;
+	}
+
 	// 회계 -> 회계 -> 타입별 차액 조회
 	public List<Map<String, Object>> AccountDeadlineDifferencePriceSearch(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -947,6 +964,13 @@ public class AccountService {
 	public List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.HeadOfficeCorporateCardPaymentList(paramMap);
+		return resultList;
+	}
+
+	// 회계 -> 본사 법인카드 결제내역 전체 조회 (account_id 무관)
+	public List<Map<String, Object>> HeadOfficeCorporateCardPaymentListAll(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.HeadOfficeCorporateCardPaymentListAll(paramMap);
 		return resultList;
 	}
 

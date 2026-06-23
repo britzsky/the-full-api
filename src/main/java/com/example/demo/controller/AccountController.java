@@ -997,6 +997,26 @@ public class AccountController {
 
 	/*
 	 * part : 회계
+	 * method : AccountDeadlineBalanceListBulk
+	 * comment : 회계 -> 미납 품목 전용 마감잔액 범위 조회
+	 */
+	@GetMapping("Account/AccountDeadlineBalanceListBulk")
+	public String AccountDeadlineBalanceListBulk(@RequestParam Map<String, Object> paramMap) {
+		return new Gson().toJson(accountService.AccountDeadlineBalanceListBulk(paramMap));
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDepositHistoryListBulk
+	 * comment : 회계 -> 미납 품목 전용 입금내역 범위 조회
+	 */
+	@GetMapping("Account/AccountDepositHistoryListBulk")
+	public String AccountDepositHistoryListBulk(@RequestParam Map<String, Object> paramMap) {
+		return new Gson().toJson(accountService.AccountDepositHistoryListBulk(paramMap));
+	}
+
+	/*
+	 * part : 회계
 	 * method : AccountDeadlineBalanceSave
 	 * comment : 회계 -> 매출마감/미수잔액 저장
 	 */
@@ -1387,6 +1407,31 @@ public class AccountController {
 		iResult += accountService.AccountDepositHistorySave(paramMap);
 		iResult += accountService.AccountBalancePriceSave(paramMap);
 		iResult += accountService.AccountDeadlineMonthBalanceUpdate(paramMap);
+
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountDepositHistoryUpdate
+	 * comment : 회계 -> 매출마감/미수잔액 입금내역 수정(입금일자, 비고)
+	 */
+	@PostMapping("Account/AccountDepositHistoryUpdate")
+	private String AccountDepositHistoryUpdate(@RequestBody Map<String, Object> paramMap) {
+
+		int iResult = 0;
+
+		iResult += accountService.AccountDepositHistoryUpdate(paramMap);
 
 		JsonObject obj = new JsonObject();
 
@@ -2163,6 +2208,18 @@ public class AccountController {
 		System.out.println(paramMap);
 		resultList = accountService.HeadOfficeCorporateCardPaymentList(paramMap);
 
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : HeadOfficeCorporateCardPaymentListAll
+	 * comment : 회계 -> 본사 법인카드 결제내역 전체 조회 (account_id 무관)
+	 */
+	@GetMapping("Account/HeadOfficeCorporateCardPaymentListAll")
+	public String HeadOfficeCorporateCardPaymentListAll(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.HeadOfficeCorporateCardPaymentListAll(paramMap);
 		return new Gson().toJson(resultList);
 	}
 

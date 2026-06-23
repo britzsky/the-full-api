@@ -1442,7 +1442,7 @@
     </select>
     
     <select id="HeadOfficeElectronicPaymentList" parameterType="map" resultType="hashmap">
-    	SELECT payment_id, 
+    	SELECT payment_id,
     		   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
     		   doc_type,
     		   user_id,
@@ -2332,9 +2332,9 @@
 	        buy_yn,
 	        payment_note
 	    </trim>
-	    
+
 	    VALUES
-	    
+
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	    	#{idx},
 	        #{payment_id},
@@ -2348,7 +2348,7 @@
 	        #{buy_yn},
 	        #{payment_note}
 	    </trim>
-	    
+
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
 	    	payment_id = #{payment_id},
@@ -2778,5 +2778,602 @@
 		WHERE idx = #{education_idx}
 	</select>
 
-</mapper>
+	<!-- 인사 -> 평가 폼 초기화용 타입 목록 (EvaluationFormInit 사용) -->
+	<select id="EvaluationFormTypes" resultType="hashmap">
+		SELECT doc_id, doc_type, large_type, middle_type, small_type, doc_name, approval_position,
+		       DATE_FORMAT(start_time, '%Y-%m-%dT%H:%i') AS start_time,
+		       DATE_FORMAT(end_time,   '%Y-%m-%dT%H:%i') AS end_time
+		FROM tb_hr_evaluation_type
+		WHERE del_yn = 'N'
+		ORDER BY doc_id ASC
+	</select>
 
+	<!-- 인사 -> 평가 설정 타입 전체 목록 조회 (del_yn 포함) -->
+	<select id="EvaluationTypeList" resultType="hashmap">
+		SELECT doc_id, doc_type, large_type, middle_type, small_type, doc_name, approval_position, del_yn, use_yn,
+		       DATE_FORMAT(start_time, '%Y-%m-%dT%H:%i') AS start_time,
+		       DATE_FORMAT(end_time,   '%Y-%m-%dT%H:%i') AS end_time
+		FROM tb_hr_evaluation_type
+		WHERE del_yn = 'N'
+		ORDER BY doc_id ASC
+	</select>
+
+	<!-- 인사 -> 평가 설정 타입 등록 (tb_hr_evaluation_type) -->
+	<insert id="EvaluationTypeInsert" parameterType="map">
+		INSERT INTO tb_hr_evaluation_type
+		    (doc_type, large_type, middle_type, small_type, doc_name, approval_position, del_yn, use_yn,
+		     start_time, end_time)
+		VALUES
+		    (#{doc_type}, #{large_type}, #{middle_type}, #{small_type}, #{doc_name}, #{approval_position}, 'N', #{use_yn},
+		     <choose><when test="start_time != null and start_time != ''">STR_TO_DATE(#{start_time}, '%Y-%m-%dT%H:%i:%s')</when><otherwise>NULL</otherwise></choose>,
+		     <choose><when test="end_time != null and end_time != ''">STR_TO_DATE(#{end_time}, '%Y-%m-%dT%H:%i:%s')</when><otherwise>NULL</otherwise></choose>)
+	</insert>
+
+	<!-- 인사 -> 평가 설정 타입 수정 (tb_hr_evaluation_type) -->
+	<update id="EvaluationTypeUpdate" parameterType="map">
+		UPDATE tb_hr_evaluation_type
+		SET doc_type = #{doc_type},
+		    large_type = #{large_type},
+		    middle_type = #{middle_type},
+		    small_type = #{small_type},
+		    doc_name = #{doc_name},
+		    approval_position = #{approval_position},
+		    use_yn = #{use_yn},
+		    start_time = <choose><when test="start_time != null and start_time != ''">STR_TO_DATE(#{start_time}, '%Y-%m-%dT%H:%i:%s')</when><otherwise>NULL</otherwise></choose>,
+		    end_time   = <choose><when test="end_time != null and end_time != ''">STR_TO_DATE(#{end_time}, '%Y-%m-%dT%H:%i:%s')</when><otherwise>NULL</otherwise></choose>
+		WHERE doc_id = #{doc_id}
+	</update>
+
+	<!-- 인사 -> 평가 설정 타입 삭제 (tb_hr_evaluation_type) -->
+	<update id="EvaluationTypeDelete" parameterType="map">
+		UPDATE tb_hr_evaluation_type
+		SET del_yn = 'Y'
+		WHERE doc_id = #{doc_id}
+	</update>
+
+	<!--
+	  인사 -> 평가 폼 초기화용 전체 사용자 목록 (dept_name 포함, EvaluationFormInit 사용)
+	  - HeadOfficeDepartmentList + HeadOfficeUserListByDepartment 2개 API를 단일 호출로 통합
+	  - dept_name을 CASE로 포함, department 기준 groupBy로 부서 목록 방식
+	  - user_id/user_name/position 포함, 조건별로 작성자 목록 방식
+	  - department NOT IN (1,7): 신사업팀·현장 제외 (HeadOfficeDepartmentList 단일 기준)
+	-->
+	<select id="EvaluationFormUsers" resultType="hashmap">
+		SELECT u.user_id,
+		       u.user_name,
+		       u.department,
+		       u.position,
+		       CASE u.department
+		           WHEN 0 THEN '대표'
+		           WHEN 2 THEN '회계팀'
+		           WHEN 3 THEN '인사팀'
+		           WHEN 4 THEN '영업팀'
+		           WHEN 5 THEN '운영팀'
+		           WHEN 6 THEN '개발팀'
+		           WHEN 8 THEN '급식사업부'
+		           WHEN 9 THEN '기획팀'
+		           ELSE '기타'
+		       END AS dept_name
+		FROM tb_user u
+		WHERE u.del_yn    = 'N'
+		  AND u.department NOT IN (1, 7)
+		ORDER BY u.department ASC, u.position ASC
+	</select>
+
+	<!--
+	  인사 -> 평가 -> 목록 조회 (세션 집계, 권한별 조건)
+	  - u.user_name, t.doc_name 등 MAX() 집계 (ONLY_FULL_GROUP_BY 대응)
+	  - file_cnt: LEFT JOIN tb_hr_evaluation_file + COUNT(DISTINCT) 집계
+	  - GROUP BY로 세션 기준 중복 제거, MIN(idx)를 대표값으로 반환
+	-->
+	<select id="EvaluationList" parameterType="map" resultType="hashmap">
+		SELECT
+		    e.idx,
+		    e.user_id,
+		    u.user_name,
+		    u.position,
+		    u.department,
+		    e.doc_type,
+		    t.doc_name,
+		    t.approval_position,
+		    DATE_FORMAT(e.start_time, '%Y-%m-%d')                                    AS start_time,
+		    DATE_FORMAT(e.end_time,   '%Y-%m-%d')                                    AS end_time,
+		    (SELECT COUNT(*) FROM tb_hr_evaluation_kpi k WHERE k.document_id = e.document_id) AS kpi_count,
+		    e.tm_user,
+		    e.tm_sign,
+		    DATE_FORMAT(e.tm_dt,  '%Y-%m-%d %H:%i:%s')                              AS tm_dt,
+		    e.hp_sign,
+		    DATE_FORMAT(e.hp_dt,  '%Y-%m-%d %H:%i:%s')                              AS hp_dt,
+		    e.hr_user,
+		    e.hr_sign,
+		    DATE_FORMAT(e.hr_dt,  '%Y-%m-%d %H:%i:%s')                              AS hr_dt,
+		    e.ceo_user,
+		    e.ceo_sign,
+		    DATE_FORMAT(e.ceo_dt, '%Y-%m-%d %H:%i:%s')                              AS ceo_dt,
+		    (SELECT COUNT(*) FROM tb_hr_evaluation_file f WHERE f.notice_idx = e.idx) AS file_cnt,
+		    DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')                              AS reg_dt,
+		    e.document_id
+		FROM tb_hr_evaluation e
+		JOIN tb_user u ON u.user_id = e.user_id
+		LEFT JOIN tb_hr_evaluation_type t ON t.doc_type  = e.doc_type
+		                                 AND DATE(t.start_time) = DATE(e.start_time)
+		                                 AND DATE(t.end_time)   = DATE(e.end_time)
+		                                 AND t.del_yn = 'N'
+		WHERE e.del_yn = 'N'
+		<choose>
+		    <when test="user_id != null and user_id != ''">
+		        AND e.user_id = #{user_id}
+		    </when>
+		    <!-- departments: 실장대상 부서 복수 목록 (예: "4,5,8") 복수 조회 -->
+		    <when test="departments != null and departments != ''">
+		        AND FIND_IN_SET(u.department, #{departments}) > 0
+		    </when>
+		    <when test="department != null and department != ''">
+		        AND u.department = #{department}
+		    </when>
+		</choose>
+		ORDER BY e.idx DESC
+	</select>
+
+	<!-- 인사 -> 평가 -> 상세 조회 (tb_hr_evaluation_kpi JOIN으로 KPI 행별 반환) -->
+	<select id="EvaluationDetail" parameterType="map" resultType="hashmap">
+		SELECT
+		    k.idx,
+		    k.type,
+		    CASE k.type
+		        WHEN 1 THEN '총괄'  WHEN 2 THEN '인사'  WHEN 3 THEN '영업'
+		        WHEN 4 THEN '개발'  WHEN 5 THEN '회계'  WHEN 6 THEN '운영'
+		        WHEN 7 THEN '기획'  ELSE ''
+		    END                                            AS type_nm,
+		    e.user_id,
+		    u.user_name,
+		    u.department                                   AS writer_department,
+		    u.position,
+		    CASE u.department
+		        WHEN 0 THEN '대표'
+		        WHEN 2 THEN '회계팀'
+		        WHEN 3 THEN '인사팀'
+		        WHEN 4 THEN '영업팀'
+		        WHEN 5 THEN '운영팀'
+		        WHEN 6 THEN '개발팀'
+		        WHEN 8 THEN '급식사업부'
+		        WHEN 9 THEN '기획팀'
+		        ELSE '기타'
+		    END                                            AS dept_name,
+		    e.doc_type,
+		    et.large_type,
+		    et.middle_type,
+		    et.small_type,
+		    et.doc_name,
+		    et.approval_position,
+		    e.charge_sign,
+		    k.goal,
+		    k.measurement,
+		    k.weight,
+		    k.performance,
+		    k.content,
+		    e.tm_user,
+		    tm_u.user_name                                 AS tm_user_name,
+		    e.tm_sign,
+		    DATE_FORMAT(e.tm_dt,   '%Y-%m-%d %H:%i:%s')  AS tm_dt,
+		    e.tm_opinion,
+		    e.hp_user,
+		    hp_u.user_name                                 AS hp_user_name,
+		    e.hp_sign,
+		    DATE_FORMAT(e.hp_dt,   '%Y-%m-%d %H:%i:%s')  AS hp_dt,
+		    e.hp_opinion,
+		    e.hr_user,
+		    hr_u.user_name                                 AS hr_user_name,
+		    e.hr_sign,
+		    DATE_FORMAT(e.hr_dt,   '%Y-%m-%d %H:%i:%s')  AS hr_dt,
+		    e.ceo_user,
+		    ceo_u.user_name                                AS ceo_user_name,
+		    e.ceo_sign,
+		    DATE_FORMAT(e.ceo_dt,  '%Y-%m-%d %H:%i:%s')  AS ceo_dt,
+		    DATE_FORMAT(e.start_time, '%Y-%m-%d')         AS start_time,
+		    DATE_FORMAT(e.end_time,   '%Y-%m-%d')         AS end_time,
+		    DATE_FORMAT(e.reg_dt,  '%Y-%m-%d %H:%i:%s')  AS reg_dt
+		FROM tb_hr_evaluation e
+		JOIN tb_hr_evaluation_kpi k ON k.document_id = e.document_id
+		JOIN tb_user u ON u.user_id = e.user_id
+		LEFT JOIN tb_user tm_u  ON tm_u.user_id  = e.tm_user
+		LEFT JOIN tb_user hp_u  ON hp_u.user_id  = e.hp_user
+		LEFT JOIN tb_user hr_u  ON hr_u.user_id  = e.hr_user
+		LEFT JOIN tb_user ceo_u ON ceo_u.user_id = e.ceo_user
+		LEFT JOIN tb_hr_evaluation_type et ON et.doc_type  = e.doc_type
+		                                  AND DATE(et.start_time) = DATE(e.start_time)
+		                                  AND DATE(et.end_time)   = DATE(e.end_time)
+		                                  AND et.del_yn = 'N'
+		WHERE e.idx    = #{idx}
+		  AND e.del_yn = 'N'
+		ORDER BY k.idx ASC
+	</select>
+
+	<!-- 인사 -> 평가 -> 수정 시 평가기간(start_time, end_time) UPDATE -->
+	<update id="EvaluationUpdatePeriod" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET start_time = STR_TO_DATE(#{new_start_time}, '%Y-%m-%d'),
+		    end_time   = STR_TO_DATE(#{new_end_time},   '%Y-%m-%d'),
+		    update_dt  = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+	</update>
+
+	<!-- 인사 -> 평가 -> 헤더 저장 (세션 1건: 결재자·기간·문서구분) -->
+	<insert id="EvaluationSave" parameterType="map" useGeneratedKeys="true" keyProperty="idx">
+		INSERT INTO tb_hr_evaluation
+		    (user_id, start_time, end_time, doc_type, charge_sign,
+		     tm_user, hp_user, hr_user, ceo_user,
+		     document_id, reg_dt, update_dt, del_yn)
+		VALUES
+		    (#{user_id},
+		     <choose>
+		         <when test="start_time != null and start_time != ''">STR_TO_DATE(#{start_time}, '%Y-%m-%d')</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="end_time != null and end_time != ''">STR_TO_DATE(#{end_time}, '%Y-%m-%d')</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="doc_type != null and doc_type != ''">#{doc_type}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="charge_sign != null and charge_sign != ''">#{charge_sign}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="tm_user != null and tm_user != ''">#{tm_user}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="hp_user != null and hp_user != ''">#{hp_user}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="hr_user != null and hr_user != ''">#{hr_user}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="ceo_user != null and ceo_user != ''">#{ceo_user}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     <choose>
+		         <when test="document_id != null and document_id != ''">#{document_id}</when>
+		         <otherwise>NULL</otherwise>
+		     </choose>,
+		     DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		     DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		     'N')
+	</insert>
+
+	<!-- 인사 -> 평가 -> KPI 행 저장 (tb_hr_evaluation_kpi, document_id = 문서번호) -->
+	<insert id="EvaluationKpiSave" parameterType="map">
+		INSERT INTO tb_hr_evaluation_kpi
+		    (document_id, type, goal, measurement, weight, performance, content)
+		VALUES
+		    (#{document_id}, #{type}, #{goal}, #{measurement}, #{weight}, #{performance}, #{content})
+	</insert>
+
+	<!-- 인사 -> 평가 -> KPI 행 삭제 (evaluation idx 기준, document_id JOIN) -->
+	<delete id="EvaluationKpiDeleteByEvalIdx" parameterType="map">
+		DELETE k FROM tb_hr_evaluation_kpi k
+		JOIN tb_hr_evaluation e ON e.document_id = k.document_id
+		WHERE e.idx = #{idx}
+	</delete>
+
+	<!-- 인사 -> 평가 -> doc_type + 오늘 날짜 기준 문서 수 조회 (document_id 시퀀스 계산용) -->
+	<select id="EvaluationCountByDocTypeAndDate" parameterType="string" resultType="int">
+		SELECT COUNT(DISTINCT document_id)
+		FROM tb_hr_evaluation
+		WHERE doc_type = #{docType}
+		  AND DATE(reg_dt) = CURDATE()
+		  AND del_yn = 'N'
+		  AND document_id IS NOT NULL
+	</select>
+
+	<!-- 인사 -> 평가 -> 헤더 소프트삭제 (KPI 행은 서비스에서 EvaluationKpiDeleteByEvalIdx 먼저 호출) -->
+	<update id="EvaluationDelete" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET del_yn    = 'Y',
+		    update_dt = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+	</update>
+
+	<!-- 인사 -> 평가 -> 첨부파일 목록 조회 -->
+	<select id="EvaluationFileList" parameterType="map" resultType="hashmap">
+		SELECT
+		    notice_idx AS evaluation_idx,
+		    image_order,
+		    image_name,
+		    image_path,
+		    DATE_FORMAT(reg_dt, '%Y-%m-%d %H:%i:%s') AS reg_dt
+		FROM tb_hr_evaluation_file
+		WHERE notice_idx = #{evaluation_idx}
+		ORDER BY image_order ASC
+	</select>
+
+	<!-- 인사 -> 평가 -> 첨부파일 저장 -->
+	<insert id="EvaluationFileSave" parameterType="map">
+		INSERT INTO tb_hr_evaluation_file
+		    (notice_idx, image_order, image_name, image_path, reg_dt)
+		VALUES
+		    (#{evaluation_idx}, #{image_order}, #{image_name}, #{image_path},
+		     DATE_ADD(NOW(), INTERVAL 9 HOUR))
+	</insert>
+
+	<!-- 인사 -> 평가 -> 첨부파일 삭제 -->
+	<delete id="EvaluationFileDelete" parameterType="map">
+		DELETE FROM tb_hr_evaluation_file
+		WHERE notice_idx = #{evaluation_idx}
+		  AND image_order = #{image_order}
+	</delete>
+
+	<!-- 인사 -> 평가 -> 수정 시 첨부파일 notice_idx 재연결 (old_idx → new_idx) -->
+	<update id="MigrateEvaluationFiles" parameterType="map">
+		UPDATE tb_hr_evaluation_file
+		SET notice_idx = #{new_idx}
+		WHERE notice_idx = #{old_idx}
+	</update>
+
+	<!-- 인사 -> 평가 -> 첨부파일 image_order 최대값 조회 -->
+	<select id="GetMaxEvaluationFileOrder" parameterType="map" resultType="java.lang.Integer">
+		SELECT MAX(image_order)
+		FROM tb_hr_evaluation_file
+		WHERE notice_idx = #{evaluation_idx}
+	</select>
+
+	<!--
+	  인사 -> 평가 -> 실적 업데이트
+	  - 팀장확인 전에만 작성자가 실적 수정 가능, tm_sign/hr_sign 무관
+	  - 단일 KPI 행 idx 기준, performance 일괄 적용
+	-->
+	<update id="EvaluationPerformanceUpdate" parameterType="map">
+		UPDATE tb_hr_evaluation_kpi
+		SET performance = #{performance}
+		WHERE idx = #{idx}
+	</update>
+
+	<!--
+	  인사 -> 평가 -> 팀장확인 처리
+	  - idx가 속한 세션(user_id + start_time + end_time) 전체를 일괄 업데이트
+	  - MySQL 서브쿼리 UPDATE 조회를 위해 방식 테이블(JOIN) 사용
+	  - tm_sign='4' : 팀장확인 완료
+	  - hr_read_dt=NULL : 인사팀장에게 알림 표시 전 인사팀장 알림 뱃지에 표시
+	  - 이미 확인된 경우(tm_sign='4')는 실행하지 않음
+	-->
+	<update id="EvaluationTeamLeaderConfirm" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET tm_sign    = '4',
+		    tm_dt      = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		    hp_read_dt = NULL,
+		    hr_read_dt = NULL,
+		    update_dt  = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		    <if test="opinion != null and opinion != ''">, tm_opinion = #{opinion}</if>
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+		  AND IFNULL(tm_sign, '') NOT IN ('4')
+	</update>
+
+	<!--
+	  인사 -> 평가 -> 실장 확인 처리
+	  - department=8 포함 dept 4·5 문서 대상(포함)
+	  - hp_sign='4', hp_opinion 저장 후 hr_read_dt=NULL (인사팀장 알림)
+	  - 팀장확인(tm_sign='4') 완료 이후에만 처리됨
+	-->
+	<update id="EvaluationHpLeaderConfirm" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET hp_sign    = '4',
+		    hp_dt      = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		    hr_read_dt = NULL,
+		    update_dt  = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		    <if test="opinion != null and opinion != ''">, hp_opinion = #{opinion}</if>
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+		  AND IFNULL(hp_sign, '') NOT IN ('4')
+	</update>
+
+	<!--
+	  인사 -> 평가 -> 인사팀장 확인 처리
+	  - 인사팀(department=3) 팀장(position=1)만 실행 가능(권한 조건 충족 시에만 실행)
+	  - hr_sign='4' : 인사팀장확인 완료
+	  - user_read_dt=NULL : 작성자에게 완료 알림 표시 전 작성자 알림 뱃지에 표시
+	  - 팀장확인(tm_sign='4') 선행 필요
+	-->
+	<update id="EvaluationHrLeaderConfirm" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET hr_sign      = '4',
+		    hr_dt        = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		    user_read_dt = CASE WHEN IFNULL(ceo_user, '') = '' THEN NULL ELSE user_read_dt END,
+		    ceo_read_dt  = CASE WHEN IFNULL(ceo_user, '') != '' THEN NULL ELSE ceo_read_dt END,
+		    update_dt    = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+		  AND (IFNULL(hp_user, '') = '' OR IFNULL(hp_sign, '') = '4')
+		  AND IFNULL(hr_sign, '') NOT IN ('4')
+	</update>
+
+	<!-- 인사 -> 평가 -> 대표확인 처리 (ceo_sign='4') -->
+	<update id="EvaluationCeoLeaderConfirm" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET ceo_sign     = '4',
+		    ceo_dt       = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+		    user_read_dt = NULL,
+		    update_dt    = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
+		  AND (IFNULL(hp_user, '') = '' OR IFNULL(hp_sign, '') = '4')
+		  AND (IFNULL(hr_user, '') = '' OR IFNULL(hr_sign, '') = '4')
+		  AND IFNULL(ceo_sign, '') NOT IN ('4')
+	</update>
+
+	<!--
+	  인사 -> 평가 -> 알림 목록 (네비바 알림 뱃지용)
+	  - 팀장결재요청    : tm_user가 배정되고 아직 결재 안됨(tm_sign != '4') 상태인 세션
+	  - 실장확인요청    : hp_user가 배정되고 팀장 완료 후 실장 확인 대기 상태인 세션
+	  - 인사팀장결재요청: hr_user가 배정되고 이미 확인 대기 상태인 세션
+	  - 대표확인요청    : ceo_user가 배정되고 상위 확인 완료 후 대표 확인 대기인 세션
+	  - 확인완료        : 배정된 작성자 문서가 모든 확인 완료 후 아직 표시 안된 세션
+	  - GROUP BY로 세션 기준 중복 제거, MIN(idx)를 대표값으로 반환
+	-->
+	<select id="EvaluationNotificationList" parameterType="map" resultType="hashmap">
+		SELECT * FROM (
+
+		    SELECT
+		        e.idx,
+		        e.user_id                                         AS writer_id,
+		        u.user_name                                       AS writer_name,
+		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
+		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
+		        '팀장결재요청'                                     AS notify_type,
+		        'KPI 평가 알림'                                    AS notify_title,
+		        CONCAT('[', u.user_name, '] KPI 평가 팀장 확인이 필요합니다.') AS notify_message,
+		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
+		    FROM tb_hr_evaluation e
+		    JOIN tb_user u ON u.user_id = e.user_id
+		    WHERE e.tm_user = #{user_id}
+		      AND IFNULL(e.tm_sign, '') NOT IN ('4')
+		      AND e.del_yn = 'N'
+
+		    UNION
+
+		    SELECT
+		        e.idx,
+		        e.user_id                                         AS writer_id,
+		        u.user_name                                       AS writer_name,
+		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
+		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
+		        '실장확인요청'                                     AS notify_type,
+		        'KPI 평가 알림'                                    AS notify_title,
+		        CONCAT('[', u.user_name, '] KPI 평가 실장 확인이 필요합니다.') AS notify_message,
+		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
+		    FROM tb_hr_evaluation e
+		    JOIN tb_user u ON u.user_id = e.user_id
+		    WHERE e.hp_user = #{user_id}
+		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
+		      AND IFNULL(e.hp_sign, '') NOT IN ('4')
+		      AND e.del_yn = 'N'
+
+		    UNION
+
+		    SELECT
+		        e.idx,
+		        e.user_id                                         AS writer_id,
+		        u.user_name                                       AS writer_name,
+		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
+		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
+		        '인사팀장결재요청'                                  AS notify_type,
+		        'KPI 평가 알림'                                    AS notify_title,
+		        CONCAT('[', u.user_name, '] KPI 평가 인사팀장 확인이 필요합니다.') AS notify_message,
+		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
+		    FROM tb_hr_evaluation e
+		    JOIN tb_user u ON u.user_id = e.user_id
+		    WHERE e.hr_user = #{user_id}
+		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
+		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
+		      AND IFNULL(e.hr_sign, '') NOT IN ('4')
+		      AND e.del_yn = 'N'
+
+		    UNION
+
+		    SELECT
+		        e.idx,
+		        e.user_id                                         AS writer_id,
+		        u.user_name                                       AS writer_name,
+		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
+		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
+		        '대표확인요청'                                      AS notify_type,
+		        'KPI 평가 알림'                                     AS notify_title,
+		        CONCAT('[', u.user_name, '] KPI 평가 대표 확인이 필요합니다.') AS notify_message,
+		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
+		    FROM tb_hr_evaluation e
+		    JOIN tb_user u ON u.user_id = e.user_id
+		    WHERE e.ceo_user = #{user_id}
+		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
+		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
+		      AND (IFNULL(e.hr_user, '') = '' OR IFNULL(e.hr_sign, '') = '4')
+		      AND IFNULL(e.ceo_sign, '') NOT IN ('4')
+		      AND e.del_yn = 'N'
+
+		    UNION
+
+		    SELECT
+		        e.idx,
+		        e.user_id                                         AS writer_id,
+		        u.user_name                                       AS writer_name,
+		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
+		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
+		        '확인완료'                                         AS notify_type,
+		        'KPI 평가 알림'                                    AS notify_title,
+		        'KPI 평가가 모든 확인 완료되었습니다'               AS notify_message,
+		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
+		    FROM tb_hr_evaluation e
+		    JOIN tb_user u ON u.user_id = e.user_id
+		    WHERE e.user_id      = #{user_id}
+		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
+		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
+		      AND (IFNULL(e.hr_user, '') = '' OR IFNULL(e.hr_sign, '') = '4')
+		      AND (IFNULL(e.ceo_user, '') = '' OR IFNULL(e.ceo_sign, '') = '4')
+		      AND e.user_read_dt IS NULL
+		      AND e.del_yn       = 'N'
+
+		) AS N
+		ORDER BY N.reg_dt DESC
+	</select>
+
+	<!--
+	  인사 -> 평가 -> 알림 읽음 처리
+	  - '확인완료'        : 작성자의 완료 알림 표시 후 user_read_dt 업데이트 (이후 알림 목록에서 제거)
+	  - '팀장결재요청'     : 팀장이 알림 표시 후 tm_read_dt 업데이트 (읽음)
+	  - '인사팀장결재요청' : 인사팀장이 알림 표시 후 hr_read_dt 업데이트 (읽음)
+	  - JOIN 방식 테이블 MySQL 서브쿼리 UPDATE 조회
+	-->
+	<update id="EvaluationNotificationReadSave" parameterType="map">
+		UPDATE tb_hr_evaluation
+		SET user_read_dt = CASE
+		                       WHEN user_id = #{user_id}
+		                        AND #{notify_type} = '확인완료'
+		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		                       ELSE user_read_dt
+		                     END,
+		    tm_read_dt   = CASE
+		                       WHEN tm_user = #{user_id}
+		                        AND #{notify_type} = '팀장결재요청'
+		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		                       ELSE tm_read_dt
+		                     END,
+		    hp_read_dt   = CASE
+		                       WHEN hp_user = #{user_id}
+		                        AND #{notify_type} = '실장확인요청'
+		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		                       ELSE hp_read_dt
+		                     END,
+		    ceo_read_dt  = CASE
+		                       WHEN ceo_user = #{user_id}
+		                        AND #{notify_type} = '대표확인요청'
+		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		                       ELSE ceo_read_dt
+		                     END,
+		    hr_read_dt   = CASE
+		                       WHEN hr_user = #{user_id}
+		                        AND #{notify_type} = '인사팀장결재요청'
+		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		                       ELSE hr_read_dt
+		                     END,
+		    update_dt    = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		WHERE idx    = #{idx}
+		  AND del_yn = 'N'
+		  AND (
+		        (user_id  = #{user_id} AND #{notify_type} = '확인완료')
+		     OR (tm_user  = #{user_id} AND #{notify_type} = '팀장결재요청')
+		     OR (hp_user  = #{user_id} AND #{notify_type} = '실장확인요청')
+		     OR (hr_user  = #{user_id} AND #{notify_type} = '인사팀장결재요청')
+		     OR (ceo_user = #{user_id} AND #{notify_type} = '대표확인요청')
+		       )
+	</update>
+</mapper>

@@ -6,6 +6,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -48,6 +50,8 @@ public class HeadOfficeController {
 	private static final String EXPENDABLE_FIXED_PAYER_USER_ID = "iy1";
 	// 문서 공통 첨부파일 업로드 제한
 	private static final int MAX_HEADOFFICE_DOCUMENT_FILE_COUNT = 10;
+	// 평가 첨부파일 업로드 제한 (공지/교육과 별도 관리)
+	private static final int MAX_EVALUATION_FILE_COUNT = 20;
 	// 문서 공통 첨부파일 허용 확장자(이미지 + PDF + 엑셀)
 	private static final Set<String> HEADOFFICE_DOCUMENT_ALLOWED_EXTENSIONS = new HashSet<>(
 		Arrays.asList(
@@ -1044,7 +1048,7 @@ public class HeadOfficeController {
 	 * method 	: EducationList
 	 * comment 	: 인사 -> 교육 -> 목록 조회
 	 */
-	@GetMapping("Education/EducationList")
+	@GetMapping("HeadOffice/EducationList")
 	public String EducationList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.EducationList(paramMap);
 		return new Gson().toJson(resultList);
@@ -1055,7 +1059,7 @@ public class HeadOfficeController {
 	 * method 	: EducationDetail
 	 * comment 	: 인사 -> 교육 -> 상세 조회
 	 */
-	@GetMapping("Education/EducationDetail")
+	@GetMapping("HeadOffice/EducationDetail")
 	public String EducationDetail(@RequestParam Map<String, Object> paramMap) {
 		Map<String, Object> result = headOfficeService.EducationDetail(paramMap);
 		return new Gson().toJson(result);
@@ -1066,7 +1070,7 @@ public class HeadOfficeController {
 	 * method 	: EducationSave
 	 * comment 	: 인사 -> 교육 -> 등록/수정 (upsert)
 	 */
-	@PostMapping("Education/EducationSave")
+	@PostMapping("HeadOffice/EducationSave")
 	public String EducationSave(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 		try {
@@ -1087,7 +1091,7 @@ public class HeadOfficeController {
 	 * method 	: EducationDelete
 	 * comment 	: 인사 -> 교육 -> 삭제 (소프트 삭제)
 	 */
-	@PostMapping("Education/EducationDelete")
+	@PostMapping("HeadOffice/EducationDelete")
 	public String EducationDelete(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 		try {
@@ -1106,7 +1110,7 @@ public class HeadOfficeController {
 	 * method 	: EducationFileList
 	 * comment 	: 인사 -> 교육 -> 첨부파일 목록 조회
 	 */
-	@GetMapping("Education/EducationFileList")
+	@GetMapping("HeadOffice/EducationFileList")
 	public String EducationFileList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.EducationFileList(paramMap);
 		return new Gson().toJson(resultList);
@@ -1117,7 +1121,7 @@ public class HeadOfficeController {
 	 * method 	: EducationFilesUpload
 	 * comment 	: 인사 -> 교육 -> 첨부파일 업로드
 	 */
-	@PostMapping("Education/EducationFilesUpload")
+	@PostMapping("HeadOffice/EducationFilesUpload")
 	public String EducationFilesUpload(
 		@RequestParam("education_idx") String educationIdx,
 		@RequestParam("files") MultipartFile[] files
@@ -1201,7 +1205,7 @@ public class HeadOfficeController {
 	 * method 	: EducationFileDelete
 	 * comment 	: 인사 -> 교육 -> 첨부파일 삭제
 	 */
-	@DeleteMapping("Education/EducationFileDelete")
+	@DeleteMapping("HeadOffice/EducationFileDelete")
 	public String EducationFileDelete(@RequestParam Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 		try {
@@ -1238,6 +1242,523 @@ public class HeadOfficeController {
 	private Path resolveEducationDirPath(String educationIdxText) {
 		String staticPath = new File(uploadDir).getAbsolutePath();
 		return Paths.get(staticPath, "education", educationIdxText).normalize();
+	}
+
+	// ──────────────────────────────────────────────────────────────────────────
+	// 인사 → 평가 (tb_hr_evaluation / tb_hr_evaluation_file)
+	// ──────────────────────────────────────────────────────────────────────────
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationFormInit
+	 * comment : 인사 -> 평가 -> 작성 폼 초기화 단일 API (3개 → 1개 통합)
+	 *            - types : 평가 문서 타입 목록 (tb_hr_evaluation_type, 대분류/중분류/소분류 셀렉터용)
+	 *            - users : 전체 사용자 목록 dept_name 포함 (tb_user)
+	 *                      → 프론트에서 groupBy 로 부서 목록 파생
+	 *                      → 부서 변경 시 클라이언트 필터링으로 작성자 목록 파생 (추가 API 없음)
+	 */
+	@GetMapping("HeadOffice/EvaluationFormInit")
+	public String EvaluationFormInit() {
+		List<Map<String, Object>> types = headOfficeService.EvaluationFormTypes();
+		List<Map<String, Object>> users = headOfficeService.EvaluationFormUsers();
+
+		JsonObject obj = new JsonObject();
+		obj.add("types", new Gson().toJsonTree(types));
+		obj.add("users", new Gson().toJsonTree(users));
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationList
+	 * comment : 인사 -> 평가 -> 목록 조회
+	 */
+	@GetMapping("HeadOffice/EvaluationTypeList")
+	public String EvaluationTypeList() {
+		List<Map<String, Object>> resultList = headOfficeService.EvaluationTypeList();
+		return new Gson().toJson(resultList);
+	}
+
+	@PostMapping("HeadOffice/EvaluationTypeSave")
+	public String EvaluationTypeSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			int affected = headOfficeService.EvaluationTypeSave(paramMap);
+			if (affected > 0) {
+				obj.addProperty("code", 200);
+				obj.addProperty("message", "저장 성공");
+			} else {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "저장 실패: 변경된 데이터가 없습니다.");
+			}
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "저장 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	@PostMapping("HeadOffice/EvaluationTypeDelete")
+	public String EvaluationTypeDelete(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			int affected = headOfficeService.EvaluationTypeDelete(paramMap);
+			if (affected > 0) {
+				obj.addProperty("code", 200);
+				obj.addProperty("message", "삭제 성공");
+			} else {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "삭제 실패: 변경된 데이터가 없습니다.");
+			}
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	@GetMapping("HeadOffice/EvaluationList")
+	public String EvaluationList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.EvaluationList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationDetail
+	 * comment : 인사 -> 평가 -> 상세 조회 (KPI 행만, 레거시 호환용)
+	 */
+	@GetMapping("HeadOffice/EvaluationDetail")
+	public String EvaluationDetail(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> result = headOfficeService.EvaluationDetail(paramMap);
+		return new Gson().toJson(result);
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationDetailWithFiles
+	 * comment : 인사 -> 평가 -> 상세 + 첨부파일 통합 조회 (프론트 API 1회 호출로 처리)
+	 *            - detail: 동일 세션 KPI 행 배열
+	 *            - files : 첨부파일 목록 (notice_idx = 세션 대표 idx 기준)
+	 */
+	@GetMapping("HeadOffice/EvaluationDetailWithFiles")
+	public String EvaluationDetailWithFiles(@RequestParam Map<String, Object> paramMap) {
+		// KPI 상세 조회
+		List<Map<String, Object>> detail = headOfficeService.EvaluationDetail(paramMap);
+
+		// 첨부파일 조회 (notice_idx = idx 동일 사용)
+		Map<String, Object> fileParams = new HashMap<>();
+		fileParams.put("evaluation_idx", paramMap.get("idx"));
+		List<Map<String, Object>> files = headOfficeService.EvaluationFileList(fileParams);
+
+		JsonObject obj = new JsonObject();
+		obj.add("detail", new Gson().toJsonTree(detail));
+		obj.add("files",  new Gson().toJsonTree(files));
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationSave
+	 * comment : 인사 -> 평가 -> 다수 KPI 행 일괄 저장, 첫 번째 idx 반환
+	 */
+	@SuppressWarnings("unchecked")
+	@PostMapping("HeadOffice/EvaluationSave")
+	public String EvaluationSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			String userId      = asText(paramMap.get("user_id"));
+			String startTime   = asText(paramMap.get("start_time"));
+			String endTime     = asText(paramMap.get("end_time"));
+			// 문서구분 (tb_hr_evaluation_type.doc_type)
+			String docType     = asText(paramMap.get("doc_type"));
+			// 작성자 담당확인 도장 - 저장 시 항상 '4' 고정 (tm_sign/hr_sign 방식과 동일)
+			String chargeSign  = "4";
+			// 팀장ID / 인사팀장ID / 실장ID - 프론트에서 자동 감지
+			String tmUser      = asText(paramMap.get("tm_user"));
+			String hrUser      = asText(paramMap.get("hr_user"));
+			String hpUser      = asText(paramMap.get("hp_user"));
+			String ceoUser     = asText(paramMap.get("ceo_user"));
+			// 수정 시: 기존 세션 대표 idx → 소프트 삭제 후 재삽입 (upsert, 별도 UPDATE SQL 불필요)
+			String editIdx     = asText(paramMap.get("edit_idx"));
+			Object itemsObj    = paramMap.get("items");
+
+			if (userId.isEmpty() || startTime.isEmpty() || endTime.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "user_id / start_time / end_time 는 필수입니다.");
+				return obj.toString();
+			}
+			if (!(itemsObj instanceof List) || ((List<?>) itemsObj).isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "items 배열이 비어있습니다.");
+				return obj.toString();
+			}
+
+			List<Map<String, Object>> items = (List<Map<String, Object>>) itemsObj;
+			int firstIdx = -1;
+
+			// upsert: edit_idx가 있으면 기존 KPI 행 삭제 + 헤더 소프트삭제 후 재삽입
+			if (!editIdx.isEmpty()) {
+				Map<String, Object> periodParam = new HashMap<>();
+				periodParam.put("idx",            editIdx);
+				periodParam.put("new_start_time", startTime);
+				periodParam.put("new_end_time",   endTime);
+				headOfficeService.EvaluationUpdatePeriod(periodParam);
+
+				Map<String, Object> deleteParam = new HashMap<>();
+				deleteParam.put("idx", editIdx);
+				headOfficeService.EvaluationDelete(deleteParam);  // KPI 삭제 + 헤더 소프트삭제
+			}
+
+			// document_id 생성: {doc_type}-{YYYYMMDDHHmmss}{seq_padded_3}
+			String documentId = "";
+			if (!docType.isEmpty()) {
+				String stamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+				int seq = headOfficeService.EvaluationCountByDocTypeAndDate(docType) + 1;
+				documentId = docType + "-" + stamp + String.format("%03d", seq);
+			}
+
+			// 헤더 1건 저장 (tb_hr_evaluation)
+			Map<String, Object> headerRow = new HashMap<>();
+			headerRow.put("user_id",     userId);
+			headerRow.put("start_time",  startTime);
+			headerRow.put("end_time",    endTime);
+			headerRow.put("doc_type",    docType);
+			headerRow.put("charge_sign", chargeSign);
+			headerRow.put("tm_user",     tmUser);
+			headerRow.put("hr_user",     hrUser);
+			headerRow.put("hp_user",     hpUser);
+			headerRow.put("ceo_user",    ceoUser);
+			headerRow.put("document_id", documentId);
+			headOfficeService.EvaluationSave(headerRow);
+			Object generatedIdx = headerRow.get("idx");
+			if (generatedIdx != null) {
+				try { firstIdx = Integer.parseInt(generatedIdx.toString()); } catch (Exception ignored) {}
+			}
+
+			// KPI 행 저장 (tb_hr_evaluation_kpi, document_id = 문서번호)
+			for (Map<String, Object> item : items) {
+				Map<String, Object> kpiRow = new HashMap<>();
+				kpiRow.put("document_id", documentId);
+				kpiRow.put("type",        item.get("type"));
+				kpiRow.put("goal",        item.get("goal"));
+				kpiRow.put("measurement", item.get("measurement"));
+				kpiRow.put("weight",      item.get("weight"));
+				kpiRow.put("performance", item.get("performance"));
+				kpiRow.put("content",     item.get("content"));
+				headOfficeService.EvaluationKpiSave(kpiRow);
+			}
+
+			// upsert: 기존 파일을 새 first_idx로 재연결 (소프트 삭제된 old_idx에 묶인 파일 보존)
+			if (!editIdx.isEmpty() && firstIdx > 0) {
+				try {
+					int oldIdx = Integer.parseInt(editIdx);
+					if (oldIdx != firstIdx) {
+						headOfficeService.MigrateEvaluationFiles(oldIdx, firstIdx);
+					}
+				} catch (Exception ignored) {}
+			}
+
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "저장 성공");
+			obj.addProperty("first_idx", firstIdx > 0 ? firstIdx : 0);
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "저장 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationDelete
+	 * comment : 인사 -> 평가 -> 삭제 (소프트 삭제)
+	 */
+	@PostMapping("HeadOffice/EvaluationDelete")
+	public String EvaluationDelete(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationDelete(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "삭제 성공");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationFileList
+	 * comment : 인사 -> 평가 -> 첨부파일 목록 조회
+	 */
+	@GetMapping("HeadOffice/EvaluationFileList")
+	public String EvaluationFileList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.EvaluationFileList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationFilesUpload
+	 * comment : 인사 -> 평가 -> 첨부파일 업로드
+	 */
+	@PostMapping("HeadOffice/EvaluationFilesUpload")
+	public String EvaluationFilesUpload(
+		@RequestParam("evaluation_idx") String evaluationIdx,
+		@RequestParam("files") MultipartFile[] files
+	) {
+		JsonObject obj = new JsonObject();
+		try {
+			String idxText = asText(evaluationIdx);
+			if (idxText.isEmpty() || files == null || files.length == 0) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "evaluation_idx 또는 files 파라미터가 비어있습니다.");
+				return obj.toString();
+			}
+
+			int idxInt;
+			try { idxInt = Integer.parseInt(idxText); } catch (Exception e) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "evaluation_idx가 유효하지 않습니다.");
+				return obj.toString();
+			}
+
+			Map<String, Object> listParam = new HashMap<>();
+			listParam.put("evaluation_idx", idxText);
+			List<Map<String, Object>> existingFiles = headOfficeService.EvaluationFileList(listParam);
+			int currentCount = existingFiles == null ? 0 : existingFiles.size();
+			if (currentCount >= MAX_EVALUATION_FILE_COUNT) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "첨부 파일은 최대 20개까지 등록 가능합니다.");
+				return obj.toString();
+			}
+
+			Path evalDirPath = resolveEvaluationDirPath(idxText);
+			Files.createDirectories(evalDirPath);
+
+			int nextOrder = headOfficeService.GetNextEvaluationFileOrder(idxInt);
+			int available = MAX_EVALUATION_FILE_COUNT - currentCount;
+			List<Map<String, Object>> inserted = new ArrayList<>();
+
+			for (MultipartFile file : files) {
+				if (inserted.size() >= available) break;
+				if (file == null || file.isEmpty()) continue;
+
+				String originalName = asText(file.getOriginalFilename());
+				if (originalName.isEmpty()) originalName = "file";
+				String safeName   = Paths.get(originalName).getFileName().toString();
+				String uniqueName = UUID.randomUUID() + "_" + safeName;
+
+				Path filePath = evalDirPath.resolve(uniqueName).normalize();
+				if (!filePath.startsWith(evalDirPath)) continue;
+				file.transferTo(filePath.toFile());
+
+				String imagePath = "/image/evaluation/" + idxText + "/" + uniqueName;
+
+				Map<String, Object> saveParam = new HashMap<>();
+				saveParam.put("evaluation_idx", idxInt);
+				saveParam.put("image_order",    nextOrder++);
+				saveParam.put("image_path",     imagePath);
+				saveParam.put("image_name",     safeName);
+				headOfficeService.EvaluationFileSave(saveParam);
+				inserted.add(saveParam);
+			}
+
+			if (inserted.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "업로드 가능한 파일이 없습니다.");
+				return obj.toString();
+			}
+
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "업로드 성공");
+			obj.add("files", new Gson().toJsonTree(inserted));
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "업로드 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationFileDelete
+	 * comment : 인사 -> 평가 -> 첨부파일 삭제
+	 */
+	@DeleteMapping("HeadOffice/EvaluationFileDelete")
+	public String EvaluationFileDelete(@RequestParam Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			String idxText        = asText(paramMap.get("evaluation_idx"));
+			String imagePathText  = asText(paramMap.get("image_path"));
+			String imageOrderText = asText(paramMap.get("image_order"));
+			if (idxText.isEmpty() || imageOrderText.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "evaluation_idx / image_order 파라미터가 필요합니다.");
+				return obj.toString();
+			}
+			if (!imagePathText.isEmpty()) {
+				String targetFileName = Paths.get(imagePathText).getFileName().toString();
+				if (!targetFileName.isEmpty()) {
+					Path evalDirPath = resolveEvaluationDirPath(idxText);
+					Path targetPath  = evalDirPath.resolve(targetFileName).normalize();
+					if (targetPath.startsWith(evalDirPath)) {
+						Files.deleteIfExists(targetPath);
+					}
+				}
+			}
+			headOfficeService.EvaluationFileDelete(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "삭제 성공");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "삭제 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	private Path resolveEvaluationDirPath(String idxText) {
+		String staticPath = new File(uploadDir).getAbsolutePath();
+		return Paths.get(staticPath, "evaluation", idxText).normalize();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationPerformanceUpdate
+	 * comment : 인사 -> 평가 -> 실적 업데이트
+	 *            - 팀장 확인 후 작성자가 실적(%)만 수정할 때 호출
+	 *            - items: [{ idx, performance }] 배열로 전달, 각 KPI 행 idx 기준으로 performance만 갱신
+	 *            - tm_sign, hr_sign 등 확인 도장은 유지됨
+	 */
+	@PostMapping("HeadOffice/EvaluationPerformanceUpdate")
+	public String EvaluationPerformanceUpdate(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationPerformanceUpdate(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "실적 저장 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실적 저장 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationTeamLeaderConfirm
+	 * comment : 인사 -> 평가 -> 팀장 확인 처리
+	 *            - 같은 부서의 팀장(position=1)이 확인 버튼을 눌렀을 때 호출
+	 *            - 동일 세션(user_id + start_time + end_time)의 모든 KPI 행에 팀장 확인 정보를 기록
+	 */
+	@PostMapping("HeadOffice/EvaluationTeamLeaderConfirm")
+	public String EvaluationTeamLeaderConfirm(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			// opinion 파라미터: tm_opinion 컬럼에 저장 (빈 값이면 무시)
+			headOfficeService.EvaluationTeamLeaderConfirm(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "팀장 확인 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "팀장 확인 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationHpLeaderConfirm
+	 * comment : 인사 -> 평가 -> 실장 확인 처리
+	 *            - department=8 팀장(position=1)이 dept 4·5 문서 확인 시 호출
+	 *            - 팀장 확인(tm_sign='4') 완료 후에만 처리됨
+	 *            - hp_opinion 저장, hr_read_dt=NULL (인사팀장 알림 발송)
+	 */
+	@PostMapping("HeadOffice/EvaluationHpLeaderConfirm")
+	public String EvaluationHpLeaderConfirm(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationHpLeaderConfirm(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "실장 확인 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실장 확인 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationHrLeaderConfirm
+	 * comment : 인사 -> 평가 -> 인사팀장 확인 처리
+	 *            - 인사팀(department=3) 팀장(position=1)이 확인 버튼을 눌렀을 때 호출
+	 *            - 동일 세션의 모든 KPI 행에 payer_sign='4' 기록
+	 */
+	@PostMapping("HeadOffice/EvaluationHrLeaderConfirm")
+	public String EvaluationHrLeaderConfirm(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationHrLeaderConfirm(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "인사팀장 확인 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "인사팀장 확인 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationNotificationList
+	 * comment : 인사 -> 평가 -> 알림 목록 (네비바 뱃지용)
+	 *            - 팀장확인요청 : tm_user가 본인이고 아직 팀장 미확인 상태
+	 *            - 인사팀장확인요청 : payer_user가 본인이고 인사팀장 미확인 상태
+	 *            - 확인완료 : 본인 작성 문서가 최종 확인 완료됐으나 열람 안 한 경우
+	 */
+	@GetMapping("HeadOffice/EvaluationNotificationList")
+	public String EvaluationNotificationList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.EvaluationNotificationList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part    : 인사
+	 * method  : EvaluationNotificationReadSave
+	 * comment : 인사 -> 평가 -> 알림 읽음 처리
+	 *            - notify_type='확인완료' → reg_read_dt 갱신 (이후 알림 목록에서 제거)
+	 *            - notify_type='팀장확인요청' → tm_read_dt 갱신
+	 *            - notify_type='인사팀장확인요청' → payer_read_dt 갱신
+	 */
+	@PostMapping("HeadOffice/EvaluationCeoLeaderConfirm")
+	public String EvaluationCeoLeaderConfirm(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationCeoLeaderConfirm(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "대표 확인 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "대표 확인 실패: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	@PostMapping("HeadOffice/EvaluationNotificationReadSave")
+	public String EvaluationNotificationReadSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			headOfficeService.EvaluationNotificationReadSave(paramMap);
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "알림 읽음 처리 완료");
+		} catch (Exception e) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "알림 읽음 처리 실패: " + e.getMessage());
+		}
+		return obj.toString();
 	}
 
 	/*
@@ -1899,3 +2420,4 @@ public class HeadOfficeController {
 		return value == null || String.valueOf(value).trim().isEmpty();
 	}
 }
+

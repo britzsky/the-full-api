@@ -426,6 +426,7 @@
 	        check_name,
 	        handover_location,
 	        meal_number,
+	        meal_time,
 	        catering_ration,
 	        normal_diet,
 	        kitchen_member,
@@ -466,6 +467,7 @@
 	          check_name,
 	          handover_location,
 	          meal_number,
+	          meal_time,
 	          catering_ration,
 	          normal_diet,
 	          kitchen_member,
@@ -503,6 +505,7 @@
 	          #{check_name},
 	          #{handover_location},
 	          #{meal_number},
+	          #{meal_time},
 	          #{catering_ration},
 	          #{normal_diet},
 	          #{kitchen_member},
@@ -539,6 +542,9 @@
 	          </if>
 	          <if test="meal_number != null">
 	          meal_number=#{meal_number},
+	          </if>
+	          <if test="meal_time != null">
+	          meal_time=#{meal_time},
 	          </if>
 	          <if test="catering_ration != null">
 	          catering_ration=#{catering_ration},
@@ -1909,7 +1915,13 @@
 			   abm.budget_grant,
 			   abm.day_use_ratio,
 			   abm.existing_budget,
-			   abm.diff_amount
+			   abm.diff_amount,
+			   (SELECT IFNULL(abm_prev.budget_grant, 0)
+			    FROM tb_account_budget_management abm_prev
+			    WHERE abm_prev.account_id = a.account_id
+			      AND abm_prev.year  = CASE WHEN #{month} = 1 THEN #{year} - 1 ELSE #{year} END
+			      AND abm_prev.month = CASE WHEN #{month} = 1 THEN 12 ELSE #{month} - 1 END
+			    LIMIT 1) AS prev_budget_grant
 		FROM tb_account a
 		LEFT OUTER JOIN tb_account_budget_management abm
 		ON abm.account_id = a.account_id
@@ -2469,11 +2481,12 @@
     
     <insert id="FieldPersonSave" parameterType="map">
     	INSERT INTO tb_account_field_person_master_table
-    	(idx, name, salary, car_yn, note, status, manpower_type, reg_dt, user_id, mod_dt)
+    	(idx, name, phone, salary, car_yn, note, status, manpower_type, reg_dt, user_id, mod_dt)
     	VALUES
-    	(#{idx}, #{name}, #{salary}, #{car_yn}, #{note}, #{status}, #{manpower_type}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
+    	(#{idx}, #{name}, #{phone}, #{salary}, #{car_yn}, #{note}, #{status}, #{manpower_type}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'), #{user_id}, DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'))
     	ON DUPLICATE KEY UPDATE
     	name=#{name},
+    	phone=#{phone},
     	salary=#{salary},
     	car_yn=#{car_yn},
     	note=#{note},
@@ -2493,25 +2506,31 @@
 			    T.note,
 			    T.status,
 			    T.manpower_type,
-			
+			    T.phone,
+
 			    -- ✅ 날짜와 무관하게 member_id/account_id가 있으면 나오도록
 			    COALESCE(NULLIF(T2.member_id, ''), TA.member_id, '') AS member_id,
 			    COALESCE(NULLIF(T2.account_id, ''), TA.account_id, '') AS account_id,
-			
+
 			    T2.record_year,
 			    T2.record_month,
 			    T2.record_date,
-			    COALESCE(NULLIF(T2.use_yn, ''), '') AS use_yn
-			
+			    COALESCE(NULLIF(T2.use_yn, ''), '') AS use_yn,
+
+			    -- ✅ 해당 거래처 기준 가장 최근 연락 이력
+			    CH.call_dt,
+			    CH.call_status
+
 			FROM tb_account_field_person_master_table T
-			
+
 			-- ✅ (1) 날짜 조건에 맞는 row (use_yn / record_* 보려는 용도)
 			LEFT JOIN tb_account_field_person_employment T2
 			  ON T2.idx = T.idx
+			 AND T2.account_id = #{account_id}
 			 AND T2.record_year = #{record_year}
 			 AND T2.record_month = #{record_month}
 			 AND T2.record_date = #{record_date}
-			
+
 			-- ✅ (2) 날짜 무관 member_id/account_id 확보용 (한번이라도 등록된 값)
 			LEFT JOIN (
 			    SELECT
@@ -2522,7 +2541,22 @@
 			    GROUP BY idx
 			) TA
 			  ON TA.idx = T.idx
-			
+
+			-- ✅ (3) 해당 거래처 기준 가장 최근 연락 이력
+			LEFT JOIN (
+			    SELECT person_idx,
+			           DATE_FORMAT(call_dt, '%Y-%m-%d') AS call_dt,
+			           call_status
+			    FROM tb_account_call_history CH1
+			    WHERE account_id = #{account_id}
+			      AND call_dt = (
+			          SELECT MAX(call_dt)
+			          FROM tb_account_call_history CH2
+			          WHERE CH2.person_idx = CH1.person_idx
+			            AND CH2.account_id = #{account_id}
+			      )
+			) CH ON CH.person_idx = T.idx
+
 			WHERE T.idx IN (
 			    SELECT idx
 			    FROM tb_account_field_root_mapping_table
@@ -2530,6 +2564,13 @@
 			)
 			AND T.position_type = #{position_type}
     </select>
+
+    <insert id="SaveCallHistory" parameterType="map">
+    	INSERT INTO tb_account_call_history (person_idx, account_id, call_dt, call_status)
+    	VALUES (#{person_idx}, #{account_id}, #{call_dt}, #{call_status})
+    	ON DUPLICATE KEY UPDATE
+    	call_status = #{call_status}
+    </insert>
     
     <insert id="EmergencyPersonEmployment" parameterType="map">
     	INSERT INTO tb_account_field_person_employment
@@ -2541,5 +2582,17 @@
     	use_yn=#{use_yn},
     	mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
     	user_id=#{user_id}
+    </insert>
+    
+    <insert id="HolidaySave" parameterType="map">
+    	INSERT INTO tb_holiday
+    	(holiday_date, country_code, country_name, holiday_name, holiday_sn)
+    	VALUES
+    	(STR_TO_DATE(#{holiday_date}, '%Y%m%d'), #{country_code}, #{country_name}, #{holiday_name}, #{holiday_sn})
+    	ON DUPLICATE KEY UPDATE
+    	country_name=#{country_name},
+    	holiday_name=#{holiday_name},
+    	holiday_sn=#{holiday_sn},
+    	updated_at=NOW()
     </insert>
 </mapper>

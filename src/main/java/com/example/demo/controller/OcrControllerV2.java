@@ -457,6 +457,7 @@ public class OcrControllerV2 {
             Map<String, Object> responseMap = new HashMap<>();
             responseMap.put("main", corporateCard);
             responseMap.put("item", detailList);
+            responseMap.put("saleDate", result.meta.saleDate); // 프론트 날짜 인식 성공 여부 판단용
             return ResponseEntity.ok(responseMap);
 
         } catch (Exception e) {

@@ -1421,6 +1421,40 @@
 		WHERE a.del_yn = 'N'
 	</select>
 	
+	<!-- 미납 품목 전용: 연도 범위 내 전체 마감잔액 한 번에 조회 -->
+	<select id="AccountDeadlineBalanceListBulk" parameterType="map" resultType="hashmap">
+		SELECT adb.account_id,
+			   a.account_name,
+			   adb.year,
+			   adb.month,
+			   IFNULL(adb.living_cost, 0)        AS living_cost,
+			   IFNULL(adb.basic_cost, 0)         AS basic_cost,
+			   IFNULL(adb.employ_cost, 0)        AS employ_cost,
+			   IFNULL(adb.integrity_cost, 0)     AS integrity_cost,
+			   IFNULL(abp.balance_price, 0)      AS balance_price,
+			   IFNULL(abp.before_price, 0)       AS before_price2
+		FROM tb_account_deadline_balance adb
+		INNER JOIN tb_account a ON a.account_id = adb.account_id AND a.del_yn = 'N'
+		LEFT JOIN tb_account_balance_price abp ON abp.account_id = adb.account_id
+		WHERE adb.year BETWEEN #{yearFrom} AND #{yearTo}
+		  AND <![CDATA[ (adb.year < #{yearTo} OR adb.month <= #{monthTo}) ]]>
+	</select>
+
+	<!-- 미납 품목 전용: 연도 범위 내 전체 거래처 입금내역 한 번에 조회 -->
+	<select id="AccountDepositHistoryListBulk" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+			   year,
+			   month,
+			   type,
+			   DATE_FORMAT(input_dt, '%Y-%m-%d') AS input_dt,
+			   deposit_amount,
+			   input_price,
+			   note
+		FROM tb_account_deposit_history
+		WHERE year BETWEEN #{yearFrom} AND #{yearTo}
+		  AND <![CDATA[ (year < #{yearTo} OR month <= #{monthTo}) ]]>
+	</select>
+
 	<select id="AccountDeadlineBalanceIntegrityCost" parameterType="map" resultType="int">
 		SELECT ifnull(MAX(integrity_cost),0) as integrity_cost
 		FROM tb_account_deadline_balance
@@ -1433,13 +1467,14 @@
 		SELECT account_id,
 			   year,
 			   month,
-			   CASE WHEN type = 1 
+			   type AS type_code,
+			   CASE WHEN type = 1
 			   		THEN '생계비'
-			   		WHEN type = 2 
+			   		WHEN type = 2
 			   		THEN '일반식대'
-			   		WHEN type = 3 
+			   		WHEN type = 3
 			   		THEN '직원식대'
-			   		WHEN type = 5 
+			   		WHEN type = 5
 			   		THEN '보전'
 			   		ELSE '미수잔액'
 			   		END AS type,
@@ -1454,6 +1489,35 @@
 		AND DATE_FORMAT(input_dt, '%Y') = #{year}
 		ORDER BY year DESC, month DESC, input_dt DESC, deposit_amount DESC
 	</select>
+
+	<update id="AccountDepositHistoryUpdate" parameterType="map">
+		UPDATE tb_account_deposit_history
+		SET
+			input_dt = CONCAT(DATE_FORMAT(#{new_input_dt}, '%Y-%m-%d'), ' ', TIME(input_dt)),
+			note = #{note}
+		WHERE account_id = #{account_id}
+		AND year = #{year}
+		AND month = #{month}
+		AND type = CASE #{type}
+			WHEN '생계비'   THEN 1
+			WHEN '일반식대' THEN 2
+			WHEN '직원식대' THEN 3
+			WHEN '보전'     THEN 5
+			WHEN '환불'     THEN 6
+			ELSE 4
+		END
+		AND DATE_FORMAT(input_dt, '%Y-%m-%d') = #{input_dt}
+		AND deposit_amount = #{deposit_amount}
+		AND input_price = #{input_price}
+		<choose>
+			<when test="balance_dt == null or balance_dt == ''">
+				AND balance_dt IS NULL
+			</when>
+			<otherwise>
+				AND DATE_FORMAT(balance_dt, '%Y-%m-%d') = #{balance_dt}
+			</otherwise>
+		</choose>
+	</update>
 	
 	<insert id="AccountDeadlineBalanceSave" parameterType="map">
 		INSERT INTO tb_account_deadline_balance
@@ -2749,17 +2813,25 @@
 			   m.user_id,
 			   m.receipt_type,
 			   m.idx,
-			   IFNULL(d.detail_total, 0) AS detail_total
+			   IFNULL((
+			       SELECT SUM(d.amount)
+			       FROM tb_headoffice_corporate_card_payment_detail_list d
+			       WHERE d.sale_id = m.sale_id
+			   ), 0) AS detail_total
 		FROM tb_headoffice_corporate_card_payment_list m
-		LEFT JOIN (
-		    SELECT sale_id, SUM(amount) AS detail_total
-		    FROM tb_headoffice_corporate_card_payment_detail_list
-		    GROUP BY sale_id
-		) d ON m.sale_id = d.sale_id
-		WHERE DATE_FORMAT(m.payment_dt, '%Y') = ${year}
-		AND DATE_FORMAT(m.payment_dt, '%m') = ${month}
+		WHERE m.payment_dt >= STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')
+		AND m.payment_dt <![CDATA[ < ]]> DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH)
 		AND m.account_id = #{account_id}
 		<choose>
+			<when test="itemType == '1' or itemType == 1">
+		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 1)
+			</when>
+			<when test="itemType == '2' or itemType == 2">
+		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 2)
+			</when>
+			<when test="itemType == '3' or itemType == 3">
+		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 3)
+			</when>
 			<when test="type == '1003' or type == 1003">
 		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 1)
 			</when>
@@ -2767,6 +2839,40 @@
 		AND EXISTS (SELECT 1 FROM tb_headoffice_corporate_card_payment_detail_list WHERE sale_id = m.sale_id AND itemType = 2)
 			</when>
 		</choose>
+		ORDER BY m.payment_dt ASC, m.sale_id ASC
+	</select>
+
+	<!-- 전체 거래처 본사 법인카드 결제내역 조회 (account_id 조건 없음) -->
+	<select id="HeadOfficeCorporateCardPaymentListAll" parameterType="map" resultType="hashmap">
+		SELECT m.sale_id,
+			   m.account_id,
+			   a.account_name,
+			   DATE_FORMAT(m.payment_dt, '%Y-%m-%d') as payment_dt,
+			   m.use_name,
+			   m.bizNo,
+			   m.total,
+			   m.vat,
+			   m.taxFree,
+			   m.tax,
+			   m.totalCard,
+			   m.cardNo,
+			   m.cardBrand,
+			   m.receipt_image,
+			   m.note,
+			   DATE_FORMAT(m.reg_dt, '%Y-%m-%d') as reg_dt,
+			   m.user_id,
+			   m.receipt_type,
+			   m.idx,
+			   IFNULL(d.detail_total, 0) AS detail_total
+		FROM tb_headoffice_corporate_card_payment_list m
+		LEFT JOIN tb_account a ON a.account_id = m.account_id
+		LEFT JOIN (
+		    SELECT sale_id, SUM(amount) AS detail_total
+		    FROM tb_headoffice_corporate_card_payment_detail_list
+		    GROUP BY sale_id
+		) d ON m.sale_id = d.sale_id
+		WHERE DATE_FORMAT(m.payment_dt, '%Y') = ${year}
+		AND DATE_FORMAT(m.payment_dt, '%m') = ${month}
 		ORDER BY m.payment_dt ASC, m.sale_id ASC
 	</select>
 

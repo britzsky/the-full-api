@@ -63,15 +63,22 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         if (text == null)
             return false;
 
-        boolean hasTitle = text.contains("카드 영수증");
+        boolean hasTitle = text.contains("카드 영수증")
+                || (text.contains("카드사/승인번호") && text.contains("결제일자"));
+        boolean hasPayInfo = text.contains("카드사/승인번호")
+                || text.contains("카드번호")
+                || text.contains("거래종류/할부");
+        boolean hasProduct = text.contains("상품명")
+                && (text.contains("상품 주문번호") || text.contains("상품주문번호"));
         boolean hasSeller = text.contains("판매자 정보") || text.contains("판매자정보") || text.contains("판매자상호");
         boolean hasFranchise = text.contains("가맹점 정보") || text.contains("가맹점정보") || text.contains("가맹점명");
-        // 취소 영수증은 승인금액+취소금액, 일반 영수증은 승인금액+공급가액dmsl
-        boolean hasAmounts = text.contains("승인금액") &&
-                (text.contains("공급가액") || text.contains("부가세액") || text.contains("취소금액")) &&
+        // 취소 영수증은 승인금액+취소금액, 일반 영수증은 승인금액과 공급가액/부가세액 조합으로 판별
+        boolean hasAmounts = text.contains("금액") &&
+                (text.contains("승인금액") || text.contains("공급가액") || text.contains("부가세액")
+                        || text.contains("취소금액")) &&
                 text.contains("합계");
 
-        return hasTitle && hasSeller && hasFranchise && hasAmounts;
+        return (hasTitle || (hasPayInfo && hasProduct)) && hasSeller && hasFranchise && hasAmounts;
     }
 
     /* ========================= ✅ 네이버 "카드 영수증" 파싱 ========================= */
@@ -100,12 +107,16 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 "[NAVER] cardBrand=" + safe(r.payment.cardBrand) + ", approvalNo=" + safe(r.approval.approvalNo));
 
         // 카드번호: "5130-****-****-8923(**/**)" 형태
-        String cardNo = extract(text, "([0-9]{4}[-\\s][0-9*]{4}[-\\s][0-9*]{4}[-\\s][0-9*]{4})");
+        String cardNo = firstNonNull(
+                extractNaverCardNo(text),
+                extract(text, "([0-9]{4}[-_][0-9*]{4}[-_][0-9*]{4}[-_][0-9*]{4})"));
         r.payment.cardMasked = normalizeCardMasked(cardNo);
         System.out.println("[NAVER] cardMasked=" + safe(r.payment.cardMasked));
 
         // 거래종류/할부
-        String tradeType = extract(text, "(신용|체크|직불)\\s*[（(]?(법인|개인)?[）)]?\\s*/\\s*(일시불|[0-9]+개월)");
+        Matcher tradeMatcher = Pattern.compile("(신용|체크|직불)\\s*[（(]?(법인|개인)?[）)]?\\s*/\\s*(일시불|[0-9]+개월)")
+                .matcher(text);
+        String tradeType = tradeMatcher.find() ? tradeMatcher.group().trim() : null;
         if (notEmpty(tradeType)) {
             r.payment.type = tradeType;
         } else {
@@ -121,7 +132,11 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
 
         // 결제일자 / 취소일자
         // 취소 영수증은 "결제일자"와 "취소일자" 두 줄이 모두 있음 → 결제일자 기준으로 파싱
-        Matcher dtm = Pattern.compile("(20\\d{2}-\\d{2}-\\d{2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)").matcher(text);
+        String paymentDateTime = extractDot(text,
+                "(?s)결제일자\\s*(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2}\\s+[0-2]?\\d:[0-5]\\d:[0-5]\\d)", 1);
+        String dateTarget = notEmpty(paymentDateTime) ? paymentDateTime : text;
+        Matcher dtm = Pattern.compile("(20\\d{2}[-./]\\d{1,2}[-./]\\d{1,2})\\s+([0-2]?\\d:[0-5]\\d:[0-5]\\d)")
+                .matcher(dateTarget);
         if (dtm.find()) {
             r.meta.saleDate = normalizeDate(dtm.group(1));
             r.meta.saleTime = normalizeTime(dtm.group(2));
@@ -145,9 +160,11 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                 String t = ln.trim();
                 if (t.isEmpty())
                     continue;
+                if (isLooksLikeLabel(t))
+                    continue;
                 if (notEmpty(orderNo) && t.contains(orderNo))
                     continue; // 주문번호 줄
-                if (t.matches(".*\\d{4}[-\\s*]+[\\d*]{4}[-\\s*]+[\\d*]{4}.*"))
+                if (isCardNumberLikeLine(t))
                     continue; // 카드번호 패턴
                 if (t.matches("20\\d{2}-\\d{2}-\\d{2}.*"))
                     continue; // 날짜 줄
@@ -155,7 +172,7 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
                     continue; // 거래종류 줄 (신용(법인)/일시불)
                 pnSb.append(t).append("\n");
             }
-            productName = pickBestProductLine(pnSb.toString());
+            productName = pnSb.toString();
             productName = cleanProductName(productName);
         }
         if (!notEmpty(orderNo)) {
@@ -479,9 +496,52 @@ public class HeadOfficeNaverReceiptParser extends BaseReceiptParser {
         // 괄호 유효기간 제거
         x = x.replaceAll("\\(.*?\\)", "").trim();
         // _ 같은 이상문자 -> *
+        x = x.replace("_", "-");
         x = x.replaceAll("[^0-9\\*\\-]", "*");
         x = x.replaceAll("\\*{2,}", "****");
+        String digits = x.replaceAll("[^0-9]", "");
+        if (digits.length() >= 8) {
+            return digits.substring(0, 4) + "-****-****-" + digits.substring(digits.length() - 4);
+        }
         return x;
+    }
+
+    // 네이버 OCR에서 카드번호가 여러 줄로 분리된 경우 라벨 아래 값을 이어붙인다.
+    private String extractNaverCardNo(String text) {
+        if (text == null)
+            return null;
+        String[] lines = text.replace("\r", "\n").split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            String label = lines[i].trim().replace(" ", "");
+            if (!label.startsWith("카드번호"))
+                continue;
+
+            StringBuilder sb = new StringBuilder();
+            for (int j = i + 1; j < lines.length; j++) {
+                String t = cleanField(lines[j]);
+                if (!notEmpty(t))
+                    continue;
+                if (t.replace(" ", "").startsWith("거래종류") || t.contains("결제일자") || t.contains("상품명"))
+                    break;
+                if (isCardNumberLikeLine(t)) {
+                    sb.append(t);
+                }
+            }
+            String merged = sb.toString();
+            if (notEmpty(merged))
+                return merged;
+        }
+        return null;
+    }
+
+    // 카드번호 전체 또는 일부처럼 보이는 줄을 상품명 후보에서 제외한다.
+    private boolean isCardNumberLikeLine(String line) {
+        if (line == null)
+            return false;
+        String compact = line.replaceAll("\\s+", "");
+        return compact.matches(".*[0-9*]{2,}[-_][0-9*]{2,}.*")
+                || compact.matches(".*[0-9]{4}[-_*0-9]+.*")
+                || compact.matches("[*\\-_/()0-9]{6,}");
     }
 
     private String extractValueAfterLabel(String text, String label, int maxLines) {

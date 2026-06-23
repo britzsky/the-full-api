@@ -41,9 +41,12 @@ public interface AccountMapper {
 	int insertOrUpdateFile(Map<String, Object> paramMap); 												// 거래처 -> 거래처 상세 이미지 업로드
 	List<Map<String, Object>> AccountDeadlineBalanceList(Map<String, Object> paramMap); 				// 회계 -> 매출마감/미수잔액 조회
 	List<Map<String, Object>> AccountDepositHistoryList(Map<String, Object> paramMap); 					// 회계 -> 매출마감/미수잔액 입금내역 조회
+	List<Map<String, Object>> AccountDeadlineBalanceListBulk(Map<String, Object> paramMap);				// 회계 -> 미납 품목 전용 마감잔액 범위 조회
+	List<Map<String, Object>> AccountDepositHistoryListBulk(Map<String, Object> paramMap);				// 회계 -> 미납 품목 전용 입금내역 범위 조회
 	int AccountDeadlineBalanceSave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 저장
 	int AccountBalancePriceSave(Map<String, Object> paramMap);											// 회계 -> 매출마감/미수잔액 총 미수금액 저장
 	int AccountDepositHistorySave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 입금내역 저장
+	int AccountDepositHistoryUpdate(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 입금내역 수정(입금일자, 비고)
 	int AccountDeadlineBalanceIntegrityCost(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 월 보전금액 조회
 	List<Map<String, Object>> AccountDeadlineDifferencePriceSearch(Map<String, Object> paramMap); 		// 회계 -> 타입별 차액 조회
 	int AccountDeadlineFilesSave(Map<String, Object> paramMap);											// 회계 -> 마감자료 저장
@@ -79,6 +82,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountPurchaseDetailList_tmp(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입집계(임시) 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); 				// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제내역 조회
+	List<Map<String, Object>> HeadOfficeCorporateCardPaymentListAll(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제내역 전체 조회 (account_id 무관)
 	List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제 상세내역 조회
 	void HeadOfficeCorporateCardPaymentDelete(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 결제내역 삭제
 	int HeadOfficeCorporateCardPaymentDetailDelete(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 결제내역 상세 삭제
