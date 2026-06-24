@@ -2873,6 +2873,9 @@
 		) d ON m.sale_id = d.sale_id
 		WHERE DATE_FORMAT(m.payment_dt, '%Y') = ${year}
 		AND DATE_FORMAT(m.payment_dt, '%m') = ${month}
+		<if test="account_id != null and account_id != ''">
+			AND m.account_id = #{account_id}
+		</if>
 		ORDER BY m.payment_dt ASC, m.sale_id ASC
 	</select>
 
