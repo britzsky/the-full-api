@@ -1507,7 +1507,8 @@ public class HeadOfficeController {
 	@PostMapping("HeadOffice/EvaluationFilesUpload")
 	public String EvaluationFilesUpload(
 		@RequestParam("evaluation_idx") String evaluationIdx,
-		@RequestParam("files") MultipartFile[] files
+		@RequestParam("files") MultipartFile[] files,
+		@RequestParam(value = "kpi_rows", required = false) String[] kpiRowsParam
 	) {
 		JsonObject obj = new JsonObject();
 		try {
@@ -1528,23 +1529,51 @@ public class HeadOfficeController {
 			Map<String, Object> listParam = new HashMap<>();
 			listParam.put("evaluation_idx", idxText);
 			List<Map<String, Object>> existingFiles = headOfficeService.EvaluationFileList(listParam);
-			int currentCount = existingFiles == null ? 0 : existingFiles.size();
-			if (currentCount >= MAX_EVALUATION_FILE_COUNT) {
-				obj.addProperty("code", 400);
-				obj.addProperty("message", "첨부 파일은 최대 20개까지 등록 가능합니다.");
-				return obj.toString();
+			if (existingFiles == null) existingFiles = new ArrayList<>();
+
+			// kpi_rows 파라미터가 files 배열과 길이가 맞으면 새 인코딩 방식 사용
+			// image_order = kpiRow * 100 + 행내파일인덱스(1~10)
+			boolean useKpiScheme = kpiRowsParam != null && kpiRowsParam.length == files.length;
+
+			// 기존 파일에서 kpiRow별 파일 수 집계 (새 인코딩만)
+			Map<Integer, Integer> kpiRowExistingCount = new HashMap<>();
+			for (Map<String, Object> f : existingFiles) {
+				int order = ((Number) f.get("image_order")).intValue();
+				if (order >= 100) {
+					kpiRowExistingCount.merge(order / 100, 1, Integer::sum);
+				}
 			}
+
+			// 이번 요청에서 kpiRow별 추가된 파일 수 (중복 방지)
+			Map<Integer, Integer> kpiRowNewCount = new HashMap<>();
+
+			// 레거시 방식용 순번
+			int nextOrder = useKpiScheme ? 0 : headOfficeService.GetNextEvaluationFileOrder(idxInt);
+			int available = MAX_EVALUATION_FILE_COUNT - existingFiles.size();
 
 			Path evalDirPath = resolveEvaluationDirPath(idxText);
 			Files.createDirectories(evalDirPath);
 
-			int nextOrder = headOfficeService.GetNextEvaluationFileOrder(idxInt);
-			int available = MAX_EVALUATION_FILE_COUNT - currentCount;
 			List<Map<String, Object>> inserted = new ArrayList<>();
 
-			for (MultipartFile file : files) {
-				if (inserted.size() >= available) break;
+			for (int i = 0; i < files.length; i++) {
+				MultipartFile file = files[i];
 				if (file == null || file.isEmpty()) continue;
+
+				int imageOrder;
+				if (useKpiScheme) {
+					int kpiRow;
+					try { kpiRow = Integer.parseInt(kpiRowsParam[i]); } catch (Exception e) { continue; }
+					if (kpiRow < 1) continue;
+					int existing = kpiRowExistingCount.getOrDefault(kpiRow, 0);
+					int added    = kpiRowNewCount.getOrDefault(kpiRow, 0);
+					if (existing + added >= 10) continue; // KPI 행당 최대 10개
+					imageOrder = kpiRow * 100 + (existing + added + 1);
+					kpiRowNewCount.merge(kpiRow, 1, Integer::sum);
+				} else {
+					if (inserted.size() >= available) break;
+					imageOrder = nextOrder++;
+				}
 
 				String originalName = asText(file.getOriginalFilename());
 				if (originalName.isEmpty()) originalName = "file";
@@ -1559,7 +1588,7 @@ public class HeadOfficeController {
 
 				Map<String, Object> saveParam = new HashMap<>();
 				saveParam.put("evaluation_idx", idxInt);
-				saveParam.put("image_order",    nextOrder++);
+				saveParam.put("image_order",    imageOrder);
 				saveParam.put("image_path",     imagePath);
 				saveParam.put("image_name",     safeName);
 				headOfficeService.EvaluationFileSave(saveParam);

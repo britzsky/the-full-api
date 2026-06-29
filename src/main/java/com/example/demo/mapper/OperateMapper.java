@@ -82,4 +82,5 @@ public interface OperateMapper {
 	int EmergencyPersonEmployment(Map<String, Object> paramMap);								// 긴급인력관리 -> 긴급인력 채용정보 저장
 	int SaveCallHistory(Map<String, Object> paramMap);											// 긴급인력관리 -> 연락 이력 저장
 	int HolidaySave(Map<String, Object> paramMap);												// 공공데이터 공휴일 정보 저장
+	List<Map<String, Object>> HolidayList(Map<String, Object> paramMap);						// 공휴일 목록 조회
 }

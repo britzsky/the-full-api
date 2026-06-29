@@ -120,4 +120,6 @@ public interface AccountMapper {
 	int AccountDispatchMemberDelete(Map<String, Object> paramMap);										// 긴급인력 파출 회원 정보 삭제
 	int AccountDispatchRecordDelete(Map<String, Object> paramMap);										// 긴급인력 파출 출근기록 삭제
 	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap);										// 회계 -> 매입집계 삭제
+	Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap);								// 회계 -> 월 마감 수정권한 조회
+	int MonthLockOverrideSave(Map<String, Object> paramMap);											// 회계 -> 월 마감 수정권한 저장/수정
 }

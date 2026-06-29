@@ -44,6 +44,13 @@ public class OperateService {
 		return accountKey;
 	}
 
+	// 공휴일 목록 조회
+	public List<Map<String, Object>> HolidayList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.HolidayList(paramMap);
+		return resultList;
+	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 조회
 	public List<Map<String, Object>> TallySheetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

@@ -2595,4 +2595,15 @@
     	holiday_sn=#{holiday_sn},
     	updated_at=NOW()
     </insert>
+
+    <select id="HolidayList" parameterType="map" resultType="map">
+    	SELECT
+    		DAY(holiday_date) AS holiday_day,
+    		DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date,
+    		holiday_name
+    	FROM tb_holiday
+    	WHERE YEAR(holiday_date) = #{year}
+    	  AND MONTH(holiday_date) = #{month}
+    	ORDER BY holiday_date
+    </select>
 </mapper>

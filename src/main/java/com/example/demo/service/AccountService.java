@@ -1317,4 +1317,14 @@ public class AccountService {
 		iResult = accountMapper.AccountPurchaseTallyV2Delete(paramMap);
 		return iResult;
 	}
+
+	// 회계 -> 월 마감 수정권한 조회
+	public Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap) {
+		return accountMapper.MonthLockOverrideGet(paramMap);
+	}
+
+	// 회계 -> 월 마감 수정권한 저장/수정
+	public int MonthLockOverrideSave(Map<String, Object> paramMap) {
+		return accountMapper.MonthLockOverrideSave(paramMap);
+	}
 }

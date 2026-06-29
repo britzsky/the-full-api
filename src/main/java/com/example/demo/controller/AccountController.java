@@ -2976,4 +2976,44 @@ public class AccountController {
 
 		return obj.toString();
 	}
+
+	/*
+	 * part : 회계
+	 * method : MonthLockOverrideGet
+	 * comment : 회계 월 마감 수정권한 조회
+	 */
+	@GetMapping("/Accounting/MonthLockOverride")
+	public String MonthLockOverrideGet(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.MonthLockOverrideGet(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (result != null) {
+			Object val = result.get("is_override");
+			int isOverride = (val != null) ? Integer.parseInt(val.toString()) : 0;
+			obj.addProperty("is_override", isOverride);
+		} else {
+			obj.addProperty("is_override", 0);
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
+	 * method : MonthLockOverrideSave
+	 * comment : 회계 월 마감 수정권한 저장/수정
+	 */
+	@PostMapping("/Accounting/MonthLockOverride")
+	public String MonthLockOverrideSave(@RequestBody Map<String, Object> paramMap) {
+		int iResult = accountService.MonthLockOverrideSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
 }

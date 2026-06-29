@@ -364,6 +364,18 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : HolidayList
+     * comment : 공휴일 목록 조회 (year, month 파라미터)
+     */
+    @GetMapping("Operate/HolidayList")
+    public String HolidayList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        resultList = operateService.HolidayList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
      * method : AccountPropertiesList
      * comment : 급식사업부 -> 운영관리 -> 위생관리 조회
      */

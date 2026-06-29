@@ -3701,4 +3701,26 @@
 		mod_id=#{user_id}
 		WHERE sale_id = #{sale_id}
 	</delete>
+
+	<!-- 회계 월 마감 수정권한 조회 -->
+	<select id="MonthLockOverrideGet" parameterType="map" resultType="hashmap">
+		SELECT is_override
+		FROM tb_account_month_lock
+		WHERE account_id = #{account_id}
+		  AND year       = #{year}
+		  AND month      = #{month}
+		  AND type       = #{type}
+		LIMIT 1
+	</select>
+
+	<!-- 회계 월 마감 수정권한 저장/수정 (UPSERT) -->
+	<insert id="MonthLockOverrideSave" parameterType="map">
+		INSERT INTO tb_account_month_lock (account_id, year, month, type, is_override, updated_by, updated_at)
+		VALUES (#{account_id}, #{year}, #{month}, #{type}, #{is_override}, #{user_id}, NOW())
+		ON DUPLICATE KEY UPDATE
+			is_override = #{is_override},
+			updated_by  = #{user_id},
+			updated_at  = NOW()
+	</insert>
+
 </mapper>
