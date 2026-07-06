@@ -30,6 +30,7 @@ import com.example.demo.WebConfig;
 import com.example.demo.mapper.AccountMapper;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.OperateService;
+import com.example.demo.controller.BudgetNoteCarryOverScheduler;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -41,6 +42,7 @@ public class OperateController {
     private final AccountMapper accountMapper;
     private final JdbcTemplate jdbcTemplate;
     private final String uploadDir;
+    private final BudgetNoteCarryOverScheduler budgetNoteCarryOverScheduler;
 
     @Autowired
     public OperateController(
@@ -49,12 +51,14 @@ public class OperateController {
             AccountMapper accountMapper,
             JdbcTemplate jdbcTemplate,
             WebConfig webConfig,
+            BudgetNoteCarryOverScheduler budgetNoteCarryOverScheduler,
             @Value("${file.upload-dir}") String uploadDir) {
         this.accountService = accountService;
         this.operateService = operateService;
         this.accountMapper = accountMapper;
         this.jdbcTemplate = jdbcTemplate;
         this.uploadDir = uploadDir;
+        this.budgetNoteCarryOverScheduler = budgetNoteCarryOverScheduler;
     }
 
     /*
@@ -1128,6 +1132,27 @@ public class OperateController {
         }
 
         return obj.toString();
+    }
+
+    /*
+     * part : 운영
+     * method : BudgetNoteCarryOverNow
+     * comment : 예산관리 비고 이월 수동 실행 (year, month 기준으로 전달 비고 → 당월 복사)
+     */
+    @PostMapping("Operate/BudgetNoteCarryOverNow")
+    public String BudgetNoteCarryOverNow(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = new HashMap<>();
+        try {
+            int year  = Integer.parseInt(String.valueOf(paramMap.get("year")));
+            int month = Integer.parseInt(String.valueOf(paramMap.get("month")));
+            int updated = budgetNoteCarryOverScheduler.carryOver(year, month);
+            result.put("code", 200);
+            result.put("message", updated + "건 비고 이월 완료");
+        } catch (Exception e) {
+            result.put("code", 500);
+            result.put("message", e.getMessage());
+        }
+        return new Gson().toJson(result);
     }
 
     /*

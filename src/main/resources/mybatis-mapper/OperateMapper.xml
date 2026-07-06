@@ -2040,6 +2040,20 @@
 	    </trim>
 	</insert>
 	
+	<update id="BudgetNoteCarryOver" parameterType="map">
+		UPDATE tb_account_budget_management curr
+		INNER JOIN tb_account_budget_management prev
+		  ON prev.account_id = curr.account_id
+		  AND prev.year  = CASE WHEN curr.month = 1 THEN curr.year - 1 ELSE curr.year END
+		  AND prev.month = CASE WHEN curr.month = 1 THEN 12 ELSE curr.month - 1 END
+		SET curr.note = prev.note
+		WHERE curr.year  = #{year}
+		  AND curr.month = #{month}
+		  AND (curr.note IS NULL OR TRIM(curr.note) = '')
+		  AND prev.note IS NOT NULL
+		  AND TRIM(prev.note) != ''
+	</update>
+
 	<select id="AnnualLeaveList" parameterType="map" resultType="map">
 		SELECT ledger_id,
 			   member_id,
