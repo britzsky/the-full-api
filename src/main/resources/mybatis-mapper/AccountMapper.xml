@@ -1418,7 +1418,9 @@
 		AND adb.month = #{month}
 		LEFT OUTER JOIN tb_account_balance_price abp
 		ON abp.account_id = a.account_id
-		WHERE a.del_yn = 'N'
+		<!-- ALL은 전체 거래처, 파라미터가 없으면 사용 중인 거래처를 조회 -->
+		WHERE (COALESCE(#{del_yn}, 'N') = 'ALL'
+			OR a.del_yn = COALESCE(#{del_yn}, 'N'))
 	</select>
 	
 	<!-- 미납 품목 전용: 연도 범위 내 전체 마감잔액 한 번에 조회 -->

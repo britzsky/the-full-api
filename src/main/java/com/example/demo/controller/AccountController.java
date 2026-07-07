@@ -2534,7 +2534,7 @@ public class AccountController {
 
 		for (Map<String, Object> paramMap : paramList) {
 			iResult += accountService.AccountCorporateCardSave(paramMap);
-			iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
+			// iResult += accountService.TallySheetCorporateCardPaymentSaveV2(paramMap);
 		}
 
 		JsonObject obj = new JsonObject();

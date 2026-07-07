@@ -125,8 +125,17 @@ public class OcrController_develop {
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "receipt_type", required = false) String receiptType,
             @RequestParam(value = "user_id", required = false) String user_id,
+            @RequestParam(value = "payType", required = false) String payType,
+            @RequestParam(value = "cash_receipt_type", required = false) String cash_receipt_type,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
-            @RequestParam(value = "use_name", required = false) String use_name) {
+            @RequestParam(value = "use_name", required = false) String use_name,
+            @RequestParam(value = "card_idx", required = false) String card_idx,
+            @RequestParam(value = "card_brand", required = false) String card_brand,
+            @RequestParam(value = "card_no", required = false) String card_no,
+            @RequestParam(value = "id", required = false) String id,
+            @RequestParam(value = "sale_id", required = false) String sale_id,
+            @RequestParam(value = "row_account_id", required = false) String row_account_id,
+            @RequestParam(value = "skip_date_mismatch_check", required = false) String skipDateMismatchCheckParam) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -146,6 +155,16 @@ public class OcrController_develop {
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
         purchase.put("use_name", use_name);
+        purchase.put("payType", payType);
+        purchase.put("cashReceiptType", cash_receipt_type);
+        // corp card 전용 필드
+        purchase.put("idx", card_idx);
+        purchase.put("card_idx", card_idx);
+        purchase.put("cardBrand", card_brand);
+        purchase.put("cardNo", card_no);
+        if (id != null) purchase.put("id", id);
+        if (sale_id != null) purchase.put("sale_id", sale_id);
+        if (row_account_id != null) purchase.put("row_account_id", row_account_id);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -249,20 +268,17 @@ public class OcrController_develop {
              */
 
             Integer parsedTotal = result.totals != null ? result.totals.total : null;
-            int effectiveTotal = (parsedTotal == null || parsedTotal < 100) ? safeInt(total) : parsedTotal;
-            if (parsedTotal == null || parsedTotal < 100) {
-                purchase.put("total", total); // total 세팅.
-            } else {
-                purchase.put("total", result.totals.total); // total 세팅.
-            }
+            int requestTotal = safeInt(total);
+            // develop 집계표: 사용자가 total을 입력했으면(>0) 무조건 우선, 없으면 OCR 결과 사용
+            int effectiveTotal = (requestTotal > 0) ? requestTotal
+                    : ((parsedTotal == null || parsedTotal < 100) ? 0 : parsedTotal);
+            purchase.put("total", effectiveTotal);
 
             purchase.put("discount", result.totals.discount);
             purchase.put("vat", result.totals.vat);
             purchase.put("taxFree", result.totals.taxFree);
             //purchase.put("use_name", result.merchant != null ? result.merchant.name : null);
 
-            // 결제금액
-            purchase.put("total", effectiveTotal);
             String approvalAmt = (result.payment != null ? result.payment.approvalAmt : null);
             int iApprovalAmt = 0;
 
@@ -276,7 +292,11 @@ public class OcrController_develop {
                 iApprovalAmt = effectiveTotal;
             }
 
-            if ("cash".equals(result.payment != null ? result.payment.type : null)) {
+            // develop 집계표: 사용자가 payType을 입력했으면 우선 적용, 없으면 OCR 결과 사용
+            boolean hasUserPayType = (payType != null && !payType.isBlank());
+            int effectivePayType = hasUserPayType ? safeInt(payType)
+                    : ("cash".equals(result.payment != null ? result.payment.type : null) ? 1 : 2);
+            if (effectivePayType == 1) {
                 purchase.put("payType", 1);
                 purchase.put("totalCash", iApprovalAmt);
                 purchase.put("totalCard", 0);
@@ -410,10 +430,24 @@ public class OcrController_develop {
         purchase.put("count_year", baseDate.format(DateTimeFormatter.ofPattern("yyyy")));
         purchase.put("count_month", baseDate.format(DateTimeFormatter.ofPattern("MM")));
 
-        // total은 requestparam에 없으니 0 (혹은 saveType에 따라 다른 정책 가능)
         purchase.putIfAbsent("discount", 0);
         purchase.putIfAbsent("vat", 0);
         purchase.putIfAbsent("taxFree", 0);
+        // payType 기본값: 사용자 입력 없으면 2(카드)
+        if (purchase.get("payType") == null) {
+            purchase.put("payType", 2);
+        }
+        // totalCash / totalCard 기본값
+        int fallbackTotal = safeInt(purchase.get("total"));
+        Object ptObj = purchase.get("payType");
+        int ptVal = (ptObj != null) ? safeInt(ptObj) : 2;
+        if (ptVal == 1) {
+            purchase.putIfAbsent("totalCash", fallbackTotal);
+            purchase.putIfAbsent("totalCard", 0);
+        } else {
+            purchase.putIfAbsent("totalCard", fallbackTotal);
+            purchase.putIfAbsent("totalCash", 0);
+        }
 
         // 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
         int year = baseDate.getYear(); // 2026

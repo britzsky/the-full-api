@@ -385,7 +385,10 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
         boolean hasComma = stripped.contains(",");
         String digits = m.group(1).replaceAll("[^0-9]", "");
 
-        if (!hasWon && !hasComma) return null;
+        // 콤마도 원도 없는 순수 숫자(예: 부가세 685)도 금액으로 허용
+        // 단, 7자리 이상은 아래 필터에서 걸림(승인번호/주문번호 방어)
+        boolean isStandaloneDigits = stripped.matches("[0-9]+");
+        if (!hasWon && !hasComma && !isStandaloneDigits) return null;
 
         // 너무 길면(주문번호급) 배제
         if (digits.length() >= 7) return null;
