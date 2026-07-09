@@ -328,6 +328,7 @@
 	        <if test="account_type != null and account_type != ''">account_type,</if>
 	        <if test="meal_type != null and meal_type != ''">meal_type,</if>
 	        <if test="del_yn != null and del_yn != ''">del_yn,</if>
+	        <if test="user_id != null and user_id != ''">user_id,</if>
 	        reg_dt
 	    )
 	    VALUES (
@@ -341,6 +342,7 @@
 	        <if test="account_type != null and account_type != ''">#{account_type},</if>
 	        <if test="meal_type != null and meal_type != ''">#{meal_type},</if>
 	        <if test="del_yn != null and del_yn != ''">#{del_yn},</if>
+	        <if test="user_id != null and user_id != ''">#{user_id},</if>
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d %H:%i:%s')
 	    )
 	    ON DUPLICATE KEY UPDATE
@@ -355,6 +357,7 @@
 	        <if test="meal_type != null and meal_type != ''">, meal_type = #{meal_type}</if>
 	        <if test="del_yn != null and del_yn != ''">, del_yn = #{del_yn}</if>
 	        <if test='del_yn == "Y"'>, del_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</if>
+	        <if test="user_id != null and user_id != ''">, user_id = #{user_id}</if>
 	</insert>
 	
 	<select id="AccountRecordSheetList" parameterType="map" resultType="hashmap">
@@ -1397,10 +1400,10 @@
 	</insert>
 	
 	<select id="AccountDeadlineBalanceList" parameterType="map" resultType="hashmap">
-		SELECT a.account_id, 
+		SELECT a.account_id,
 			   a.account_name,
-		       adb.year, 
-			   adb.month, 
+		       adb.year,
+			   adb.month,
 			   adb.balance_file,
 			   ifnull(adb.living_cost,0) as living_cost,
 		       ifnull(adb.basic_cost,0) as basic_cost,
@@ -1418,9 +1421,14 @@
 		AND adb.month = #{month}
 		LEFT OUTER JOIN tb_account_balance_price abp
 		ON abp.account_id = a.account_id
+		LEFT OUTER JOIN tb_account_info ai
+		ON ai.account_id = a.account_id
 		<!-- ALL은 전체 거래처, 파라미터가 없으면 사용 중인 거래처를 조회 -->
 		WHERE (COALESCE(#{del_yn}, 'N') = 'ALL'
 			OR a.del_yn = COALESCE(#{del_yn}, 'N'))
+		AND (COALESCE(#{del_yn}, 'N') = 'ALL'
+			OR ai.contract_end IS NULL
+			OR LEFT(ai.contract_end, 7) >= CONCAT(#{year}, '-', LPAD(#{month}, 2, '0')))
 	</select>
 	
 	<!-- 미납 품목 전용: 연도 범위 내 전체 마감잔액 한 번에 조회 -->

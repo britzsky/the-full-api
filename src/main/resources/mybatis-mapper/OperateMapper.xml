@@ -1973,6 +1973,7 @@
 	        day_use_ratio,
 	        existing_budget,
 	        diff_amount,
+	        user_id,
 	        update_dt
 	    )
 	    VALUES
@@ -1993,6 +1994,7 @@
 	        #{day_use_ratio},
 	        #{existing_budget},
 	        #{diff_amount},
+	        #{user_id},
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    )
 	    ON DUPLICATE KEY UPDATE
@@ -2035,6 +2037,9 @@
 	        </if>
 	        <if test="diff_amount != null">
 	            diff_amount = #{diff_amount},
+	        </if>
+	        <if test="user_id != null and user_id != ''">
+	            user_id = #{user_id},
 	        </if>
 	        update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
