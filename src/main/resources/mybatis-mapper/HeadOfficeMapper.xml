@@ -723,6 +723,9 @@
                             -- 20250819193613,		 대교뉴이프(마음고향2호점)
                             -- 20250819193535		 마음고향
                         )
+                        <if test="account_ids != null and account_ids != ''">
+                            AND account_id IN (${account_ids})
+                        </if>
 					    GROUP BY year, month
 					) AS aggregated_data
 					ORDER BY year ASC, month ASC
