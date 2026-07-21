@@ -68,7 +68,13 @@ public class CardReceiptController {
             @RequestParam(value = "cardNo", required = false) String cardNo,
             @RequestParam(value = "cardBrand", required = false) String cardBrand,
             @RequestParam(value = "saveType", required = false) String saveType,
-            @RequestParam(value = "sale_id", required = false) String sale_id) {
+            @RequestParam(value = "sale_id", required = false) String sale_id,
+            @RequestParam(value = "receiptType", required = false) String receiptType,
+            @RequestParam(value = "tallyType", required = false) String tallyType,
+            @RequestParam(value = "use_name", required = false) String useName,
+            @RequestParam(value = "total", required = false) String total,
+            @RequestParam(value = "cell_date", required = false) String cellDate,
+            @RequestParam(value = "user_id", required = false) String userId) {
         try {
             if (file == null || file.isEmpty()) {
                 return ResponseEntity.badRequest().body("file is empty");
@@ -94,26 +100,32 @@ public class CardReceiptController {
 
             String resultPath = "/image/" + folderValue + "/" + saleIdForPath + "/" + uniqueFileName;
 
-            // ✅ 1) 파싱 (type 있으면 강제, 없으면 자동)
+            String resolvedReceiptType = firstNonBlank(receiptType, type);
+
+            // ✅ 1) 파싱 (영수증 타입이 있으면 강제, 없으면 자동)
             CardReceiptResponse res;
             BaseReceiptParser.ReceiptResult result;
             try {
-                res = cardReceiptParseService.parseFile(savedPath.toFile(), type);
+                res = cardReceiptParseService.parseFile(savedPath.toFile(), resolvedReceiptType);
                 result = res.result;
             } catch (Exception ex) {
                 // ✅ 파싱 실패해도 기본값으로 DB 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(
-                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath, sale_id));
+                        objectValue, cardNo, cardBrand, saveType, resolvedReceiptType, tallyType,
+                        useName, total, cellDate, userId, resultPath, sale_id));
             }
 
             if (result == null || result.meta == null || result.meta.saleDate == null) {
                 // ✅ 핵심 meta 없으면 기본값으로 DB 저장
                 return ResponseEntity.ok(saveWithRequestParamsOnly(
-                        objectValue, folderValue, cardNo, cardBrand, saveType, type, resultPath, sale_id));
+                        objectValue, cardNo, cardBrand, saveType, resolvedReceiptType, tallyType,
+                        useName, total, cellDate, userId, resultPath, sale_id));
             }
 
-            // ✅ 2) saleId 생성(영수증 날짜 기반)
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            // 선택한 집계표 셀 날짜를 우선 사용하고, 없으면 영수증 인식 날짜를 사용한다.
+            LocalDate date = cellDate != null && !cellDate.isBlank()
+                    ? DateUtils.parseFlexibleDate(cellDate)
+                    : DateUtils.parseFlexibleDate(result.meta.saleDate);
             LocalDateTime dateTime = LocalDateTime.of(date, LocalTime.now());
             String parsedSaleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : parsedSaleId;
@@ -140,9 +152,8 @@ public class CardReceiptController {
 
             corporateCard.put("cardNo", cardNo);
             corporateCard.put("cardBrand", cardBrand);
-            // ✅ 요청으로 받은 영수증 타입 저장 (DB에 UNKNOWN 기본값 들어가는 것 방지)
-            corporateCard.put("type", type);
-            corporateCard.put("receipt_type", type);
+            corporateCard.put("type", parseTallyType(tallyType));
+            corporateCard.put("receipt_type", resolvedReceiptType);
             corporateCard.put("sale_id", targetSaleId);
 
             String rawText = extractRawText(result);
@@ -155,15 +166,18 @@ public class CardReceiptController {
                     normalizeBizNoSafe(valueBelowLabel(rawText, "사업자등록번호"))
             );
 
-            corporateCard.put("use_name", merchantName);
+            corporateCard.put("use_name", firstNonBlank(useName, merchantName));
             corporateCard.put("bizNo", merchantBizNo);
             corporateCard.put("payment_dt", date);
-            corporateCard.put("total", result.totals != null ? result.totals.total : null);
+            corporateCard.put("total", hasPositiveAmount(total)
+                    ? total
+                    : result.totals != null ? result.totals.total : null);
             corporateCard.put("discount", result.totals != null ? result.totals.discount : null);
             corporateCard.put("vat", result.totals != null ? result.totals.vat : null);
             corporateCard.put("taxFree", result.totals != null ? result.totals.taxFree : null);
             corporateCard.put("tax", result.totals != null ? result.totals.taxable : null);
             corporateCard.put("receipt_image", resultPath);
+            corporateCard.put("user_id", userId);
 
             // detailList
             List<Map<String, Object>> detailList = new ArrayList<>();
@@ -212,36 +226,44 @@ public class CardReceiptController {
     // ✅ 파싱 실패 시에도 기본값으로 저장
     private Map<String, Object> saveWithRequestParamsOnly(
             String objectValue,
-            String folderValue,
             String cardNo,
             String cardBrand,
             String saveType,
             String receiptType,
+            String tallyType,
+            String useName,
+            String total,
+            String cellDate,
+            String userId,
             String resultPath,
             String sale_id) {
         Map<String, Object> corporateCard = new HashMap<>();
 
         LocalDateTime now = LocalDateTime.now();
+        LocalDate paymentDate = cellDate != null && !cellDate.isBlank()
+                ? DateUtils.parseFlexibleDate(cellDate)
+                : now.toLocalDate();
         String generatedSaleId = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
         String targetSaleId = (sale_id != null && !sale_id.isBlank()) ? sale_id : generatedSaleId;
 
         corporateCard.put("account_id", objectValue);
-        corporateCard.put("year", now.getYear());
-        corporateCard.put("month", now.getMonthValue());
+        corporateCard.put("year", paymentDate.getYear());
+        corporateCard.put("month", paymentDate.getMonthValue());
         corporateCard.put("cardNo", cardNo);
         corporateCard.put("cardBrand", cardBrand);
-        // ✅ 파싱 실패 시에도 요청 타입은 그대로 저장
+        corporateCard.put("type", parseTallyType(tallyType));
         corporateCard.put("receipt_type", receiptType);
         corporateCard.put("sale_id", targetSaleId);
-        corporateCard.put("use_name", null);
+        corporateCard.put("use_name", useName);
         corporateCard.put("bizNo", null);
-        corporateCard.put("payment_dt", now.toLocalDate());
-        corporateCard.put("total", 0);
+        corporateCard.put("payment_dt", paymentDate);
+        corporateCard.put("total", total != null && !total.isBlank() ? total : 0);
         corporateCard.put("discount", 0);
         corporateCard.put("vat", 0);
         corporateCard.put("taxFree", 0);
         corporateCard.put("tax", 0);
         corporateCard.put("receipt_image", resultPath);
+        corporateCard.put("user_id", userId);
 
         boolean isAccount = "account".equalsIgnoreCase(saveType);
         if (isAccount) {
@@ -253,6 +275,26 @@ public class CardReceiptController {
         }
 
         return corporateCard;
+    }
+
+    // 집계표 구분값이 없거나 숫자가 아니면 기존 기본 타입으로 처리한다.
+    private int parseTallyType(String tallyType) {
+        if (tallyType == null || !tallyType.matches("^\\d+$")) {
+            return 1000;
+        }
+        return Integer.parseInt(tallyType);
+    }
+
+    // 화면 입력 금액이 0이면 OCR에서 인식한 합계 금액을 사용한다.
+    private boolean hasPositiveAmount(String total) {
+        if (total == null || total.isBlank()) {
+            return false;
+        }
+        try {
+            return Double.parseDouble(total.replace(",", "")) > 0;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 
     // ---------------- 너 기존 classify/taxify 그대로 붙여넣기 ----------------
