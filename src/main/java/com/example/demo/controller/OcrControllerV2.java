@@ -265,7 +265,7 @@ public class OcrControllerV2 {
                 String paymentCardBrand = result.payment != null ? result.payment.cardBrand : null;
                 Integer parsedTotal = result.totals != null ? result.totals.total : null;
                 int userInputTotal = toInt(total);
-                int effectiveTotal = useUserInputTotal
+                int effectiveTotal = (useUserInputTotal && userInputTotal > 0)
                         ? userInputTotal
                         : (parsedTotal == null || parsedTotal < 100) ? userInputTotal : parsedTotal;
 
