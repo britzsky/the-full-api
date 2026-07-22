@@ -390,8 +390,10 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
         boolean isStandaloneDigits = stripped.matches("[0-9]+");
         if (!hasWon && !hasComma && !isStandaloneDigits) return null;
 
-        // 너무 길면(주문번호급) 배제
-        if (digits.length() >= 7) return null;
+        // 콤마·원 없는 순수 숫자가 7자리 이상이면 승인번호/주문번호 가능성이 높아 배제
+        // 단, 콤마가 있거나 원이 붙어있으면 실제 금액(100만원+)이므로 10자리 미만까지 허용
+        if (!hasComma && !hasWon && digits.length() >= 7) return null;
+        if (digits.length() >= 10) return null;
 
         return toInt(m.group(1));
     }
@@ -588,6 +590,17 @@ public class HeadOfficeCoupangReceiptParser extends BaseReceiptParser {
     private String normalizeInstallment(String picked, List<String> lines) {
         if (picked == null) return null;
         String x = picked.trim();
+        // "할부개월"은 라벨 자체이므로 실제 값(일시불 또는 N개월)을 재탐색
+        if (x.equals("할부개월")) {
+            for (String s : lines) {
+                if (s.trim().equals("일시불")) return "일시불";
+            }
+            for (String s : lines) {
+                String t = s.trim();
+                if (t.matches("\\d+개월")) return t;
+            }
+            return null;
+        }
         if (x.equals("할부")) {
             for (String s : lines) {
                 if (s.contains("개월")) return s.trim();

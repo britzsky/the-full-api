@@ -717,7 +717,7 @@ public class OcrControllerV2 {
 
     // 상세 품목 금액이 파싱 금액으로 다시 저장되지 않도록 첫 품목에 입력 금액을 세팅한다.
     private Object resolveDetailAmount(Object parsedAmount, int userInputTotal, boolean useUserInputTotal, boolean isFirstDetail) {
-        if (!useUserInputTotal) {
+        if (!useUserInputTotal || userInputTotal <= 0) {
             return parsedAmount;
         }
         return isFirstDetail ? userInputTotal : 0;
