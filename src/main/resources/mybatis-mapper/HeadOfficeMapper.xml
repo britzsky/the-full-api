@@ -3219,7 +3219,6 @@
 	<!--
 	  인사 -> 평가 -> 알림 목록 (네비바 알림 뱃지용)
 	  - 팀장결재요청    : tm_user가 배정되고 아직 결재 안됨(tm_sign != '4') 상태인 세션
-	  - 실장확인요청    : hp_user가 배정되고 팀장 완료 후 실장 확인 대기 상태인 세션
 	  - 인사팀장결재요청: hr_user가 배정되고 이미 확인 대기 상태인 세션
 	  - 대표확인요청    : ceo_user가 배정되고 상위 확인 완료 후 대표 확인 대기인 세션
 	  - 확인완료        : 배정된 작성자 문서가 모든 확인 완료 후 아직 표시 안된 세션
@@ -3252,25 +3251,6 @@
 		        u.user_name                                       AS writer_name,
 		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
 		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
-		        '실장확인요청'                                     AS notify_type,
-		        'KPI 평가 알림'                                    AS notify_title,
-		        CONCAT('[', u.user_name, '] KPI 평가 실장 확인이 필요합니다.') AS notify_message,
-		        DATE_FORMAT(e.reg_dt, '%Y-%m-%d %H:%i:%s')       AS reg_dt
-		    FROM tb_hr_evaluation e
-		    JOIN tb_user u ON u.user_id = e.user_id
-		    WHERE e.hp_user = #{user_id}
-		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
-		      AND IFNULL(e.hp_sign, '') NOT IN ('4')
-		      AND e.del_yn = 'N'
-
-		    UNION
-
-		    SELECT
-		        e.idx,
-		        e.user_id                                         AS writer_id,
-		        u.user_name                                       AS writer_name,
-		        DATE_FORMAT(e.start_time, '%Y-%m-%d')            AS start_time,
-		        DATE_FORMAT(e.end_time,   '%Y-%m-%d')            AS end_time,
 		        '인사팀장결재요청'                                  AS notify_type,
 		        'KPI 평가 알림'                                    AS notify_title,
 		        CONCAT('[', u.user_name, '] KPI 평가 인사팀장 확인이 필요합니다.') AS notify_message,
@@ -3279,7 +3259,6 @@
 		    JOIN tb_user u ON u.user_id = e.user_id
 		    WHERE e.hr_user = #{user_id}
 		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
-		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
 		      AND IFNULL(e.hr_sign, '') NOT IN ('4')
 		      AND e.del_yn = 'N'
 
@@ -3299,7 +3278,6 @@
 		    JOIN tb_user u ON u.user_id = e.user_id
 		    WHERE e.ceo_user = #{user_id}
 		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
-		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
 		      AND (IFNULL(e.hr_user, '') = '' OR IFNULL(e.hr_sign, '') = '4')
 		      AND IFNULL(e.ceo_sign, '') NOT IN ('4')
 		      AND e.del_yn = 'N'
@@ -3320,7 +3298,6 @@
 		    JOIN tb_user u ON u.user_id = e.user_id
 		    WHERE e.user_id      = #{user_id}
 		      AND (IFNULL(e.tm_user, '') = '' OR IFNULL(e.tm_sign, '') = '4')
-		      AND (IFNULL(e.hp_user, '') = '' OR IFNULL(e.hp_sign, '') = '4')
 		      AND (IFNULL(e.hr_user, '') = '' OR IFNULL(e.hr_sign, '') = '4')
 		      AND (IFNULL(e.ceo_user, '') = '' OR IFNULL(e.ceo_sign, '') = '4')
 		      AND e.user_read_dt IS NULL
@@ -3351,12 +3328,6 @@
 		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
 		                       ELSE tm_read_dt
 		                     END,
-		    hp_read_dt   = CASE
-		                       WHEN hp_user = #{user_id}
-		                        AND #{notify_type} = '실장확인요청'
-		                         THEN DATE_ADD(NOW(), INTERVAL 9 HOUR)
-		                       ELSE hp_read_dt
-		                     END,
 		    ceo_read_dt  = CASE
 		                       WHEN ceo_user = #{user_id}
 		                        AND #{notify_type} = '대표확인요청'
@@ -3375,7 +3346,6 @@
 		  AND (
 		        (user_id  = #{user_id} AND #{notify_type} = '확인완료')
 		     OR (tm_user  = #{user_id} AND #{notify_type} = '팀장결재요청')
-		     OR (hp_user  = #{user_id} AND #{notify_type} = '실장확인요청')
 		     OR (hr_user  = #{user_id} AND #{notify_type} = '인사팀장결재요청')
 		     OR (ceo_user = #{user_id} AND #{notify_type} = '대표확인요청')
 		       )
