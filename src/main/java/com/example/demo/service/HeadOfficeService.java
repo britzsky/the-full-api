@@ -123,14 +123,6 @@ public class HeadOfficeService {
 			throw new RuntimeException("BudgetTotalSave 저장 실패");
 		}
 
-		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
-		param.put("result", 0);
-		operateMapper.SuppliesBudgetSave(param);
-		result = (int) param.get("result");
-		if (result != 1) {
-			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
-		}
-
 		return 1; // 전체 성공
 	}
 
