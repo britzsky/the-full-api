@@ -1374,10 +1374,9 @@ public class HeadOfficeController {
 			String docType     = asText(paramMap.get("doc_type"));
 			// 작성자 담당확인 도장 - 저장 시 항상 '4' 고정 (tm_sign/hr_sign 방식과 동일)
 			String chargeSign  = "4";
-			// 팀장ID / 인사팀장ID / 실장ID - 프론트에서 자동 감지
+			// 팀장ID / 인사팀장ID / 대표ID - 프론트에서 자동 감지
 			String tmUser      = asText(paramMap.get("tm_user"));
 			String hrUser      = asText(paramMap.get("hr_user"));
-			String hpUser      = asText(paramMap.get("hp_user"));
 			String ceoUser     = asText(paramMap.get("ceo_user"));
 			// 수정 시: 기존 세션 대표 idx → 소프트 삭제 후 재삽입 (upsert, 별도 UPDATE SQL 불필요)
 			String editIdx     = asText(paramMap.get("edit_idx"));
@@ -1427,7 +1426,6 @@ public class HeadOfficeController {
 			headerRow.put("charge_sign", chargeSign);
 			headerRow.put("tm_user",     tmUser);
 			headerRow.put("hr_user",     hrUser);
-			headerRow.put("hp_user",     hpUser);
 			headerRow.put("ceo_user",    ceoUser);
 			headerRow.put("document_id", documentId);
 			headOfficeService.EvaluationSave(headerRow);
@@ -1441,6 +1439,7 @@ public class HeadOfficeController {
 				Map<String, Object> kpiRow = new HashMap<>();
 				kpiRow.put("document_id", documentId);
 				kpiRow.put("type",        item.get("type"));
+				kpiRow.put("plan",        item.get("plan"));
 				kpiRow.put("goal",        item.get("goal"));
 				kpiRow.put("measurement", item.get("measurement"));
 				kpiRow.put("weight",      item.get("weight"));

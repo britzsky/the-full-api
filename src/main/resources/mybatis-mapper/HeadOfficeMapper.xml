@@ -2951,6 +2951,7 @@
 		    et.doc_name,
 		    et.approval_position,
 		    e.charge_sign,
+		    k.plan,
 		    k.goal,
 		    k.measurement,
 		    k.weight,
@@ -3055,9 +3056,9 @@
 	<!-- 인사 -> 평가 -> KPI 행 저장 (tb_hr_evaluation_kpi, document_id = 문서번호) -->
 	<insert id="EvaluationKpiSave" parameterType="map">
 		INSERT INTO tb_hr_evaluation_kpi
-		    (document_id, type, goal, measurement, weight, performance, content)
+		    (document_id, type, plan, goal, measurement, weight, performance, content)
 		VALUES
-		    (#{document_id}, #{type}, #{goal}, #{measurement}, #{weight}, #{performance}, #{content})
+		    (#{document_id}, #{type}, #{plan}, #{goal}, #{measurement}, #{weight}, #{performance}, #{content})
 	</insert>
 
 	<!-- 인사 -> 평가 -> KPI 행 삭제 (evaluation idx 기준, document_id JOIN) -->
