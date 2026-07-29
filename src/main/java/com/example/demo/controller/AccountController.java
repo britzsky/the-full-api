@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -54,6 +56,9 @@ public class AccountController {
 	private GeocodingService geocodingService;
 	private final String uploadDir;
 
+	private static final Logger log =
+	        LoggerFactory.getLogger(AccountController.class);
+	
 	@Autowired
 	public AccountController(
 			AccountService accountService,
@@ -1988,6 +1993,7 @@ public class AccountController {
 	@GetMapping("Account/AccountMappingList")
 	public List<Map<String, Object>> AccountMappingList(String account_id) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
+		
 		resultList = accountService.AccountMappingList(account_id);
 
 		return resultList;
@@ -2001,7 +2007,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPurchaseTallyList")
 	public String AccountPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPurchaseTallyList(paramMap);
 
 		return new Gson().toJson(resultList);
@@ -2015,7 +2021,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPurchaseTallyForTallyTab")
 	public String AccountPurchaseTallyForTallyTab(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPurchaseTallyForTallyTab(paramMap);
 
 		return new Gson().toJson(resultList);
@@ -2029,7 +2035,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPurchaseDetailList")
 	public String AccountPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPurchaseDetailList(paramMap);
 
 		return new Gson().toJson(resultList);
@@ -2043,7 +2049,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPurchaseDetailList_tmp")
 	public String AccountPurchaseTallyList_tmp(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPurchaseDetailList_tmp(paramMap);
 
 		return new Gson().toJson(resultList);
@@ -2057,7 +2063,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPersonPurchaseTallyList")
 	public String AccountPersonPurchaseTallyList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPersonPurchaseTallyList(paramMap);
 
 		return new Gson().toJson(resultList);
@@ -2071,7 +2077,7 @@ public class AccountController {
 	@GetMapping("Account/AccountPersonPurchaseDetailList")
 	public String AccountPersonPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-
+		
 		resultList = accountService.AccountPersonPurchaseDetailList(paramMap);
 
 		return new Gson().toJson(resultList);

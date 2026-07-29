@@ -905,7 +905,8 @@ public class AccountService {
 	// 회계 -> 매입 -> 매입마감 조회
 	public List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		normalizeZeroToEmpty(paramMap, "account_id", "type", "year", "month", "payType");
+		
+		normalizeZeroToEmpty(paramMap, "account_id", "type", "year", "month", "payType", "start_dt", "end_dt");
 		resultList = accountMapper.AccountPurchaseTallyList(paramMap);
 		return resultList;
 	}

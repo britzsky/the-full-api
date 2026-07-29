@@ -2292,6 +2292,9 @@
         <if test="payType != null and payType.toString() == '2'">
 	        AND apt.totalCard != 0
         </if>
+        <if test="start_dt != '' and end_dt != ''">
+	        AND DATE_FORMAT(apt.saleDate, '%Y-%m-%d') BETWEEN #{start_dt} AND #{end_dt}
+        </if>
         <if test="year != null and year != '' and year != '0'">
 	        AND YEAR(apt.saleDate) = CAST(#{year} AS UNSIGNED)
         </if>
