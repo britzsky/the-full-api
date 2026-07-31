@@ -743,6 +743,14 @@ public class AccountService {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
 		}
 
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return 1; // ✅ 전체 성공
 	}
 
@@ -775,6 +783,14 @@ public class AccountService {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
 		}
 
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return 1; // ✅ 전체 성공
 	}
 
@@ -799,13 +815,33 @@ public class AccountService {
 			throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
 		}
 
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return 1; // ✅ 전체 성공
 	}
 
-	// ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
+	// ProfitLossTotalSave + 소모품 예산 누계 저장 (etc_cost 확정 후 순서대로 실행)
 	public void callProfitLossTotalSave(Map<String, Object> param) {
 		param.put("result", 0);
 		headOfficeMapper.ProfitLossTotalSave(param);
+		int result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+		}
+
+		// 소모품 예산 누계 갱신 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
 	}
 
 	// 현장 -> 집계표 -> 영수증 매장 확인 조회
@@ -842,7 +878,8 @@ public class AccountService {
 				historyParam.remove("itemtype");
 				historyParam.put("savetype", 1);
 				accountMapper.AccountPurchaseHistorySave(historyParam);
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+			}
 		}
 		return iResult;
 	}
@@ -858,22 +895,26 @@ public class AccountService {
 				if (historyParam.get("total") == null || historyParam.get("saleDate") == null) {
 					Map<String, Object> master = accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
 					if (master != null) {
-						if (historyParam.get("total") == null) historyParam.put("total", master.get("total"));
-						if (historyParam.get("saleDate") == null) historyParam.put("saleDate", master.get("saleDate"));
-						if (historyParam.get("account_id") == null) historyParam.put("account_id", master.get("account_id"));
+						if (historyParam.get("total") == null)
+							historyParam.put("total", master.get("total"));
+						if (historyParam.get("saleDate") == null)
+							historyParam.put("saleDate", master.get("saleDate"));
+						if (historyParam.get("account_id") == null)
+							historyParam.put("account_id", master.get("account_id"));
 					}
 				}
 				normalizeHistoryTypeFields(historyParam);
 				historyParam.put("savetype", 2);
 				accountMapper.AccountPurchaseHistorySave(historyParam);
-			} catch (Exception ignored) {}
+			} catch (Exception ignored) {
+			}
 		}
 		return iResult;
 	}
-	
+
 	// 회계 -> 거래처 자료 입력 삭제
 	public int AccountPurchaseTallyDelete(Map<String, Object> paramMap) {
-		
+
 		int result = 0;
 
 		paramMap.put("result", 0); // OUT 값 초기화
@@ -883,7 +924,7 @@ public class AccountService {
 		if (result != 1) {
 			throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day_v2 프로시저 실패");
 		}
-		
+
 		return result;
 	}
 
@@ -891,7 +932,7 @@ public class AccountService {
 	public int AccountPurchaseTallyDetailDelete(Map<String, Object> paramMap) {
 		return accountMapper.AccountPurchaseTallyDetailDelete(paramMap);
 	}
-	
+
 	// 회계 -> 매입마감 sale_id 기준 기존 결제일자 조회
 	public Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap) {
 		return accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
@@ -1142,6 +1183,14 @@ public class AccountService {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
 		}
 
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		paramMap.put("result", 0);
+		operateMapper.SuppliesBudgetSave(paramMap);
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return result;
 	}
 
@@ -1177,6 +1226,14 @@ public class AccountService {
 		result = (int) paramMap.get("result");
 		if (result != 1) {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+		}
+
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		paramMap.put("result", 0);
+		operateMapper.SuppliesBudgetSave(paramMap);
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
 		}
 
 		return result;
@@ -1229,6 +1286,14 @@ public class AccountService {
 		result = (int) paramMap.get("result");
 		if (result != 1) {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
+		}
+
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		paramMap.put("result", 0);
+		operateMapper.SuppliesBudgetSave(paramMap);
+		result = (int) paramMap.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
 		}
 
 		return result;

@@ -2485,5 +2485,102 @@ public class HeadOfficeController {
 	private boolean isBlank(Object value) {
 		return value == null || String.valueOf(value).trim().isEmpty();
 	}
+
+	/*
+	 * part    : 본사
+	 * method  : ErpSurveyQuestionList
+	 * comment : ERP 만족도 조사 -> 문항 목록 조회
+	 */
+	@GetMapping("HeadOffice/ErpSurveyQuestionList")
+	public String ErpSurveyQuestionList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.ErpSurveyQuestionList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part    : 본사
+	 * method  : ErpSurveyQuestionSave
+	 * comment : ERP 만족도 조사 -> 문항 저장 (기존 삭제 후 재등록)
+	 */
+	@PostMapping("HeadOffice/ErpSurveyQuestionSave")
+	public String ErpSurveyQuestionSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			int count = headOfficeService.ErpSurveyQuestionSave(paramMap);
+			obj.addProperty("code", count > 0 ? 200 : 400);
+			obj.addProperty("message", count > 0 ? "성공" : "실패");
+		} catch (Exception e) {
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "오류: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 본사
+	 * method  : ErpSurveyResponseCheck
+	 * comment : ERP 만족도 조사 -> 유저 제출 여부 확인
+	 */
+	@GetMapping("HeadOffice/ErpSurveyResponseCheck")
+	public String ErpSurveyResponseCheck(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = headOfficeService.ErpSurveyResponseCheck(paramMap);
+		JsonObject obj = new JsonObject();
+		boolean submitted = result != null && Integer.parseInt(String.valueOf(result.getOrDefault("cnt", "0"))) > 0;
+		obj.addProperty("submitted", submitted);
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 본사
+	 * method  : ErpSurveyResponseSave
+	 * comment : ERP 만족도 조사 -> 응답 제출
+	 */
+	@PostMapping("HeadOffice/ErpSurveyResponseSave")
+	public String ErpSurveyResponseSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		try {
+			// 중복 제출 방지
+			Map<String, Object> check = headOfficeService.ErpSurveyResponseCheck(paramMap);
+			boolean alreadySubmitted = check != null && Integer.parseInt(String.valueOf(check.getOrDefault("cnt", "0"))) > 0;
+			if (alreadySubmitted) {
+				obj.addProperty("code", 409);
+				obj.addProperty("message", "이미 제출하셨습니다.");
+				return obj.toString();
+			}
+			int count = headOfficeService.ErpSurveyResponseSave(paramMap);
+			obj.addProperty("code", count > 0 ? 200 : 400);
+			obj.addProperty("message", count > 0 ? "성공" : "실패");
+		} catch (Exception e) {
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "오류: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 본사
+	 * method  : ErpSurveyStats
+	 * comment : ERP 만족도 조사 -> 통계 조회 (관리자용)
+	 */
+	@GetMapping("HeadOffice/ErpSurveyStats")
+	public String ErpSurveyStats(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> raw = headOfficeService.ErpSurveyStats(paramMap);
+
+		// questionStats 각 행의 score_12~score_20 컬럼을 scoreDistribution 맵으로 변환
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> questionStats = (List<Map<String, Object>>) raw.get("questionStats");
+		if (questionStats != null) {
+			for (Map<String, Object> q : questionStats) {
+				Map<String, Object> dist = new HashMap<>();
+				dist.put("12",  q.remove("score_12"));
+				dist.put("14",  q.remove("score_14"));
+				dist.put("16",  q.remove("score_16"));
+				dist.put("18",  q.remove("score_18"));
+				dist.put("20",  q.remove("score_20"));
+				q.put("scoreDistribution", dist);
+			}
+		}
+		return new Gson().toJson(raw);
+	}
 }
 

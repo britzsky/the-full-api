@@ -97,4 +97,11 @@ public interface HeadOfficeMapper {
 	int MigrateEvaluationFiles(Map<String, Object> paramMap); 										// 인사 -> 평가 -> 수정 시 첨부파일 notice_idx 재연결 (old_idx → new_idx)
 	List<Map<String, Object>> SelectKPIOnOff(Map<String, Object> paramMap); 						// 인사 -> 평가 -> KPI 작성 on, off 조회
 	int SaveKPIOnOff(Map<String, Object> paramMap); 												// 인사 -> 평가 -> KPI 작성 on, off 저장
+	List<Map<String, Object>> ErpSurveyQuestionList(Map<String, Object> paramMap);					// ERP 만족도 -> 문항 목록 조회
+	int ErpSurveyQuestionDeleteByQuarter(Map<String, Object> paramMap);								// ERP 만족도 -> 기존 문항 삭제 (분기+연도 기준)
+	int ErpSurveyQuestionSave(Map<String, Object> paramMap);										// ERP 만족도 -> 문항 저장
+	Map<String, Object> ErpSurveyResponseCheck(Map<String, Object> paramMap);						// ERP 만족도 -> 제출 여부 확인
+	int ErpSurveyResponseSave(Map<String, Object> paramMap);										// ERP 만족도 -> 응답 저장
+	List<Map<String, Object>> ErpSurveyStats(Map<String, Object> paramMap);							// ERP 만족도 -> 문항별 통계 조회
+	Map<String, Object> ErpSurveyOverallStats(Map<String, Object> paramMap);						// ERP 만족도 -> 전체 요약 통계 조회
 }

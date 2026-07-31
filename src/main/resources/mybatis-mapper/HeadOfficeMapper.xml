@@ -3387,7 +3387,7 @@
 		     OR (ceo_user = #{user_id} AND #{notify_type} = '대표확인요청')
 		       )
 	</update>
-	
+
 	<select id="SelectKPIOnOff" parameterType="map" resultType="hashmap">
 		SELECT ifnull(member_can_write, 1) as member_can_write,
 			   ifnull(leader_can_write, 1) as leader_can_write
@@ -3402,4 +3402,88 @@
 			ON DUPLICATE KEY UPDATE
 			member_can_write = #{member_can_write}, leader_can_write = #{leader_can_write}, updated_at = SYSDATE()
 	</insert>
+
+	<!-- 문항 목록 조회 -->
+	<select id="ErpSurveyQuestionList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+		       quarter,
+		       year,
+		       question_order,
+		       question_text,
+		       DATE_FORMAT(reg_dt, '%Y-%m-%d') AS reg_dt
+		  FROM tb_survey_question
+		 WHERE quarter = #{quarter}
+		   AND year    = #{year}
+		   AND del_yn  = 'N'
+		 ORDER BY question_order ASC
+	</select>
+
+	<!-- 기존 문항 삭제 (분기+연도 기준 소프트 삭제) -->
+	<update id="ErpSurveyQuestionDeleteByQuarter" parameterType="map">
+		UPDATE tb_survey_question
+		   SET del_yn    = 'Y',
+		       update_dt = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		 WHERE quarter = #{quarter}
+		   AND year    = #{year}
+		   AND del_yn  = 'N'
+	</update>
+
+	<!-- 문항 저장 -->
+	<insert id="ErpSurveyQuestionSave" parameterType="map">
+		INSERT INTO tb_survey_question
+		    (quarter, year, question_order, question_text, reg_dt, del_yn)
+		VALUES
+		    (#{quarter}, #{year}, #{question_order}, #{question_text},
+		     DATE_ADD(NOW(), INTERVAL 9 HOUR), 'N')
+	</insert>
+
+	<!-- 유저 제출 여부 확인 -->
+	<select id="ErpSurveyResponseCheck" parameterType="map" resultType="hashmap">
+		SELECT COUNT(*) AS cnt
+		  FROM tb_survey_response
+		 WHERE user_id = #{user_id}
+		   AND quarter = #{quarter}
+		   AND year    = #{year}
+	</select>
+
+	<!-- 응답 저장 -->
+	<insert id="ErpSurveyResponseSave" parameterType="map">
+		INSERT INTO tb_survey_response
+		    (user_id, question_idx, score, quarter, year, reg_dt)
+		VALUES
+		    (#{user_id}, #{question_idx}, #{score}, #{quarter}, #{year},
+		     DATE_ADD(NOW(), INTERVAL 9 HOUR))
+	</insert>
+
+	<!-- 문항별 통계 조회 (응답 분포 + 평균) -->
+	<select id="ErpSurveyStats" parameterType="map" resultType="hashmap">
+		SELECT q.idx,
+		       q.question_order,
+		       q.question_text,
+		       ROUND(AVG(r.score), 1)                                    AS average,
+		       SUM(CASE WHEN r.score = 12 THEN 1 ELSE 0 END)            AS score_12,
+		       SUM(CASE WHEN r.score = 14 THEN 1 ELSE 0 END)            AS score_14,
+		       SUM(CASE WHEN r.score = 16 THEN 1 ELSE 0 END)            AS score_16,
+		       SUM(CASE WHEN r.score = 18 THEN 1 ELSE 0 END)            AS score_18,
+		       SUM(CASE WHEN r.score = 20 THEN 1 ELSE 0 END)            AS score_20
+		  FROM tb_survey_question q
+		  LEFT JOIN tb_survey_response r ON r.question_idx = q.idx
+		 WHERE q.quarter = #{quarter}
+		   AND q.year    = #{year}
+		   AND q.del_yn  = 'N'
+		 GROUP BY q.idx, q.question_order, q.question_text
+		 ORDER BY q.question_order ASC
+	</select>
+
+	<!-- 전체 요약 통계 (총 응답자, 전체 평균) -->
+	<select id="ErpSurveyOverallStats" parameterType="map" resultType="hashmap">
+		SELECT COUNT(DISTINCT r.user_id)     AS total_respondents,
+		       ROUND(AVG(r.score), 1)        AS overall_average
+		  FROM tb_survey_response r
+		  JOIN tb_survey_question q ON q.idx = r.question_idx
+		 WHERE r.quarter = #{quarter}
+		   AND r.year    = #{year}
+		   AND q.del_yn  = 'N'
+	</select>
+
 </mapper>

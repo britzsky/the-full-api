@@ -53,6 +53,7 @@ public interface OperateMapper {
 	List<Map<String, Object>> BudgetManageMentList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영관리 -> 예산관리 조회
 	int BudgetTableSave(Map<String, Object> paramMap);											// 급식사업부 -> 운영관리 -> 예산관리 저장
 	int BudgetNoteCarryOver(Map<String, Object> paramMap);										// 전달 비고 → 당월 이월 (스케줄러/수동)
+	void SuppliesBudgetSave(Map<String, Object> paramMap);										// 소모품 예산 누계 저장 프로시저 (저장 화면에서 소모품 저장 시 호출)
 	List<Map<String, Object>> BudgetStandardList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
 	List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 	List<Map<String, Object>> AnnualLeaveList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 정보 조회

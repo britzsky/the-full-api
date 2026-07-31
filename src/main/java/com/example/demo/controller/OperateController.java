@@ -1035,9 +1035,10 @@ public class OperateController {
 
                 try {
                     Map<String, Object> profitParam = new HashMap<>();
-                    profitParam.put("year", year);
-                    profitParam.put("month", month);
+                    profitParam.put("year",       Integer.parseInt(year));
+                    profitParam.put("month",      Integer.parseInt(month));
                     profitParam.put("account_id", accountId);
+                    // callProfitLossTotalSave 내부에서 SuppliesBudgetSave까지 처리
                     operateService.callProfitLossTotalSave(profitParam);
                 } catch (Exception e) {
                     System.err.println(
@@ -1117,6 +1118,7 @@ public class OperateController {
 
         if (iResult > 0) {
             for (Map<String, Object> paramMap : rows) {
+                // BudgetTotalSave 내부에서 SuppliesBudgetSave까지 트랜잭션으로 처리
                 iResult += operateService.BudgetTotalSave(paramMap);
             }
         }
@@ -1131,6 +1133,36 @@ public class OperateController {
             obj.addProperty("message", "실패");
         }
 
+        return obj.toString();
+    }
+
+    /*
+     * part : 운영
+     * method : SuppliesBudgetSave
+     * comment : 소모품 예산 누계 저장 — 소모품 관련 저장 화면에서 저장 성공 시 호출
+     *           tb_account_supplies_budget 테이블의 예산/사용/잔여/누계를 갱신
+     */
+    @PostMapping("Operate/SuppliesBudgetSave")
+    public String SuppliesBudgetSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        try {
+            int    year      = Integer.parseInt(String.valueOf(paramMap.get("year")));
+            int    month     = Integer.parseInt(String.valueOf(paramMap.get("month")));
+            String accountId = String.valueOf(paramMap.get("account_id"));
+
+            Map<String, Object> param = new HashMap<>();
+            param.put("year",       year);
+            param.put("month",      month);
+            param.put("account_id", accountId);
+
+            operateService.SuppliesBudgetSave(param);
+
+            obj.addProperty("code",    200);
+            obj.addProperty("message", "성공");
+        } catch (Exception e) {
+            obj.addProperty("code",    400);
+            obj.addProperty("message", e.getMessage());
+        }
         return obj.toString();
     }
 

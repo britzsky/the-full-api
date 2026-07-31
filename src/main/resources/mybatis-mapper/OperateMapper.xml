@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
@@ -1889,6 +1889,12 @@
 		FROM tb_account_meals_number
 	</select>
 	
+	<!-- =====================================================================
+	     예산관리 목록 조회
+	     - tb_account_budget_management : 식자재 예산/사용 데이터
+	     - tb_account_supplies_budget   : 소모품 예산/누계 데이터 (LEFT JOIN, 별도 테이블)
+	     - 전월 예산부여금액은 서브쿼리로 조회
+	     ===================================================================== -->
 	<select id="BudgetManageMentList" parameterType="map" resultType="map">
 		SELECT a.account_id,
 			   a.account_name,
@@ -1916,6 +1922,17 @@
 			   abm.day_use_ratio,
 			   abm.existing_budget,
 			   abm.diff_amount,
+			   abm.first_sales,
+			   -- 소모품 예산/누계 (tb_account_supplies_budget 별도 테이블 JOIN)
+			   IFNULL(asb.supplies_budget, 0)     AS supplies_budget,
+			   IFNULL(asb.supplies_used, 0)       AS supplies_used,
+			   IFNULL(asb.supplies_remaining, 0)  AS supplies_remaining,
+			   IFNULL(asb.supplies_cumulative, 0) AS supplies_cumulative,
+			   IFNULL(asb.event_budget, 0)        AS event_budget,
+			   IFNULL(asb.event_used, 0)          AS event_used,
+			   IFNULL(asb.event_remaining, 0)     AS event_remaining,
+			   IFNULL(asb.event_cumulative, 0)    AS event_cumulative,
+			   -- 전월 예산부여금액 서브쿼리
 			   (SELECT IFNULL(abm_prev.budget_grant, 0)
 			    FROM tb_account_budget_management abm_prev
 			    WHERE abm_prev.account_id = a.account_id
@@ -1923,11 +1940,17 @@
 			      AND abm_prev.month = CASE WHEN #{month} = 1 THEN 12 ELSE #{month} - 1 END
 			    LIMIT 1) AS prev_budget_grant
 		FROM tb_account a
+		-- 식자재 예산 테이블 JOIN
 		LEFT OUTER JOIN tb_account_budget_management abm
 		ON abm.account_id = a.account_id
-		AND abm.year = #{year}
+		AND abm.year  = #{year}
 		AND abm.month = #{month}
-		WHERE a.account_id not in 
+		-- 소모품 예산/누계 전용 테이블 JOIN
+		LEFT OUTER JOIN tb_account_supplies_budget asb
+		ON asb.account_id = a.account_id
+		AND asb.year  = #{year}
+		AND asb.month = LPAD(#{month}, 2, '0')
+		WHERE a.account_id NOT IN
  		(
  			20260122065002,
 			20260122071337,
@@ -1973,6 +1996,7 @@
 	        day_use_ratio,
 	        existing_budget,
 	        diff_amount,
+	        first_sales,
 	        user_id,
 	        update_dt
 	    )
@@ -1994,6 +2018,7 @@
 	        #{day_use_ratio},
 	        #{existing_budget},
 	        #{diff_amount},
+	        #{first_sales},
 	        #{user_id},
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    )
@@ -2038,6 +2063,9 @@
 	        <if test="diff_amount != null">
 	            diff_amount = #{diff_amount},
 	        </if>
+	        <if test="first_sales != null">
+	            first_sales = #{first_sales},
+	        </if>
 	        <if test="user_id != null and user_id != ''">
 	            user_id = #{user_id},
 	        </if>
@@ -2045,6 +2073,20 @@
 	    </trim>
 	</insert>
 	
+	
+	<!-- =====================================================================
+	     소모품 예산 누계 저장 프로시저 호출
+	     - 소모품 관련 저장 화면에서 저장 성공 후 백그라운드로 호출
+	     - tb_account_supplies_budget 테이블의 예산/사용/잔여/누계 갱신
+	     ===================================================================== -->
+	<select id="SuppliesBudgetSave" statementType="CALLABLE" parameterType="map">
+	    { CALL SuppliesBudgetSave(
+	        #{year,       mode=IN,  jdbcType=INTEGER},
+	        #{month,      mode=IN,  jdbcType=INTEGER},
+	        #{account_id, mode=IN,  jdbcType=VARCHAR},
+	        #{result,     mode=OUT, jdbcType=INTEGER}
+	    ) }
+	</select>
 	<update id="BudgetNoteCarryOver" parameterType="map">
 		UPDATE tb_account_budget_management curr
 		INNER JOIN tb_account_budget_management prev

@@ -123,6 +123,14 @@ public class HeadOfficeService {
 			throw new RuntimeException("BudgetTotalSave 저장 실패");
 		}
 
+		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return 1; // 전체 성공
 	}
 
@@ -518,17 +526,73 @@ public class HeadOfficeService {
 		paramMap.put("new_idx", newIdx);
 		headOfficeMapper.MigrateEvaluationFiles(paramMap);
 	}
-	
+
 	// 인사 -> 평가 -> KPI 작성 on,off 조회
 	public List<Map<String, Object>> SelectKPIOnOff(Map<String, Object> paramMap) {
 		return headOfficeMapper.SelectKPIOnOff(paramMap);
 	}
-	
+
 	// 인사 -> 평가 -> KPI 작성 on,off 저장
 	public int SaveKPIOnOff(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = headOfficeMapper.SaveKPIOnOff(paramMap);
-		
+
 		return iResult;
+	}
+
+	// ERP 만족도 -> 문항 목록 조회
+	public List<Map<String, Object>> ErpSurveyQuestionList(Map<String, Object> paramMap) {
+		return headOfficeMapper.ErpSurveyQuestionList(paramMap);
+	}
+
+	// ERP 만족도 -> 문항 저장 (기존 문항 삭제 후 재등록)
+	@Transactional
+	public int ErpSurveyQuestionSave(Map<String, Object> paramMap) {
+		headOfficeMapper.ErpSurveyQuestionDeleteByQuarter(paramMap);
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> questions = (List<Map<String, Object>>) paramMap.get("questions");
+		if (questions == null || questions.isEmpty())
+			return 0;
+		int count = 0;
+		for (Map<String, Object> q : questions) {
+			Map<String, Object> row = new java.util.HashMap<>(paramMap);
+			row.put("question_order", q.get("order"));
+			row.put("question_text", q.get("text"));
+			count += headOfficeMapper.ErpSurveyQuestionSave(row);
+		}
+		return count;
+	}
+
+	// ERP 만족도 -> 제출 여부 확인
+	public Map<String, Object> ErpSurveyResponseCheck(Map<String, Object> paramMap) {
+		return headOfficeMapper.ErpSurveyResponseCheck(paramMap);
+	}
+
+	// ERP 만족도 -> 응답 저장
+	@Transactional
+	public int ErpSurveyResponseSave(Map<String, Object> paramMap) {
+		@SuppressWarnings("unchecked")
+		List<Map<String, Object>> answers = (List<Map<String, Object>>) paramMap.get("answers");
+		if (answers == null || answers.isEmpty())
+			return 0;
+		int count = 0;
+		for (Map<String, Object> ans : answers) {
+			Map<String, Object> row = new java.util.HashMap<>(paramMap);
+			row.put("question_idx", ans.get("question_idx"));
+			row.put("score", ans.get("score"));
+			count += headOfficeMapper.ErpSurveyResponseSave(row);
+		}
+		return count;
+	}
+
+	// ERP 만족도 -> 통계 조회 (문항별 + 전체 요약)
+	public Map<String, Object> ErpSurveyStats(Map<String, Object> paramMap) {
+		List<Map<String, Object>> questionStats = headOfficeMapper.ErpSurveyStats(paramMap);
+		Map<String, Object> overall = headOfficeMapper.ErpSurveyOverallStats(paramMap);
+		Map<String, Object> result = new java.util.HashMap<>();
+		result.put("questionStats", questionStats);
+		result.put("totalRespondents", overall != null ? overall.get("total_respondents") : 0);
+		result.put("overallAverage", overall != null ? overall.get("overall_average") : 0);
+		return result;
 	}
 }

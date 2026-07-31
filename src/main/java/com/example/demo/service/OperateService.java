@@ -201,13 +201,32 @@ public class OperateService {
 			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
 		}
 
+		// 손익 집계가 확정된 월부터 소모품 예산과 누계를 함께 갱신
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
+
 		return 1; // ✅ 전체 성공
 	}
 
-	// ProfitLossTotalSave만 호출 (합계 재계산, year/month/account_id를 param으로 받음)
+	// 손익 합계와 해당 월 이후의 소모품 예산 누계를 함께 갱신
 	public void callProfitLossTotalSave(Map<String, Object> param) {
 		param.put("result", 0);
 		headOfficeMapper.ProfitLossTotalSave(param);
+		int result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+		}
+
+		param.put("result", 0);
+		operateMapper.SuppliesBudgetSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ SuppliesBudgetSave 프로시저 실패");
+		}
 	}
 
 	// 급식사업부 -> 운영관리 -> 고객사관리 -> 면허증 및 자격증관리 조회
@@ -372,6 +391,18 @@ public class OperateService {
 	// 급식사업부 -> 운영관리 -> 예산관리 저장
 	public int BudgetTableSave(Map<String, Object> paramMap) {
 		return operateMapper.BudgetTableSave(paramMap);
+	}
+
+	// 소모품 예산 누계 저장 — 소모품 저장 화면에서 저장 성공 시 백그라운드 호출
+	@Transactional(rollbackFor = Exception.class)
+	public int SuppliesBudgetSave(Map<String, Object> param) {
+		param.put("result", 0); // OUT 파라미터 초기화
+		operateMapper.SuppliesBudgetSave(param);
+		int result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("SuppliesBudgetSave 프로시저 실패");
+		}
+		return 1;
 	}
 
 	@Transactional(rollbackFor = Exception.class) // ✅ 전체 작업 트랜잭션
