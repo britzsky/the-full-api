@@ -1646,7 +1646,45 @@ public class HeadOfficeController {
 		}
 		return obj.toString();
 	}
+	
+	/*
+	 * part    : 인사
+	 * method  : SelectKPIOnOff
+	 * comment : 인사 -> 평가 -> KPI작성 on, off 조회
+	 */
+	@GetMapping("HeadOffice/SelectKPIOnOff")
+	public String SelectKPIOnOff(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.SelectKPIOnOff(paramMap);
+		
+		return new Gson().toJson(resultList);
+	}
+	
+	/*
+	 * part : 인사
+	 * method : SaveKPIOnOff
+	 * comment : 사 -> 평가 -> KPI작성 on, off 저장
+	 */
+	@PostMapping("HeadOffice/SaveKPIOnOff")
+	private String AccountPurchaseDetailSave(@RequestBody Map<String, Object> paramMap) {
+		
+		System.out.println(paramMap);
+		
+		int iResult = 0;
 
+		iResult += headOfficeService.SaveKPIOnOff(paramMap);
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+	
 	private Path resolveEvaluationDirPath(String idxText) {
 		String staticPath = new File(uploadDir).getAbsolutePath();
 		return Paths.get(staticPath, "evaluation", idxText).normalize();

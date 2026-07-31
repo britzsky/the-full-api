@@ -95,4 +95,6 @@ public interface HeadOfficeMapper {
 	List<Map<String, Object>> EvaluationNotificationList(Map<String, Object> paramMap); 			// 인사 -> 평가 -> 알림 목록 (팀장결재요청 / 인사팀장결재요청 / 확인완료)
 	int EvaluationNotificationReadSave(Map<String, Object> paramMap); 								// 인사 -> 평가 -> 알림 읽음 처리 (reg_read_dt / tm_read_dt / payer_read_dt 업데이트)
 	int MigrateEvaluationFiles(Map<String, Object> paramMap); 										// 인사 -> 평가 -> 수정 시 첨부파일 notice_idx 재연결 (old_idx → new_idx)
+	List<Map<String, Object>> SelectKPIOnOff(Map<String, Object> paramMap); 						// 인사 -> 평가 -> KPI 작성 on, off 조회
+	int SaveKPIOnOff(Map<String, Object> paramMap); 												// 인사 -> 평가 -> KPI 작성 on, off 저장
 }

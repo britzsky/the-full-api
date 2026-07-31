@@ -982,6 +982,8 @@
 				    <if test="month != ''">
 				        AND month = #{month}
 			        </if>
+			        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
+	        		AND basic_cost != 0 
 				    GROUP BY account_id, year, month
 				) AS aggregated_data
 		                 JOIN tb_account T
@@ -1086,6 +1088,8 @@
 				<if test="month != ''">
 		            AND T.month = #{month}
 		        </if>
+		        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
+	        	AND basic_cost != 0 
 		        <if test="account_id != 'ALL'">
 		            AND T.account_id = #{account_id}
 		        </if>
@@ -1256,6 +1260,8 @@
 		    <if test="month != ''">
 		        AND month = #{month}
 	        </if>
+	        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
+	        AND basic_cost != 0  
 		    GROUP BY account_id, year
 		) AS aggregated_data
                  JOIN tb_account T
@@ -3381,4 +3387,19 @@
 		     OR (ceo_user = #{user_id} AND #{notify_type} = '대표확인요청')
 		       )
 	</update>
+	
+	<select id="SelectKPIOnOff" parameterType="map" resultType="hashmap">
+		SELECT ifnull(member_can_write, 1) as member_can_write,
+			   ifnull(leader_can_write, 1) as leader_can_write
+		FROM tb_role_write_permissions
+	</select>
+	
+	<insert id="SaveKPIOnOff" parameterType="map">
+		INSERT INTO tb_role_write_permissions
+			(member_can_write, leader_can_write, updated_at, user_id)
+			VALUES
+			(#{member_can_write}, #{leader_can_write}, SYSDATE(), #{user_id})
+			ON DUPLICATE KEY UPDATE
+			member_can_write = #{member_can_write}, leader_can_write = #{leader_can_write}, updated_at = SYSDATE()
+	</insert>
 </mapper>

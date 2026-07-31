@@ -518,4 +518,17 @@ public class HeadOfficeService {
 		paramMap.put("new_idx", newIdx);
 		headOfficeMapper.MigrateEvaluationFiles(paramMap);
 	}
+	
+	// 인사 -> 평가 -> KPI 작성 on,off 조회
+	public List<Map<String, Object>> SelectKPIOnOff(Map<String, Object> paramMap) {
+		return headOfficeMapper.SelectKPIOnOff(paramMap);
+	}
+	
+	// 인사 -> 평가 -> KPI 작성 on,off 저장
+	public int SaveKPIOnOff(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = headOfficeMapper.SaveKPIOnOff(paramMap);
+		
+		return iResult;
+	}
 }
