@@ -743,6 +743,34 @@ public class AccountController {
 				if (row != null)
 					payloadMap.putAll(row);
 			}
+
+			// 초기투자비용 변경이력 처리
+			for (Map<String, Object> row : etcData) {
+				if (row == null) continue;
+
+				Object newUpfrontObj = row.get("upfront_cost");
+				int newUpfront = 0;
+				if (newUpfrontObj != null && !newUpfrontObj.toString().isEmpty()) {
+					try { newUpfront = Integer.parseInt(newUpfrontObj.toString()); } catch (Exception ignored) {}
+				}
+
+				// 이력 테이블에서 마지막 저장값 조회 (없으면 최초 insert)
+				List<Map<String, Object>> upfrontHistoryList = accountService.AccountUpfrontHistoryList(payloadMap);
+				boolean isFirstInsert = upfrontHistoryList.isEmpty();
+				int savedUpfront = 0;
+				if (!isFirstInsert) {
+					Object savedObj = upfrontHistoryList.get(0).get("upfront_cost");
+					if (savedObj != null && !savedObj.toString().isEmpty()) {
+						try { savedUpfront = Integer.parseInt(savedObj.toString()); } catch (Exception ignored) {}
+					}
+				}
+
+				if (newUpfront != savedUpfront) {
+					payloadMap.put("before_upfront_cost", isFirstInsert ? null : savedUpfront);
+					payloadMap.put("upfront_status", isFirstInsert ? "insert" : "update");
+					accountService.AccountUpfrontHistorySave(payloadMap);
+				}
+			}
 		}
 
 		if (eventData != null) {
@@ -3019,6 +3047,84 @@ public class AccountController {
 		} else {
 			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * part    : 현장
+	 * method  : PurchaseRequestUserInfo
+	 * comment : 현장 -> 구입요청 -> 로그인 사용자 기준 거래처명 + 1차결재자 조회
+	 */
+	@GetMapping("/FieldBoard/PurchaseRequestUserInfo")
+	public String PurchaseRequestUserInfo(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.PurchaseRequestUserInfo(paramMap);
+		return new Gson().toJson(result != null ? result : new HashMap<>());
+	}
+
+	/*
+	 * part    : 현장
+	 * method  : PurchaseManagerList
+	 * comment : 현장 -> 구입 업장관리 -> 관리자 목록 (department=5, position=2,3)
+	 */
+	@GetMapping("/FieldBoard/PurchaseManagerList")
+	public String PurchaseManagerList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> list = accountService.PurchaseManagerList(paramMap);
+		return new Gson().toJson(list != null ? list : new ArrayList<>());
+	}
+
+	/*
+	 * part    : 현장
+	 * method  : PurchaseAccountList
+	 * comment : 현장 -> 구입 업장관리 -> 전체 거래처 목록
+	 */
+	@GetMapping("/FieldBoard/PurchaseAccountList")
+	public String PurchaseAccountList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> list = accountService.PurchaseAccountList(paramMap);
+		return new Gson().toJson(list != null ? list : new ArrayList<>());
+	}
+
+	/*
+	 * part    : 현장
+	 * method  : PurchaseManagerAccountMapList
+	 * comment : 현장 -> 구입 업장관리 -> 관리자별 매핑 거래처 목록
+	 */
+	@GetMapping("/FieldBoard/PurchaseManagerAccountMapList")
+	public String PurchaseManagerAccountMapList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> list = accountService.PurchaseManagerAccountMapList(paramMap);
+		return new Gson().toJson(list != null ? list : new ArrayList<>());
+	}
+
+	/*
+	 * part    : 현장
+	 * method  : PurchaseManagerAccountMapSave
+	 * comment : 현장 -> 구입 업장관리 -> 관리자-거래처 매핑 저장 (기존 삭제 후 재등록)
+	 */
+	@SuppressWarnings("unchecked")
+	@PostMapping("/FieldBoard/PurchaseManagerAccountMapSave")
+	public String PurchaseManagerAccountMapSave(@RequestBody Map<String, Object> payload) {
+		JsonObject obj = new JsonObject();
+		try {
+			String managerUserId = payload.getOrDefault("user_id", "").toString().trim();
+			if (managerUserId.isEmpty()) {
+				obj.addProperty("code", 400);
+				obj.addProperty("message", "관리자 ID가 없습니다.");
+				return obj.toString();
+			}
+
+			List<Map<String, Object>> list = new ArrayList<>();
+			Object rawList = payload.get("list");
+			if (rawList instanceof List) {
+				list = (List<Map<String, Object>>) rawList;
+			}
+
+			accountService.PurchaseManagerAccountMapSave(managerUserId, list);
+
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "저장되었습니다.");
+		} catch (Exception e) {
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "저장 중 오류: " + e.getMessage());
 		}
 		return obj.toString();
 	}

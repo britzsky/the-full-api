@@ -37,6 +37,8 @@ public interface AccountMapper {
 	int AccountCoordinateSave(Map<String, Object> paramMap);											// 거래처 -> 거래처 주소 좌표 저장
 	int AccountDietPriceHistorySave(Map<String, Object> paramMap);										// 거래처 -> 거래처 상세 -> 식단가 변경내역 저장
 	List<Map<String, Object>>AccountDietPriceHistoryList(Map<String, Object> paramMap);					// 거래처 -> 거래처 상세 -> 식단가 변경내역 조회
+	int AccountUpfrontHistorySave(Map<String, Object> paramMap);										// 거래처 -> 초기투자비용 변경이력 저장
+	List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap);					// 거래처 -> 초기투자비용 현재값 조회
 	List<Map<String, Object>> AccountBusinessImgList(Map<String, Object> paramMap); 					// 거래처 -> 거래처 상세 이미지 조회
 	int insertOrUpdateFile(Map<String, Object> paramMap); 												// 거래처 -> 거래처 상세 이미지 업로드
 	List<Map<String, Object>> AccountDeadlineBalanceList(Map<String, Object> paramMap); 				// 회계 -> 매출마감/미수잔액 조회
@@ -122,4 +124,12 @@ public interface AccountMapper {
 	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap);										// 회계 -> 매입집계 삭제
 	Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap);								// 회계 -> 월 마감 수정권한 조회
 	int MonthLockOverrideSave(Map<String, Object> paramMap);											// 회계 -> 월 마감 수정권한 저장/수정
+
+	// 현장 -> 구입요청
+	Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap);							// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)
+	List<Map<String, Object>> PurchaseManagerList(Map<String, Object> paramMap);						// 현장 -> 구입 업장관리 -> 관리자 목록 (department=5, position=2,3)
+	List<Map<String, Object>> PurchaseAccountList(Map<String, Object> paramMap);						// 현장 -> 구입 업장관리 -> 전체 거래처 목록
+	List<Map<String, Object>> PurchaseManagerAccountMapList(Map<String, Object> paramMap);				// 현장 -> 구입 업장관리 -> 관리자별 매핑 거래처 목록
+	int PurchaseManagerAccountMapDelete(Map<String, Object> paramMap);									// 현장 -> 구입 업장관리 -> 매핑 전체 삭제 (user_id 기준)
+	int PurchaseManagerAccountMapSave(Map<String, Object> paramMap);									// 현장 -> 구입 업장관리 -> 매핑 단건 저장
 }

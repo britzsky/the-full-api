@@ -540,6 +540,20 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 거래처 -> 초기투자비용 현재값 조회
+	public List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountUpfrontHistoryList(paramMap);
+		return resultList;
+	}
+
+	// 거래처 -> 초기투자비용 변경이력 저장
+	public int AccountUpfrontHistorySave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountUpfrontHistorySave(paramMap);
+		return iResult;
+	}
+
 	// 거래처 -> 거래처상세 이미지 업로드
 	public int insertOrUpdateFile(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -813,6 +827,14 @@ public class AccountService {
 		result = (int) param.get("result");
 		if (result != 1) {
 			throw new RuntimeException("❌ ProfitLossTotalSave 프로시저 실패");
+		}
+
+		// 예산 저장 프로시저 호출
+		param.put("result", 0);
+		operateMapper.BudgetTotalSave(param);
+		result = (int) param.get("result");
+		if (result != 1) {
+			throw new RuntimeException("❌ BudgetTotalSave 프로시저 실패");
 		}
 
 		// 소모품 예산 누계 저장 (ProfitLossTotalSave로 etc_cost 확정 후 실행)
@@ -1392,5 +1414,41 @@ public class AccountService {
 	// 회계 -> 월 마감 수정권한 저장/수정
 	public int MonthLockOverrideSave(Map<String, Object> paramMap) {
 		return accountMapper.MonthLockOverrideSave(paramMap);
+	}
+
+	// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)
+	public Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap) {
+		return accountMapper.PurchaseRequestUserInfo(paramMap);
+	}
+
+	// 현장 -> 구입 업장관리 -> 관리자 목록
+	public List<Map<String, Object>> PurchaseManagerList(Map<String, Object> paramMap) {
+		return accountMapper.PurchaseManagerList(paramMap);
+	}
+
+	// 현장 -> 구입 업장관리 -> 전체 거래처 목록
+	public List<Map<String, Object>> PurchaseAccountList(Map<String, Object> paramMap) {
+		return accountMapper.PurchaseAccountList(paramMap);
+	}
+
+	// 현장 -> 구입 업장관리 -> 관리자별 매핑 거래처 목록
+	public List<Map<String, Object>> PurchaseManagerAccountMapList(Map<String, Object> paramMap) {
+		return accountMapper.PurchaseManagerAccountMapList(paramMap);
+	}
+
+	// 현장 -> 구입 업장관리 -> 매핑 저장 (기존 삭제 후 재등록)
+	@Transactional
+	public int PurchaseManagerAccountMapSave(String managerUserId, List<Map<String, Object>> list) {
+		Map<String, Object> delParam = new HashMap<>();
+		delParam.put("user_id", managerUserId);
+		accountMapper.PurchaseManagerAccountMapDelete(delParam);
+
+		int count = 0;
+		for (Map<String, Object> row : list) {
+			if (row == null) continue;
+			row.put("user_id", managerUserId);
+			count += accountMapper.PurchaseManagerAccountMapSave(row);
+		}
+		return count;
 	}
 }

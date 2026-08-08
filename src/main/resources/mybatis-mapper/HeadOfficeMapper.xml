@@ -623,6 +623,9 @@
 					    not_budget_cost,
 					    ROUND(IFNULL(not_budget_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS not_budget_ratio,
 					    
+					    upfront_cost,
+					    ROUND(IFNULL(upfront_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS upfront_cost_ratio,
+
 					    purchase_total,
 					    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1) AS purchase_total_ratio,
 					
@@ -684,6 +687,8 @@
 					        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 					        SUM(IFNULL(event_cost, 0)) AS event_cost,
 					        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
+					        SUM(IFNULL(upfront_cost, 0)) AS upfront_cost,
+					        SUM(CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_monthly_deprec,
 					        -- 인건비 및 기타
 					        SUM(IFNULL(person_cost, 0)) AS person_cost,
 					        SUM(IFNULL(dispatch_cost, 0)) AS dispatch_cost,
@@ -694,14 +699,13 @@
 					        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
 					        SUM(IFNULL(business_profit, 0)) AS business_profit,
 					        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
-					        
+
 					        SUM(IFNULL(sales_total, 0)) AS sales_total,
 					        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
-					        
-					        -- 식수 추정치 로직 (필요시 내부 변수/상수 적용)
-					        ROUND(SUM(IFNULL(living_cost, 0)) / 30 / 5000, 1) AS living_estimate, 
-					        ROUND(SUM(IFNULL(basic_cost, 0)) / 30 / 5000, 1) AS basic_estimate,
-					
+
+					        SUM(IFNULL(living_estimate, 0)) AS living_estimate,
+					        SUM(IFNULL(basic_estimate, 0)) AS basic_estimate,
+
 					        MAX(utility_bills_note) AS utility_bills_note,
 					        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 					    FROM the_full.tb_account_managerment_table
@@ -784,6 +788,9 @@
 					    ifnull(person_ratio,0) as person_ratio,
 					    ifnull(sales_total,0) as sales_total,
 					    ifnull(sales_total_ratio,0) as sales_total_ratio,
+					    ifnull(upfront_cost,0) as upfront_cost,
+					    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 1) AS upfront_cost_ratio,
+					    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
 					    ifnull(purchase_total,0) as purchase_total,
 					    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
 					    ifnull(person_total,0) as person_total,
@@ -898,6 +905,9 @@
 				    not_budget_cost,
 				    ROUND(IFNULL(not_budget_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS not_budget_ratio,
 				    
+				    upfront_cost,
+				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS upfront_cost_ratio,
+
 				    purchase_total,
 				    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1) AS purchase_total_ratio,
 				
@@ -957,6 +967,8 @@
 				        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 				        SUM(IFNULL(event_cost, 0)) AS event_cost,
 				        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
+				        SUM(IFNULL(upfront_cost, 0)) AS upfront_cost,
+				        SUM(CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_monthly_deprec,
 				        -- 인건비 및 기타
 				        SUM(IFNULL(person_cost, 0)) AS person_cost,
 				        SUM(IFNULL(dispatch_cost, 0)) AS dispatch_cost,
@@ -971,10 +983,9 @@
 				        SUM(IFNULL(sales_total, 0)) AS sales_total,
 				        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
 				        
-				        -- 식수 추정치 로직 (필요시 내부 변수/상수 적용)
-				        ROUND(SUM(IFNULL(living_cost, 0)) / 30 / 5000, 1) AS living_estimate, 
-				        ROUND(SUM(IFNULL(basic_cost, 0)) / 30 / 5000, 1) AS basic_estimate,
-				
+				        SUM(IFNULL(living_estimate, 0)) AS living_estimate,
+				        SUM(IFNULL(basic_estimate, 0)) AS basic_estimate,
+
 				        MAX(utility_bills_note) AS utility_bills_note,
 				        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 				    FROM the_full.tb_account_managerment_table
@@ -1060,6 +1071,9 @@
 				    ifnull(person_ratio,0) as person_ratio,
 				    ifnull(sales_total,0) as sales_total,
 				    ifnull(sales_total_ratio,0) as sales_total_ratio,
+				    ifnull(upfront_cost,0) as upfront_cost,
+				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 1) AS upfront_cost_ratio,
+				    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
 				    ifnull(purchase_total,0) as purchase_total,
 				    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
 				    ifnull(person_total,0) as person_total,
@@ -1235,6 +1249,7 @@
 		        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 		        SUM(IFNULL(event_cost, 0)) AS event_cost,
 		        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
+		        SUM(IFNULL(upfront_cost, 0)) AS upfront_cost,
 		        -- 인건비 및 기타
 		        SUM(IFNULL(person_cost, 0)) AS person_cost,
 		        SUM(IFNULL(dispatch_cost, 0)) AS dispatch_cost,
@@ -1638,16 +1653,86 @@
 			   ep.doc_type,
 			   IFNULL(ept.approval_position, -1) AS approval_position,
 			   ep.department,
+			   draft_user.account_id,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN IFNULL(draft_account.account_name, '')
+			     ELSE ''
+			   END AS account_name,
 			   ep.status,
 			   ep.retention_dt,
 			   ep.access_level,
 			   ep.user_id,
 			   ep.reg_user_id,
+			   draft_user.user_name AS reg_user_name,
 			   ep.charge_sign,
-			   ep.tm_user,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			      AND EXISTS (
+			       SELECT 1
+			       FROM tb_account_purchase_mapping pam
+			       JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+			       WHERE pam.user_id = #{user_id}
+			         AND pam.account_id = drafter.account_id
+			      )
+			     THEN #{user_id}
+			     ELSE ep.tm_user
+			   END AS tm_user,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			      AND EXISTS (
+			       SELECT 1
+			       FROM tb_account_purchase_mapping pam
+			       JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+			       WHERE pam.user_id = #{user_id}
+			         AND pam.account_id = drafter.account_id
+			      )
+			     THEN (SELECT viewer_user.user_name FROM tb_user viewer_user WHERE viewer_user.user_id = #{user_id} LIMIT 1)
+			     ELSE (SELECT first_user.user_name FROM tb_user first_user WHERE first_user.user_id = ep.tm_user LIMIT 1)
+			   END AS tm_user_name,
 			   ep.tm_sign,
 			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
-			   ep.payer_user,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN COALESCE(
+			       NULLIF(ep.payer_user, ''),
+			       (
+			         SELECT second_approver.user_id
+			         FROM tb_account_purchase_mapping pam2
+			         JOIN tb_user mapped_manager
+			           ON mapped_manager.user_id = pam2.user_id
+			          AND IFNULL(mapped_manager.del_yn, 'N') = 'N'
+			         JOIN tb_user second_approver
+			           ON second_approver.department = mapped_manager.department
+			          AND second_approver.position = 1
+			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
+			         WHERE pam2.account_id = draft_user.account_id
+			         ORDER BY CASE WHEN pam2.user_id = ep.tm_user THEN 0 ELSE 1 END, pam2.user_id, second_approver.user_id
+			         LIMIT 1
+			       )
+			     )
+			     ELSE ep.payer_user
+			   END AS payer_user,
+			   CASE
+			     WHEN IFNULL(ep.payer_user, '') != ''
+			       THEN (SELECT stored_second.user_name FROM tb_user stored_second WHERE stored_second.user_id = ep.payer_user LIMIT 1)
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			       THEN (
+			         SELECT second_approver.user_name
+			         FROM tb_account_purchase_mapping pam3
+			         JOIN tb_user mapped_manager3
+			           ON mapped_manager3.user_id = pam3.user_id
+			          AND IFNULL(mapped_manager3.del_yn, 'N') = 'N'
+			         JOIN tb_user second_approver
+			           ON second_approver.department = mapped_manager3.department
+			          AND second_approver.position = 1
+			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
+			         WHERE pam3.account_id = draft_user.account_id
+			         ORDER BY CASE WHEN pam3.user_id = ep.tm_user THEN 0 ELSE 1 END, pam3.user_id, second_approver.user_id
+			         LIMIT 1
+			       )
+			     ELSE ''
+			   END AS payer_user_name,
 			   ep.payer_sign,
 			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
 			   ep.ceo_user,
@@ -1662,17 +1747,17 @@
 			   	 	THEN '승인완료'
 			   	 WHEN IFNULL(ep.tm_user, '') != ''
 			   	  AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
-			   	 	THEN CASE WHEN IFNULL(ep.tm_sign, '') = '2' THEN '검토중(팀장)' ELSE '결재대기(팀장)' END
+			   	 	THEN CASE WHEN IFNULL(ep.tm_sign, '') = '2' THEN '검토중(1차)' ELSE '결재대기(1차)' END
 			   	 WHEN IFNULL(ep.payer_user, '') != ''
 			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
 			   	  AND IFNULL(ep.payer_sign, '') NOT IN ('3', '4')
-			   	 	THEN CASE WHEN IFNULL(ep.payer_sign, '') = '2' THEN '검토중(결재자)' ELSE '결재대기(결재자)' END
+			   	 	THEN CASE WHEN IFNULL(ep.payer_sign, '') = '2' THEN '검토중(2차)' ELSE '결재대기(2차)' END
 			   	 WHEN IFNULL(ep.ceo_user, '') != ''
 			   	  AND (IFNULL(ep.tm_user, '') = '' OR IFNULL(ep.tm_sign, '') = '4')
 			   	  AND (IFNULL(ep.payer_user, '') = '' OR IFNULL(ep.payer_sign, '') = '4')
 			   	  AND IFNULL(ep.ceo_sign, '') NOT IN ('3', '4')
-			   	 	THEN CASE WHEN IFNULL(ep.ceo_sign, '') = '2' THEN '검토중(대표)' ELSE '결재대기(대표)' END
-			   	 ELSE '결재대기(팀장)'
+			   	 	THEN CASE WHEN IFNULL(ep.ceo_sign, '') = '2' THEN '검토중(최종)' ELSE '결재대기(최종)' END
+			   	 ELSE '결재대기(1차)'
 			   END AS progress_status_text,
 			   CASE
 			   	 WHEN ep.reg_user_id = #{user_id} THEN 'reg'
@@ -1700,6 +1785,12 @@
 		LEFT JOIN tb_electronic_payment_type ept
 		  ON CAST(ept.doc_type AS CHAR) = CAST(ep.doc_type AS CHAR)
 		 AND IFNULL(ept.del_yn, 'N') = 'N'
+		LEFT JOIN tb_user draft_user
+		  ON draft_user.user_id = ep.reg_user_id
+		 AND IFNULL(draft_user.del_yn, 'N') = 'N'
+		LEFT JOIN tb_account draft_account
+		  ON draft_account.account_id = draft_user.account_id
+		 AND IFNULL(draft_account.del_yn, 'N') = 'N'
 		<choose>
 			<when test="user_id != null and user_id != ''">
 				WHERE EXISTS (
@@ -1714,6 +1805,18 @@
 					  		OR ep.ceo_user = #{user_id}
 					  		OR ep.payer_user = #{user_id}
 					  		OR (lu.position = 1 AND lu.department = ep.department)
+					  		OR (
+					  			UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+					  			AND EXISTS (
+					  				SELECT 1
+					  				FROM tb_account_purchase_mapping pam
+					  				JOIN tb_user drafter
+					  				  ON drafter.user_id = ep.reg_user_id
+					  				 AND IFNULL(drafter.del_yn, 'N') = 'N'
+					  				WHERE pam.user_id = #{user_id}
+					  				  AND pam.account_id = drafter.account_id
+					  			)
+					  		)
 					  		OR (
 					  			#{user_id} = 'iy1'
 					  			AND EXISTS (
@@ -1740,16 +1843,86 @@
 			   ep.doc_type,
 			   IFNULL(ept.approval_position, -1) AS approval_position,
 			   ep.department,
+			   draft_user.account_id,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN IFNULL(draft_account.account_name, '')
+			     ELSE ''
+			   END AS account_name,
 			   ep.status,
 			   ep.retention_dt,
 			   ep.access_level,
 			   ep.user_id,
 			   ep.reg_user_id,
+			   draft_user.user_name AS reg_user_name,
 			   ep.charge_sign,
-			   ep.tm_user,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			      AND EXISTS (
+			       SELECT 1
+			       FROM tb_account_purchase_mapping pam_name
+			       JOIN tb_user drafter_name ON drafter_name.user_id = ep.reg_user_id
+			       WHERE pam_name.user_id = #{user_id}
+			         AND pam_name.account_id = drafter_name.account_id
+			      )
+			     THEN (SELECT viewer_user.user_name FROM tb_user viewer_user WHERE viewer_user.user_id = #{user_id} LIMIT 1)
+			     ELSE (SELECT first_user.user_name FROM tb_user first_user WHERE first_user.user_id = ep.tm_user LIMIT 1)
+			   END AS tm_user_name,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
+			      AND EXISTS (
+			       SELECT 1
+			       FROM tb_account_purchase_mapping pam
+			       JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+			       WHERE pam.user_id = #{user_id}
+			         AND pam.account_id = drafter.account_id
+			      )
+			     THEN #{user_id}
+			     ELSE ep.tm_user
+			   END AS tm_user,
 			   ep.tm_sign,
 			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
-			   ep.payer_user,
+			   CASE
+			     WHEN IFNULL(ep.payer_user, '') != ''
+			       THEN (SELECT stored_second.user_name FROM tb_user stored_second WHERE stored_second.user_id = ep.payer_user LIMIT 1)
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			       THEN (
+			         SELECT second_name.user_name
+			         FROM tb_account_purchase_mapping pam_name2
+			         JOIN tb_user mapped_name
+			           ON mapped_name.user_id = pam_name2.user_id
+			          AND IFNULL(mapped_name.del_yn, 'N') = 'N'
+			         JOIN tb_user second_name
+			           ON second_name.department = mapped_name.department
+			          AND second_name.position = 1
+			          AND IFNULL(second_name.del_yn, 'N') = 'N'
+			         WHERE pam_name2.account_id = draft_user.account_id
+			         ORDER BY CASE WHEN pam_name2.user_id = ep.tm_user THEN 0 ELSE 1 END, pam_name2.user_id, second_name.user_id
+			         LIMIT 1
+			       )
+			     ELSE ''
+			   END AS payer_user_name,
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN COALESCE(
+			       NULLIF(ep.payer_user, ''),
+			       (
+			         SELECT second_approver.user_id
+			         FROM tb_account_purchase_mapping pam2
+			         JOIN tb_user mapped_manager
+			           ON mapped_manager.user_id = pam2.user_id
+			          AND IFNULL(mapped_manager.del_yn, 'N') = 'N'
+			         JOIN tb_user second_approver
+			           ON second_approver.department = mapped_manager.department
+			          AND second_approver.position = 1
+			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
+			         WHERE pam2.account_id = draft_user.account_id
+			         ORDER BY CASE WHEN pam2.user_id = ep.tm_user THEN 0 ELSE 1 END, pam2.user_id, second_approver.user_id
+			         LIMIT 1
+			       )
+			     )
+			     ELSE ep.payer_user
+			   END AS payer_user,
 			   ep.payer_sign,
 			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
 			   ep.ceo_user,
@@ -1759,6 +1932,12 @@
 		LEFT JOIN tb_electronic_payment_type ept
 		  ON CAST(ept.doc_type AS CHAR) = CAST(ep.doc_type AS CHAR)
 		 AND IFNULL(ept.del_yn, 'N') = 'N'
+		LEFT JOIN tb_user draft_user
+		  ON draft_user.user_id = ep.reg_user_id
+		 AND IFNULL(draft_user.del_yn, 'N') = 'N'
+		LEFT JOIN tb_account draft_account
+		  ON draft_account.account_id = draft_user.account_id
+		 AND IFNULL(draft_account.del_yn, 'N') = 'N'
 		WHERE ep.payment_id = #{payment_id}
 		  <choose>
 		  	<when test="user_id != null and user_id != ''">
@@ -1772,9 +1951,21 @@
 		  			  		OR ep.reg_user_id = #{user_id}
 		  			  		OR ep.tm_user = #{user_id}
 		  			  		OR ep.ceo_user = #{user_id}
-		  			  		OR ep.payer_user = #{user_id}
-		  			  		OR (lu.position = 1 AND lu.department = ep.department)
-		  			  		OR (
+			  		  		OR ep.payer_user = #{user_id}
+			  		  		OR (lu.position = 1 AND lu.department = ep.department)
+			  		  		OR (
+			  		  			UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  			AND EXISTS (
+			  		  				SELECT 1
+			  		  				FROM tb_account_purchase_mapping pam
+			  		  				JOIN tb_user drafter
+			  		  				  ON drafter.user_id = ep.reg_user_id
+			  		  				 AND IFNULL(drafter.del_yn, 'N') = 'N'
+			  		  				WHERE pam.user_id = #{user_id}
+			  		  				  AND pam.account_id = drafter.account_id
+			  		  			)
+			  		  		)
+			  		  		OR (
 		  			  			#{user_id} = 'iy1'
 		  			  			AND EXISTS (
 		  			  				SELECT 1
@@ -1920,9 +2111,21 @@
 		  			  	OR ep.reg_user_id = #{user_id}
 		  			  	OR ep.tm_user = #{user_id}
 		  			  	OR ep.ceo_user = #{user_id}
-		  			  	OR ep.payer_user = #{user_id}
-		  			  	OR (lu.position = 1 AND lu.department = ep.department)
-		  			  	OR (
+			  		  	OR ep.payer_user = #{user_id}
+			  		  	OR (lu.position = 1 AND lu.department = ep.department)
+			  		  	OR (
+			  		  		UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  		AND EXISTS (
+			  		  			SELECT 1
+			  		  			FROM tb_account_purchase_mapping pam
+			  		  			JOIN tb_user drafter
+			  		  			  ON drafter.user_id = ep.reg_user_id
+			  		  			 AND IFNULL(drafter.del_yn, 'N') = 'N'
+			  		  			WHERE pam.user_id = #{user_id}
+			  		  			  AND pam.account_id = drafter.account_id
+			  		  		)
+			  		  	)
+			  		  	OR (
 		  			  		#{user_id} = 'iy1'
 		  			  		AND EXISTS (
 		  			  			SELECT 1
@@ -1941,8 +2144,38 @@
 	</select>
 
 	<update id="ElectronicPaymentManageTmSignSave" parameterType="map">
-		UPDATE tb_headoffice_electronic_payment
-		SET tm_sign = #{action_status},
+		UPDATE tb_headoffice_electronic_payment ep
+		SET tm_user = CASE
+						WHEN UPPER(CAST(doc_type AS CHAR)) = 'FP'
+						 AND EXISTS (
+							SELECT 1
+							FROM tb_account_purchase_mapping pam
+							JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+							WHERE pam.user_id = #{user_id}
+							  AND pam.account_id = drafter.account_id
+						 )
+						THEN #{user_id}
+						ELSE ep.tm_user
+					END,
+			payer_user = CASE
+						WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+						 AND IFNULL(ep.payer_user, '') = ''
+						THEN COALESCE(
+							(
+								SELECT second_approver.user_id
+								FROM tb_user first_approver
+								JOIN tb_user second_approver
+								  ON second_approver.department = first_approver.department
+								 AND second_approver.position = 1
+								 AND IFNULL(second_approver.del_yn, 'N') = 'N'
+								WHERE first_approver.user_id = #{user_id}
+								LIMIT 1
+							),
+							ep.payer_user
+						)
+						ELSE ep.payer_user
+					END,
+			tm_sign = #{action_status},
 			tm_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			reg_read_dt = NULL,
 			status = CASE
@@ -1950,6 +2183,9 @@
 					     OR IFNULL(ceo_sign, '') = '3'
 					     OR IFNULL(payer_sign, '') = '3'
 					     THEN 3
+					   WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+					     AND #{action_status} = '4'
+					     THEN 2
 					   WHEN #{action_status} = '4'
 					     AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
 					     AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
@@ -1961,7 +2197,19 @@
 					   ELSE 1
 					 END
 		WHERE payment_id = #{payment_id}
-		  AND tm_user = #{user_id}
+		  AND (
+			ep.tm_user = #{user_id}
+			OR (
+				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+				AND EXISTS (
+					SELECT 1
+					FROM tb_account_purchase_mapping pam
+					JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+					WHERE pam.user_id = #{user_id}
+					  AND pam.account_id = drafter.account_id
+				)
+			)
+		  )
 		  AND IFNULL(tm_sign, '') NOT IN ('3', '4')
 	</update>
 
@@ -1995,8 +2243,12 @@
 	</update>
 
 	<update id="ElectronicPaymentManagePayerSignSave" parameterType="map">
-		UPDATE tb_headoffice_electronic_payment
-		SET payer_sign = #{action_status},
+		UPDATE tb_headoffice_electronic_payment ep
+		SET payer_user = CASE
+						WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN #{user_id}
+						ELSE ep.payer_user
+					END,
+			payer_sign = #{action_status},
 			payer_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			reg_read_dt = NULL,
 			tm_read_dt = NULL,
@@ -2016,7 +2268,22 @@
 					   ELSE 1
 					 END
 		WHERE payment_id = #{payment_id}
-		  AND payer_user = #{user_id}
+		  AND (
+			ep.payer_user = #{user_id}
+			OR (
+				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+				AND EXISTS (
+					SELECT 1
+					FROM tb_user first_approver
+					JOIN tb_user second_approver
+					  ON second_approver.department = first_approver.department
+					 AND second_approver.position = 1
+					 AND IFNULL(second_approver.del_yn, 'N') = 'N'
+					WHERE first_approver.user_id = ep.tm_user
+					  AND second_approver.user_id = #{user_id}
+				)
+			)
+		  )
 		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
 		  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
 	</update>
@@ -2033,13 +2300,14 @@
 	</update>
 
 	<select id="ElectronicPaymentNotificationList" parameterType="map" resultType="hashmap">
-		SELECT *
+		<!-- 문서유형 필터용 조인 컬럼은 제외하고 알림 표시용 문자열 컬럼만 반환한다. -->
+		SELECT N.*
 		FROM (
 			SELECT payment_id,
 				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
 				   '결재요청' AS notify_type,
 				   '전자결재 알림' AS notify_title,
-				   CONCAT('[', payment_id, '] 팀장 결재가 필요합니다.') AS notify_message
+				   CONCAT('[', payment_id, '] 1차 결재가 필요합니다.') AS notify_message
 			FROM tb_headoffice_electronic_payment
 			WHERE tm_user = #{user_id}
 			  AND IFNULL(tm_user, '') != ''
@@ -2051,12 +2319,27 @@
 				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
 				   '결재요청' AS notify_type,
 				   '전자결재 알림' AS notify_title,
-				   CONCAT('[', payment_id, '] 결재자 결재가 필요합니다.') AS notify_message
-			FROM tb_headoffice_electronic_payment
-			WHERE payer_user = #{user_id}
-			  AND IFNULL(payer_user, '') != ''
-			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
-			  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
+				   CONCAT('[', ep_second.payment_id, '] 2차 결재가 필요합니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment ep_second
+			WHERE (
+				ep_second.payer_user = #{user_id}
+				OR (
+					UPPER(CAST(ep_second.doc_type AS CHAR)) = 'FP'
+					AND IFNULL(ep_second.payer_user, '') = ''
+					AND EXISTS (
+						SELECT 1
+						FROM tb_user first_approver
+						JOIN tb_user second_approver
+						  ON second_approver.department = first_approver.department
+						 AND second_approver.position = 1
+						 AND IFNULL(second_approver.del_yn, 'N') = 'N'
+						WHERE first_approver.user_id = ep_second.tm_user
+						  AND second_approver.user_id = #{user_id}
+					)
+				)
+			  )
+			  AND (IFNULL(ep_second.tm_user, '') = '' OR IFNULL(ep_second.tm_sign, '') = '4')
+			  AND IFNULL(ep_second.payer_sign, '') NOT IN ('3', '4')
 
 			UNION
 
@@ -2084,6 +2367,7 @@
 			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
 			  AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
 			  AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
+			  AND (UPPER(CAST(doc_type AS CHAR)) != 'FP' OR IFNULL(payer_sign, '') = '4')
 			  AND reg_read_dt IS NULL
 
 			UNION
@@ -2131,6 +2415,11 @@
 			  AND IFNULL(ceo_sign, '') = '3'
 			  AND payer_read_dt IS NULL
 		) AS N
+		<if test="doc_type != null and doc_type != ''">
+			INNER JOIN tb_headoffice_electronic_payment EP_FILTER
+			  ON EP_FILTER.payment_id = N.payment_id
+			 AND EP_FILTER.doc_type = #{doc_type}
+		</if>
 		ORDER BY N.draft_dt DESC, N.payment_id DESC
 	</select>
 
@@ -2273,9 +2562,21 @@
 		  			  	OR ep.reg_user_id = #{user_id}
 		  			  	OR ep.tm_user = #{user_id}
 		  			  	OR ep.ceo_user = #{user_id}
-		  			  	OR ep.payer_user = #{user_id}
-		  			  	OR (lu.position = 1 AND lu.department = ep.department)
-		  			  	OR (
+			  		  	OR ep.payer_user = #{user_id}
+			  		  	OR (lu.position = 1 AND lu.department = ep.department)
+			  		  	OR (
+			  		  		UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  		AND EXISTS (
+			  		  			SELECT 1
+			  		  			FROM tb_account_purchase_mapping pam
+			  		  			JOIN tb_user drafter
+			  		  			  ON drafter.user_id = ep.reg_user_id
+			  		  			 AND IFNULL(drafter.del_yn, 'N') = 'N'
+			  		  			WHERE pam.user_id = #{user_id}
+			  		  			  AND pam.account_id = drafter.account_id
+			  		  		)
+			  		  	)
+			  		  	OR (
 		  			  		#{user_id} = 'iy1'
 		  			  		AND EXISTS (
 		  			  			SELECT 1
@@ -2407,16 +2708,22 @@
     <select id="HeadOfficeDepartmentList" resultType="hashmap">
 		SELECT department, 
 			   CASE WHEN department = 0
-			   		THEN '대표실'
+			   			THEN '대표실'
 			   		WHEN department = 2
-			   		THEN '회계팀'
+			   			THEN '회계팀'
 			   		WHEN department = 3
-			   		THEN '인사팀'
+			   			THEN '인사팀'
 			   		WHEN department = 4
-			   		THEN '영업팀'
+			   			THEN '영업팀'
 			   		WHEN department = 5
-			   		THEN '운영팀'
-			   		ELSE '개발팀' END AS dept_name
+			   			THEN '운영팀'
+			   		WHEN department = 6
+			   			THEN '개발팀'
+			   		WHEN department = 8
+			   			THEN '급식사업부'
+			   		WHEN department = 9
+			   			THEN '기획팀' 
+			   		END AS dept_name
 	 	FROM tb_user
 		WHERE del_yn = 'N'
 		AND department not in (1,7)

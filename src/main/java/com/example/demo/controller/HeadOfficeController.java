@@ -453,7 +453,9 @@ public class HeadOfficeController {
 			// 2) 본문 저장
 			String paymentIdText = String.valueOf(main.getOrDefault("payment_id", "")).trim();
 			boolean isDraftDoc = DOC_KIND_DRAFT.equals(docKind);
-			boolean isExpenseDoc = DOC_KIND_PAYMENT.equals(docKind);
+			// FP 구매요청서는 결재 흐름은 유지하되 본문을 소모품 구매 품의서 품목으로 저장한다.
+			boolean isFieldPurchaseRequest = "FP".equalsIgnoreCase(docTypeText);
+			boolean isExpenseDoc = DOC_KIND_PAYMENT.equals(docKind) && !isFieldPurchaseRequest;
 
 			if (!paymentIdText.isEmpty()) {
 				Map<String, Object> deleteParam = new HashMap<>();
@@ -498,6 +500,8 @@ public class HeadOfficeController {
 					row.remove("idx"); // idx는 AI PK이므로 전달값 제거
 					row.put("payment_id", paymentIdText);
 					row.put("payment_note", asText(item.get("payment_note")));
+					row.put("link", asText(item.get("link")));
+					row.put("note", asText(item.get("note")));
 					row.put("use_name", asText(item.get("use_name")));
 					row.put("buy_yn", normalizeYn(item.get("buy_yn")));
 					rowsToSave.add(row);
@@ -2149,6 +2153,8 @@ public class HeadOfficeController {
 		if (key.contains("소모품") && key.contains("품의서")) return DOC_KIND_EXPENDABLE;
 		if (key.contains("기안서")) return DOC_KIND_DRAFT;
 		if (key.contains("지출결의서")) return DOC_KIND_PAYMENT;
+		// 현장 구매요청서(FP)는 지출결의서 포맷과 동일하게 처리
+		if (key.contains("구매요청서")) return DOC_KIND_PAYMENT;
 		return "";
 	}
 
