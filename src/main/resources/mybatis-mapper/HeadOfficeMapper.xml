@@ -689,6 +689,7 @@
 					        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
 					        SUM(IFNULL(upfront_cost, 0)) AS upfront_cost,
 					        SUM(CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_monthly_deprec,
+					        MAX(CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_original_cost,
 					        -- 인건비 및 기타
 					        SUM(IFNULL(person_cost, 0)) AS person_cost,
 					        SUM(IFNULL(dispatch_cost, 0)) AS dispatch_cost,
@@ -791,6 +792,7 @@
 					    ifnull(upfront_cost,0) as upfront_cost,
 					    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 1) AS upfront_cost_ratio,
 					    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
+					    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
 					    ifnull(purchase_total,0) as purchase_total,
 					    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
 					    ifnull(person_total,0) as person_total,
@@ -969,6 +971,7 @@
 				        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
 				        SUM(IFNULL(upfront_cost, 0)) AS upfront_cost,
 				        SUM(CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_monthly_deprec,
+				        MAX(CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END) AS upfront_original_cost,
 				        -- 인건비 및 기타
 				        SUM(IFNULL(person_cost, 0)) AS person_cost,
 				        SUM(IFNULL(dispatch_cost, 0)) AS dispatch_cost,
@@ -1074,6 +1077,7 @@
 				    ifnull(upfront_cost,0) as upfront_cost,
 				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 1) AS upfront_cost_ratio,
 				    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
+				    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
 				    ifnull(purchase_total,0) as purchase_total,
 				    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
 				    ifnull(person_total,0) as person_total,
