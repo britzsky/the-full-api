@@ -2087,19 +2087,22 @@
 	        #{result,     mode=OUT, jdbcType=INTEGER}
 	    ) }
 	</select>
-	<update id="BudgetNoteCarryOver" parameterType="map">
-		UPDATE tb_account_budget_management curr
-		INNER JOIN tb_account_budget_management prev
-		  ON prev.account_id = curr.account_id
-		  AND prev.year  = CASE WHEN curr.month = 1 THEN curr.year - 1 ELSE curr.year END
-		  AND prev.month = CASE WHEN curr.month = 1 THEN 12 ELSE curr.month - 1 END
-		SET curr.note = prev.note
-		WHERE curr.year  = #{year}
-		  AND curr.month = #{month}
-		  AND (curr.note IS NULL OR TRIM(curr.note) = '')
+	<!--
+	     당월(curr) 행이 아직 존재하지 않는 경우(사용자가 해당 월 화면을 한 번도 저장하지 않은 경우)에도
+	     비고가 이월되도록 INNER JOIN UPDATE 대신 INSERT ... SELECT ... ON DUPLICATE KEY UPDATE 사용.
+	     PK(year, month, account_id) 외 컬럼은 전부 기본값(0/NULL)이 있어 note만 넣는 INSERT가 안전함.
+	-->
+	<insert id="BudgetNoteCarryOver" parameterType="map">
+		INSERT INTO tb_account_budget_management (year, month, account_id, note)
+		SELECT #{year}, #{month}, prev.account_id, prev.note
+		FROM tb_account_budget_management prev
+		WHERE prev.year  = CASE WHEN #{month} = 1 THEN #{year} - 1 ELSE #{year} END
+		  AND prev.month = CASE WHEN #{month} = 1 THEN 12 ELSE #{month} - 1 END
 		  AND prev.note IS NOT NULL
 		  AND TRIM(prev.note) != ''
-	</update>
+		ON DUPLICATE KEY UPDATE
+		  note = IF(note IS NULL OR TRIM(note) = '', VALUES(note), note)
+	</insert>
 
 	<select id="AnnualLeaveList" parameterType="map" resultType="map">
 		SELECT ledger_id,
