@@ -996,8 +996,8 @@
 				    <if test="month != ''">
 				        AND month = #{month}
 			        </if>
-			        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
-	        		AND basic_cost != 0 
+			        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
+	        		AND (basic_cost != 0 OR basic_cost2 != 0)
 				    GROUP BY account_id, year, month
 				) AS aggregated_data
 		                 JOIN tb_account T
@@ -1076,8 +1076,8 @@
 				    ifnull(sales_total_ratio,0) as sales_total_ratio,
 				    ifnull(upfront_cost,0) as upfront_cost,
 				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 1) AS upfront_cost_ratio,
-				    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
-				    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
+				    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=T.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
+				    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=T.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
 				    ifnull(purchase_total,0) as purchase_total,
 				    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
 				    ifnull(person_total,0) as person_total,
@@ -1106,8 +1106,8 @@
 				<if test="month != ''">
 		            AND T.month = #{month}
 		        </if>
-		        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
-	        	AND basic_cost != 0 
+		        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
+	        	AND (basic_cost != 0 OR basic_cost2 != 0)
 		        <if test="account_id != 'ALL'">
 		            AND T.account_id = #{account_id}
 		        </if>
@@ -1279,8 +1279,8 @@
 		    <if test="month != ''">
 		        AND month = #{month}
 	        </if>
-	        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다
-	        AND basic_cost != 0  
+	        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
+	        AND (basic_cost != 0 OR basic_cost2 != 0)
 		    GROUP BY account_id, year
 		) AS aggregated_data
                  JOIN tb_account T
