@@ -596,6 +596,9 @@ public class OcrControllerV2 {
             applyMasterZeroDefaults(corporateCard);
             iResult += accountService.HeadOfficeCorporateCardPaymentSave(corporateCard);
             iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(detailMap);
+            // ✅ fallback 경로에서도 집계표(tb_account_tally_sheet) 동기화가 반드시 실행되어야 한다.
+            // (누락 시 1002/1003 결제는 저장은 되지만 집계표에 반영되지 않는 문제가 발생함)
+            iResult += accountService.TallySheetCorporateCardPaymentSaveV2(detailMap);
         }
 
         return corporateCard;
