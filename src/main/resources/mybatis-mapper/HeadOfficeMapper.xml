@@ -3452,10 +3452,13 @@
 	  - 팀장확인 전에만 작성자가 실적 수정 가능, tm_sign/hr_sign 무관
 	  - 단일 KPI 행 idx 기준, performance 일괄 적용
 	-->
+	<!-- 실적 저장: 팀장 의견(tm_opinion)이 이미 등록된 세션은 실적 수정 불가 -->
 	<update id="EvaluationPerformanceUpdate" parameterType="map">
-		UPDATE tb_hr_evaluation_kpi
-		SET performance = #{performance}
-		WHERE idx = #{idx}
+		UPDATE tb_hr_evaluation_kpi k
+		JOIN tb_hr_evaluation e ON e.document_id = k.document_id
+		SET k.performance = #{performance}
+		WHERE k.idx = #{idx}
+		  AND IFNULL(e.tm_opinion, '') = ''
 	</update>
 
 	<!--
