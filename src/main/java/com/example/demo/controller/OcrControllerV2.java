@@ -119,7 +119,8 @@ public class OcrControllerV2 {
             @RequestParam(value = "tallyType", required = false) String tallyType,
             @RequestParam(value = "use_name", required = false) String use_name,
             @RequestParam(value = "total", required = false) String total,
-            @RequestParam(value = "cell_date", required = false) String cell_date) {
+            @RequestParam(value = "cell_date", required = false) String cell_date,
+            @RequestParam(value = "skip_date_mismatch_check", required = false) String skip_date_mismatch_check) {
 
         // 파일 저장
         File tempFile = saveFile(file);
@@ -221,7 +222,28 @@ public class OcrControllerV2 {
             // =========================
 
             // 4) saleId 생성(영수증 날짜 기반)
-            LocalDate date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+            // ✅ tallysheet_develop처럼 검증을 건너뛰는 화면은 OCR 날짜 대신 사용자 입력(cell_date)을 강제 사용
+            boolean skipDateMismatchCheck = "Y".equalsIgnoreCase(skip_date_mismatch_check)
+                    || "true".equalsIgnoreCase(skip_date_mismatch_check);
+
+            LocalDate date;
+            if (skipDateMismatchCheck && cell_date != null && !cell_date.isBlank()) {
+                date = DateUtils.parseFlexibleDate(cell_date);
+            } else {
+                date = DateUtils.parseFlexibleDate(result.meta.saleDate);
+                // ✅ 집계표에서 선택한 날짜(cell_date)와 영수증 거래일자가 다르면 저장하지 않고 반려한다. (V3와 동일)
+                if (cell_date != null && !cell_date.isBlank()) {
+                    String receiptDateStr = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                    if (!receiptDateStr.equals(cell_date)) {
+                        Map<String, Object> error = new HashMap<>();
+                        error.put("code", 400);
+                        error.put("message", "선택된 집계표 일자와 영수증 거래일자가 일치하지 않습니다.\n");
+                        error.put("[집계표]", cell_date);
+                        error.put("[거래일자]", receiptDateStr);
+                        return ResponseEntity.badRequest().body(error);
+                    }
+                }
+            }
             LocalDateTime dateTime = LocalDateTime.of(date, LocalTime.now());
             String saleId = dateTime.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
             // 재업로드/수정 시 전달된 sale_id를 우선 사용한다.
