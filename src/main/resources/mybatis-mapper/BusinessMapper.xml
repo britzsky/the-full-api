@@ -401,8 +401,22 @@
 	</update>
 	
 	<!-- 급식사업부 일정관리 -> 담당자 조회 -->
+	<!-- del_dt(DATETIME)는 LocalDateTime으로 매핑되어 Gson 직렬화 시 InaccessibleObjectException(java.time 모듈 미개방)을 유발하므로,
+	     SELECT u.* 대신 컬럼을 명시하고 날짜/시간 컬럼은 다른 조회들처럼 문자열로 변환해서 반환 -->
 	<select id="BusinessMemberList" parameterType="map" resultType="hashmap">
-		SELECT u.*
+		SELECT u.user_id,
+		       u.user_name,
+		       u.password,
+		       u.user_type,
+		       u.account_id,
+		       u.position,
+		       u.department,
+		       u.use_yn,
+		       u.del_yn,
+		       u.web_position,
+		       DATE_FORMAT(u.reg_dt, '%Y-%m-%d') AS reg_dt,
+		       DATE_FORMAT(u.join_dt, '%Y-%m-%d') AS join_dt,
+		       DATE_FORMAT(u.del_dt, '%Y-%m-%d') AS del_dt
 		FROM tb_user u
 		WHERE u.del_yn = 'N'
 		<if test="team_code != null and team_code != ''">
