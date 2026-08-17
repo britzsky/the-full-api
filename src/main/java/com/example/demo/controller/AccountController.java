@@ -164,7 +164,7 @@ public class AccountController {
 	@GetMapping("/Account/AccountUtilMemberList")
 	public String AccountUtilMemberList(@RequestParam(required = false) Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = accountService.AccountUtilMemberList();
+		resultList = accountService.AccountUtilMemberList(paramMap);
 
 		return new Gson().toJson(resultList);
 	}
@@ -203,6 +203,79 @@ public class AccountController {
 			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
 		}
+
+		return obj.toString();
+	}
+
+	/*
+	 * method : AccountUtilRecordAccountNameList
+	 * comment : 유틸 출근부 -> 관리표(tb_account_managerment_table) 등록 거래처명 참고 목록
+	 */
+	@GetMapping("/Account/AccountUtilRecordAccountNameList")
+	public String AccountUtilRecordAccountNameList() {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountUtilRecordAccountNameList();
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountUtilRecordExcelSave
+	 * comment : 유틸 출근부 -> 엑셀 업로드 일괄 등록(upsert)
+	 *           PK(연/월/일자/거래처/직원)가 완전히 같은 행만 UPDATE되고,
+	 *           거래처가 다르면 같은 날짜라도 별개 행으로 추가된다.
+	 *           → 같은 직원이 같은 날 여러 거래처에 동시 배정되는 것을 허용한다.
+	 *           ✅ 단, 재업로드 시 "거래처가 바뀐" 날짜는 upsert만으로 이전 행이 지워지지 않으므로,
+	 *              업로드된 직원(member_id) 단위로 해당 연/월 기존 배정을 먼저 전부 삭제한 뒤
+	 *              엑셀에 있는 값으로 다시 채운다(월 단위 전체 교체).
+	 */
+	@PostMapping("/Account/AccountUtilRecordExcelSave")
+	public String AccountUtilRecordExcelSave(@RequestBody Map<String, Object> payload) {
+
+		List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
+
+		int savedCount = 0;
+		List<Map<String, Object>> failedRows = new ArrayList<>();
+
+		if (rows != null && !rows.isEmpty()) {
+			// ✅ 재업로드 시 이전 배정이 그대로 남지 않도록, 업로드 대상 직원의 해당 연/월 기존 행을 먼저 삭제
+			java.util.Set<Object> memberIds = new java.util.LinkedHashSet<>();
+			for (Map<String, Object> row : rows) {
+				Object mid = row.get("member_id");
+				if (mid != null) memberIds.add(mid);
+			}
+			if (!memberIds.isEmpty()) {
+				Map<String, Object> deleteParam = new HashMap<>();
+				deleteParam.put("record_year", rows.get(0).get("record_year"));
+				deleteParam.put("record_month", rows.get(0).get("record_month"));
+				deleteParam.put("member_ids", new ArrayList<>(memberIds));
+				accountService.AccountUtilRecordDeleteByMonth(deleteParam);
+			}
+
+			for (Map<String, Object> row : rows) {
+				try {
+					int iResult = accountService.AccountUtilRecordSave(row);	// upsert 등록
+					if (iResult > 0) {
+						savedCount += 1;
+					} else {
+						failedRows.add(row);
+					}
+				} catch (Exception e) {
+					failedRows.add(row);
+				}
+			}
+		}
+
+		JsonObject obj = new JsonObject();
+		if (savedCount > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		obj.addProperty("savedCount", savedCount);
+		obj.addProperty("failedCount", failedRows.size());
 
 		return obj.toString();
 	}

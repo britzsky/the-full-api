@@ -53,7 +53,7 @@
 		AND ats.count_month = #{month}
 		WHERE amv.account_id = #{account_id}
         AND amv.del_yn = 'N'
-		ORDER BY amv.type asc
+		ORDER BY CASE WHEN amv.type IN (1002, 1003) THEN 2 WHEN amv.type IN (1000, 1008) THEN 1 ELSE 0 END asc, amv.type asc
 	</select>
 
 	<select id="TallySheetAllList" parameterType="map" resultType="hashmap">
@@ -107,7 +107,7 @@
 		AND abm.year = #{year}
 		AND abm.month = #{month}
 		WHERE amv.del_yn = 'N'
-		ORDER BY a.account_name ASC, amv.account_id, amv.type ASC
+		ORDER BY a.account_name ASC, amv.account_id, CASE WHEN amv.type IN (1002, 1003) THEN 2 WHEN amv.type IN (1000, 1008) THEN 1 ELSE 0 END ASC, amv.type ASC
 	</select>
 
 	<select id="TallySheetNote" parameterType="map" resultType="hashmap">

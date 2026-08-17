@@ -130,11 +130,26 @@
 		AND password = #{password}
 	</select>
 	
+	<!-- ✅ 유틸 출근부 서식: 실제 손익표(관리표)에 등록된 거래처명 참고 목록
+	     tb_account_managerment_table(손익표 데이터)과 tb_account를 account_id로 조인해
+	     실제 운영/관리 중인 거래처명만 중복 없이 뽑는다(엑셀 AK열부터 참고용으로 나열). -->
+	<select id="AccountUtilRecordAccountNameList" resultType="map">
+		SELECT DISTINCT a.account_name
+		FROM tb_account_managerment_table m
+		JOIN tb_account a ON a.account_id = m.account_id
+		ORDER BY a.account_name
+	</select>
+
+	<!-- 유틸/통합 직원 조회. position_type = 6(유틸), 7(통합)
+	     파라미터로 position_type을 넘기면 해당 구분만 필터링(예: 유틸 출근부 서식은 6만 조회) -->
 	<select id="AccountUtilMemberList" parameterType="map" resultType="map">
 		SELECT member_id, name, position_type
 		FROM tb_account_members T
 		WHERE position_type in (6,7)
 		AND del_yn = 'N'
+		<if test="position_type != null and position_type != ''">
+			AND position_type = #{position_type}
+		</if>
 	</select>
 	
 	<select id="AccountUtilMappingList" parameterType="map" resultType="map">
@@ -176,7 +191,8 @@
 		ON DUPLICATE KEY UPDATE
 		member_id = #{member_id},
 		account_id = #{account_id},
-		del_yn = #{del_yn}
+		del_yn = #{del_yn},
+		user_id = #{user_id}
 	</insert>
 	
 	<insert id="AccountMemberSave" parameterType="map">
@@ -445,7 +461,40 @@
 		AND IFNULL(T.del_yn,'N') = 'N'
 		UNION ALL
 		-- 아래는 유틸 직원
+		-- ✅ 더 이상 tb_account_util_member_mapping(고정 매핑)을 사용하지 않고,
+		--    "유틸 출근부" 엑셀 업로드로 저장된 tb_account_util_record(일자별 배정)를 조인해서 표시한다.
 		SELECT
+          'nor' as gubun,
+          T.account_id,
+          T.member_id,
+          T2.position,
+          T2.position_type,
+          T2.cor_type,
+          T2.name,
+          T.record_year,
+          T.record_month,
+          T.record_date,
+          T.type,
+          T.start_time,
+          T.end_time,
+          0 AS salary,
+          T.note
+          , DATE_FORMAT(T2.del_dt, '%Y-%m-%d') as del_dt
+          , '' as act_join_dt
+          , '' as pay_yn
+         from tb_account_util_record T
+         join tb_account_members T2
+         on T2.member_id = T.member_id
+         where T.account_id = #{account_id}
+          AND T.record_year = #{year}
+          AND T.record_month = #{month}
+          AND T.is_present = 'Y'
+          AND IFNULL(T2.display_yn,'Y') = 'Y'
+        UNION ALL
+        -- 아래는 통합 직원(position_type=7) 전용. tb_account_util_member_mapping 매핑 기준으로 노출한다.
+        -- 매핑이 활성(del_yn='N')이면 항상 노출되고, 매핑이 해제(del_yn='Y')된 뒤에는
+        -- 이미 tb_account_record에 등록된 연/월만 계속 노출되고 미등록 연/월은 숨겨진다.
+        SELECT
           'nor' as gubun,
           T.account_id,
           T.member_id,
@@ -473,7 +522,15 @@
          AND T3.record_year = #{year}
        	 AND T3.record_month = #{month}
          where T.account_id = #{account_id}
-          AND IFNULL(T2.display_yn,'Y') = 'Y'
+          AND T2.position_type = 7
+          AND T.idx = (
+              SELECT MAX(idx) FROM tb_account_util_member_mapping
+              WHERE member_id = T.member_id AND account_id = T.account_id
+          )
+          AND (
+              IFNULL(T.del_yn,'N') = 'N'
+              OR T3.record_date IS NOT NULL
+          )
         UNION ALL
         -- 채용예정 인원
 		SELECT
@@ -568,6 +625,50 @@
 				 , X.member_id;
 	</select>
 	
+	<!-- ✅ 유틸 출근부 엑셀 업로드 등록(upsert)
+	     PK(record_year, record_month, record_date, account_id, member_id)가 그대로 겹치는 경우에만
+	     UPDATE되고, account_id가 다르면 같은 날짜라도 별개 행으로 INSERT된다.
+	     → 같은 직원이 같은 날 여러 거래처에 동시 배정되는 것을 허용하는 정책(요청에 따름).
+	     start_time/end_time은 member_id 기준 tb_account_members 값을 그대로 사용한다.
+	     account_id는 PK 컬럼이라 NULL을 저장할 수 없어, 비근무('휴')/미매칭 건은 프론트에서 빈 문자열('')로 내려온다. -->
+	<insert id="AccountUtilRecordSave" parameterType="map">
+		INSERT INTO tb_account_util_record (
+			record_year, record_month, record_date, type, account_id, member_id,
+			is_present, note, start_time, end_time, reg_dt, update_dt, user_id
+		)
+		VALUES (
+			#{record_year}, #{record_month}, #{record_date}, #{type}, #{account_id}, #{member_id},
+			#{is_present}, #{note},
+			(SELECT start_time FROM tb_account_members WHERE member_id = #{member_id} LIMIT 1),
+			(SELECT end_time FROM tb_account_members WHERE member_id = #{member_id} LIMIT 1),
+			CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			#{user_id}
+		)
+		ON DUPLICATE KEY UPDATE
+			type = #{type},
+			is_present = #{is_present},
+			note = #{note},
+			start_time = (SELECT start_time FROM tb_account_members WHERE member_id = #{member_id} LIMIT 1),
+			end_time = (SELECT end_time FROM tb_account_members WHERE member_id = #{member_id} LIMIT 1),
+			update_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			user_id = #{user_id}
+	</insert>
+
+	<!-- ✅ 유틸 출근부 엑셀 재업로드 시, 같은 연/월/직원의 기존 배정을 먼저 비워서
+	     재업로드 전 값(예: 이전에 배정됐던 다른 거래처 행)이 그대로 남지 않도록 한다.
+	     PK에 account_id가 포함되어 있어 upsert만으로는 "거래처가 바뀐" 날짜의
+	     이전 행이 삭제되지 않기 때문에, member_id 단위로 해당 연/월 전체를 삭제 후 재삽입한다. -->
+	<delete id="AccountUtilRecordDeleteByMonth" parameterType="map">
+		DELETE FROM tb_account_util_record
+		WHERE record_year = #{record_year}
+		  AND record_month = #{record_month}
+		  AND member_id IN
+		  <foreach collection="member_ids" item="mid" open="(" separator="," close=")">
+		  	#{mid}
+		  </foreach>
+	</delete>
+
 	<select id="AccountRecordDispatchList" parameterType="map" resultType="hashmap">
       SELECT
           subquery.member_id,

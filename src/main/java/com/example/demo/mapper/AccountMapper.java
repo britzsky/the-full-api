@@ -13,7 +13,8 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountListV2(Map<String, Object> paramMap);								// 거래처 목록
 	List<Map<String, Object>> AccountDirectList();														// 신사업 -> 직영점 목록
 	List<Map<String, Object>> AccountMemberList();														// 직원 목록
-	List<Map<String, Object>> AccountUtilMemberList();													// 직원관리 -> 유틸직원 조회
+	List<Map<String, Object>> AccountUtilMemberList(Map<String, Object> paramMap);						// 직원관리 -> 유틸직원 조회(position_type: 6=유틸, 7=통합, 미지정시 전체)
+	List<Map<String, Object>> AccountUtilRecordAccountNameList();										// 출근부 -> 유틸 출근부 -> 관리표 등록 거래처명 참고 목록
 	List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap);						// 직원관리 -> 유틸 직원 매핑정보 조회
 	int AccountUtilMemberMappingSave(Map<String, Object> paramMap);										// 직원관리 -> 유틸 직원 매핑정보 저장
 	List<Map<String, Object>> AccountTallySheetList(Map<String, Object> paramMap);						// 거래처 -> 집계표
@@ -22,6 +23,8 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountDispatchMemberHistoryList(Map<String, Object> paramMap); 			// 출근부 -> 파출등록 이력 인원 조회
 	List<Map<String, Object>> AccountRecordMemberList(Map<String, Object> paramMap); 					// 출근부 -> 직원정보
 	List<Map<String, Object>> AccountRecordSheetList(Map<String, Object> paramMap); 					// 출근부 -> 출근현황
+	int AccountUtilRecordSave(Map<String, Object> paramMap);											// 출근부 -> 유틸 출근부 -> 엑셀 업로드 등록(upsert)
+	int AccountUtilRecordDeleteByMonth(Map<String, Object> paramMap);									// 출근부 -> 유틸 출근부 -> 엑셀 재업로드 시 기존 배정 삭제(연/월/직원 단위)
 	List<Map<String, Object>> AccountMemberRecordTime(Map<String, Object> paramMap);					// 출근부 -> 출근현황 출퇴근 시간 조회
 	int AccountMemberRecordSave(Map<String, Object> paramMap);											// 출근부 -> 상용출근 정보 저장
 	int AccountMemberRecRecordSave(Map<String, Object> paramMap);										// 출근부 -> 채용현황 출근 정보 저장

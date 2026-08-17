@@ -335,10 +335,17 @@ public class AccountService {
 		return resultList;
 	}
 
-	// 유틸 직원 조회
-	public List<Map<String, Object>> AccountUtilMemberList() {
+	// 유틸/통합 직원 조회 (position_type: 6=유틸, 7=통합, 미지정 시 전체)
+	public List<Map<String, Object>> AccountUtilMemberList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = accountMapper.AccountUtilMemberList();
+		resultList = accountMapper.AccountUtilMemberList(paramMap);
+		return resultList;
+	}
+
+	// 유틸 출근부 -> 관리표(tb_account_managerment_table)에 등록된 거래처명 참고 목록
+	public List<Map<String, Object>> AccountUtilRecordAccountNameList() {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountUtilRecordAccountNameList();
 		return resultList;
 	}
 
@@ -353,6 +360,20 @@ public class AccountService {
 	public int AccountUtilMemberMappingSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = accountMapper.AccountUtilMemberMappingSave(paramMap);
+		return iResult;
+	}
+
+	// 유틸 출근부 -> 엑셀 업로드 등록(upsert, 같은 날 여러 거래처 동시 배정 허용)
+	public int AccountUtilRecordSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountUtilRecordSave(paramMap);
+		return iResult;
+	}
+
+	// 유틸 출근부 -> 엑셀 재업로드 시, 해당 연/월의 기존 배정(직원 단위)을 먼저 삭제
+	public int AccountUtilRecordDeleteByMonth(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountUtilRecordDeleteByMonth(paramMap);
 		return iResult;
 	}
 
