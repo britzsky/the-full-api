@@ -155,8 +155,9 @@ public class UserController {
 			out.put("code", "200");
 			out.put("updated", updated);
 		} catch (Exception e) {
+			e.printStackTrace();
 			out.put("code", "400");
-			out.put("msg", "승인 저장 처리 중 오류가 발생했습니다.");
+			out.put("msg", "승인 저장 처리 중 오류가 발생했습니다: " + e.getMessage());
 		}
 		return out;
 	}

@@ -103,10 +103,8 @@
 
     <update id="UpdateUserUseYn" parameterType="map">
         UPDATE tb_user
-        SET use_yn = #{use_yn}
-        <if test="use_yn == 'Y'">
-            , auth_id = #{auth_id}
-        </if>
+        SET use_yn = #{use_yn},
+            auth_id = COALESCE(#{auth_id}, auth_id)
         WHERE user_id = #{user_id}
     </update>
 
