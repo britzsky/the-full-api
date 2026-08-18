@@ -104,6 +104,9 @@
     <update id="UpdateUserUseYn" parameterType="map">
         UPDATE tb_user
         SET use_yn = #{use_yn}
+        <if test="use_yn == 'Y'">
+            , auth_id = #{auth_id}
+        </if>
         WHERE user_id = #{user_id}
     </update>
 
@@ -125,7 +128,8 @@
             account_id,
             position,
             department,
-            use_yn
+            use_yn,
+            request_dt
         )
         VALUES (
             #{user_id},
@@ -137,7 +141,8 @@
             #{account_id},
             #{position},
             #{department},
-            COALESCE(#{use_yn}, 'N')
+            COALESCE(#{use_yn}, 'N'),
+            CONVERT_TZ(NOW(), '+00:00', '+09:00')
         )
         ON DUPLICATE KEY UPDATE
         <trim suffixOverrides=",">

@@ -151,7 +151,7 @@ public class UserController {
 			Object listObj = body.get("list");
 			List<Map<String, Object>> list = (List<Map<String, Object>>) listObj;
 
-			int updated = userService.ApprovalSave(list);
+			int updated = userService.ApprovalSave(list, requesterId);
 			out.put("code", "200");
 			out.put("updated", updated);
 		} catch (Exception e) {

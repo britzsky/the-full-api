@@ -60,7 +60,7 @@ public class UserService {
 
 	// ✅ 승인 저장 (리스트로 들어온 use_yn 반영)
 	@Transactional
-	public int ApprovalSave(List<Map<String, Object>> list) {
+	public int ApprovalSave(List<Map<String, Object>> list, String approverId) {
 		int updated = 0;
 		if (list == null)
 			return 0;
@@ -77,6 +77,10 @@ public class UserService {
 			Map<String, Object> param = new HashMap<>();
 			param.put("user_id", userId);
 			param.put("use_yn", useYn);
+			// ✅ 승인(Y) 처리한 경우에만 승인자 아이디 기록
+			if ("Y".equals(useYn)) {
+				param.put("auth_id", approverId);
+			}
 
 			updated += userMapper.UpdateUserUseYn(param);
 		}
