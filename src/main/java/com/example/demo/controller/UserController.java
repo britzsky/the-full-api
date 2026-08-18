@@ -62,6 +62,15 @@ public class UserController {
 		}
 
 		// ===== 성공 응답 =====
+		// ✅ 로그인 이력 저장
+		try {
+			Map<String, Object> historyParam = new HashMap<>();
+			historyParam.put("user_id", String.valueOf(resultMap.get("user_id")));
+			userService.InsertLoginHistory(historyParam);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 		obj.addProperty("user_id", String.valueOf(resultMap.get("user_id")));
 		obj.addProperty("user_type", String.valueOf(resultMap.get("user_type")));
 		obj.addProperty("position", String.valueOf(resultMap.get("position")));
@@ -113,6 +122,32 @@ public class UserController {
 	public Map<String, Object> ApprovalSave(@RequestBody Map<String, Object> body) {
 		Map<String, Object> out = new HashMap<>();
 		try {
+			// ✅ 승인 권한 체크: 개발팀(department=6) + 팀장(position=1)만 허용
+			String requesterId = normalizeText(body.get("requester_id"));
+			if (requesterId.isEmpty()) {
+				out.put("code", "403");
+				out.put("msg", "요청자 정보가 없습니다.");
+				return out;
+			}
+
+			Map<String, Object> requesterParam = new HashMap<>();
+			requesterParam.put("user_id", requesterId);
+			List<Map<String, Object>> requesterInfoList = userService.SelectUserInfo(requesterParam);
+			if (requesterInfoList == null || requesterInfoList.isEmpty()) {
+				out.put("code", "403");
+				out.put("msg", "요청자 정보를 확인할 수 없습니다.");
+				return out;
+			}
+
+			Map<String, Object> requesterInfo = requesterInfoList.get(0);
+			String department = normalizeText(requesterInfo.get("department"));
+			String position = normalizeText(requesterInfo.get("position"));
+			if (!"6".equals(department) || !"1".equals(position)) {
+				out.put("code", "403");
+				out.put("msg", "승인 권한이 없습니다.");
+				return out;
+			}
+
 			Object listObj = body.get("list");
 			List<Map<String, Object>> list = (List<Map<String, Object>>) listObj;
 

@@ -23,6 +23,11 @@ public class UserService {
 		return userMapper.Login(paramMap);
 	}
 
+	// 로그인 이력 저장
+	public int InsertLoginHistory(Map<String, Object> paramMap) {
+		return userMapper.InsertLoginHistory(paramMap);
+	}
+
 	// 공통 키 생성값
 	public String NowDateKey() {
 		return userMapper.NowDateKey();

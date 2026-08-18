@@ -8,6 +8,11 @@
         CALL tb_user_login(#{userId}, #{password})
     </select>
 
+    <insert id="InsertLoginHistory" parameterType="map">
+        INSERT INTO tb_login_history (user_id, login_dt)
+        VALUES (#{user_id}, DATE_ADD(NOW(), INTERVAL 9 HOUR))
+    </insert>
+
     <select id="NowDateKey" resultType="String">
         SELECT DATE_FORMAT(NOW(6), '%Y%m%d%H%i%s%f')
     </select>

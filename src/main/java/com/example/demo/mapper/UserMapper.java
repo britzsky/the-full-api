@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Mapper;
 public interface UserMapper {
 
 	Map<String, Object> Login(Map<String, Object> paramMap);
+	int InsertLoginHistory(Map<String, Object> paramMap);
 	String NowDateKey();
 	int CountUserId(Map<String, Object> paramMap);
 	String SelectUtilMemberIdByUserId(Map<String, Object> paramMap);
