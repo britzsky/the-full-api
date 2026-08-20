@@ -1472,4 +1472,56 @@ public class AccountService {
 		}
 		return count;
 	}
+
+	// ===================== 출, 퇴근 기록 =====================
+
+	// 출, 퇴근 기록 -> 사업장 기준 좌표 조회
+	public Map<String, Object> SelectAccountCoordinate(Map<String, Object> paramMap) {
+		return accountMapper.SelectAccountCoordinate(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 등록기기 정보 조회
+	public Map<String, Object> SelectDeviceInfo(Map<String, Object> paramMap) {
+		return accountMapper.SelectDeviceInfo(paramMap);
+	}
+
+	// ✅ 출, 퇴근 기록 -> 등록기기 등록/변경 요청 - tb_member_device에 PK(유니크 제약)가 없으므로
+	//    기존 행이 있는지 먼저 조회해서 있으면 UPDATE, 없으면 INSERT 한다.
+	public int UpsertDeviceRequest(Map<String, Object> paramMap) {
+		Map<String, Object> existing = accountMapper.SelectDeviceInfo(paramMap);
+		if (existing == null) {
+			return accountMapper.InsertDeviceRequest(paramMap);
+		}
+		return accountMapper.UpdateDeviceRequestPending(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 등록기기 요청 승인
+	public int ApproveDevice(Map<String, Object> paramMap) {
+		return accountMapper.ApproveDevice(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 등록기기 요청 반려
+	public int RejectDevice(Map<String, Object> paramMap) {
+		return accountMapper.RejectDevice(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록
+	public List<Map<String, Object>> SelectDeviceRequestList(Map<String, Object> paramMap) {
+		return accountMapper.SelectDeviceRequestList(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 출퇴근 기록 저장(upsert)
+	public int UpsertCommuteRecord(Map<String, Object> paramMap) {
+		return accountMapper.UpsertCommuteRecord(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회
+	public Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap) {
+		return accountMapper.SelectTodayCommuteStatus(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
+	public List<Map<String, Object>> SelectCommuteRecordList(Map<String, Object> paramMap) {
+		return accountMapper.SelectCommuteRecordList(paramMap);
+	}
 }

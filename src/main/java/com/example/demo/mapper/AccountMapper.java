@@ -7,132 +7,290 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface AccountMapper {
-	
+
 	String NowDateKey();
-	List<Map<String, Object>> AccountList(Map<String, Object> paramMap);								// 거래처 목록
-	List<Map<String, Object>> AccountListV2(Map<String, Object> paramMap);								// 거래처 목록
-	List<Map<String, Object>> AccountDirectList();														// 신사업 -> 직영점 목록
-	List<Map<String, Object>> AccountMemberList();														// 직원 목록
-	List<Map<String, Object>> AccountUtilMemberList(Map<String, Object> paramMap);						// 직원관리 -> 유틸직원 조회(position_type: 6=유틸, 7=통합, 미지정시 전체)
-	List<Map<String, Object>> AccountUtilRecordAccountNameList();										// 출근부 -> 유틸 출근부 -> 관리표 등록 거래처명 참고 목록
-	List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap);						// 직원관리 -> 유틸 직원 매핑정보 조회
-	int AccountUtilMemberMappingSave(Map<String, Object> paramMap);										// 직원관리 -> 유틸 직원 매핑정보 저장
-	List<Map<String, Object>> AccountTallySheetList(Map<String, Object> paramMap);						// 거래처 -> 집계표
-	int AccountSave(Map<String, Object> paramMap);														// 거래처 -> 집계표 저장(예정)
-	List<Map<String, Object>> AccountRecordDispatchList(Map<String, Object> paramMap); 					// 출근부 -> 파출정보
-	List<Map<String, Object>> AccountDispatchMemberHistoryList(Map<String, Object> paramMap); 			// 출근부 -> 파출등록 이력 인원 조회
-	List<Map<String, Object>> AccountRecordMemberList(Map<String, Object> paramMap); 					// 출근부 -> 직원정보
-	List<Map<String, Object>> AccountRecordSheetList(Map<String, Object> paramMap); 					// 출근부 -> 출근현황
-	int AccountUtilRecordSave(Map<String, Object> paramMap);											// 출근부 -> 유틸 출근부 -> 엑셀 업로드 등록(upsert)
-	int AccountUtilRecordDeleteByMonth(Map<String, Object> paramMap);									// 출근부 -> 유틸 출근부 -> 엑셀 재업로드 시 기존 배정 삭제(연/월/직원 단위)
-	List<Map<String, Object>> AccountMemberRecordTime(Map<String, Object> paramMap);					// 출근부 -> 출근현황 출퇴근 시간 조회
-	int AccountMemberRecordSave(Map<String, Object> paramMap);											// 출근부 -> 상용출근 정보 저장
-	int AccountMemberRecRecordSave(Map<String, Object> paramMap);										// 출근부 -> 채용현황 출근 정보 저장
-	int AccountDispatchRecordSave(Map<String, Object> paramMap);										// 출근부 -> 파출출근 정보 저장
-	int AccountDispatchMemberSave(Map<String, Object> paramMap);										// 출근부 -> 파출직원 정보 저장
-	List<Map<String, Object>> AccountPropertiesList(Map<String, Object> paramMap); 						// 거래처 -> 기물리스트
-	List<Map<String, Object>> AccountInfoList(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	List<Map<String, Object>> AccountInfoList_2(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	List<Map<String, Object>> AccountInfoList_3(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	List<Map<String, Object>> AccountInfoList_4(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	List<Map<String, Object>> AccountInfoList_5(Map<String, Object> paramMap); 							// 거래처 -> 거래처 상세
-	int AccountInfoSave(Map<String, Object> paramMap);													// 거래처 -> 거래처 상세 저장
-	int AccountCoordinateSave(Map<String, Object> paramMap);											// 거래처 -> 거래처 주소 좌표 저장
-	int AccountDietPriceHistorySave(Map<String, Object> paramMap);										// 거래처 -> 거래처 상세 -> 식단가 변경내역 저장
-	List<Map<String, Object>>AccountDietPriceHistoryList(Map<String, Object> paramMap);					// 거래처 -> 거래처 상세 -> 식단가 변경내역 조회
-	int AccountUpfrontHistorySave(Map<String, Object> paramMap);										// 거래처 -> 초기투자비용 변경이력 저장
-	List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap);					// 거래처 -> 초기투자비용 현재값 조회
-	List<Map<String, Object>> AccountBusinessImgList(Map<String, Object> paramMap); 					// 거래처 -> 거래처 상세 이미지 조회
-	int insertOrUpdateFile(Map<String, Object> paramMap); 												// 거래처 -> 거래처 상세 이미지 업로드
-	List<Map<String, Object>> AccountDeadlineBalanceList(Map<String, Object> paramMap); 				// 회계 -> 매출마감/미수잔액 조회
-	List<Map<String, Object>> AccountDepositHistoryList(Map<String, Object> paramMap); 					// 회계 -> 매출마감/미수잔액 입금내역 조회
-	List<Map<String, Object>> AccountDeadlineBalanceListBulk(Map<String, Object> paramMap);				// 회계 -> 미납 품목 전용 마감잔액 범위 조회
-	List<Map<String, Object>> AccountDepositHistoryListBulk(Map<String, Object> paramMap);				// 회계 -> 미납 품목 전용 입금내역 범위 조회
-	int AccountDeadlineBalanceSave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 저장
-	int AccountBalancePriceSave(Map<String, Object> paramMap);											// 회계 -> 매출마감/미수잔액 총 미수금액 저장
-	int AccountDepositHistorySave(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 입금내역 저장
-	int AccountDepositHistoryUpdate(Map<String, Object> paramMap);										// 회계 -> 매출마감/미수잔액 입금내역 수정(입금일자, 비고)
-	int AccountDeadlineBalanceIntegrityCost(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 월 보전금액 조회
-	List<Map<String, Object>> AccountDeadlineDifferencePriceSearch(Map<String, Object> paramMap); 		// 회계 -> 타입별 차액 조회
-	int AccountDeadlineFilesSave(Map<String, Object> paramMap);											// 회계 -> 마감자료 저장
-	List<Map<String, Object>> AccountDeadlineFilesList(Map<String, Object> paramMap); 					// 회계 -> 마감자료 조회
-	int AccountIssueSave(Map<String, Object> paramMap);													// 운영,회계 -> 거래처 이슈 저장
-	List<Map<String, Object>> AccountIssueList(Map<String, Object> paramMap);							// 운영,회계 -> 거래처 이슈 조회
-	List<Map<String, Object>> AccountCommunicationMappingList(Map<String, Object> paramMap);			// 운영,영업 -> 구분 조회
-	int AccountCommunicationMappingSave(Map<String, Object> paramMap);									// 운영,영업 -> 구분 저장
-	int AccountCommunicationMappingDelete(Map<String, Object> paramMap);								// 운영,영업 -> 구분 삭제
-	List<Map<String, Object>> AccountCommunicationList(Map<String, Object> paramMap);					// 운영,영업 -> 마감이슈, 고객사이슈 조회
-	int AccountCommunicationInsert(Map<String, Object> paramMap);										// 운영,영업 -> 마감이슈, 고객사이슈 저장
-	int AccountCommunicationUpdate(Map<String, Object> paramMap);										// 운영,영업 -> 마감이슈, 고객사이슈 업데이트
+
+	List<Map<String, Object>> AccountList(Map<String, Object> paramMap); // 거래처 목록
+
+	List<Map<String, Object>> AccountListV2(Map<String, Object> paramMap); // 거래처 목록
+
+	List<Map<String, Object>> AccountDirectList(); // 신사업 -> 직영점 목록
+
+	List<Map<String, Object>> AccountMemberList(); // 직원 목록
+
+	List<Map<String, Object>> AccountUtilMemberList(Map<String, Object> paramMap); // 직원관리 -> 유틸직원 조회(position_type:
+																					// 6=유틸, 7=통합, 미지정시 전체)
+
+	List<Map<String, Object>> AccountUtilRecordAccountNameList(); // 출근부 -> 유틸 출근부 -> 관리표 등록 거래처명 참고 목록
+
+	List<Map<String, Object>> AccountUtilMappingList(Map<String, Object> paramMap); // 직원관리 -> 유틸 직원 매핑정보 조회
+
+	int AccountUtilMemberMappingSave(Map<String, Object> paramMap); // 직원관리 -> 유틸 직원 매핑정보 저장
+
+	List<Map<String, Object>> AccountTallySheetList(Map<String, Object> paramMap); // 거래처 -> 집계표
+
+	int AccountSave(Map<String, Object> paramMap); // 거래처 -> 집계표 저장(예정)
+
+	List<Map<String, Object>> AccountRecordDispatchList(Map<String, Object> paramMap); // 출근부 -> 파출정보
+
+	List<Map<String, Object>> AccountDispatchMemberHistoryList(Map<String, Object> paramMap); // 출근부 -> 파출등록 이력 인원 조회
+
+	List<Map<String, Object>> AccountRecordMemberList(Map<String, Object> paramMap); // 출근부 -> 직원정보
+
+	List<Map<String, Object>> AccountRecordSheetList(Map<String, Object> paramMap); // 출근부 -> 출근현황
+
+	int AccountUtilRecordSave(Map<String, Object> paramMap); // 출근부 -> 유틸 출근부 -> 엑셀 업로드 등록(upsert)
+
+	int AccountUtilRecordDeleteByMonth(Map<String, Object> paramMap); // 출근부 -> 유틸 출근부 -> 엑셀 재업로드 시 기존 배정 삭제(연/월/직원 단위)
+
+	List<Map<String, Object>> AccountMemberRecordTime(Map<String, Object> paramMap); // 출근부 -> 출근현황 출퇴근 시간 조회
+
+	int AccountMemberRecordSave(Map<String, Object> paramMap); // 출근부 -> 상용출근 정보 저장
+
+	int AccountMemberRecRecordSave(Map<String, Object> paramMap); // 출근부 -> 채용현황 출근 정보 저장
+
+	int AccountDispatchRecordSave(Map<String, Object> paramMap); // 출근부 -> 파출출근 정보 저장
+
+	int AccountDispatchMemberSave(Map<String, Object> paramMap); // 출근부 -> 파출직원 정보 저장
+
+	List<Map<String, Object>> AccountPropertiesList(Map<String, Object> paramMap); // 거래처 -> 기물리스트
+
+	List<Map<String, Object>> AccountInfoList(Map<String, Object> paramMap); // 거래처 -> 거래처 상세
+
+	List<Map<String, Object>> AccountInfoList_2(Map<String, Object> paramMap); // 거래처 -> 거래처 상세
+
+	List<Map<String, Object>> AccountInfoList_3(Map<String, Object> paramMap); // 거래처 -> 거래처 상세
+
+	List<Map<String, Object>> AccountInfoList_4(Map<String, Object> paramMap); // 거래처 -> 거래처 상세
+
+	List<Map<String, Object>> AccountInfoList_5(Map<String, Object> paramMap); // 거래처 -> 거래처 상세
+
+	int AccountInfoSave(Map<String, Object> paramMap); // 거래처 -> 거래처 상세 저장
+
+	int AccountCoordinateSave(Map<String, Object> paramMap); // 거래처 -> 거래처 주소 좌표 저장
+
+	int AccountDietPriceHistorySave(Map<String, Object> paramMap); // 거래처 -> 거래처 상세 -> 식단가 변경내역 저장
+
+	List<Map<String, Object>> AccountDietPriceHistoryList(Map<String, Object> paramMap); // 거래처 -> 거래처 상세 -> 식단가 변경내역 조회
+
+	int AccountUpfrontHistorySave(Map<String, Object> paramMap); // 거래처 -> 초기투자비용 변경이력 저장
+
+	List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap); // 거래처 -> 초기투자비용 현재값 조회
+
+	List<Map<String, Object>> AccountBusinessImgList(Map<String, Object> paramMap); // 거래처 -> 거래처 상세 이미지 조회
+
+	int insertOrUpdateFile(Map<String, Object> paramMap); // 거래처 -> 거래처 상세 이미지 업로드
+
+	List<Map<String, Object>> AccountDeadlineBalanceList(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 조회
+
+	List<Map<String, Object>> AccountDepositHistoryList(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 입금내역 조회
+
+	List<Map<String, Object>> AccountDeadlineBalanceListBulk(Map<String, Object> paramMap); // 회계 -> 미납 품목 전용 마감잔액 범위 조회
+
+	List<Map<String, Object>> AccountDepositHistoryListBulk(Map<String, Object> paramMap); // 회계 -> 미납 품목 전용 입금내역 범위 조회
+
+	int AccountDeadlineBalanceSave(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 저장
+
+	int AccountBalancePriceSave(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 총 미수금액 저장
+
+	int AccountDepositHistorySave(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 입금내역 저장
+
+	int AccountDepositHistoryUpdate(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 입금내역 수정(입금일자, 비고)
+
+	int AccountDeadlineBalanceIntegrityCost(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 월 보전금액 조회
+
+	List<Map<String, Object>> AccountDeadlineDifferencePriceSearch(Map<String, Object> paramMap); // 회계 -> 타입별 차액 조회
+
+	int AccountDeadlineFilesSave(Map<String, Object> paramMap); // 회계 -> 마감자료 저장
+
+	List<Map<String, Object>> AccountDeadlineFilesList(Map<String, Object> paramMap); // 회계 -> 마감자료 조회
+
+	int AccountIssueSave(Map<String, Object> paramMap); // 운영,회계 -> 거래처 이슈 저장
+
+	List<Map<String, Object>> AccountIssueList(Map<String, Object> paramMap); // 운영,회계 -> 거래처 이슈 조회
+
+	List<Map<String, Object>> AccountCommunicationMappingList(Map<String, Object> paramMap); // 운영,영업 -> 구분 조회
+
+	int AccountCommunicationMappingSave(Map<String, Object> paramMap); // 운영,영업 -> 구분 저장
+
+	int AccountCommunicationMappingDelete(Map<String, Object> paramMap); // 운영,영업 -> 구분 삭제
+
+	List<Map<String, Object>> AccountCommunicationList(Map<String, Object> paramMap); // 운영,영업 -> 마감이슈, 고객사이슈 조회
+
+	int AccountCommunicationInsert(Map<String, Object> paramMap); // 운영,영업 -> 마감이슈, 고객사이슈 저장
+
+	int AccountCommunicationUpdate(Map<String, Object> paramMap); // 운영,영업 -> 마감이슈, 고객사이슈 업데이트
 	// 배치성 데이터
-	List<Map<String, Object>> BatchForPayBack(Map<String, Object> paramMap); 							// 본사 -> 관리표 -> 손익표 (판장금)
-	int AccountAnnualLeaveLedgerDelete(Map<String, Object> paramMap);									// 출근부 -> 연차관리 기존 데이터 삭제
-	int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 연차관리 저장
-	int AccountOverTimeLedgerDelete(Map<String, Object> paramMap);										// 출근부 -> 초과관리 기존 데이터 삭제
-	int AccountOverTimeLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 초과관리 저장
-	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
-	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
-	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
-	void AccountPurchaseTallyDelete(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 삭제
-	int AccountPurchaseTallyDetailDelete(Map<String, Object> paramMap);								// 현장 -> 집계표 -> 매입집계 상세 삭제
-	int AccountPurchaseHistorySave(Map<String, Object> paramMap);										// 회계 -> 매입마감 변경이력 저장
-	Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap);				// 회계 -> 매입마감 sale_id 기준 total/saleDate 조회
-	Map<String, Object> AccountPurchaseTallyBySaleDateAndType(Map<String, Object> paramMap);			// 집계표 동기화 시 account_id+saleDate+type 기준 기존 row 조회
-	int AccountPurchaseTallyTotalUpdate(Map<String, Object> paramMap);									// 집계표 동기화 시 기존 row total UPDATE
-	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap);							// 현장 -> 매입집계 영수증 경로 조회
-	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap);				// 현장 -> 매입집계 영수증(1~3) 경로 조회
-	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회
-	List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap); 			// 회계 -> 매입집계(TallyTab) 조회
-	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입집계 조회
-	List<Map<String, Object>> AccountPurchaseDetailList_tmp(Map<String, Object> paramMap); 				// 회계 -> 매입 -> 매입집계(임시) 조회
-	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); 				// 회계 -> 본사 법인카드 목록 조회
-	List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제내역 조회
-	List<Map<String, Object>> HeadOfficeCorporateCardPaymentListAll(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제내역 전체 조회 (account_id 무관)
-	List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList(Map<String, Object> paramMap); 	// 회계 -> 본사 법인카드 결제 상세내역 조회
-	void HeadOfficeCorporateCardPaymentDelete(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 결제내역 삭제
-	int HeadOfficeCorporateCardPaymentDetailDelete(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 결제내역 상세 삭제
-	int HeadOfficeCorporateCardSave(Map<String, Object> paramMap);										// 회계 -> 본사 법인카드 저장
-	int HeadOfficeCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 본사 법인카드 결제내역 저장
-	int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 상세내역 저장
-	String HeadOfficeCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap);					// 회계 -> 본사 법인카드 영수증 경로 조회
-	String HeadOfficeCorporateCardPaymentDtBySaleId(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 sale_id 기준 기존 결제일자 조회
-	List<Map<String, Object>> AccountCorporateCardList(Map<String, Object> paramMap); 					// 회계 -> 본사 법인카드 목록 조회
-	List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap); 			// 회계 -> 본사 법인카드 결제내역 조회
-	List<Map<String, Object>> AccountCorporateCardPaymentDetailList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제 상세내역 조회
-	int AccountCorporateCardSave(Map<String, Object> paramMap);											// 회계 -> 현장 법인카드 저장
-	void AccountCorporateCardPaymentDelete(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 결제내역 삭제
-	int AccountCorporateCardPaymentDetailDelete(Map<String, Object> paramMap);							// 회계 -> 현장 법인카드 결제내역 상세 삭제
-	int AccountCorporateCardPaymentSave(Map<String, Object> paramMap);									// 회계 -> 현장 법인카드 결제내역 저장
-	int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap);							// 회계 -> 현장 법인카드 상세내역 저장
-	int AccountCorporateCardPaymentToPurchaseTallySave(Map<String, Object> paramMap);					// 회계 -> 현장 법인카드 결제내역을 매입집계(type=1000)로 동기화
-	String AccountCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap);						// 회계 -> 현장 법인카드 영수증 경로 조회
-	void TallySheetCorporateCardPaymentSave(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 집계표 적용
-	void TallySheetCorporateCardPaymentSaveV2(Map<String, Object> paramMap);							// 회계 -> 본사 법인카드 집계표 적용 (detail 기준)
-	List<Map<String, Object>> AccountPurchaseTallyPaymentList(Map<String, Object> paramMap); 			// 집계표 -> 결제 리스트 조회
-	void TallySheetPaymentSave(Map<String, Object> paramMap);											// 집계표 -> 집계표 적용
-	int TallySheetPaymentDelete(Map<String, Object> paramMap);											// 집계표 -> 집계표 내역 삭제
-	int AccountMemberRecordUpdateByOldKey(Map<String, Object> paramMap);								// 인사 -> 직원파출 매핑 수정 시 기존 출근기록 수정
-	int AccountMemberDispatchMappingSave(Map<String, Object> paramMap);									// 인사 -> 직원파출 매핑 저장
-	Map<String, Object> AccountMemberDispatchMappingOne(Map<String, Object> paramMap); 					// 인사 -> 직원파출 매핑 단건 조회
-	List<Map<String, Object>> AccountMemberDispatchMappingList(Map<String, Object> paramMap); 			// 인사 -> 직원파출 매핑 조회
-	int AccountDepositEmptyUse(Map<String, Object> paramMap);											// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 조회
-	int AccountDepositHistoryRecalc(Map<String, Object> paramMap);										// 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정					
-	int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
-	List<Map<String, Object>> AccountPersonPurchaseTallyList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 조회
-	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
-	List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap); 				// 회계 -> 매입(본사용) 조회
-	int AccountPurchaseTallyV2Save(Map<String, Object> paramMap);										// 회계 -> 매입(본사용) 저장
-	int AccountDispatchMemberDelete(Map<String, Object> paramMap);										// 긴급인력 파출 회원 정보 삭제
-	int AccountDispatchRecordDelete(Map<String, Object> paramMap);										// 긴급인력 파출 출근기록 삭제
-	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap);										// 회계 -> 매입집계 삭제
-	Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap);								// 회계 -> 월 마감 수정권한 조회
-	int MonthLockOverrideSave(Map<String, Object> paramMap);											// 회계 -> 월 마감 수정권한 저장/수정
+
+	List<Map<String, Object>> BatchForPayBack(Map<String, Object> paramMap); // 본사 -> 관리표 -> 손익표 (판장금)
+
+	int AccountAnnualLeaveLedgerDelete(Map<String, Object> paramMap); // 출근부 -> 연차관리 기존 데이터 삭제
+
+	int AccountAnnualLeaveLedgerSave(Map<String, Object> paramMap); // 출근부 -> 연차관리 저장
+
+	int AccountOverTimeLedgerDelete(Map<String, Object> paramMap); // 출근부 -> 초과관리 기존 데이터 삭제
+
+	int AccountOverTimeLedgerSave(Map<String, Object> paramMap); // 출근부 -> 초과관리 저장
+
+	List<Map<String, Object>> AccountMappingList(String account_id); // 현장 -> 집계표 -> 영수증 매장 확인 조회
+
+	int AccountPurchaseSave(Map<String, Object> paramMap); // 현장 -> 집계표 -> 매입집계 저장
+
+	int AccountPurchaseDetailSave(Map<String, Object> paramMap); // 현장 -> 집계표 -> 매입집계 상세 저장
+
+	void AccountPurchaseTallyDelete(Map<String, Object> paramMap); // 현장 -> 집계표 -> 매입집계 삭제
+
+	int AccountPurchaseTallyDetailDelete(Map<String, Object> paramMap); // 현장 -> 집계표 -> 매입집계 상세 삭제
+
+	int AccountPurchaseHistorySave(Map<String, Object> paramMap); // 회계 -> 매입마감 변경이력 저장
+
+	Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap); // 회계 -> 매입마감 sale_id 기준
+																							// total/saleDate 조회
+
+	Map<String, Object> AccountPurchaseTallyBySaleDateAndType(Map<String, Object> paramMap); // 집계표 동기화 시
+																								// account_id+saleDate+type
+																								// 기준 기존 row 조회
+
+	int AccountPurchaseTallyTotalUpdate(Map<String, Object> paramMap); // 집계표 동기화 시 기존 row total UPDATE
+
+	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap); // 현장 -> 매입집계 영수증 경로 조회
+
+	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap); // 현장 -> 매입집계 영수증(1~3) 경로 조회
+
+	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); // 회계 -> 매입 -> 매입마감 조회
+
+	List<Map<String, Object>> AccountPurchaseTallyForTallyTab(Map<String, Object> paramMap); // 회계 -> 매입집계(TallyTab) 조회
+
+	List<Map<String, Object>> AccountPurchaseDetailList(Map<String, Object> paramMap); // 회계 -> 매입 -> 매입집계 조회
+
+	List<Map<String, Object>> AccountPurchaseDetailList_tmp(Map<String, Object> paramMap); // 회계 -> 매입 -> 매입집계(임시) 조회
+
+	List<Map<String, Object>> HeadOfficeCorporateCardList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 목록 조회
+
+	List<Map<String, Object>> HeadOfficeCorporateCardPaymentList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역 조회
+
+	List<Map<String, Object>> HeadOfficeCorporateCardPaymentListAll(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역
+																									// 전체 조회 (account_id
+																									// 무관)
+
+	List<Map<String, Object>> HeadOfficeCorporateCardPaymentDetailList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드
+																										// 결제 상세내역 조회
+
+	void HeadOfficeCorporateCardPaymentDelete(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역 삭제
+
+	int HeadOfficeCorporateCardPaymentDetailDelete(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역 상세 삭제
+
+	int HeadOfficeCorporateCardSave(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 저장
+
+	int HeadOfficeCorporateCardPaymentSave(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역 저장
+
+	int HeadOfficeCorporateCardPaymentDetailLSave(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 상세내역 저장
+
+	String HeadOfficeCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 영수증 경로 조회
+
+	String HeadOfficeCorporateCardPaymentDtBySaleId(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 sale_id 기준 기존 결제일자
+																					// 조회
+
+	List<Map<String, Object>> AccountCorporateCardList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 목록 조회
+
+	List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제내역 조회
+
+	List<Map<String, Object>> AccountCorporateCardPaymentDetailList(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 결제
+																									// 상세내역 조회
+
+	int AccountCorporateCardSave(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 저장
+
+	void AccountCorporateCardPaymentDelete(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 결제내역 삭제
+
+	int AccountCorporateCardPaymentDetailDelete(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 결제내역 상세 삭제
+
+	int AccountCorporateCardPaymentSave(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 결제내역 저장
+
+	int AccountCorporateCardPaymentDetailLSave(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 상세내역 저장
+
+	int AccountCorporateCardPaymentToPurchaseTallySave(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 결제내역을
+																						// 매입집계(type=1000)로 동기화
+
+	String AccountCorporateCardReceiptImageBySaleId(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 영수증 경로 조회
+
+	void TallySheetCorporateCardPaymentSave(Map<String, Object> paramMap); // 회계 -> 현장 법인카드 집계표 적용
+
+	void TallySheetCorporateCardPaymentSaveV2(Map<String, Object> paramMap); // 회계 -> 본사 법인카드 집계표 적용 (detail 기준)
+
+	List<Map<String, Object>> AccountPurchaseTallyPaymentList(Map<String, Object> paramMap); // 집계표 -> 결제 리스트 조회
+
+	void TallySheetPaymentSave(Map<String, Object> paramMap); // 집계표 -> 집계표 적용
+
+	int TallySheetPaymentDelete(Map<String, Object> paramMap); // 집계표 -> 집계표 내역 삭제
+
+	int AccountMemberRecordUpdateByOldKey(Map<String, Object> paramMap); // 인사 -> 직원파출 매핑 수정 시 기존 출근기록 수정
+
+	int AccountMemberDispatchMappingSave(Map<String, Object> paramMap); // 인사 -> 직원파출 매핑 저장
+
+	Map<String, Object> AccountMemberDispatchMappingOne(Map<String, Object> paramMap); // 인사 -> 직원파출 매핑 단건 조회
+
+	List<Map<String, Object>> AccountMemberDispatchMappingList(Map<String, Object> paramMap); // 인사 -> 직원파출 매핑 조회
+
+	int AccountDepositEmptyUse(Map<String, Object> paramMap); // 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 조회
+
+	int AccountDepositHistoryRecalc(Map<String, Object> paramMap); // 영업 -> 매출 -> 매출마감/미수잔액 -> 입금내역 수정
+
+	int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap); // 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
+
+	List<Map<String, Object>> AccountPersonPurchaseTallyList(Map<String, Object> paramMap); // 회계 -> 개인구매 관리 -> 개인구매 조회
+
+	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); // 회계 -> 개인구매 관리 -> 개인구매 상세
+																								// 조회
+
+	List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap); // 회계 -> 매입(본사용) 조회
+
+	int AccountPurchaseTallyV2Save(Map<String, Object> paramMap); // 회계 -> 매입(본사용) 저장
+
+	int AccountDispatchMemberDelete(Map<String, Object> paramMap); // 긴급인력 파출 회원 정보 삭제
+
+	int AccountDispatchRecordDelete(Map<String, Object> paramMap); // 긴급인력 파출 출근기록 삭제
+
+	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap); // 회계 -> 매입집계 삭제
+
+	Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap); // 회계 -> 월 마감 수정권한 조회
+
+	int MonthLockOverrideSave(Map<String, Object> paramMap); // 회계 -> 월 마감 수정권한 저장/수정
 
 	// 현장 -> 구입요청
-	Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap);							// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)
-	List<Map<String, Object>> PurchaseManagerList(Map<String, Object> paramMap);						// 현장 -> 구입 업장관리 -> 관리자 목록 (department=5, position=2,3)
-	List<Map<String, Object>> PurchaseAccountList(Map<String, Object> paramMap);						// 현장 -> 구입 업장관리 -> 전체 거래처 목록
-	List<Map<String, Object>> PurchaseManagerAccountMapList(Map<String, Object> paramMap);				// 현장 -> 구입 업장관리 -> 관리자별 매핑 거래처 목록
-	int PurchaseManagerAccountMapDelete(Map<String, Object> paramMap);									// 현장 -> 구입 업장관리 -> 매핑 전체 삭제 (user_id 기준)
-	int PurchaseManagerAccountMapSave(Map<String, Object> paramMap);									// 현장 -> 구입 업장관리 -> 매핑 단건 저장
+	Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap); // 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)
+
+	List<Map<String, Object>> PurchaseManagerList(Map<String, Object> paramMap); // 현장 -> 구입 업장관리 -> 관리자 목록
+																					// (department=5, position=2,3)
+
+	List<Map<String, Object>> PurchaseAccountList(Map<String, Object> paramMap); // 현장 -> 구입 업장관리 -> 전체 거래처 목록
+
+	List<Map<String, Object>> PurchaseManagerAccountMapList(Map<String, Object> paramMap); // 현장 -> 구입 업장관리 -> 관리자별 매핑
+																							// 거래처 목록
+
+	int PurchaseManagerAccountMapDelete(Map<String, Object> paramMap); // 현장 -> 구입 업장관리 -> 매핑 전체 삭제 (user_id 기준)
+
+	int PurchaseManagerAccountMapSave(Map<String, Object> paramMap); // 현장 -> 구입 업장관리 -> 매핑 단건 저장
+
+	// 출, 퇴근 기록
+	Map<String, Object> SelectAccountCoordinate(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 사업장 기준 좌표 조회
+
+	Map<String, Object> SelectDeviceInfo(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 등록기기 정보 조회 (account_id +
+																		// user_name 기준)
+
+	int InsertDeviceRequest(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성
+
+	int UpdateDeviceRequestPending(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신)
+
+	int ApproveDevice(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 등록기기 요청 승인
+
+	int RejectDevice(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 등록기기 요청 반려
+
+	List<Map<String, Object>> SelectDeviceRequestList(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록
+																						// (관리자용)
+
+	int UpsertCommuteRecord(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 출퇴근 기록 저장 (하루 1행, 출근/퇴근 각각 해당 컬럼만 upsert)
+
+	Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
+
+	List<Map<String, Object>> SelectCommuteRecordList(Map<String, Object> paramMap); // 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 }

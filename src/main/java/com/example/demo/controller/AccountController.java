@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -3198,6 +3199,214 @@ public class AccountController {
 		} catch (Exception e) {
 			obj.addProperty("code", 500);
 			obj.addProperty("message", "저장 중 오류: " + e.getMessage());
+		}
+		return obj.toString();
+	}
+
+	// ===================== 출, 퇴근 기록 =====================
+	// 웹(the_full) 전용 API. 거리 오차 계산은 클라이언트(웹)에서 수행하고, 서버는 그 값을 저장하면서
+	// 등록기기(tb_member_device) 승인 여부만 추가로 검증한다.
+	// 식별 기준은 user_id(로그인 계정)가 아니라 account_id + user_name(이름) 이다.
+
+	private String normalizeCommuteText(Object value) {
+		return value == null ? "" : String.valueOf(value).trim();
+	}
+
+	/*
+	 * method : AccountCoordinateInfo
+	 * comment : 출, 퇴근 기록 -> 사업장 기준 좌표 조회
+	 */
+	@PostMapping("/User/AccountCoordinateInfo")
+	public String AccountCoordinateInfo(@RequestBody Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.SelectAccountCoordinate(paramMap);
+		return new Gson().toJson(result == null ? new HashMap<>() : result);
+	}
+
+	/*
+	 * method : CommuteSave
+	 * comment : 출, 퇴근 기록 -> 출근/퇴근 저장. 등록기기 승인 여부를 먼저 검증한 뒤 하루 1행으로 upsert.
+	 */
+	@PostMapping("/User/CommuteSave")
+	public ResponseEntity<String> CommuteSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+
+		String accountId = normalizeCommuteText(paramMap.get("account_id"));
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String tDate = normalizeCommuteText(paramMap.get("t_date"));
+		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
+
+		if (accountId.isEmpty() || userName.isEmpty() || tDate.isEmpty()) {
+			obj.addProperty("msg", "필수 정보가 누락되었습니다.");
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(obj.toString());
+		}
+
+		try {
+			// 1) 등록기기 승인 검증 (account_id + user_name 기준)
+			Map<String, Object> paramDevice = new HashMap<>();
+			paramDevice.put("account_id", accountId);
+			paramDevice.put("user_name", userName);
+			Map<String, Object> deviceInfo = accountService.SelectDeviceInfo(paramDevice);
+
+			String approvedYn = deviceInfo == null ? "N" : normalizeCommuteText(deviceInfo.get("approve_yn")).toUpperCase();
+			String approvedToken = deviceInfo == null ? "" : normalizeCommuteText(deviceInfo.get("device_token"));
+			String pendingToken = deviceInfo == null ? "" : normalizeCommuteText(deviceInfo.get("pending_device_token"));
+
+			boolean isApprovedDevice = "Y".equals(approvedYn) && !approvedToken.isEmpty()
+					&& !deviceToken.isEmpty() && approvedToken.equals(deviceToken);
+
+			if (!isApprovedDevice) {
+				// ✅ 승인 대기중인 요청이 이미 이 기기로 올라가 있는 경우와, 완전히 새 기기인 경우를 구분해서 안내
+				boolean alreadyPendingThisDevice = !pendingToken.isEmpty() && !deviceToken.isEmpty()
+						&& pendingToken.equals(deviceToken);
+
+				if (alreadyPendingThisDevice) {
+					obj.addProperty("reason", "PENDING");
+					obj.addProperty("msg", "기기 등록 승인 대기중입니다. 관리자 승인 후 출퇴근이 가능합니다.");
+				} else {
+					// ✅ 새 기기 - 자동으로 등록 요청을 남긴다 (직원이 따로 버튼을 안 눌러도 되게)
+					try {
+						Map<String, Object> autoRequest = new HashMap<>();
+						autoRequest.put("account_id", accountId);
+						autoRequest.put("user_name", userName);
+						autoRequest.put("device_token", deviceToken);
+						autoRequest.put("device_name", normalizeCommuteText(paramMap.get("device_name")));
+						accountService.UpsertDeviceRequest(autoRequest);
+					} catch (Exception ignore) {
+						// 자동 등록 요청 실패는 무시하고 아래 안내 메시지는 그대로 내려준다
+					}
+					obj.addProperty("reason", "NEW_DEVICE");
+					obj.addProperty("msg", "새로운 기기입니다.\n관리자 승인 후 출퇴근이 가능합니다.");
+				}
+				return ResponseEntity.status(HttpStatus.FORBIDDEN).body(obj.toString());
+			}
+
+			// ✅ 출퇴근 기록에는 user_id를 저장하지 않는다(컬럼만 미리 만들어둠). 식별은 account_id + user_name 기준.
+			Map<String, Object> record = new HashMap<>();
+			record.put("user_name", userName);
+			record.put("account_id", accountId);
+			record.put("t_date", tDate);
+			record.put("start_time", paramMap.get("start_time"));
+			record.put("end_time", paramMap.get("end_time"));
+			record.put("st_x_coordinate", paramMap.get("st_x_coordinate"));
+			record.put("st_y_coordinate", paramMap.get("st_y_coordinate"));
+			record.put("st_error_margin", paramMap.get("st_error_margin"));
+			record.put("ed_x_coordinate", paramMap.get("ed_x_coordinate"));
+			record.put("ed_y_coordinate", paramMap.get("ed_y_coordinate"));
+			record.put("ed_error_margin", paramMap.get("ed_error_margin"));
+			record.put("device_token", deviceToken);
+
+			accountService.UpsertCommuteRecord(record);
+
+			obj.addProperty("msg", "저장되었습니다.");
+			return ResponseEntity.ok(obj.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("msg", "출퇴근 저장 중 오류가 발생했습니다.");
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(obj.toString());
+		}
+	}
+
+	/*
+	 * method : CommuteTodayStatus
+	 * comment : 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회 (웹 화면의 출근/퇴근 버튼 상태 제어용, account_id + user_name 기준)
+	 */
+	@GetMapping("/User/CommuteTodayStatus")
+	public String CommuteTodayStatus(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.SelectTodayCommuteStatus(paramMap);
+		return new Gson().toJson(result == null ? new HashMap<>() : result);
+	}
+
+	/*
+	 * method : CommuteRecordList
+	 * comment : 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
+	 */
+	@GetMapping("/User/CommuteRecordList")
+	public String CommuteRecordList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.SelectCommuteRecordList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : CommuteDeviceInfo
+	 * comment : 출, 퇴근 기록 -> 등록기기(승인/요청) 상태 조회 (account_id + user_name 기준)
+	 */
+	@GetMapping("/Commute/CommuteDeviceInfo")
+	public String CommuteDeviceInfo(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.SelectDeviceInfo(paramMap);
+		return new Gson().toJson(result);
+	}
+
+	/*
+	 * method : CommuteDeviceRequest
+	 * comment : 출, 퇴근 기록 -> 등록기기 신규등록/변경 요청 (관리자 승인 전까지는 미승인 상태)
+	 */
+	@PostMapping("/Commute/CommuteDeviceRequest")
+	public String CommuteDeviceRequest(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+
+		String accountId = normalizeCommuteText(paramMap.get("account_id"));
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
+
+		if (accountId.isEmpty() || userName.isEmpty() || deviceToken.isEmpty()) {
+			obj.addProperty("code", "400");
+			obj.addProperty("msg", "필수 정보가 누락되었습니다.");
+			return obj.toString();
+		}
+
+		try {
+			accountService.UpsertDeviceRequest(paramMap);
+			obj.addProperty("code", "200");
+			obj.addProperty("msg", "기기 등록 요청이 접수되었습니다. 관리자 승인 후 사용할 수 있습니다.");
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("code", "500");
+			obj.addProperty("msg", "기기 등록 요청 중 오류가 발생했습니다.");
+		}
+		return obj.toString();
+	}
+
+	/*
+	 * method : CommuteDeviceRequestList
+	 * comment : 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 (관리자)
+	 */
+	@GetMapping("/Commute/CommuteDeviceRequestList")
+	public String CommuteDeviceRequestList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.SelectDeviceRequestList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : CommuteDeviceApprove
+	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name 기준)
+	 */
+	@PostMapping("/Commute/CommuteDeviceApprove")
+	public String CommuteDeviceApprove(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+
+		String accountId = normalizeCommuteText(paramMap.get("account_id"));
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String approve = normalizeCommuteText(paramMap.get("approve")).toUpperCase();
+
+		if (accountId.isEmpty() || userName.isEmpty()) {
+			obj.addProperty("code", "400");
+			obj.addProperty("msg", "필수 정보가 누락되었습니다.");
+			return obj.toString();
+		}
+
+		try {
+			if ("Y".equals(approve)) {
+				accountService.ApproveDevice(paramMap);
+				obj.addProperty("msg", "기기 등록을 승인했습니다.");
+			} else {
+				accountService.RejectDevice(paramMap);
+				obj.addProperty("msg", "기기 등록 요청을 반려했습니다.");
+			}
+			obj.addProperty("code", "200");
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("code", "500");
+			obj.addProperty("msg", "처리 중 오류가 발생했습니다.");
 		}
 		return obj.toString();
 	}
