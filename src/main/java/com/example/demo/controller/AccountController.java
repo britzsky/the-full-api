@@ -470,6 +470,16 @@ public class AccountController {
 				// 초과근무 시간 사용이 있는 지 체크.
 				if (iType == 1) {
 					if (position.equals("영양사") || iPositionType == 1) {
+						// ✅ 화면에서 출/퇴근 시간을 별도로 선택하지 않은 경우 start_time/end_time이
+						//    빈 문자열로 전달될 수 있으므로, 이 경우 기본 근무시간(org_start_time/org_end_time)으로
+						//    보정한다. (보정 시 시작/종료 시각 차이가 0이 되어 보상시간 사용으로 처리되지 않음)
+						if (row.get("start_time") == null || row.get("start_time").toString().trim().isEmpty()) {
+							row.put("start_time", row.get("org_start_time"));
+						}
+						if (row.get("end_time") == null || row.get("end_time").toString().trim().isEmpty()) {
+							row.put("end_time", row.get("org_end_time"));
+						}
+
 						// 시각 파싱
 						DateTimeFormatter minutFormatter = DateTimeFormatter.ofPattern("H:m");
 
@@ -2173,6 +2183,20 @@ public class AccountController {
 
 	/*
 	 * part : 회계
+	 * method : AccountPersonPurchaseTallyListAll
+	 * comment : 회계 -> 개인구매 영수증 마감 자료 전체 조회 (account_id 무관)
+	 */
+	@GetMapping("Account/AccountPersonPurchaseTallyListAll")
+	public String AccountPersonPurchaseTallyListAll(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountPersonPurchaseTallyListAll(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
 	 * method : AccountPurchaseTallyList_tmp
 	 * comment : 회계 -> 개인구매 관리 -> 개인구매 상세 조회
 	 */
@@ -2612,6 +2636,20 @@ public class AccountController {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 
 		resultList = accountService.AccountCorporateCardPaymentList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 회계
+	 * method : AccountCorporateCardPaymentListAll
+	 * comment : 회계 -> 현장 법인카드 결제내역 전체 조회 (account_id 무관)
+	 */
+	@GetMapping("Account/AccountCorporateCardPaymentListAll")
+	public String AccountCorporateCardPaymentListAll(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+
+		resultList = accountService.AccountCorporateCardPaymentListAll(paramMap);
 
 		return new Gson().toJson(resultList);
 	}

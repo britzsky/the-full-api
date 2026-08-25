@@ -2855,7 +2855,39 @@
 		AND DATE_FORMAT(apt.saleDate, '%m') = ${month}
         ORDER BY apt.saleDate ASC, apt.sale_id ASC
 	</select>
-	
+
+	<select id="AccountPersonPurchaseTallyListAll" parameterType="map" resultType="hashmap">
+		SELECT apt.sale_id,
+		       apt.account_id,
+		       a.account_name,
+		       apt.use_name,
+		       DATE_FORMAT(apt.saleDate, '%Y-%m-%d') as saleDate,
+		       ifnull(apt.total, 0) as total,
+		       ifnull(apt.vat, 0) as vat,
+		       ifnull(apt.taxFree, 0) as taxFree,
+		       ifnull(apt.tax, 0) as tax,
+		       ifnull(apt.totalCash, 0) as totalCash,
+		       ifnull(apt.totalCard, 0) as totalCard,
+		       apt.payType,
+		       apt.cardNo,
+		       apt.cardBrand,
+		       apt.bizNo,
+		       apt.receipt_image,
+		       apt.receipt_image2,
+		       apt.receipt_image3,
+		       apt.note,
+		       apt.receipt_type
+		FROM tb_account_purchase_tally apt
+		LEFT JOIN tb_account a ON a.account_id = apt.account_id
+		WHERE apt.type = 1008
+		AND DATE_FORMAT(apt.saleDate, '%Y') = ${year}
+		AND DATE_FORMAT(apt.saleDate, '%m') = ${month}
+		<if test="account_id != null and account_id != ''">
+			AND apt.account_id = #{account_id}
+		</if>
+		ORDER BY apt.saleDate ASC, apt.sale_id ASC
+	</select>
+
 	<select id="AccountPersonPurchaseDetailList" parameterType="map" resultType="hashmap">
 		SELECT apt.account_id, 
 			   aptd.sale_id,
@@ -3191,7 +3223,44 @@
 		</where>
 		ORDER BY payment_dt ASC, sale_id ASC
 	</select>
-	
+
+	<!-- 전체 거래처 현장 법인카드 결제내역 조회 (account_id 조건 없음) -->
+	<select id="AccountCorporateCardPaymentListAll" parameterType="map" resultType="hashmap">
+		SELECT m.sale_id,
+			   m.account_id,
+			   a.account_name,
+			   DATE_FORMAT(m.payment_dt, '%Y-%m-%d') as payment_dt,
+			   m.use_name,
+			   m.bizNo,
+			   m.total,
+			   m.vat,
+			   m.taxFree,
+			   m.tax,
+			   m.totalCard,
+			   m.cardNo,
+			   m.cardBrand,
+			   m.receipt_image,
+			   m.note,
+			   DATE_FORMAT(m.reg_dt, '%Y-%m-%d') as reg_dt,
+			   m.user_id,
+			   m.receipt_type,
+			   m.idx,
+			   IFNULL(d.detail_total, 0) AS detail_total
+		FROM tb_account_corporate_card_payment_list m
+		LEFT JOIN tb_account a ON a.account_id = m.account_id
+		LEFT JOIN (
+		    SELECT sale_id, SUM(amount) AS detail_total
+		    FROM tb_account_corporate_card_payment_detail_list
+		    GROUP BY sale_id
+		) d ON m.sale_id = d.sale_id
+		WHERE DATE_FORMAT(m.payment_dt, '%Y') = ${year}
+		AND DATE_FORMAT(m.payment_dt, '%m') = ${month}
+		<if test="account_id != null and account_id != ''">
+			AND m.account_id = #{account_id}
+		</if>
+		ORDER BY m.payment_dt ASC, m.sale_id ASC
+	</select>
+
 	<select id="AccountCorporateCardPaymentDetailList" parameterType="string" resultType="hashmap">
 		SELECT idx, sale_id, name, qty, amount, unitPrice, taxType, itemType
 		FROM tb_account_corporate_card_payment_detail_list

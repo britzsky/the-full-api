@@ -458,8 +458,8 @@
 		JOIN tb_user u ON u.user_id = bc.user_id
 		LEFT JOIN tb_account a
 		       ON TRIM(CAST(a.account_id AS CHAR)) = TRIM(CAST(bc.account_id AS CHAR))
-		WHERE DATE_FORMAT(bc.start_date, '%Y-%m') = CONCAT(#{year}, '-', #{month})
-		  AND DATE_FORMAT(bc.end_date,   '%Y-%m') = CONCAT(#{year}, '-', #{month})
+		WHERE bc.start_date &lt;= LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d'))
+		  AND IFNULL(bc.end_date, bc.start_date) >= STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d')
 		  AND bc.del_yn = 'N'
 		<if test="team_code != null and team_code != ''">
 			AND bc.team_code = #{team_code}

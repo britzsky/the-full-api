@@ -1024,6 +1024,13 @@ public class AccountService {
 		return resultList;
 	}
 
+	// 회계 -> 개인구매 영수증 마감 자료 전체 조회 (account_id 무관)
+	public List<Map<String, Object>> AccountPersonPurchaseTallyListAll(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountPersonPurchaseTallyListAll(paramMap);
+		return resultList;
+	}
+
 	// 집계표 -> 결제 리스트 조회
 	public List<Map<String, Object>> AccountPurchaseTallyPaymentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
@@ -1123,6 +1130,13 @@ public class AccountService {
 	public List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = accountMapper.AccountCorporateCardPaymentList(paramMap);
+		return resultList;
+	}
+
+	// 회계 -> 현장 법인카드 결제내역 전체 조회 (account_id 무관)
+	public List<Map<String, Object>> AccountCorporateCardPaymentListAll(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountCorporateCardPaymentListAll(paramMap);
 		return resultList;
 	}
 

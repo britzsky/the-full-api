@@ -98,6 +98,7 @@ public interface AccountMapper {
 	String HeadOfficeCorporateCardPaymentDtBySaleId(Map<String, Object> paramMap);						// 회계 -> 본사 법인카드 sale_id 기준 기존 결제일자 조회
 	List<Map<String, Object>> AccountCorporateCardList(Map<String, Object> paramMap); 					// 회계 -> 본사 법인카드 목록 조회
 	List<Map<String, Object>> AccountCorporateCardPaymentList(Map<String, Object> paramMap); 			// 회계 -> 본사 법인카드 결제내역 조회
+	List<Map<String, Object>> AccountCorporateCardPaymentListAll(Map<String, Object> paramMap); 		// 회계 -> 현장 법인카드 결제내역 전체 조회 (account_id 무관)
 	List<Map<String, Object>> AccountCorporateCardPaymentDetailList(Map<String, Object> paramMap); 		// 회계 -> 본사 법인카드 결제 상세내역 조회
 	int AccountCorporateCardSave(Map<String, Object> paramMap);											// 회계 -> 현장 법인카드 저장
 	void AccountCorporateCardPaymentDelete(Map<String, Object> paramMap);								// 회계 -> 현장 법인카드 결제내역 삭제
@@ -120,6 +121,7 @@ public interface AccountMapper {
 	int AccountDeadlineMonthBalanceUpdate(Map<String, Object> paramMap);								// 회계 -> 매출마감/미수잔액 입금내역 저장시, 월미수금액 저장
 	List<Map<String, Object>> AccountPersonPurchaseTallyList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 조회
 	List<Map<String, Object>> AccountPersonPurchaseDetailList(Map<String, Object> paramMap); 			// 회계 -> 개인구매 관리 -> 개인구매 상세 조회
+	List<Map<String, Object>> AccountPersonPurchaseTallyListAll(Map<String, Object> paramMap); 			// 회계 -> 개인구매 영수증 마감 자료 전체 조회 (account_id 무관)
 	List<Map<String, Object>> AccountPurchaseTallyV2List(Map<String, Object> paramMap); 				// 회계 -> 매입(본사용) 조회
 	int AccountPurchaseTallyV2Save(Map<String, Object> paramMap);										// 회계 -> 매입(본사용) 저장
 	int AccountDispatchMemberDelete(Map<String, Object> paramMap);										// 긴급인력 파출 회원 정보 삭제
@@ -148,3 +150,4 @@ public interface AccountMapper {
 	Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
 	List<Map<String, Object>> SelectCommuteRecordList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 }
+ 
