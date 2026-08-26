@@ -3444,6 +3444,16 @@ public class AccountController {
 	}
 
 	/*
+	 * method : CommuteDeviceList
+	 * comment : 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록 (관리자)
+	 */
+	@GetMapping("/Account/CommuteDeviceList")
+	public String CommuteDeviceList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.SelectDeviceList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
 	 * method : CommuteDeviceApprove
 	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name + phone_last4 기준)
 	 */

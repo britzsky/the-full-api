@@ -1524,6 +1524,11 @@ public class AccountService {
 		return accountMapper.SelectDeviceRequestList(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록
+	public List<Map<String, Object>> SelectDeviceList(Map<String, Object> paramMap) {
+		return accountMapper.SelectDeviceList(paramMap);
+	}
+
 	// 출, 퇴근 기록 -> 출퇴근 기록 저장(upsert)
 	public int UpsertCommuteRecord(Map<String, Object> paramMap) {
 		return accountMapper.UpsertCommuteRecord(paramMap);

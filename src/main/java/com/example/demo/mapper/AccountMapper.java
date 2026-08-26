@@ -146,6 +146,7 @@ public interface AccountMapper {
 	int ApproveDevice(Map<String, Object> paramMap);													// 출, 퇴근 기록 -> 등록기기 요청 승인
 	int RejectDevice(Map<String, Object> paramMap);														// 출, 퇴근 기록 -> 등록기기 요청 반려
 	List<Map<String, Object>> SelectDeviceRequestList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 (관리자용)
+	List<Map<String, Object>> SelectDeviceList(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록 (관리자용)
 	int UpsertCommuteRecord(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 출퇴근 기록 저장 (하루 1행, 출근/퇴근 각각 해당 컬럼만 upsert)
 	List<Map<String, Object>> SelectCommuteIdentitiesByDeviceToken(Map<String, Object> paramMap);		// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
 	Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회

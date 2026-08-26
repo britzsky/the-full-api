@@ -4146,6 +4146,25 @@
 		ORDER BY d.request_dt DESC
 	</select>
 
+	<!-- 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록 (관리자) -->
+	<select id="SelectDeviceList" parameterType="map" resultType="hashmap">
+		SELECT
+			d.account_id,
+			a.account_name,
+			d.user_name,
+			d.phone_last4,
+			d.device_token,
+			d.device_name,
+			d.approve_yn,
+			DATE_FORMAT(d.approve_dt, '%Y-%m-%d %H:%i:%s') AS approve_dt,
+			d.approve_user_id
+		FROM tb_member_device d
+		LEFT JOIN tb_account a
+			ON a.account_id = d.account_id
+		WHERE d.approve_yn = 'Y'
+		ORDER BY a.account_name, d.user_name
+	</select>
+
 	<!-- 출, 퇴근 기록 -> 사업장 기준 좌표 조회 (원본값 그대로 반환, 거리계산은 클라이언트에서) -->
 	<select id="SelectAccountCoordinate" parameterType="map" resultType="hashmap">
 		SELECT
