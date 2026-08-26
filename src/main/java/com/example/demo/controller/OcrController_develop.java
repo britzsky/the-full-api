@@ -129,6 +129,7 @@ public class OcrController_develop {
             @RequestParam(value = "cash_receipt_type", required = false) String cash_receipt_type,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
             @RequestParam(value = "use_name", required = false) String use_name,
+            @RequestParam(value = "buyer", required = false) String buyer,
             @RequestParam(value = "card_idx", required = false) String card_idx,
             @RequestParam(value = "card_brand", required = false) String card_brand,
             @RequestParam(value = "card_no", required = false) String card_no,
@@ -155,6 +156,7 @@ public class OcrController_develop {
         purchase.put("receipt_type", receiptType);
         purchase.put("total", total);
         purchase.put("use_name", use_name);
+        purchase.put("buyer", buyer);
         purchase.put("payType", payType);
         purchase.put("cashReceiptType", cash_receipt_type);
         // corp card 전용 필드

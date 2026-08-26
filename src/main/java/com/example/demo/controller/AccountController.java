@@ -3245,6 +3245,9 @@ public class AccountController {
 	// 웹(the_full) 전용 API. 거리 오차 계산은 클라이언트(웹)에서 수행하고, 서버는 그 값을 저장하면서
 	// 등록기기(tb_member_device) 승인 여부만 추가로 검증한다.
 	// 식별 기준은 user_id(로그인 계정)가 아니라 account_id + user_name(이름) 이다.
+	// ✅ phone_last4(휴대폰 뒷자리 4자리): 같은 사업장에 동명이인이 있을 때 구분하기 위해 추가.
+	//    모바일앱(thefull-m)은 이 값을 안 보낼 수 있으므로, 비어 있으면 ""로 채워서 저장한다
+	//    (tb_member_device.phone_last4 / tb_commute_record.phone_last4가 NOT NULL DEFAULT ''이기 때문).
 
 	private String normalizeCommuteText(Object value) {
 		return value == null ? "" : String.valueOf(value).trim();
@@ -3254,7 +3257,7 @@ public class AccountController {
 	 * method : AccountCoordinateInfo
 	 * comment : 출, 퇴근 기록 -> 사업장 기준 좌표 조회
 	 */
-	@PostMapping("/User/AccountCoordinateInfo")
+	@PostMapping("/Account/AccountCoordinateInfo")
 	public String AccountCoordinateInfo(@RequestBody Map<String, Object> paramMap) {
 		Map<String, Object> result = accountService.SelectAccountCoordinate(paramMap);
 		return new Gson().toJson(result == null ? new HashMap<>() : result);
@@ -3264,12 +3267,13 @@ public class AccountController {
 	 * method : CommuteSave
 	 * comment : 출, 퇴근 기록 -> 출근/퇴근 저장. 등록기기 승인 여부를 먼저 검증한 뒤 하루 1행으로 upsert.
 	 */
-	@PostMapping("/User/CommuteSave")
+	@PostMapping("/Account/CommuteSave")
 	public ResponseEntity<String> CommuteSave(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 
 		String accountId = normalizeCommuteText(paramMap.get("account_id"));
 		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
 		String tDate = normalizeCommuteText(paramMap.get("t_date"));
 		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
 
@@ -3279,10 +3283,11 @@ public class AccountController {
 		}
 
 		try {
-			// 1) 등록기기 승인 검증 (account_id + user_name 기준)
+			// 1) 등록기기 승인 검증 (account_id + user_name + phone_last4 기준)
 			Map<String, Object> paramDevice = new HashMap<>();
 			paramDevice.put("account_id", accountId);
 			paramDevice.put("user_name", userName);
+			paramDevice.put("phone_last4", phoneLast4);
 			Map<String, Object> deviceInfo = accountService.SelectDeviceInfo(paramDevice);
 
 			String approvedYn = deviceInfo == null ? "N" : normalizeCommuteText(deviceInfo.get("approve_yn")).toUpperCase();
@@ -3306,6 +3311,7 @@ public class AccountController {
 						Map<String, Object> autoRequest = new HashMap<>();
 						autoRequest.put("account_id", accountId);
 						autoRequest.put("user_name", userName);
+						autoRequest.put("phone_last4", phoneLast4);
 						autoRequest.put("device_token", deviceToken);
 						autoRequest.put("device_name", normalizeCommuteText(paramMap.get("device_name")));
 						accountService.UpsertDeviceRequest(autoRequest);
@@ -3318,10 +3324,28 @@ public class AccountController {
 				return ResponseEntity.status(HttpStatus.FORBIDDEN).body(obj.toString());
 			}
 
-			// ✅ 출퇴근 기록에는 user_id를 저장하지 않는다(컬럼만 미리 만들어둠). 식별은 account_id + user_name 기준.
+			// ✅ 대리출근 방지: 오늘 이 기기(device_token)로 이미 다른 사람 이름이 찍혀있으면 차단.
+			//    (예: 한 사람이 동료 폰을 빌려서, 혹은 동료 폰으로 대신 출퇴근을 찍어주는 경우를 막기 위함)
+			Map<String, Object> paramDeviceUsage = new HashMap<>();
+			paramDeviceUsage.put("account_id", accountId);
+			paramDeviceUsage.put("device_token", deviceToken);
+			paramDeviceUsage.put("t_date", tDate);
+			List<Map<String, Object>> todayIdentities = accountService.SelectCommuteIdentitiesByDeviceToken(paramDeviceUsage);
+			for (Map<String, Object> identity : todayIdentities) {
+				String otherUserName = normalizeCommuteText(identity.get("user_name"));
+				String otherPhoneLast4 = normalizeCommuteText(identity.get("phone_last4"));
+				if (!otherUserName.equals(userName) || !otherPhoneLast4.equals(phoneLast4)) {
+					obj.addProperty("reason", "DEVICE_IDENTITY_CONFLICT");
+					obj.addProperty("msg", "이 기기로 오늘 이미 " + otherUserName + "님의 출퇴근이 기록되어 있습니다.\n본인 기기로 출퇴근해주세요.");
+					return ResponseEntity.status(HttpStatus.CONFLICT).body(obj.toString());
+				}
+			}
+
+			// ✅ 출퇴근 기록에는 user_id를 저장하지 않는다(컬럼만 미리 만들어둠). 식별은 account_id + user_name + phone_last4 기준.
 			Map<String, Object> record = new HashMap<>();
 			record.put("user_name", userName);
 			record.put("account_id", accountId);
+			record.put("phone_last4", phoneLast4);
 			record.put("t_date", tDate);
 			record.put("start_time", paramMap.get("start_time"));
 			record.put("end_time", paramMap.get("end_time"));
@@ -3348,8 +3372,9 @@ public class AccountController {
 	 * method : CommuteTodayStatus
 	 * comment : 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회 (웹 화면의 출근/퇴근 버튼 상태 제어용, account_id + user_name 기준)
 	 */
-	@GetMapping("/User/CommuteTodayStatus")
+	@GetMapping("/Account/CommuteTodayStatus")
 	public String CommuteTodayStatus(@RequestParam Map<String, Object> paramMap) {
+		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
 		Map<String, Object> result = accountService.SelectTodayCommuteStatus(paramMap);
 		return new Gson().toJson(result == null ? new HashMap<>() : result);
 	}
@@ -3358,7 +3383,7 @@ public class AccountController {
 	 * method : CommuteRecordList
 	 * comment : 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 	 */
-	@GetMapping("/User/CommuteRecordList")
+	@GetMapping("/Account/CommuteRecordList")
 	public String CommuteRecordList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = accountService.SelectCommuteRecordList(paramMap);
 		return new Gson().toJson(resultList);
@@ -3366,10 +3391,11 @@ public class AccountController {
 
 	/*
 	 * method : CommuteDeviceInfo
-	 * comment : 출, 퇴근 기록 -> 등록기기(승인/요청) 상태 조회 (account_id + user_name 기준)
+	 * comment : 출, 퇴근 기록 -> 등록기기(승인/요청) 상태 조회 (account_id + user_name + phone_last4 기준)
 	 */
-	@GetMapping("/Commute/CommuteDeviceInfo")
+	@GetMapping("/Account/CommuteDeviceInfo")
 	public String CommuteDeviceInfo(@RequestParam Map<String, Object> paramMap) {
+		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
 		Map<String, Object> result = accountService.SelectDeviceInfo(paramMap);
 		return new Gson().toJson(result);
 	}
@@ -3378,19 +3404,22 @@ public class AccountController {
 	 * method : CommuteDeviceRequest
 	 * comment : 출, 퇴근 기록 -> 등록기기 신규등록/변경 요청 (관리자 승인 전까지는 미승인 상태)
 	 */
-	@PostMapping("/Commute/CommuteDeviceRequest")
+	@PostMapping("/Account/CommuteDeviceRequest")
 	public String CommuteDeviceRequest(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 
 		String accountId = normalizeCommuteText(paramMap.get("account_id"));
 		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
 		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
 
-		if (accountId.isEmpty() || userName.isEmpty() || deviceToken.isEmpty()) {
+		if (accountId.isEmpty() || userName.isEmpty() || phoneLast4.isEmpty() || deviceToken.isEmpty()) {
 			obj.addProperty("code", "400");
 			obj.addProperty("msg", "필수 정보가 누락되었습니다.");
 			return obj.toString();
 		}
+
+		paramMap.put("phone_last4", phoneLast4);
 
 		try {
 			accountService.UpsertDeviceRequest(paramMap);
@@ -3408,7 +3437,7 @@ public class AccountController {
 	 * method : CommuteDeviceRequestList
 	 * comment : 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 (관리자)
 	 */
-	@GetMapping("/Commute/CommuteDeviceRequestList")
+	@GetMapping("/Account/CommuteDeviceRequestList")
 	public String CommuteDeviceRequestList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = accountService.SelectDeviceRequestList(paramMap);
 		return new Gson().toJson(resultList);
@@ -3416,14 +3445,15 @@ public class AccountController {
 
 	/*
 	 * method : CommuteDeviceApprove
-	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name 기준)
+	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name + phone_last4 기준)
 	 */
-	@PostMapping("/Commute/CommuteDeviceApprove")
+	@PostMapping("/Account/CommuteDeviceApprove")
 	public String CommuteDeviceApprove(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
 
 		String accountId = normalizeCommuteText(paramMap.get("account_id"));
 		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
 		String approve = normalizeCommuteText(paramMap.get("approve")).toUpperCase();
 
 		if (accountId.isEmpty() || userName.isEmpty()) {
@@ -3431,6 +3461,8 @@ public class AccountController {
 			obj.addProperty("msg", "필수 정보가 누락되었습니다.");
 			return obj.toString();
 		}
+
+		paramMap.put("phone_last4", phoneLast4);
 
 		try {
 			if ("Y".equals(approve)) {

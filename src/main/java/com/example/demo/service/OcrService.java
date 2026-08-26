@@ -71,34 +71,42 @@ public class OcrService {
         // 1️⃣ 이미지 크기/용량 최적화 (유지)
         // OCR 처리량을 늘리고 전송 시간을 줄이는 데 도움이 됩니다.
     	File optimized = autoOptimizeImage(file);
-    	
-        // 2️⃣ Google Document AI 요청 생성
-        // 이 요청은 이제 구조화된 데이터 추출(Expense Parser)이 아닌
-        // 문서 내 모든 텍스트를 인식하는 (일반 OCR) 기능을 수행합니다.
-        String name = String.format("projects/%s/locations/%s/processors/%s",
-                projectId, location, processorId);
-        
-        ByteString content;
-        try (FileInputStream inputStream = new FileInputStream(optimized)) {
-            content = ByteString.readFrom(inputStream);
+
+        try {
+            // 2️⃣ Google Document AI 요청 생성
+            // 이 요청은 이제 구조화된 데이터 추출(Expense Parser)이 아닌
+            // 문서 내 모든 텍스트를 인식하는 (일반 OCR) 기능을 수행합니다.
+            String name = String.format("projects/%s/locations/%s/processors/%s",
+                    projectId, location, processorId);
+
+            ByteString content;
+            try (FileInputStream inputStream = new FileInputStream(optimized)) {
+                content = ByteString.readFrom(inputStream);
+            }
+
+            RawDocument rawDocument = RawDocument.newBuilder()
+                    .setContent(content)
+                    // 이미지 파일을 보내므로 image/jpeg MimeType을 사용합니다.
+                    .setMimeType("image/jpeg")
+                    .build();
+
+            ProcessRequest request = ProcessRequest.newBuilder()
+                    .setName(name)
+                    .setRawDocument(rawDocument)
+                    .build();
+
+            // 3️⃣ Document AI 호출
+            // 반환되는 Document 객체는 텍스트(document.getText())와 레이아웃 정보만 포함합니다.
+            ProcessResponse response = docAiClient.processDocument(request);
+
+            return response.getDocument();
+        } finally {
+            // 리사이즈 과정에서 새로 생긴 임시파일이면 사용 후 정리한다.
+            // 원본(file)과 동일하면 컨트롤러가 별도로 삭제하므로 여기서는 지우지 않는다.
+            if (optimized != file) {
+                optimized.delete();
+            }
         }
-    	
-        RawDocument rawDocument = RawDocument.newBuilder()
-                .setContent(content)
-                // 이미지 파일을 보내므로 image/jpeg MimeType을 사용합니다.
-                .setMimeType("image/jpeg") 
-                .build();
-        
-        ProcessRequest request = ProcessRequest.newBuilder()
-                .setName(name)
-                .setRawDocument(rawDocument)
-                .build();
-        
-        // 3️⃣ Document AI 호출
-        // 반환되는 Document 객체는 텍스트(document.getText())와 레이아웃 정보만 포함합니다.
-        ProcessResponse response = docAiClient.processDocument(request);
-        
-        return response.getDocument();
         
         // Expense Parser를 사용했다면 여기서 
         // document.getEntitiesList() 등을 사용하여 구조화된 영수증 항목을 추출합니다.
@@ -127,9 +135,17 @@ public class OcrService {
 
         System.out.printf("🖼️ 원본 이미지: %dx%d (%.2f MB)%n", width, height, beforeSize / 1024.0 / 1024.0);
 
+        // 원본 파일(컨트롤러가 생성/삭제 책임을 가짐)은 여기서 지우지 않기 위해 참조를 남겨둔다.
+        File originalFile = file;
+
         // 📏 1단계: 해상도 1800px 이하로 강제 축소
         if (width > 1800 || height > 1800) {
-            file = resizeImage(file, 1800, 1800);
+            File resized = resizeImage(file, 1800, 1800);
+            if (resized != file) {
+                // resizeImage가 실제로 새 임시파일을 만든 경우에만 교체.
+                // file이 originalFile이면(=아직 리사이즈 전) 원본은 지우지 않는다.
+                file = resized;
+            }
         }
 
         // 📦 2단계: 5MB 이하로 자동 축소 루프
@@ -138,7 +154,18 @@ public class OcrService {
         while (optimized.length() > 5_000_000) {
             System.out.printf("⚠️ [%d차] 용량 초과 (%.2f MB) → 추가 축소 중...%n",
                     pass++, optimized.length() / 1024.0 / 1024.0);
-            optimized = resizeImage(optimized, 1600, 1600);
+            File next = resizeImage(optimized, 1600, 1600);
+            if (next == optimized) {
+                // scale >= 1.0 이라 더 이상 줄일 수 없는 경우(=리사이즈 취소).
+                // 새로 생긴 파일이 없으므로 그대로 종료 (무한루프 방지).
+                System.out.println("⚠️ 더 이상 해상도를 줄일 수 없어 용량 축소를 중단합니다.");
+                break;
+            }
+            if (optimized != originalFile) {
+                // 이전 단계에서 새로 생성된 중간 리사이즈 파일만 정리. 원본은 컨트롤러가 삭제한다.
+                optimized.delete();
+            }
+            optimized = next;
         }
 
         System.out.printf("✅ 최종 이미지: %.2f MB%n", optimized.length() / 1024.0 / 1024.0);

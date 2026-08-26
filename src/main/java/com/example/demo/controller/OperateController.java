@@ -1101,6 +1101,19 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : PersonCostBudgetList
+     * comment : 급식사업부 -> 운영관리 -> 예산관리(인건비, 매출대비 45% 이상) 조회
+     */
+    @GetMapping("Operate/PersonCostBudgetList")
+    public String PersonCostBudgetList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        resultList = operateService.PersonCostBudgetList(paramMap);
+
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
      * method : BudgetTableSave
      * comment : 급식사업부 -> 운영관리 -> 예산관리 저장
      */

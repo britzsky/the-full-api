@@ -388,6 +388,13 @@ public class OperateService {
 		return resultList;
 	}
 
+	// 급식사업부 -> 운영관리 -> 예산관리(인건비, 매출대비 45% 이상) 조회
+	public List<Map<String, Object>> PersonCostBudgetList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.PersonCostBudgetList(paramMap);
+		return resultList;
+	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리 저장
 	public int BudgetTableSave(Map<String, Object> paramMap) {
 		return operateMapper.BudgetTableSave(paramMap);

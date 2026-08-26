@@ -1529,6 +1529,11 @@ public class AccountService {
 		return accountMapper.UpsertCommuteRecord(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
+	public List<Map<String, Object>> SelectCommuteIdentitiesByDeviceToken(Map<String, Object> paramMap) {
+		return accountMapper.SelectCommuteIdentitiesByDeviceToken(paramMap);
+	}
+
 	// 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회
 	public Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap) {
 		return accountMapper.SelectTodayCommuteStatus(paramMap);

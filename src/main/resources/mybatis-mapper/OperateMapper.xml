@@ -1966,6 +1966,99 @@
  		</if>
 	</select>
 	
+	<!-- ✅ 인건비 예산관리: 매출 대비 인건비 45% 이상인 업장만 조회
+	     - 당월 손익표(tb_account_managerment_table) 실적이 있으면 그 값을 쓰고,
+	       없으면(0/NULL) 2개월 전 실적으로 대체(person_cost 예시 쿼리와 동일한 fallback 로직) -->
+	<select id="PersonCostBudgetList" parameterType="map" resultType="map">
+		<!-- ✅ 이번월(선택월)에 매출/인건비 둘 다 입력되어 있어야 "이번월 실적 있음"으로 인정.
+		     매출만 먼저 들어오고 인건비가 아직 없는 등 하나라도 비어있으면 2개월 전 실적으로 대체(base_year/base_month) -->
+		<!-- ✅ base_month 기준 인건비 비율 45% 이상 업장만 조회 -->
+		<!-- ✅ base_month 기준 전월/전전월 인건비·매출 금액도 함께 내려서 프론트에서 3개월 합계 추이를 계산 -->
+		SELECT t.*,
+			   ROUND(t.person_total / t.sales_total * 100, 1) AS person_ratio
+		FROM (
+			SELECT b.account_id,
+				   b.account_name,
+				   b.base_year,
+				   b.base_month,
+				   (SELECT m0.sales_total FROM tb_account_managerment_table m0
+					 WHERE m0.account_id = b.account_id AND m0.year = b.base_year AND m0.month = b.base_month
+					 LIMIT 1) AS sales_total,
+				   (SELECT m0.person_total FROM tb_account_managerment_table m0
+					 WHERE m0.account_id = b.account_id AND m0.year = b.base_year AND m0.month = b.base_month
+					 LIMIT 1) AS person_total,
+				   (SELECT m1.sales_total FROM tb_account_managerment_table m1
+					 WHERE m1.account_id = b.account_id
+					   AND m1.year  = <![CDATA[ CASE WHEN b.base_month = 1 THEN b.base_year - 1 ELSE b.base_year END ]]>
+					   AND m1.month = <![CDATA[ CASE WHEN b.base_month = 1 THEN 12 ELSE b.base_month - 1 END ]]>
+					 LIMIT 1) AS prev_month_sales_total,
+				   (SELECT m1.person_total FROM tb_account_managerment_table m1
+					 WHERE m1.account_id = b.account_id
+					   AND m1.year  = <![CDATA[ CASE WHEN b.base_month = 1 THEN b.base_year - 1 ELSE b.base_year END ]]>
+					   AND m1.month = <![CDATA[ CASE WHEN b.base_month = 1 THEN 12 ELSE b.base_month - 1 END ]]>
+					 LIMIT 1) AS prev_month_person_total,
+				   (SELECT m2.sales_total FROM tb_account_managerment_table m2
+					 WHERE m2.account_id = b.account_id
+					   AND m2.year  = <![CDATA[ CASE WHEN b.base_month <= 2 THEN b.base_year - 1 ELSE b.base_year END ]]>
+					   AND m2.month = <![CDATA[ CASE WHEN b.base_month <= 2 THEN b.base_month + 10 ELSE b.base_month - 2 END ]]>
+					 LIMIT 1) AS prev_prev_month_sales_total,
+				   (SELECT m2.person_total FROM tb_account_managerment_table m2
+					 WHERE m2.account_id = b.account_id
+					   AND m2.year  = <![CDATA[ CASE WHEN b.base_month <= 2 THEN b.base_year - 1 ELSE b.base_year END ]]>
+					   AND m2.month = <![CDATA[ CASE WHEN b.base_month <= 2 THEN b.base_month + 10 ELSE b.base_month - 2 END ]]>
+					 LIMIT 1) AS prev_prev_month_person_total
+			FROM (
+				SELECT a.account_id,
+					   a.account_name,
+					   COALESCE(
+						   (SELECT NULLIF(m1.year, 0) FROM tb_account_managerment_table m1
+							 WHERE m1.account_id = a.account_id AND m1.year = #{year} AND m1.month = #{month}
+							   AND NULLIF(m1.person_total, 0) IS NOT NULL
+							   AND NULLIF(m1.sales_total, 0) IS NOT NULL
+							 LIMIT 1),
+						   (SELECT m2.year FROM tb_account_managerment_table m2
+							 WHERE m2.account_id = a.account_id
+							   AND m2.year  = <![CDATA[ CASE WHEN #{month} <= 2 THEN #{year} - 1 ELSE #{year} END ]]>
+							   AND m2.month = <![CDATA[ CASE WHEN #{month} <= 2 THEN #{month} + 10 ELSE #{month} - 2 END ]]>
+							 LIMIT 1)
+					   ) AS base_year,
+					   COALESCE(
+						   (SELECT NULLIF(m1.month, 0) FROM tb_account_managerment_table m1
+							 WHERE m1.account_id = a.account_id AND m1.year = #{year} AND m1.month = #{month}
+							   AND NULLIF(m1.person_total, 0) IS NOT NULL
+							   AND NULLIF(m1.sales_total, 0) IS NOT NULL
+							 LIMIT 1),
+						   (SELECT m2.month FROM tb_account_managerment_table m2
+							 WHERE m2.account_id = a.account_id
+							   AND m2.year  = <![CDATA[ CASE WHEN #{month} <= 2 THEN #{year} - 1 ELSE #{year} END ]]>
+							   AND m2.month = <![CDATA[ CASE WHEN #{month} <= 2 THEN #{month} + 10 ELSE #{month} - 2 END ]]>
+							 LIMIT 1)
+					   ) AS base_month
+				FROM tb_account a
+				WHERE a.del_yn = 'N'
+				AND a.account_id NOT IN
+				(
+					20260122065002,
+					20260122071337,
+					20260122071857,
+					20260122072114,
+					20260122072245,
+					20260122072529,
+					20260122072732
+				)
+				<if test='account_id != null'>
+					AND a.account_id = #{account_id}
+				</if>
+			) b
+			WHERE b.base_year IS NOT NULL AND b.base_month IS NOT NULL
+		) t
+		WHERE t.sales_total IS NOT NULL
+		AND t.sales_total > 0
+		AND t.person_total IS NOT NULL
+		AND ROUND(t.person_total / t.sales_total * 100, 1) >= 45
+		ORDER BY (t.person_total / t.sales_total) DESC
+	</select>
+
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
 		<!-- ✅ status_yn 미전달(기존 호출) 시에도 기존 동작 유지되도록 기본값 N 사용 -->
 		<bind name="statusYn" value="status_yn != null and status_yn != '' ? status_yn : 'N'" />

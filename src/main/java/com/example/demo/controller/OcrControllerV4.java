@@ -127,6 +127,7 @@ public class OcrControllerV4 {
             @RequestParam(value = "cash_receipt_type", required = false) String cash_receipt_type,
             @RequestParam(value = "total", required = false, defaultValue = "0") Integer total,
             @RequestParam(value = "use_name", required = false) String use_name,
+            @RequestParam(value = "buyer", required = false) String buyer,
             @RequestParam(value = "skip_date_mismatch_check", required = false) String skipDateMismatchCheckParam) {
 
         // 파일 저장
@@ -145,6 +146,7 @@ public class OcrControllerV4 {
         purchase.put("payType", payType);
         purchase.put("cashReceiptType", cash_receipt_type);
         purchase.put("use_name", Optional.ofNullable(use_name).orElse(""));
+        purchase.put("buyer", buyer);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);

@@ -2205,7 +2205,8 @@
 	        cashReceiptType,
 	        user_id,
 	        reg_dt,
-	        receipt_type
+	        receipt_type,
+	        buyer
 	    </trim>
 	    VALUES
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -2232,7 +2233,8 @@
 	        #{cashReceiptType},
 	        #{user_id},
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
-	        #{receipt_type}
+	        #{receipt_type},
+	        #{buyer}
 	    </trim>
 	    ON DUPLICATE KEY UPDATE
 	    <trim suffixOverrides=",">
@@ -2272,7 +2274,8 @@
 	        cashReceiptType = #{cashReceiptType},
 	        mod_id = #{user_id},
 	        mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
-	        receipt_type = #{receipt_type}
+	        receipt_type = #{receipt_type},
+	        buyer = #{buyer}
 	    </trim>
 	</insert>
 
@@ -2834,7 +2837,8 @@
 		       apt.bizNo,
 		       am.ceo_name,
 		       apt.sale_id,
-		       apt.receipt_type
+		       apt.receipt_type,
+		       apt.buyer
 		FROM tb_account a
 		JOIN tb_account_mapping_v2 amv
 		ON amv.account_id = a.account_id
@@ -2876,7 +2880,8 @@
 		       apt.receipt_image2,
 		       apt.receipt_image3,
 		       apt.note,
-		       apt.receipt_type
+		       apt.receipt_type,
+		       apt.buyer
 		FROM tb_account_purchase_tally apt
 		LEFT JOIN tb_account a ON a.account_id = apt.account_id
 		WHERE apt.type = 1008
@@ -2954,6 +2959,7 @@
 		       note,
 		       bizNo,
 		       receipt_type,
+		       buyer,
 		       cashReceiptType as cash_receipt_type
 		FROM tb_account_purchase_tally
 		WHERE account_id = #{account_id}
@@ -4050,6 +4056,7 @@
 		SELECT
 			account_id,
 			user_name,
+			phone_last4,
 			device_token,
 			device_name,
 			approve_yn,
@@ -4061,19 +4068,21 @@
 		FROM tb_member_device
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
 		ORDER BY (approve_yn = 'Y') DESC, mod_dt DESC, reg_dt DESC
 		LIMIT 1
 	</select>
 
-	<!-- ✅ PK를 (account_id, user_name)으로 걸지 않으므로 ON DUPLICATE KEY 대신
-		 "있으면 UPDATE, 없으면 INSERT"를 애플리케이션(Service)에서 판단해서 아래 두 개 중 하나를 호출한다. -->
+	<!-- ✅ PK를 (account_id, user_name, phone_last4)으로 걸지 않으므로 ON DUPLICATE KEY 대신
+		 "있으면 UPDATE, 없으면 INSERT"를 애플리케이션(Service)에서 판단해서 아래 두 개 중 하나를 호출한다.
+		 ✅ phone_last4: 동명이인(같은 account_id+user_name) 구분용 - commute_migration.sql 참고 -->
 
 	<!-- 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성 -->
 	<insert id="InsertDeviceRequest" parameterType="map">
 		INSERT INTO tb_member_device
-		(account_id, user_name, pending_device_token, pending_device_name, request_dt, approve_yn)
+		(account_id, user_name, phone_last4, pending_device_token, pending_device_name, request_dt, approve_yn)
 		VALUES
-		(#{account_id}, #{user_name}, #{device_token}, #{device_name}, NOW(), 'N')
+		(#{account_id}, #{user_name}, #{phone_last4}, #{device_token}, #{device_name}, NOW(), 'N')
 	</insert>
 
 	<!-- 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신) -->
@@ -4085,6 +4094,7 @@
 			request_dt = NOW()
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
 	</update>
 
 	<!-- 출, 퇴근 기록 -> 등록기기 요청 승인: pending -> 승인된 기기로 반영 -->
@@ -4101,6 +4111,7 @@
 			mod_dt = NOW()
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
 	</update>
 
 	<!-- 출, 퇴근 기록 -> 등록기기 요청 반려: pending만 초기화, 기존 승인 기기는 유지 -->
@@ -4112,6 +4123,7 @@
 			mod_dt = NOW()
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
 	</update>
 
 	<!-- 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 -->
@@ -4120,6 +4132,7 @@
 			d.account_id,
 			a.account_name,
 			d.user_name,
+			d.phone_last4,
 			d.device_token,
 			d.device_name,
 			d.approve_yn,
@@ -4143,16 +4156,27 @@
 		WHERE account_id = #{account_id}
 	</select>
 
-	<!-- 출, 퇴근 기록 -> 출퇴근 기록 저장: 하루(account_id+user_name+t_date) 1행, 출근/퇴근 호출 시 해당 컬럼만 upsert -->
-	<!-- ✅ user_id는 지금은 저장하지 않음(컬럼만 미리 만들어둠). 식별은 user_name 기준. -->
+	<!-- 출, 퇴근 기록 -> 대리출근 방지: 오늘(t_date) 이 기기(device_token)로 이미 다른 사람 이름이 찍혀있는지 확인.
+		 한 기기가 하루 안에 서로 다른(user_name, phone_last4) 조합으로 출퇴근을 남기면 안 되므로,
+		 CommuteSave에서 저장 직전에 이 쿼리로 기존 사용 이력을 조회해 다른 사람인지 검사한다. -->
+	<select id="SelectCommuteIdentitiesByDeviceToken" parameterType="map" resultType="hashmap">
+		SELECT DISTINCT user_name, phone_last4
+		FROM tb_commute_record
+		WHERE account_id = #{account_id}
+			AND device_token = #{device_token}
+			AND t_date = #{t_date}
+	</select>
+
+	<!-- 출, 퇴근 기록 -> 출퇴근 기록 저장: 하루(account_id+user_name+phone_last4+t_date) 1행, 출근/퇴근 호출 시 해당 컬럼만 upsert -->
+	<!-- ✅ user_id는 지금은 저장하지 않음(컬럼만 미리 만들어둠). 식별은 user_name + phone_last4(동명이인 구분용) 기준. -->
 	<insert id="UpsertCommuteRecord" parameterType="map">
 		INSERT INTO tb_commute_record
-		(user_name, account_id, t_date, start_time, end_time,
+		(user_name, account_id, phone_last4, t_date, start_time, end_time,
 		 st_x_coordinate, st_y_coordinate, st_error_margin,
 		 ed_x_coordinate, ed_y_coordinate, ed_error_margin,
 		 device_token, reg_dt)
 		VALUES
-		(#{user_name}, #{account_id}, #{t_date}, #{start_time}, #{end_time},
+		(#{user_name}, #{account_id}, #{phone_last4}, #{t_date}, #{start_time}, #{end_time},
 		 #{st_x_coordinate}, #{st_y_coordinate}, #{st_error_margin},
 		 #{ed_x_coordinate}, #{ed_y_coordinate}, #{ed_error_margin},
 		 #{device_token}, NOW())
@@ -4171,7 +4195,7 @@
 		</trim>
 	</insert>
 
-	<!-- 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 (account_id + user_name 기준) -->
+	<!-- 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 (account_id + user_name + phone_last4 기준) -->
 	<select id="SelectTodayCommuteStatus" parameterType="map" resultType="hashmap">
 		SELECT
 			DATE_FORMAT(t_date, '%Y-%m-%d') AS t_date,
@@ -4180,6 +4204,7 @@
 		FROM tb_commute_record
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
 			AND t_date = DATE(NOW())
 	</select>
 
@@ -4200,6 +4225,9 @@
 		<where>
 			<if test="user_name != null and user_name != ''">
 				AND r.user_name = #{user_name}
+			</if>
+			<if test="phone_last4 != null and phone_last4 != ''">
+				AND r.phone_last4 = #{phone_last4}
 			</if>
 			<if test="account_id != null and account_id != ''">
 				AND r.account_id = #{account_id}
