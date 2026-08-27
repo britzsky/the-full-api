@@ -34,6 +34,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.example.demo.model.CardReceiptResponse;
 import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
+import com.example.demo.parser.HeadOfficeReceiptParserFactory;
 import com.example.demo.parser.ReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
@@ -168,6 +169,9 @@ public class OcrController_develop {
         if (sale_id != null) purchase.put("sale_id", sale_id);
         if (row_account_id != null) purchase.put("row_account_id", row_account_id);
 
+        // ✅ 기타-소모품(1002)/기타-식자재(1003): 프로덕션 /Corporate/receipt-scan(OcrControllerV2)와 동일한 저장 대상
+        boolean isHeadOfficeType = (type != null && (type == 1002 || type == 1003));
+
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
 
@@ -205,19 +209,37 @@ public class OcrController_develop {
                     return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
                 }
 
-                String resolvedReceiptType = resolveReceiptType(receiptType, doc);
-                purchase.put("receipt_type", resolvedReceiptType);
+                if (isHeadOfficeType) {
+                    // 소모품(1002)/식자재(1003)는 V2(/Corporate/receipt-scan)와 동일하게 본사 법인카드 전용 파서를 사용한다.
+                    purchase.put("receipt_type", receiptType);
+                    String parserType = resolveHeadOfficeParserType(receiptType);
 
-                Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
-                        .submit(() -> ReceiptParserFactory.parse(doc, resolvedReceiptType));
+                    Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
+                            .submit(() -> HeadOfficeReceiptParserFactory.parse(doc, parserType));
 
-                try {
-                    result = parseFuture.get(10, TimeUnit.SECONDS);
-                } catch (TimeoutException te) {
-                    parseFuture.cancel(true);
-                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
-                } catch (Exception ex) {
-                    return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                    try {
+                        result = parseFuture.get(10, TimeUnit.SECONDS);
+                    } catch (TimeoutException te) {
+                        parseFuture.cancel(true);
+                        return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                    } catch (Exception ex) {
+                        return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                    }
+                } else {
+                    String resolvedReceiptType = resolveReceiptType(receiptType, doc);
+                    purchase.put("receipt_type", resolvedReceiptType);
+
+                    Future<BaseReceiptParser.ReceiptResult> parseFuture = executor
+                            .submit(() -> ReceiptParserFactory.parse(doc, resolvedReceiptType));
+
+                    try {
+                        result = parseFuture.get(10, TimeUnit.SECONDS);
+                    } catch (TimeoutException te) {
+                        parseFuture.cancel(true);
+                        return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                    } catch (Exception ex) {
+                        return ResponseEntity.ok(saveWithRequestParamsOnly(purchase, file));
+                    }
                 }
             }
 
@@ -388,11 +410,68 @@ public class OcrController_develop {
             purchase.put("count_year", yearStr);
             purchase.put("count_month", monthStr);
 
+            // ✅ develop 화면은 사용자가 입력한 total을 항상 우선한다(위 effectiveTotal 계산과 동일 원칙).
+            // 법인카드(1000)/기타-소모품·식자재(1002,1003) 저장분에 한해 상세금액도 사용자 입력값을 따르게 맞춘다.
+            boolean useUserInputTotal = requestTotal > 0;
+            if (useUserInputTotal && (type != null) && (type == 1000 || isHeadOfficeType) && !detailList.isEmpty()) {
+                boolean isFirst = true;
+                for (Map<String, Object> m : detailList) {
+                    m.put("amount", isFirst ? effectiveTotal : 0);
+                    m.put("unitPrice", isFirst ? effectiveTotal : 0);
+                    isFirst = false;
+                }
+            }
+
             int iResult = 0;
-            iResult += accountService.AccountPurchaseSave(purchase);
-            iResult += accountService.TallySheetPaymentSave(purchase);
-            for (Map<String, Object> m : detailList) {
-                iResult += accountService.AccountPurchaseDetailSave(m);
+
+            if (type != null && type == 1000) {
+                // ✅ 법인카드(type=1000): 프로덕션 /receipt-scanV3(OcrControllerV3)와 동일하게
+                //    tb_account_corporate_card_payment_list + tb_account_purchase_tally 이중 저장
+                iResult += accountService.AccountCorporateCardPaymentSave(purchase);
+                iResult += accountService.AccountPurchaseSave(purchase);
+                iResult += accountService.TallySheetCorporateCardPaymentSave(purchase);
+                for (Map<String, Object> m : detailList) {
+                    iResult += accountService.AccountCorporateCardPaymentDetailLSave(m);
+                }
+            } else if (isHeadOfficeType) {
+                // ✅ 기타-소모품(1002)/기타-식자재(1003): 프로덕션 /Corporate/receipt-scan(OcrControllerV2)와 동일하게
+                //    tb_headoffice_corporate_card_payment_list 계열에 저장 (tb_account_purchase_tally에는 저장하지 않음)
+                int forcedTallyType = type;
+                int forcedItemType = (forcedTallyType == 1003) ? 1 : 2;
+
+                if (detailList.isEmpty()) {
+                    // ✅ V2와 동일: 파싱된 품목이 없으면 사용자 입력값으로 상세 1건을 생성해서
+                    //    집계표(tb_account_tally_sheet) 동기화 프로시저가 반드시 실행되게 한다.
+                    Map<String, Object> fallbackDetail = new HashMap<>();
+                    fallbackDetail.put("sale_id", saleId);
+                    fallbackDetail.put("name", "");
+                    fallbackDetail.put("qty", 0);
+                    fallbackDetail.put("amount", effectiveTotal);
+                    fallbackDetail.put("unitPrice", 0);
+                    fallbackDetail.put("taxType", 3);
+                    detailList.add(fallbackDetail);
+                }
+                for (Map<String, Object> m : detailList) {
+                    m.put("itemType", forcedItemType);
+                    m.put("type", forcedTallyType);
+                    m.put("account_id", account_id);
+                    m.put("payment_dt", purchase.get("payment_dt"));
+                    m.put("year", year);
+                    m.put("month", month);
+                }
+
+                purchase.put("type", forcedTallyType);
+                iResult += accountService.HeadOfficeCorporateCardPaymentSave(purchase);
+                for (Map<String, Object> m : detailList) {
+                    iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(m);
+                    iResult += accountService.TallySheetCorporateCardPaymentSaveV2(m);
+                }
+            } else {
+                iResult += accountService.AccountPurchaseSave(purchase);
+                iResult += accountService.TallySheetPaymentSave(purchase);
+                for (Map<String, Object> m : detailList) {
+                    iResult += accountService.AccountPurchaseDetailSave(m);
+                }
             }
 
             return ResponseEntity.ok(purchase);
@@ -468,10 +547,40 @@ public class OcrController_develop {
             purchase.put(dayKey, safeInt(purchase.get("total")));
         }
 
+        Object typeObj = purchase.get("type");
+        int typeInt = safeInt(typeObj);
+
         int iResult = 0;
-        iResult += accountService.AccountPurchaseSave(purchase);
-        iResult += accountService.TallySheetPaymentSave(purchase);
-        // ✅ detail은 저장하지 않음(파싱값 없으니까)
+        if (typeInt == 1000) {
+            // ✅ OCR/파싱 실패 시에도 법인카드는 tb_account_corporate_card_payment_list에 저장한다.
+            iResult += accountService.AccountCorporateCardPaymentSave(purchase);
+            iResult += accountService.AccountPurchaseSave(purchase);
+            iResult += accountService.TallySheetCorporateCardPaymentSave(purchase);
+        } else if (typeInt == 1002 || typeInt == 1003) {
+            // ✅ OCR/파싱 실패 시에도 소모품/식자재는 tb_headoffice_corporate_card_payment_list에 저장한다.
+            purchase.put("type", typeInt);
+            iResult += accountService.HeadOfficeCorporateCardPaymentSave(purchase);
+
+            Map<String, Object> fallbackDetail = new HashMap<>();
+            fallbackDetail.put("sale_id", saleId);
+            fallbackDetail.put("name", "");
+            fallbackDetail.put("qty", 0);
+            fallbackDetail.put("amount", safeInt(purchase.get("total")));
+            fallbackDetail.put("unitPrice", 0);
+            fallbackDetail.put("taxType", 3);
+            fallbackDetail.put("itemType", typeInt == 1003 ? 1 : 2);
+            fallbackDetail.put("type", typeInt);
+            fallbackDetail.put("account_id", purchase.get("account_id"));
+            fallbackDetail.put("payment_dt", purchase.get("payment_dt"));
+            fallbackDetail.put("year", year);
+            fallbackDetail.put("month", month);
+            iResult += accountService.HeadOfficeCorporateCardPaymentDetailLSave(fallbackDetail);
+            iResult += accountService.TallySheetCorporateCardPaymentSaveV2(fallbackDetail);
+        } else {
+            iResult += accountService.AccountPurchaseSave(purchase);
+            iResult += accountService.TallySheetPaymentSave(purchase);
+        }
+        // ✅ detail은 저장하지 않음(파싱값 없으니까, 1002/1003 제외)
 
         return purchase;
     }
@@ -504,6 +613,14 @@ public class OcrController_develop {
 
     private boolean isCorpCardType(Integer type) {
         return type != null && type == 1000;
+    }
+
+    // ✅ 기타-소모품(1002)/기타-식자재(1003) 전용 OCR 파서 타입 결정 (V2의 resolveParserType과 동일)
+    private String resolveHeadOfficeParserType(String receiptType) {
+        if (receiptType != null && !receiptType.isBlank() && !"UNKNOWN".equalsIgnoreCase(receiptType)) {
+            return receiptType;
+        }
+        return "coupang";
     }
 
     private String resolveReceiptType(String receiptType, Document doc) {

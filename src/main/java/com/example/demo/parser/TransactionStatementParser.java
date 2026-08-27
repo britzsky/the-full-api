@@ -1560,12 +1560,12 @@ public class TransactionStatementParser extends BaseReceiptParser {
             return;
         }
 
-        Pattern p3 = Pattern.compile("(납품\\s*일자|작성\\s*일자|거래\\s*일자|일\\s*자)\\s*[:：]?\\s*(20\\d{2}|\\d{2})[./\\-]\\s*(\\d{1,2})[./\\-]\\s*(\\d{1,2})");
+        // ✅ 연도 자리에 순수 두 자리 숫자까지 허용하면 엉뚱한 숫자가 연도로 잘못 매칭되어
+        //    오래된 과거 날짜로 오인식되는 것 방지 → 4자리 연도(20xx)만 신뢰, 2자리만 매칭되면 다음 패턴으로 이동
+        Pattern p3 = Pattern.compile("(납품\\s*일자|작성\\s*일자|거래\\s*일자|일\\s*자)\\s*[:：]?\\s*(20\\d{2})[./\\-]\\s*(\\d{1,2})[./\\-]\\s*(\\d{1,2})");
         Matcher m3 = p3.matcher(text);
         if (m3.find()) {
-            String year = m3.group(2);
-            if (year.length() == 2) year = "20" + year;
-            res.issueDate = year + "-" + pad2(m3.group(3)) + "-" + pad2(m3.group(4));
+            res.issueDate = m3.group(2) + "-" + pad2(m3.group(3)) + "-" + pad2(m3.group(4));
             return;
         }
 

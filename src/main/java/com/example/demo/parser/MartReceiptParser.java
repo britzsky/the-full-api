@@ -96,7 +96,9 @@ public class MartReceiptParser extends BaseReceiptParser {
 
     // -------------------- 섹션 분리 --------------------
     private String pickValidDate(String text) {
-        Pattern p = Pattern.compile("\\b((?:20)?\\d{2})[./-](\\d{1,2})[./-](\\d{1,2})\\b");
+        // ✅ 라벨 없이 전체 텍스트를 훑는 fallback이라, 연도 자리에 순수 2자리까지 허용하면
+        //    바코드/전화번호 조각이 오래된 과거 연도로 오인식되는 것 방지 → 4자리 연도(20xx)만 신뢰
+        Pattern p = Pattern.compile("\\b(20\\d{2})[./-](\\d{1,2})[./-](\\d{1,2})\\b");
         Matcher m = p.matcher(text);
 
         String best = null;
