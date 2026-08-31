@@ -1490,48 +1490,48 @@ public class AccountService {
 	// ===================== 출, 퇴근 기록 =====================
 
 	// 출, 퇴근 기록 -> 사업장 기준 좌표 조회
-	public Map<String, Object> SelectAccountCoordinate(Map<String, Object> paramMap) {
-		return accountMapper.SelectAccountCoordinate(paramMap);
+	public Map<String, Object> AccountCoordinateInfo(Map<String, Object> paramMap) {
+		return accountMapper.AccountCoordinateInfo(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 등록기기 정보 조회
-	public Map<String, Object> SelectDeviceInfo(Map<String, Object> paramMap) {
-		return accountMapper.SelectDeviceInfo(paramMap);
+	public Map<String, Object> CommuteDeviceInfo(Map<String, Object> paramMap) {
+		return accountMapper.CommuteDeviceInfo(paramMap);
 	}
 
 	// ✅ 출, 퇴근 기록 -> 등록기기 등록/변경 요청 - tb_member_device에 PK(유니크 제약)가 없으므로
 	//    기존 행이 있는지 먼저 조회해서 있으면 UPDATE, 없으면 INSERT 한다.
-	public int UpsertDeviceRequest(Map<String, Object> paramMap) {
-		Map<String, Object> existing = accountMapper.SelectDeviceInfo(paramMap);
+	public int CommuteDeviceRequest(Map<String, Object> paramMap) {
+		Map<String, Object> existing = accountMapper.CommuteDeviceInfo(paramMap);
 		if (existing == null) {
-			return accountMapper.InsertDeviceRequest(paramMap);
+			return accountMapper.CommuteDeviceRequestInsert(paramMap);
 		}
-		return accountMapper.UpdateDeviceRequestPending(paramMap);
+		return accountMapper.CommuteDeviceRequestUpdatePending(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 등록기기 요청 승인
-	public int ApproveDevice(Map<String, Object> paramMap) {
-		return accountMapper.ApproveDevice(paramMap);
+	public int CommuteDeviceApprove(Map<String, Object> paramMap) {
+		return accountMapper.CommuteDeviceApprove(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 등록기기 요청 반려
-	public int RejectDevice(Map<String, Object> paramMap) {
-		return accountMapper.RejectDevice(paramMap);
+	public int CommuteDeviceReject(Map<String, Object> paramMap) {
+		return accountMapper.CommuteDeviceReject(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록
-	public List<Map<String, Object>> SelectDeviceRequestList(Map<String, Object> paramMap) {
-		return accountMapper.SelectDeviceRequestList(paramMap);
+	public List<Map<String, Object>> CommuteDeviceRequestList(Map<String, Object> paramMap) {
+		return accountMapper.CommuteDeviceRequestList(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록
-	public List<Map<String, Object>> SelectDeviceList(Map<String, Object> paramMap) {
-		return accountMapper.SelectDeviceList(paramMap);
+	public List<Map<String, Object>> CommuteDeviceList(Map<String, Object> paramMap) {
+		return accountMapper.CommuteDeviceList(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 출퇴근 기록 저장(upsert)
-	public int UpsertCommuteRecord(Map<String, Object> paramMap) {
-		return accountMapper.UpsertCommuteRecord(paramMap);
+	public int CommuteSave(Map<String, Object> paramMap) {
+		return accountMapper.CommuteSave(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
@@ -1540,12 +1540,12 @@ public class AccountService {
 	}
 
 	// 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회
-	public Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap) {
-		return accountMapper.SelectTodayCommuteStatus(paramMap);
+	public Map<String, Object> CommuteTodayStatus(Map<String, Object> paramMap) {
+		return accountMapper.CommuteTodayStatus(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
-	public List<Map<String, Object>> SelectCommuteRecordList(Map<String, Object> paramMap) {
-		return accountMapper.SelectCommuteRecordList(paramMap);
+	public List<Map<String, Object>> CommuteRecordList(Map<String, Object> paramMap) {
+		return accountMapper.CommuteRecordList(paramMap);
 	}
 }

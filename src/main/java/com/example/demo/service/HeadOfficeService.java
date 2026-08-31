@@ -270,6 +270,11 @@ public class HeadOfficeService {
 		return headOfficeMapper.ElectronicPaymentItemBuyYnSave(paramMap);
 	}
 
+	// 본사 -> 전자결재 관리 -> 구매요청품목 예산포함여부/구매진행여부 저장
+	public int ElectronicPaymentItemPurchaseInfoSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.ElectronicPaymentItemPurchaseInfoSave(paramMap);
+	}
+
 	// 본사 -> 전자결재 알림 목록 조회
 	public List<Map<String, Object>> ElectronicPaymentNotificationList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

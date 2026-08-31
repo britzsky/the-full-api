@@ -3259,7 +3259,7 @@ public class AccountController {
 	 */
 	@PostMapping("/Account/AccountCoordinateInfo")
 	public String AccountCoordinateInfo(@RequestBody Map<String, Object> paramMap) {
-		Map<String, Object> result = accountService.SelectAccountCoordinate(paramMap);
+		Map<String, Object> result = accountService.AccountCoordinateInfo(paramMap);
 		return new Gson().toJson(result == null ? new HashMap<>() : result);
 	}
 
@@ -3288,7 +3288,7 @@ public class AccountController {
 			paramDevice.put("account_id", accountId);
 			paramDevice.put("user_name", userName);
 			paramDevice.put("phone_last4", phoneLast4);
-			Map<String, Object> deviceInfo = accountService.SelectDeviceInfo(paramDevice);
+			Map<String, Object> deviceInfo = accountService.CommuteDeviceInfo(paramDevice);
 
 			String approvedYn = deviceInfo == null ? "N" : normalizeCommuteText(deviceInfo.get("approve_yn")).toUpperCase();
 			String approvedToken = deviceInfo == null ? "" : normalizeCommuteText(deviceInfo.get("device_token"));
@@ -3314,7 +3314,7 @@ public class AccountController {
 						autoRequest.put("phone_last4", phoneLast4);
 						autoRequest.put("device_token", deviceToken);
 						autoRequest.put("device_name", normalizeCommuteText(paramMap.get("device_name")));
-						accountService.UpsertDeviceRequest(autoRequest);
+						accountService.CommuteDeviceRequest(autoRequest);
 					} catch (Exception ignore) {
 						// 자동 등록 요청 실패는 무시하고 아래 안내 메시지는 그대로 내려준다
 					}
@@ -3357,7 +3357,7 @@ public class AccountController {
 			record.put("ed_error_margin", paramMap.get("ed_error_margin"));
 			record.put("device_token", deviceToken);
 
-			accountService.UpsertCommuteRecord(record);
+			accountService.CommuteSave(record);
 
 			obj.addProperty("msg", "저장되었습니다.");
 			return ResponseEntity.ok(obj.toString());
@@ -3375,7 +3375,7 @@ public class AccountController {
 	@GetMapping("/Account/CommuteTodayStatus")
 	public String CommuteTodayStatus(@RequestParam Map<String, Object> paramMap) {
 		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
-		Map<String, Object> result = accountService.SelectTodayCommuteStatus(paramMap);
+		Map<String, Object> result = accountService.CommuteTodayStatus(paramMap);
 		return new Gson().toJson(result == null ? new HashMap<>() : result);
 	}
 
@@ -3385,7 +3385,7 @@ public class AccountController {
 	 */
 	@GetMapping("/Account/CommuteRecordList")
 	public String CommuteRecordList(@RequestParam Map<String, Object> paramMap) {
-		List<Map<String, Object>> resultList = accountService.SelectCommuteRecordList(paramMap);
+		List<Map<String, Object>> resultList = accountService.CommuteRecordList(paramMap);
 		return new Gson().toJson(resultList);
 	}
 
@@ -3396,7 +3396,7 @@ public class AccountController {
 	@GetMapping("/Account/CommuteDeviceInfo")
 	public String CommuteDeviceInfo(@RequestParam Map<String, Object> paramMap) {
 		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
-		Map<String, Object> result = accountService.SelectDeviceInfo(paramMap);
+		Map<String, Object> result = accountService.CommuteDeviceInfo(paramMap);
 		return new Gson().toJson(result);
 	}
 
@@ -3422,7 +3422,7 @@ public class AccountController {
 		paramMap.put("phone_last4", phoneLast4);
 
 		try {
-			accountService.UpsertDeviceRequest(paramMap);
+			accountService.CommuteDeviceRequest(paramMap);
 			obj.addProperty("code", "200");
 			obj.addProperty("msg", "기기 등록 요청이 접수되었습니다. 관리자 승인 후 사용할 수 있습니다.");
 		} catch (Exception e) {
@@ -3439,7 +3439,7 @@ public class AccountController {
 	 */
 	@GetMapping("/Account/CommuteDeviceRequestList")
 	public String CommuteDeviceRequestList(@RequestParam Map<String, Object> paramMap) {
-		List<Map<String, Object>> resultList = accountService.SelectDeviceRequestList(paramMap);
+		List<Map<String, Object>> resultList = accountService.CommuteDeviceRequestList(paramMap);
 		return new Gson().toJson(resultList);
 	}
 
@@ -3449,7 +3449,7 @@ public class AccountController {
 	 */
 	@GetMapping("/Account/CommuteDeviceList")
 	public String CommuteDeviceList(@RequestParam Map<String, Object> paramMap) {
-		List<Map<String, Object>> resultList = accountService.SelectDeviceList(paramMap);
+		List<Map<String, Object>> resultList = accountService.CommuteDeviceList(paramMap);
 		return new Gson().toJson(resultList);
 	}
 
@@ -3476,10 +3476,10 @@ public class AccountController {
 
 		try {
 			if ("Y".equals(approve)) {
-				accountService.ApproveDevice(paramMap);
+				accountService.CommuteDeviceApprove(paramMap);
 				obj.addProperty("msg", "기기 등록을 승인했습니다.");
 			} else {
-				accountService.RejectDevice(paramMap);
+				accountService.CommuteDeviceReject(paramMap);
 				obj.addProperty("msg", "기기 등록 요청을 반려했습니다.");
 			}
 			obj.addProperty("code", "200");

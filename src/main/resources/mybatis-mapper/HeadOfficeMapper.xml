@@ -2001,6 +2001,8 @@
 			   R.link,
 			   R.note,
 			   R.buy_yn,
+			   R.budget_yn,
+			   R.purchase_yn,
 			   R.payment_note,
 			   R.content,
 			   R.amount,
@@ -2025,6 +2027,8 @@
 				   pr.link,
 				   pr.note,
 				   IFNULL(pr.buy_yn, 'N') AS buy_yn,
+				   pr.budget_yn,
+				   pr.purchase_yn,
 				   pr.payment_note,
 				   '' AS content,
 				   NULL AS amount,
@@ -2055,6 +2059,8 @@
 				   '' AS link,
 				   d.note AS note,
 				   '' AS buy_yn,
+				   NULL AS budget_yn,
+				   NULL AS purchase_yn,
 				   '' AS payment_note,
 				   d.details AS content,
 				   NULL AS amount,
@@ -2085,6 +2091,8 @@
 				   '' AS link,
 				   '' AS note,
 				   '' AS buy_yn,
+				   NULL AS budget_yn,
+				   NULL AS purchase_yn,
 				   '' AS payment_note,
 				   pd.content AS content,
 				   pd.amount AS amount,
@@ -2294,29 +2302,108 @@
 	</update>
 
 	<update id="ElectronicPaymentItemBuyYnSave" parameterType="map">
+		<!--
+			구매여부(buy_yn) 저장
+			- 소모품 구매 품의서: 고정 결재자(payer_user, 실제로는 iy1)가 결재 완료 전까지 저장
+			- 현장 구매요청서(FP): 구매진행 담당자(si1)가 실제 구매 완료 여부를 저장(결재 완료 이후에도 갱신 가능)
+		-->
 		UPDATE tb_headoffice_purchase_request pr
 		JOIN tb_headoffice_electronic_payment ep
 		  ON ep.payment_id = pr.payment_id
 		SET pr.buy_yn = #{buy_yn}
 		WHERE pr.payment_id = #{payment_id}
 		  AND pr.idx = #{idx}
-		  AND ep.payer_user = #{user_id}
+		  AND (
+			(ep.payer_user = #{user_id} AND IFNULL(ep.payer_sign, '') != '4')
+			OR (
+				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+				AND #{user_id} = 'si1'
+				AND IFNULL(ep.tm_sign, '') != '3'
+				AND IFNULL(ep.payer_sign, '') != '3'
+				<!-- 구매진행여부가 '진행(Y)'이 아닌 품목은 실제로 구매할 대상이 아니므로 구매여부 체크 자체를 막는다. -->
+				AND IFNULL(pr.purchase_yn, 'N') = 'Y'
+			)
+		  )
+	</update>
+
+	<update id="ElectronicPaymentItemPurchaseInfoSave" parameterType="map">
+		<!-- 현장 구매요청서(FP) 1차/2차 결재자가 예산포함여부/구매진행여부를 저장(upsert)한다. -->
+		UPDATE tb_headoffice_purchase_request pr
+		JOIN tb_headoffice_electronic_payment ep
+		  ON ep.payment_id = pr.payment_id
+		SET pr.budget_yn = #{budget_yn},
+			pr.purchase_yn = #{purchase_yn}
+		WHERE pr.payment_id = #{payment_id}
+		  AND pr.idx = #{idx}
+		  AND UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+		  AND (
+			ep.tm_user = #{user_id}
+			OR ep.payer_user = #{user_id}
+			OR (
+				<!-- 1차 결재자(tm_user)가 아직 배정되지 않은 FP 문서는
+				     거래처-사용자 매핑(tb_account_purchase_mapping)에 걸린 사용자가 1차 결재자 역할을 한다.
+				     (실제 tm_user 컬럼은 1차 결재 저장 시점에야 채워지므로, 그 전에도 매핑된 사용자는 값을 저장할 수 있어야 한다.) -->
+				IFNULL(ep.tm_user, '') = ''
+				AND EXISTS (
+					SELECT 1
+					FROM tb_account_purchase_mapping pam
+					JOIN tb_user drafter
+					  ON drafter.user_id = ep.reg_user_id
+					 AND IFNULL(drafter.del_yn, 'N') = 'N'
+					WHERE pam.user_id = #{user_id}
+					  AND pam.account_id = drafter.account_id
+				)
+			)
+			OR (
+				<!-- 1차 결재자(tm_user)가 없는 FP 문서는 같은 부서 팀장이 2차 결재자 역할을 대신한다. -->
+				IFNULL(ep.payer_user, '') = ''
+				AND EXISTS (
+					SELECT 1
+					FROM tb_user first_approver
+					JOIN tb_user second_approver
+					  ON second_approver.department = first_approver.department
+					 AND second_approver.position = 1
+					 AND IFNULL(second_approver.del_yn, 'N') = 'N'
+					WHERE first_approver.user_id = ep.tm_user
+					  AND second_approver.user_id = #{user_id}
+				)
+			)
+		  )
 		  AND IFNULL(ep.payer_sign, '') != '4'
+		  AND IFNULL(ep.tm_sign, '') != '3'
+		  AND IFNULL(ep.payer_sign, '') != '3'
 	</update>
 
 	<select id="ElectronicPaymentNotificationList" parameterType="map" resultType="hashmap">
 		<!-- 문서유형 필터용 조인 컬럼은 제외하고 알림 표시용 문자열 컬럼만 반환한다. -->
 		SELECT N.*
 		FROM (
-			SELECT payment_id,
-				   DATE_FORMAT(draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
+			SELECT ep_first.payment_id,
+				   DATE_FORMAT(ep_first.draft_dt, '%Y-%m-%d %H:%i:%s') AS draft_dt,
 				   '결재요청' AS notify_type,
 				   '전자결재 알림' AS notify_title,
-				   CONCAT('[', payment_id, '] 1차 결재가 필요합니다.') AS notify_message
-			FROM tb_headoffice_electronic_payment
-			WHERE tm_user = #{user_id}
-			  AND IFNULL(tm_user, '') != ''
-			  AND IFNULL(tm_sign, '') NOT IN ('3', '4')
+				   CONCAT('[', ep_first.payment_id, '] 1차 결재가 필요합니다.') AS notify_message
+			FROM tb_headoffice_electronic_payment ep_first
+			WHERE IFNULL(ep_first.tm_sign, '') NOT IN ('3', '4')
+			  AND (
+				(IFNULL(ep_first.tm_user, '') != '' AND ep_first.tm_user = #{user_id})
+				OR (
+					<!-- 현장 구매요청서(FP)는 1차 결재자가 아직 배정되지 않았어도
+					     거래처-사용자 매핑(tb_account_purchase_mapping)에 걸린 사용자에게는
+					     결재대기 알림이 떠야 한다. -->
+					UPPER(CAST(ep_first.doc_type AS CHAR)) = 'FP'
+					AND IFNULL(ep_first.tm_user, '') = ''
+					AND EXISTS (
+						SELECT 1
+						FROM tb_account_purchase_mapping pam
+						JOIN tb_user drafter
+						  ON drafter.user_id = ep_first.reg_user_id
+						 AND IFNULL(drafter.del_yn, 'N') = 'N'
+						WHERE pam.user_id = #{user_id}
+						  AND pam.account_id = drafter.account_id
+					)
+				)
+			  )
 
 			UNION
 

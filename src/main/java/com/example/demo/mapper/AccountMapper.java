@@ -139,17 +139,17 @@ public interface AccountMapper {
 	int PurchaseManagerAccountMapSave(Map<String, Object> paramMap);									// 현장 -> 구입 업장관리 -> 매핑 단건 저장
 
 	// 출, 퇴근 기록
-	Map<String, Object> SelectAccountCoordinate(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 사업장 기준 좌표 조회
-	Map<String, Object> SelectDeviceInfo(Map<String, Object> paramMap);									// 출, 퇴근 기록 -> 등록기기 정보 조회 (account_id + user_name 기준)
-	int InsertDeviceRequest(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성
-	int UpdateDeviceRequestPending(Map<String, Object> paramMap);										// 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신)
-	int ApproveDevice(Map<String, Object> paramMap);													// 출, 퇴근 기록 -> 등록기기 요청 승인
-	int RejectDevice(Map<String, Object> paramMap);														// 출, 퇴근 기록 -> 등록기기 요청 반려
-	List<Map<String, Object>> SelectDeviceRequestList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 (관리자용)
-	List<Map<String, Object>> SelectDeviceList(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록 (관리자용)
-	int UpsertCommuteRecord(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 출퇴근 기록 저장 (하루 1행, 출근/퇴근 각각 해당 컬럼만 upsert)
+	Map<String, Object> AccountCoordinateInfo(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 사업장 기준 좌표 조회
+	Map<String, Object> CommuteDeviceInfo(Map<String, Object> paramMap);									// 출, 퇴근 기록 -> 등록기기 정보 조회 (account_id + user_name 기준)
+	int CommuteDeviceRequestInsert(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성
+	int CommuteDeviceRequestUpdatePending(Map<String, Object> paramMap);										// 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신)
+	int CommuteDeviceApprove(Map<String, Object> paramMap);													// 출, 퇴근 기록 -> 등록기기 요청 승인
+	int CommuteDeviceReject(Map<String, Object> paramMap);														// 출, 퇴근 기록 -> 등록기기 요청 반려
+	List<Map<String, Object>> CommuteDeviceRequestList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 승인 대기중인 등록기기 요청 목록 (관리자용)
+	List<Map<String, Object>> CommuteDeviceList(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 승인 완료된 등록기기(사람+기기) 전체 목록 (관리자용)
+	int CommuteSave(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 출퇴근 기록 저장 (하루 1행, 출근/퇴근 각각 해당 컬럼만 upsert)
 	List<Map<String, Object>> SelectCommuteIdentitiesByDeviceToken(Map<String, Object> paramMap);		// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
-	Map<String, Object> SelectTodayCommuteStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
-	List<Map<String, Object>> SelectCommuteRecordList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
+	Map<String, Object> CommuteTodayStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
+	List<Map<String, Object>> CommuteRecordList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 }
  

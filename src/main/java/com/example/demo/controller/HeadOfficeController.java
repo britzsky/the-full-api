@@ -698,6 +698,27 @@ public class HeadOfficeController {
 		return obj.toString();
 	}
 
+	/*
+	 * part		: 본사
+     * method 	: ElectronicPaymentItemPurchaseInfoSave
+     * comment 	: 본사 -> 전자결재 관리 -> 구매요청품목 예산포함여부/구매진행여부 저장(1차/2차 결재자)
+     */
+	@PostMapping("HeadOffice/ElectronicPaymentItemPurchaseInfoSave")
+	public String ElectronicPaymentItemPurchaseInfoSave(@RequestBody Map<String, Object> payload) {
+		int iResult = headOfficeService.ElectronicPaymentItemPurchaseInfoSave(payload);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
 	/* 
 	 * part		: 본사
      * method 	: ElectronicPaymentNotificationList
