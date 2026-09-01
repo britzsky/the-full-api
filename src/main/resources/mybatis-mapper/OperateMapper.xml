@@ -2194,7 +2194,7 @@
 		  AND prev.note IS NOT NULL
 		  AND TRIM(prev.note) != ''
 		ON DUPLICATE KEY UPDATE
-		  note = IF(note IS NULL OR TRIM(note) = '', VALUES(note), note)
+		  note = IF(tb_account_budget_management.note IS NULL OR TRIM(tb_account_budget_management.note) = '', VALUES(note), tb_account_budget_management.note)
 	</insert>
 
 	<select id="AnnualLeaveList" parameterType="map" resultType="map">

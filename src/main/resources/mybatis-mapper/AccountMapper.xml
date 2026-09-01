@@ -182,7 +182,7 @@
 				AND 1 = 0
 			</otherwise>
 		</choose>
-	</select>
+	</select>  
 	
 	<insert id="AccountUtilMemberMappingSave" parameterType="map">
 		INSERT INTO tb_account_util_member_mapping
