@@ -1,6 +1,7 @@
 package com.example.demo.controller;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -25,7 +26,9 @@ public class BudgetNoteCarryOverScheduler {
     // 매월 1일 00:10 실행 (한국 시간 기준)
     @Scheduled(cron = "0 10 0 1 * *", zone = "Asia/Seoul")
     public void runMonthly() {
-        LocalDate today = LocalDate.now();
+        // ⚠️ LocalDate.now()는 서버 OS 기본 타임존(UTC) 기준이라 크론 발동 시점(KST 00:10)에
+        //    아직 전날 날짜로 계산되는 버그가 있었음. 반드시 Asia/Seoul로 명시.
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         carryOver(today.getYear(), today.getMonthValue());
     }
 

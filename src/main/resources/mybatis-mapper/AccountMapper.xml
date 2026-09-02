@@ -4186,6 +4186,28 @@
 			AND t_date = #{t_date}
 	</select>
 
+	<!-- 출, 퇴근 기록 -> 대리출근 방지: 이 device_token이 이미 "다른 사람" 이름으로 승인돼 있는지 조회.
+		 본인확인(CommuteDeviceOwnerCheck) 시점, 그리고 기기승인(CommuteDeviceApprove) 시점에 사용. -->
+	<select id="SelectApprovedDeviceOwner" parameterType="map" resultType="hashmap">
+		SELECT account_id, user_name, phone_last4
+		FROM tb_member_device
+		WHERE device_token = #{device_token}
+			AND approve_yn = 'Y'
+			AND NOT (account_id = #{account_id} AND user_name = #{user_name} AND phone_last4 = #{phone_last4})
+		LIMIT 1
+	</select>
+
+	<!-- 출, 퇴근 기록 -> 기기 중복 사용(대리출근 의심) 이력 저장 -->
+	<insert id="InsertMemberDeviceConflictLog" parameterType="map">
+		INSERT INTO tb_member_device_conflict_log
+		(account_id, user_name, phone_last4, device_token, device_name,
+		 owner_account_id, owner_user_name, owner_phone_last4, event_type, reg_dt)
+		VALUES
+		(#{account_id}, #{user_name}, #{phone_last4}, #{device_token}, #{device_name},
+		 #{owner_account_id}, #{owner_user_name}, #{owner_phone_last4}, #{event_type},
+		 CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+	</insert>
+
 	<!-- 출, 퇴근 기록 -> 출퇴근 기록 저장: 하루(account_id+user_name+phone_last4+t_date) 1행, 출근/퇴근 호출 시 해당 컬럼만 upsert -->
 	<!-- ✅ user_id는 지금은 저장하지 않음(컬럼만 미리 만들어둠). 식별은 user_name + phone_last4(동명이인 구분용) 기준. -->
 	<insert id="CommuteSave" parameterType="map">

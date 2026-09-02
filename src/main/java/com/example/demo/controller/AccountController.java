@@ -3401,6 +3401,70 @@ public class AccountController {
 	}
 
 	/*
+	 * method : CommuteDeviceOwnerCheck
+	 * comment : 출, 퇴근 기록 -> 대리출근 방지: 본인확인 시 이 device_token이 이미 "다른 사람" 이름으로
+	 *           승인돼 있는지 확인한다. 충돌이 감지되면 tb_member_device_conflict_log에 이력을 남긴다.
+	 *           (account_id + user_name + phone_last4 + device_token 기준)
+	 */
+	@GetMapping("/Account/CommuteDeviceOwnerCheck")
+	public String CommuteDeviceOwnerCheck(@RequestParam Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+
+		String accountId = normalizeCommuteText(paramMap.get("account_id"));
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
+		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
+		String deviceName = normalizeCommuteText(paramMap.get("device_name"));
+
+		if (accountId.isEmpty() || userName.isEmpty() || deviceToken.isEmpty()) {
+			obj.addProperty("conflict", false);
+			return obj.toString();
+		}
+
+		try {
+			Map<String, Object> paramCheck = new HashMap<>();
+			paramCheck.put("account_id", accountId);
+			paramCheck.put("user_name", userName);
+			paramCheck.put("phone_last4", phoneLast4);
+			paramCheck.put("device_token", deviceToken);
+
+			Map<String, Object> owner = accountService.SelectApprovedDeviceOwner(paramCheck);
+
+			if (owner == null) {
+				obj.addProperty("conflict", false);
+				return obj.toString();
+			}
+
+			String ownerUserName = normalizeCommuteText(owner.get("user_name"));
+
+			try {
+				Map<String, Object> logParam = new HashMap<>();
+				logParam.put("account_id", accountId);
+				logParam.put("user_name", userName);
+				logParam.put("phone_last4", phoneLast4);
+				logParam.put("device_token", deviceToken);
+				logParam.put("device_name", deviceName);
+				logParam.put("owner_account_id", normalizeCommuteText(owner.get("account_id")));
+				logParam.put("owner_user_name", ownerUserName);
+				logParam.put("owner_phone_last4", normalizeCommuteText(owner.get("phone_last4")));
+				logParam.put("event_type", "CONFIRM");
+				accountService.InsertMemberDeviceConflictLog(logParam);
+			} catch (Exception ignore) {
+				// 이력 저장 실패는 무시하고 아래 안내는 그대로 내려준다
+			}
+
+			obj.addProperty("conflict", true);
+			obj.addProperty("owner_user_name", ownerUserName);
+			obj.addProperty("msg", "이미 " + ownerUserName + "님의 근무기록으로 등록되어 있습니다.");
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("conflict", false);
+		}
+
+		return obj.toString();
+	}
+
+	/*
 	 * method : CommuteDeviceRequest
 	 * comment : 출, 퇴근 기록 -> 등록기기 신규등록/변경 요청 (관리자 승인 전까지는 미승인 상태)
 	 */
@@ -3476,6 +3540,29 @@ public class AccountController {
 
 		try {
 			if ("Y".equals(approve)) {
+				// ✅ 대리출근 방지(옵션 B): 승인하려는 pending_device_token이 이미 "다른 사람"에게
+				//    승인된 기기라면 승인 자체를 막는다. (같은 기기가 두 사람 이름으로 동시에
+				//    승인 상태가 되는 것을 서버 단에서 원천 차단)
+				Map<String, Object> pendingInfo = accountService.CommuteDeviceInfo(paramMap);
+				String pendingToken = pendingInfo == null ? "" : normalizeCommuteText(pendingInfo.get("pending_device_token"));
+
+				if (!pendingToken.isEmpty()) {
+					Map<String, Object> ownerCheck = new HashMap<>();
+					ownerCheck.put("account_id", accountId);
+					ownerCheck.put("user_name", userName);
+					ownerCheck.put("phone_last4", phoneLast4);
+					ownerCheck.put("device_token", pendingToken);
+
+					Map<String, Object> owner = accountService.SelectApprovedDeviceOwner(ownerCheck);
+
+					if (owner != null) {
+						String ownerUserName = normalizeCommuteText(owner.get("user_name"));
+						obj.addProperty("code", "409");
+						obj.addProperty("msg", "이 기기는 이미 " + ownerUserName + "님에게 승인된 기기라서 승인할 수 없습니다.");
+						return obj.toString();
+					}
+				}
+
 				accountService.CommuteDeviceApprove(paramMap);
 				obj.addProperty("msg", "기기 등록을 승인했습니다.");
 			} else {

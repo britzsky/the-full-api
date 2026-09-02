@@ -1539,6 +1539,16 @@ public class AccountService {
 		return accountMapper.SelectCommuteIdentitiesByDeviceToken(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 이 device_token이 이미 다른 사람에게 승인돼 있는지 조회 (대리출근 의심 탐지)
+	public Map<String, Object> SelectApprovedDeviceOwner(Map<String, Object> paramMap) {
+		return accountMapper.SelectApprovedDeviceOwner(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 기기 중복 사용(대리출근 의심) 이력 저장
+	public int InsertMemberDeviceConflictLog(Map<String, Object> paramMap) {
+		return accountMapper.InsertMemberDeviceConflictLog(paramMap);
+	}
+
 	// 출, 퇴근 기록 -> 오늘 출퇴근 진행상태 조회
 	public Map<String, Object> CommuteTodayStatus(Map<String, Object> paramMap) {
 		return accountMapper.CommuteTodayStatus(paramMap);
