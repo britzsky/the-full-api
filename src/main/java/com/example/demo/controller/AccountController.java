@@ -3526,6 +3526,9 @@ public class AccountController {
 	/*
 	 * method : CommuteDeviceApprove
 	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name + phone_last4 기준)
+	 *           승인 시 (1) 다른 사람 이름으로 이미 승인된 기기면 거부, (2) 같은 사람이 다른
+	 *           phone_last4로 이미 이 기기를 승인받아 놓은 예전 행이 있으면 그 행의 승인을 해제해서
+	 *           device_token 하나당 승인 행이 항상 1개만 남도록 정리한다(이중 승인 방지).
 	 */
 	@PostMapping("/Account/CommuteDeviceApprove")
 	public String CommuteDeviceApprove(@RequestBody Map<String, Object> paramMap) {
@@ -3583,6 +3586,27 @@ public class AccountController {
 						obj.addProperty("code", "409");
 						obj.addProperty("msg", "이 기기는 이미 " + ownerUserName + "님에게 승인된 기기라서 승인할 수 없습니다.");
 						return obj.toString();
+					}
+
+					// ✅ 이중 승인 방지: 대리출근 의심(다른 사람)은 아니지만, 같은 사람(account_id+user_name)이
+					//    예전에 다른 phone_last4(번호 오타/변경)로 이미 이 device_token을 승인받은 행이
+					//    남아있을 수 있다. 그대로 두면 같은 기기가 두 행에서 동시에 "승인됨" 상태가 되므로,
+					//    이번 승인 직전에 그 예전 행을 찾아 승인 해제해서 device_token당 승인 행이
+					//    하나만 남도록 정리한다.
+					Map<String, Object> staleOwnerCheck = new HashMap<>();
+					staleOwnerCheck.put("account_id", accountId);
+					staleOwnerCheck.put("user_name", userName);
+					staleOwnerCheck.put("phone_last4", phoneLast4);
+					staleOwnerCheck.put("device_token", pendingToken);
+
+					Map<String, Object> staleRow = accountService.SelectApprovedDeviceByOwnerToken(staleOwnerCheck);
+
+					if (staleRow != null) {
+						Map<String, Object> clearParam = new HashMap<>();
+						clearParam.put("account_id", normalizeCommuteText(staleRow.get("account_id")));
+						clearParam.put("user_name", normalizeCommuteText(staleRow.get("user_name")));
+						clearParam.put("phone_last4", normalizeCommuteText(staleRow.get("phone_last4")));
+						accountService.ClearDeviceApproval(clearParam);
 					}
 				}
 

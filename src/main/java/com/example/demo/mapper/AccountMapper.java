@@ -152,6 +152,8 @@ public interface AccountMapper {
 	Map<String, Object> CommuteTodayStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
 	List<Map<String, Object>> CommuteRecordList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 	Map<String, Object> SelectApprovedDeviceOwner(Map<String, Object> paramMap);						// 출, 퇴근 기록 -> 이 device_token이 이미 다른 사람에게 승인돼 있는지 조회 (대리출근 의심 탐지)
+	Map<String, Object> SelectApprovedDeviceByOwnerToken(Map<String, Object> paramMap);				// 출, 퇴근 기록 -> 같은 사람이 같은 device_token으로 이미 승인받은 다른 phone_last4 행 조회 (이중 승인 방지)
+	int ClearDeviceApproval(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 위에서 찾은 예전 행의 승인 해제 (이중 승인 정리)
 	int InsertMemberDeviceConflictLog(Map<String, Object> paramMap);									// 출, 퇴근 기록 -> 기기 중복 사용(대리출근 의심) 이력 저장
 }
  

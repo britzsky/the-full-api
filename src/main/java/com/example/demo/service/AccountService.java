@@ -1544,6 +1544,16 @@ public class AccountService {
 		return accountMapper.SelectApprovedDeviceOwner(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 같은 사람이 같은 device_token으로 이미 승인받은 다른 phone_last4 행 조회 (이중 승인 방지)
+	public Map<String, Object> SelectApprovedDeviceByOwnerToken(Map<String, Object> paramMap) {
+		return accountMapper.SelectApprovedDeviceByOwnerToken(paramMap);
+	}
+
+	// 출, 퇴근 기록 -> 위에서 찾은 예전 행의 승인 해제 (이중 승인 정리)
+	public int ClearDeviceApproval(Map<String, Object> paramMap) {
+		return accountMapper.ClearDeviceApproval(paramMap);
+	}
+
 	// 출, 퇴근 기록 -> 기기 중복 사용(대리출근 의심) 이력 저장
 	public int InsertMemberDeviceConflictLog(Map<String, Object> paramMap) {
 		return accountMapper.InsertMemberDeviceConflictLog(paramMap);
