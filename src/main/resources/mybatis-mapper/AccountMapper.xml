@@ -4187,13 +4187,17 @@
 	</select>
 
 	<!-- 출, 퇴근 기록 -> 대리출근 방지: 이 device_token이 이미 "다른 사람" 이름으로 승인돼 있는지 조회.
-		 본인확인(CommuteDeviceOwnerCheck) 시점, 그리고 기기승인(CommuteDeviceApprove) 시점에 사용. -->
+		 본인확인(CommuteDeviceOwnerCheck) 시점, 그리고 기기승인(CommuteDeviceApprove) 시점에 사용.
+		 ✅ 같은 사람이 여러 업장(account_id)에서 근무할 수 있으므로, "같은 사람"인지 여부는
+		    account_id가 아니라 user_name + phone_last4로만 판단한다(동명이인 구분 기준과 동일).
+		    account_id까지 같아야 같은 사람으로 쳐주면, 한 사람이 자기 폰으로 다른 업장에 새로
+		    등록/승인 요청을 할 때마다 "다른 사람 기기"로 오판되어 대리출근 충돌로 잘못 걸린다. -->
 	<select id="SelectApprovedDeviceOwner" parameterType="map" resultType="hashmap">
 		SELECT account_id, user_name, phone_last4
 		FROM tb_member_device
 		WHERE device_token = #{device_token}
 			AND approve_yn = 'Y'
-			AND NOT (account_id = #{account_id} AND user_name = #{user_name} AND phone_last4 = #{phone_last4})
+			AND NOT (user_name = #{user_name} AND phone_last4 = #{phone_last4})
 		LIMIT 1
 	</select>
 
