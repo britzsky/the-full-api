@@ -59,7 +59,11 @@ public class AccountController {
 
 	private static final Logger log =
 	        LoggerFactory.getLogger(AccountController.class);
-	
+
+	// tb_member_device_conflict_log.event_type: 대리출근 의심 이력을 감지한 시점
+	private static final int DEVICE_CONFLICT_EVENT_CONFIRM = 1; // 본인확인(CommuteDeviceOwnerCheck) 단계에서 감지
+	private static final int DEVICE_CONFLICT_EVENT_APPROVE = 2; // 기기승인(CommuteDeviceApprove) 단계에서 감지
+
 	@Autowired
 	public AccountController(
 			AccountService accountService,
@@ -3447,7 +3451,7 @@ public class AccountController {
 				logParam.put("owner_account_id", normalizeCommuteText(owner.get("account_id")));
 				logParam.put("owner_user_name", ownerUserName);
 				logParam.put("owner_phone_last4", normalizeCommuteText(owner.get("phone_last4")));
-				logParam.put("event_type", "CONFIRM");
+				logParam.put("event_type", DEVICE_CONFLICT_EVENT_CONFIRM);
 				accountService.InsertMemberDeviceConflictLog(logParam);
 			} catch (Exception ignore) {
 				// 이력 저장 실패는 무시하고 아래 안내는 그대로 내려준다
@@ -3557,6 +3561,23 @@ public class AccountController {
 
 					if (owner != null) {
 						String ownerUserName = normalizeCommuteText(owner.get("user_name"));
+
+						try {
+							Map<String, Object> logParam = new HashMap<>();
+							logParam.put("account_id", accountId);
+							logParam.put("user_name", userName);
+							logParam.put("phone_last4", phoneLast4);
+							logParam.put("device_token", pendingToken);
+							logParam.put("device_name", normalizeCommuteText(pendingInfo.get("pending_device_name")));
+							logParam.put("owner_account_id", normalizeCommuteText(owner.get("account_id")));
+							logParam.put("owner_user_name", ownerUserName);
+							logParam.put("owner_phone_last4", normalizeCommuteText(owner.get("phone_last4")));
+							logParam.put("event_type", DEVICE_CONFLICT_EVENT_APPROVE);
+							accountService.InsertMemberDeviceConflictLog(logParam);
+						} catch (Exception ignore) {
+							// 이력 저장 실패는 무시하고 아래 승인 거부 응답은 그대로 내려준다
+						}
+
 						obj.addProperty("code", "409");
 						obj.addProperty("msg", "이 기기는 이미 " + ownerUserName + "님에게 승인된 기기라서 승인할 수 없습니다.");
 						return obj.toString();
