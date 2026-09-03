@@ -105,4 +105,5 @@ public interface HeadOfficeMapper {
 	int ErpSurveyResponseSave(Map<String, Object> paramMap);										// ERP 만족도 -> 응답 저장
 	List<Map<String, Object>> ErpSurveyStats(Map<String, Object> paramMap);							// ERP 만족도 -> 문항별 통계 조회
 	Map<String, Object> ErpSurveyOverallStats(Map<String, Object> paramMap);						// ERP 만족도 -> 전체 요약 통계 조회
+	List<String> ErpSurveyCommentList(Map<String, Object> paramMap);								// ERP 만족도 -> 추가 의견 목록 조회 (관리자용, 작성자 비노출)
 }

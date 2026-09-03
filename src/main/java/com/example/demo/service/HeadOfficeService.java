@@ -573,31 +573,42 @@ public class HeadOfficeService {
 		return headOfficeMapper.ErpSurveyResponseCheck(paramMap);
 	}
 
-	// ERP 만족도 -> 응답 저장
+	// ERP 만족도 -> 응답 저장 (문항별 점수 + 추가 의견(선택))
+	// comment는 별도 테이블 없이 tb_survey_response 컬럼에 저장하되, 제출 1건당 첫 번째 문항 행에만 채워 넣는다.
 	@Transactional
 	public int ErpSurveyResponseSave(Map<String, Object> paramMap) {
 		@SuppressWarnings("unchecked")
 		List<Map<String, Object>> answers = (List<Map<String, Object>>) paramMap.get("answers");
 		if (answers == null || answers.isEmpty())
 			return 0;
+
+		Object commentObj = paramMap.get("comment");
+		String comment = commentObj != null && !String.valueOf(commentObj).trim().isEmpty()
+				? String.valueOf(commentObj).trim()
+				: null;
+
 		int count = 0;
-		for (Map<String, Object> ans : answers) {
+		for (int i = 0; i < answers.size(); i++) {
+			Map<String, Object> ans = answers.get(i);
 			Map<String, Object> row = new java.util.HashMap<>(paramMap);
 			row.put("question_idx", ans.get("question_idx"));
 			row.put("score", ans.get("score"));
+			row.put("comment", i == 0 ? comment : null); // 첫 행에만 저장, 나머지는 null
 			count += headOfficeMapper.ErpSurveyResponseSave(row);
 		}
 		return count;
 	}
 
-	// ERP 만족도 -> 통계 조회 (문항별 + 전체 요약)
+	// ERP 만족도 -> 통계 조회 (문항별 + 전체 요약 + 추가 의견)
 	public Map<String, Object> ErpSurveyStats(Map<String, Object> paramMap) {
 		List<Map<String, Object>> questionStats = headOfficeMapper.ErpSurveyStats(paramMap);
 		Map<String, Object> overall = headOfficeMapper.ErpSurveyOverallStats(paramMap);
+		List<String> comments = headOfficeMapper.ErpSurveyCommentList(paramMap);
 		Map<String, Object> result = new java.util.HashMap<>();
 		result.put("questionStats", questionStats);
 		result.put("totalRespondents", overall != null ? overall.get("total_respondents") : 0);
 		result.put("overallAverage", overall != null ? overall.get("overall_average") : 0);
+		result.put("comments", comments != null ? comments : new java.util.ArrayList<>());
 		return result;
 	}
 }

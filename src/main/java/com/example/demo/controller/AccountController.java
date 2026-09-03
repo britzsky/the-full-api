@@ -3406,9 +3406,11 @@ public class AccountController {
 
 	/*
 	 * method : CommuteDeviceOwnerCheck
-	 * comment : 출, 퇴근 기록 -> 대리출근 방지: 본인확인 시 이 device_token이 이미 "다른 사람" 이름으로
+	 * comment : 출, 퇴근 기록 -> 대리출근 방지: 본인확인 시 이 device_token이 이미 "다른 이름"으로
 	 *           승인돼 있는지 확인한다. 충돌이 감지되면 tb_member_device_conflict_log에 이력을 남긴다.
-	 *           (account_id + user_name + phone_last4 + device_token 기준)
+	 *           "같은 사람"인지 여부는 user_name만으로 판단한다(account_id, phone_last4는 안 봄 -
+	 *           이유는 SelectApprovedDeviceOwner 주석 참고). 즉 이름이 같으면 뒷자리가 달라도(번호
+	 *           오타/변경) 충돌로 안 잡고 그냥 새 phone_last4로 미승인 상태가 되어 재승인 절차를 탄다.
 	 */
 	@GetMapping("/Account/CommuteDeviceOwnerCheck")
 	public String CommuteDeviceOwnerCheck(@RequestParam Map<String, Object> paramMap) {

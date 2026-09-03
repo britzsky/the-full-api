@@ -3849,11 +3849,12 @@
 	</select>
 
 	<!-- 응답 저장 -->
+	<!-- comment: 제출 1건당 첫 번째 문항 행에만 값이 들어오고, 나머지 문항 행은 null -->
 	<insert id="ErpSurveyResponseSave" parameterType="map">
 		INSERT INTO tb_survey_response
-		    (user_id, question_idx, score, quarter, year, reg_dt)
+		    (user_id, question_idx, score, comment, quarter, year, reg_dt)
 		VALUES
-		    (#{user_id}, #{question_idx}, #{score}, #{quarter}, #{year},
+		    (#{user_id}, #{question_idx}, #{score}, #{comment}, #{quarter}, #{year},
 		     DATE_ADD(NOW(), INTERVAL 9 HOUR))
 	</insert>
 
@@ -3886,6 +3887,18 @@
 		 WHERE r.quarter = #{quarter}
 		   AND r.year    = #{year}
 		   AND q.del_yn  = 'N'
+	</select>
+
+	<!-- 추가 의견 목록 조회 (관리자용, 작성자 정보 없이 등록순) -->
+	<!-- 제출당 첫 문항 행에만 comment가 채워지므로, NULL/공백 제외하면 제출 1건당 1행만 잡힘 -->
+	<select id="ErpSurveyCommentList" parameterType="map" resultType="string">
+		SELECT comment
+		  FROM tb_survey_response
+		 WHERE quarter = #{quarter}
+		   AND year    = #{year}
+		   AND comment IS NOT NULL
+		   AND comment != ''
+		 ORDER BY reg_dt ASC
 	</select>
 
 </mapper>
