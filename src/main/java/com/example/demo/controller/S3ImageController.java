@@ -22,12 +22,23 @@ public class S3ImageController {
 
     @GetMapping("/image/**")
     public ResponseEntity<Void> redirectToS3(HttpServletRequest request) {
+        return redirectToS3(request, false);
+    }
+
+    @GetMapping("/download/image/**")
+    public ResponseEntity<Void> downloadFromS3(HttpServletRequest request) {
+        return redirectToS3(request, true);
+    }
+
+    private ResponseEntity<Void> redirectToS3(HttpServletRequest request, boolean download) {
         String requestPath = request.getRequestURI();
         int imageIndex = requestPath.indexOf("/image/");
         if (imageIndex < 0) return ResponseEntity.notFound().build();
         String storedPath = requestPath.substring(imageIndex);
         if (!fileStorageService.exists(storedPath)) return ResponseEntity.notFound().build();
-        URI location = URI.create(fileStorageService.createPresignedGetUrl(storedPath).toString());
+        URI location = URI.create((download
+                ? fileStorageService.createPresignedDownloadUrl(storedPath)
+                : fileStorageService.createPresignedGetUrl(storedPath)).toString());
         return ResponseEntity.status(302)
                 .header(HttpHeaders.LOCATION, location.toString())
                 .build();

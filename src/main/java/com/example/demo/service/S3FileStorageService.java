@@ -3,6 +3,7 @@ package com.example.demo.service;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
@@ -78,15 +79,30 @@ public class S3FileStorageService {
     }
 
     public URL createPresignedGetUrl(String storedPath) {
+        return createPresignedGetUrl(storedPath, false);
+    }
+
+    public URL createPresignedDownloadUrl(String storedPath) {
+        return createPresignedGetUrl(storedPath, true);
+    }
+
+    private URL createPresignedGetUrl(String storedPath, boolean download) {
         requireConfiguredBucket();
         String objectKey = toObjectKey(storedPath);
-        GetObjectRequest getRequest = GetObjectRequest.builder()
+        GetObjectRequest.Builder getRequest = GetObjectRequest.builder()
                 .bucket(bucket)
-                .key(physicalKey(objectKey))
-                .build();
+                .key(physicalKey(objectKey));
+        if (download) {
+            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
+                    .replace("\r", "")
+                    .replace("\n", "");
+            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+            getRequest.responseContentDisposition("attachment; filename*=UTF-8''" + encodedFilename);
+        }
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(presignedUrlDuration)
-                .getObjectRequest(getRequest)
+                .getObjectRequest(getRequest.build())
                 .build();
         return s3Presigner.presignGetObject(presignRequest).url();
     }
