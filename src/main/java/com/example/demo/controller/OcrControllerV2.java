@@ -36,6 +36,7 @@ import com.example.demo.parser.HeadOfficeReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.OcrService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.utils.BizNoUtils;
 import com.example.demo.utils.DateUtils;
 import com.google.cloud.documentai.v1.Document;
@@ -63,11 +64,12 @@ public class OcrControllerV2 {
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
 
-    private final String uploadDir;
+    private static final String uploadDir = System.getProperty("java.io.tmpdir");
+    @Autowired
+    private S3FileStorageService fileStorageService;
 
     @Autowired
-    public OcrControllerV2(@Value("${file.upload-dir}") String uploadDir) {
-        this.uploadDir = uploadDir;
+    public OcrControllerV2() {
     }
 
     // ✅ 식재료 키워드
@@ -381,24 +383,7 @@ public class OcrControllerV2 {
 
                 String resultPath = "";
 
-                // 프로젝트 루트 대신 static 폴더 경로 사용
-                String staticPath = new File(uploadDir).getAbsolutePath();
-                String basePath = staticPath + "/" + folderValue + "/" + targetSaleId + "/";
-
-                Path dirPath = Paths.get(basePath);
-                Files.createDirectories(dirPath); // 폴더 없으면 생성
-
-                String originalFileName = file.getOriginalFilename();
-                if (originalFileName == null || originalFileName.isBlank()) {
-                    originalFileName = "receipt";
-                }
-                String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-                Path filePath = dirPath.resolve(uniqueFileName);
-
-                file.transferTo(filePath.toFile()); // 파일 저장
-
-                // 브라우저 접근용 경로 반환
-                resultPath = "/image/" + folderValue + "/" + targetSaleId + "/" + uniqueFileName;
+                resultPath = fileStorageService.upload(file, folderValue, targetSaleId);
                 corporateCard.put("receipt_image", resultPath);
             }
 
@@ -629,21 +614,7 @@ public class OcrControllerV2 {
     // ✅ fallback용 이미지 저장 로직 분리
     private void attachReceiptImage(Map<String, Object> corporateCard, MultipartFile file, String saleId,
             String folderValue) throws Exception {
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + folderValue + "/" + saleId + "/";
-
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath);
-
-        String originalFileName = file.getOriginalFilename();
-        if (originalFileName == null || originalFileName.isBlank()) {
-            originalFileName = "receipt";
-        }
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
-
-        file.transferTo(filePath.toFile());
-        String resultPath = "/image/" + folderValue + "/" + saleId + "/" + uniqueFileName;
+        String resultPath = fileStorageService.upload(file, folderValue, saleId);
         corporateCard.put("receipt_image", resultPath);
     }
 

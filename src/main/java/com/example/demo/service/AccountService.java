@@ -1,10 +1,5 @@
 package com.example.demo.service;
 
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +19,7 @@ public class AccountService {
 	AccountMapper accountMapper;
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
-	private final String uploadDir;
+	private final S3FileStorageService fileStorageService;
 
 	// 문자열에서 숫자만 추출(최대 길이 제한)
 	private static String keepOnlyDigits(String value, int maxLen) {
@@ -157,54 +152,9 @@ public class AccountService {
 		if (!normalizedPath.startsWith("/image/")) {
 			return;
 		}
-
-		String relativePath = normalizedPath.substring("/image/".length());
-		if (!hasText(relativePath)) {
-			return;
-		}
-
-		Path rootPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-		Path targetPath = rootPath.resolve(relativePath).normalize();
-		if (!targetPath.startsWith(rootPath)) {
-			return;
-		}
-
 		try {
-			Files.deleteIfExists(targetPath);
-		} catch (IOException ignore) {
-		}
-
-		// 파일이 이미 없더라도, 해당 파일이 있던 폴더가 비었으면 1단계만 정리한다.
-		deleteEmptyParentDirectories(targetPath.getParent(), rootPath);
-	}
-
-	// 비어있는 부모 폴더 1단계 정리
-	private void deleteEmptyParentDirectories(Path startPath, Path rootPath) {
-		if (startPath == null) {
-			return;
-		}
-
-		Path currentPath = startPath.toAbsolutePath().normalize();
-		// 파일이 들어있던 바로 그 폴더(1단계)만 빈 폴더 정리한다.
-		if (!currentPath.startsWith(rootPath) || currentPath.equals(rootPath)) {
-			return;
-		}
-
-		boolean isEmpty = false;
-		try (DirectoryStream<Path> stream = Files.newDirectoryStream(currentPath)) {
-			isEmpty = !stream.iterator().hasNext();
-		} catch (IOException e) {
-			return;
-		}
-
-		if (!isEmpty) {
-			return;
-		}
-
-		try {
-			Files.deleteIfExists(currentPath);
-		} catch (IOException e) {
-			return;
+			fileStorageService.delete(normalizedPath);
+		} catch (RuntimeException ignore) {
 		}
 	}
 
@@ -308,11 +258,11 @@ public class AccountService {
 			AccountMapper accountMapper,
 			HeadOfficeMapper headOfficeMapper,
 			OperateMapper operateMapper,
-			@Value("${file.upload-dir}") String uploadDir) {
+			S3FileStorageService fileStorageService) {
 		this.accountMapper = accountMapper;
 		this.headOfficeMapper = headOfficeMapper;
 		this.operateMapper = operateMapper;
-		this.uploadDir = uploadDir;
+		this.fileStorageService = fileStorageService;
 	}
 
 	// 공통 -> 현재 날짜 키 조회

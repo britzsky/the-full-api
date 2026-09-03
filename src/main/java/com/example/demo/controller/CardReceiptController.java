@@ -31,6 +31,7 @@ import com.example.demo.parser.BaseReceiptParser;
 import com.example.demo.parser.BaseReceiptParser.Item;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.CardReceiptParseService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.utils.BizNoUtils;
 import com.example.demo.utils.DateUtils;
 
@@ -52,11 +53,11 @@ public class CardReceiptController {
     @Autowired
     private AccountService accountService;
 
-    private final String uploadDir;
+    @Autowired
+    private S3FileStorageService fileStorageService;
 
     @Autowired
-    public CardReceiptController(@Value("${file.upload-dir}") String uploadDir) {
-        this.uploadDir = uploadDir;
+    public CardReceiptController() {
     }
 
     @PostMapping("/parse")
@@ -85,20 +86,14 @@ public class CardReceiptController {
             // ✅ 0) 파일 저장
             String saleIdForPath = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
 
-            String staticPath = new File(uploadDir).getAbsolutePath();
-            String basePath = staticPath + "/" + folderValue + "/" + saleIdForPath + "/";
-            Path dirPath = Paths.get(basePath);
-            Files.createDirectories(dirPath);
-
-            String originalFileName = file.getOriginalFilename();
-            String uniqueFileName = UUID.randomUUID() + "_" + (originalFileName == null ? "receipt" : originalFileName);
-            Path savedPath = dirPath.resolve(uniqueFileName);
+            Path savedPath = Files.createTempFile("card_receipt_", ".tmp");
+            savedPath.toFile().deleteOnExit();
 
             try (var in = file.getInputStream()) {
                 Files.copy(in, savedPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
 
-            String resultPath = "/image/" + folderValue + "/" + saleIdForPath + "/" + uniqueFileName;
+            String resultPath = fileStorageService.upload(file, folderValue, saleIdForPath);
 
             String resolvedReceiptType = firstNonBlank(receiptType, type);
 

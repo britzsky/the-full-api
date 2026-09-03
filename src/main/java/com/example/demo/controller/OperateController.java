@@ -30,18 +30,21 @@ import com.example.demo.WebConfig;
 import com.example.demo.mapper.AccountMapper;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.OperateService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.controller.BudgetNoteCarryOverScheduler;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 @RestController
 public class OperateController {
+	private static final String uploadDir = System.getProperty("java.io.tmpdir");
 
     private final AccountService accountService;
     private final OperateService operateService;
     private final AccountMapper accountMapper;
     private final JdbcTemplate jdbcTemplate;
-    private final String uploadDir;
+    @Autowired
+    private S3FileStorageService fileStorageService;
     private final BudgetNoteCarryOverScheduler budgetNoteCarryOverScheduler;
 
     @Autowired
@@ -51,13 +54,11 @@ public class OperateController {
             AccountMapper accountMapper,
             JdbcTemplate jdbcTemplate,
             WebConfig webConfig,
-            BudgetNoteCarryOverScheduler budgetNoteCarryOverScheduler,
-            @Value("${file.upload-dir}") String uploadDir) {
+            BudgetNoteCarryOverScheduler budgetNoteCarryOverScheduler) {
         this.accountService = accountService;
         this.operateService = operateService;
         this.accountMapper = accountMapper;
         this.jdbcTemplate = jdbcTemplate;
-        this.uploadDir = uploadDir;
         this.budgetNoteCarryOverScheduler = budgetNoteCarryOverScheduler;
     }
 
@@ -401,6 +402,15 @@ public class OperateController {
             @RequestParam("type") String type,
             @RequestParam("gubun") String gubun,
             @RequestParam("folder") String folder) throws IOException {
+
+        if (fileStorageService != null) {
+            String s3Path = fileStorageService.upload(file, type, gubun, folder);
+            JsonObject s3Result = new JsonObject();
+            s3Result.addProperty("code", 200);
+            s3Result.addProperty("message", "성공");
+            s3Result.addProperty("image_path", s3Path);
+            return s3Result.toString();
+        }
 
         String resultPath = "";
 

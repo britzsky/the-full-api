@@ -40,6 +40,8 @@ tasks.withType(ProcessResources) {
 }
 
 dependencies {
+	implementation platform('software.amazon.awssdk:bom:2.31.68')
+	implementation 'software.amazon.awssdk:s3'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	// 외부 톰캣에서 돌릴 거니까 providedRuntime
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'

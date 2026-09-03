@@ -34,15 +34,18 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
 import com.example.demo.service.HeadOfficeService;
+import com.example.demo.service.S3FileStorageService;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 @RestController
 public class HeadOfficeController {
+	private static final String uploadDir = System.getProperty("java.io.tmpdir");
 	
 	private final HeadOfficeService headOfficeService;
-	private final String uploadDir;
+	@Autowired
+	private S3FileStorageService fileStorageService;
 	private static final String DOC_KIND_DRAFT = "draft";
 	private static final String DOC_KIND_EXPENDABLE = "expendable";
 	private static final String DOC_KIND_PAYMENT = "payment";
@@ -71,11 +74,9 @@ public class HeadOfficeController {
     @Autowired
     public HeadOfficeController(
 		HeadOfficeService headOfficeService,
-		WebConfig webConfig,
-		@Value("${file.upload-dir}") String uploadDir
+		WebConfig webConfig
 	) {
     	this.headOfficeService = headOfficeService;
-    	this.uploadDir = uploadDir;
     }
     
     /* 
@@ -612,25 +613,12 @@ public class HeadOfficeController {
 			}
 
 			String imagePathText = asText(matchedFile.get("image_path"));
-			Path filePath = resolveElectronicPaymentStoredFilePath(imagePathText);
-			if (filePath == null || !Files.exists(filePath)) {
+			if (!fileStorageService.exists(imagePathText)) {
 				return ResponseEntity.notFound().build();
 			}
-
-			Resource resource = new UrlResource(filePath.toUri());
-			if (!resource.exists()) {
-				return ResponseEntity.notFound().build();
-			}
-
-			String detectedContentType = Files.probeContentType(filePath);
-			MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-			if (detectedContentType != null && !detectedContentType.trim().isEmpty()) {
-				mediaType = MediaType.parseMediaType(detectedContentType);
-			}
-
-			return ResponseEntity.ok()
-				.contentType(mediaType)
-				.body(resource);
+			return ResponseEntity.status(302)
+					.location(fileStorageService.createPresignedGetUrl(imagePathText).toURI())
+					.build();
 		} catch (Exception e) {
 			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
 		}
@@ -976,9 +964,6 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
-			Path noticeDirPath = resolveNoticeDirPath(noticeIdxText);
-			Files.createDirectories(noticeDirPath);
-
 			int nextOrder = headOfficeService.GetNextNoticeFileOrder(noticeIdxInt);
 			int availableCount = MAX_HEADOFFICE_DOCUMENT_FILE_COUNT - currentCount;
 			List<Map<String, Object>> insertedFiles = new ArrayList<>();
@@ -990,13 +975,7 @@ public class HeadOfficeController {
 				String originalFileName = asText(file.getOriginalFilename());
 				if (originalFileName.isEmpty()) originalFileName = "file";
 				String safeFileName = Paths.get(originalFileName).getFileName().toString();
-				String uniqueFileName = UUID.randomUUID() + "_" + safeFileName;
-
-				Path filePath = noticeDirPath.resolve(uniqueFileName).normalize();
-				if (!filePath.startsWith(noticeDirPath)) continue;
-				file.transferTo(filePath.toFile());
-
-				String imagePath = "/image/notice/" + noticeIdxText + "/" + uniqueFileName;
+				String imagePath = fileStorageService.upload(file, "notice", noticeIdxText);
 
 				Map<String, Object> saveParam = new HashMap<>();
 				saveParam.put("notice_idx", noticeIdxInt);
@@ -1042,7 +1021,10 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
-			if (!imagePathText.isEmpty()) {
+			if (!imagePathText.isEmpty() && fileStorageService != null) {
+				fileStorageService.delete(imagePathText);
+			}
+			if (!imagePathText.isEmpty() && fileStorageService == null) {
 				String targetFileName = Paths.get(imagePathText).getFileName().toString();
 				if (!targetFileName.isEmpty()) {
 					Path noticeDirPath = resolveNoticeDirPath(noticeIdxText);
@@ -1177,9 +1159,6 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
-			Path educationDirPath = resolveEducationDirPath(educationIdxText);
-			Files.createDirectories(educationDirPath);
-
 			int nextOrder = headOfficeService.GetNextEducationFileOrder(educationIdxInt);
 			int availableCount = MAX_HEADOFFICE_DOCUMENT_FILE_COUNT - currentCount;
 			List<Map<String, Object>> insertedFiles = new ArrayList<>();
@@ -1191,13 +1170,7 @@ public class HeadOfficeController {
 				String originalFileName = asText(file.getOriginalFilename());
 				if (originalFileName.isEmpty()) originalFileName = "file";
 				String safeFileName = Paths.get(originalFileName).getFileName().toString();
-				String uniqueFileName = UUID.randomUUID() + "_" + safeFileName;
-
-				Path filePath = educationDirPath.resolve(uniqueFileName).normalize();
-				if (!filePath.startsWith(educationDirPath)) continue;
-				file.transferTo(filePath.toFile());
-
-				String imagePath = "/image/education/" + educationIdxText + "/" + uniqueFileName;
+				String imagePath = fileStorageService.upload(file, "education", educationIdxText);
 
 				Map<String, Object> saveParam = new HashMap<>();
 				saveParam.put("education_idx", educationIdxInt);
@@ -1243,7 +1216,10 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
-			if (!imagePathText.isEmpty()) {
+			if (!imagePathText.isEmpty() && fileStorageService != null) {
+				fileStorageService.delete(imagePathText);
+			}
+			if (!imagePathText.isEmpty() && fileStorageService == null) {
 				String targetFileName = Paths.get(imagePathText).getFileName().toString();
 				if (!targetFileName.isEmpty()) {
 					Path educationDirPath = resolveEducationDirPath(educationIdxText);
@@ -1575,9 +1551,6 @@ public class HeadOfficeController {
 			int nextOrder = useKpiScheme ? 0 : headOfficeService.GetNextEvaluationFileOrder(idxInt);
 			int available = MAX_EVALUATION_FILE_COUNT - existingFiles.size();
 
-			Path evalDirPath = resolveEvaluationDirPath(idxText);
-			Files.createDirectories(evalDirPath);
-
 			List<Map<String, Object>> inserted = new ArrayList<>();
 
 			for (int i = 0; i < files.length; i++) {
@@ -1602,13 +1575,7 @@ public class HeadOfficeController {
 				String originalName = asText(file.getOriginalFilename());
 				if (originalName.isEmpty()) originalName = "file";
 				String safeName   = Paths.get(originalName).getFileName().toString();
-				String uniqueName = UUID.randomUUID() + "_" + safeName;
-
-				Path filePath = evalDirPath.resolve(uniqueName).normalize();
-				if (!filePath.startsWith(evalDirPath)) continue;
-				file.transferTo(filePath.toFile());
-
-				String imagePath = "/image/evaluation/" + idxText + "/" + uniqueName;
+				String imagePath = fileStorageService.upload(file, "evaluation", idxText);
 
 				Map<String, Object> saveParam = new HashMap<>();
 				saveParam.put("evaluation_idx", idxInt);
@@ -1652,7 +1619,10 @@ public class HeadOfficeController {
 				obj.addProperty("message", "evaluation_idx / image_order 파라미터가 필요합니다.");
 				return obj.toString();
 			}
-			if (!imagePathText.isEmpty()) {
+			if (!imagePathText.isEmpty() && fileStorageService != null) {
+				fileStorageService.delete(imagePathText);
+			}
+			if (!imagePathText.isEmpty() && fileStorageService == null) {
 				String targetFileName = Paths.get(imagePathText).getFileName().toString();
 				if (!targetFileName.isEmpty()) {
 					Path evalDirPath = resolveEvaluationDirPath(idxText);
@@ -2196,9 +2166,6 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
-			Path paymentDirPath = resolveElectronicPaymentDirPath(paymentIdText);
-			Files.createDirectories(paymentDirPath);
-
 			Map<String, Object> fileListParam = new HashMap<>();
 			fileListParam.put("payment_id", paymentIdText);
 			List<Map<String, Object>> existingFiles = headOfficeService.ElectronicPaymentFileList(fileListParam);
@@ -2226,13 +2193,7 @@ public class HeadOfficeController {
 					skippedUnsupportedCount++;
 					continue;
 				}
-				String uniqueFileName = UUID.randomUUID() + "_" + safeFileName;
-
-				Path filePath = paymentDirPath.resolve(uniqueFileName).normalize();
-				if (!filePath.startsWith(paymentDirPath)) continue;
-				file.transferTo(filePath.toFile());
-
-				String imagePath = "/image/electronic_payment/" + paymentIdText + "/" + uniqueFileName;
+				String imagePath = fileStorageService.upload(file, "electronic_payment", paymentIdText);
 
 				Map<String, Object> saveParam = new HashMap<>();
 				saveParam.put("payment_id", paymentIdText);
@@ -2284,8 +2245,11 @@ public class HeadOfficeController {
 				return obj.toString();
 			}
 
+			if (fileStorageService != null) {
+				fileStorageService.delete(imagePathText);
+			}
 			String targetFileName = Paths.get(imagePathText).getFileName().toString();
-			if (!targetFileName.isEmpty()) {
+			if (!targetFileName.isEmpty() && fileStorageService == null) {
 				Path paymentDirPath = resolveElectronicPaymentDirPath(paymentIdText);
 				Path targetPath = paymentDirPath.resolve(targetFileName).normalize();
 				if (targetPath.startsWith(paymentDirPath)) {

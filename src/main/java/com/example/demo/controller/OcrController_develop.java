@@ -40,6 +40,7 @@ import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.CardReceiptParseService;
 import com.example.demo.service.OcrService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.service.OperateService;
 import com.example.demo.utils.BizNoUtils;
 import com.example.demo.utils.DateUtils;
@@ -71,11 +72,12 @@ public class OcrController_develop {
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
 
-    private final String uploadDir;
+    private static final String uploadDir = System.getProperty("java.io.tmpdir");
+    @Autowired
+    private S3FileStorageService fileStorageService;
 
     @Autowired
-    public OcrController_develop(@Value("${file.upload-dir}") String uploadDir) {
-        this.uploadDir = uploadDir;
+    public OcrController_develop() {
     }
 
     // ✅ 식재료 키워드
@@ -587,17 +589,7 @@ public class OcrController_develop {
 
     // ✅ fallback용 이미지 저장 로직 분리
     private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + "receipt/" + saleId + "/";
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath);
-
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
-
-        file.transferTo(filePath.toFile());
-        String resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+        String resultPath = fileStorageService.upload(file, "receipt", saleId);
         purchase.put("receipt_image", resultPath);
     }
 

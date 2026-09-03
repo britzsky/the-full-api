@@ -38,6 +38,7 @@ import com.example.demo.parser.ReceiptParserFactory;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.AiReceiptAnalyzer;
 import com.example.demo.service.OcrService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.service.OperateService;
 import com.example.demo.utils.BizNoUtils;
 import com.example.demo.utils.DateUtils;
@@ -66,11 +67,12 @@ public class OcrControllerV5 {
     @Autowired(required = false)
     private AiReceiptAnalyzer aiAnalyzer; // 향후 자동 분석용 (지금은 사용 안 해도 OK)
 
-    private final String uploadDir;
+    private static final String uploadDir = System.getProperty("java.io.tmpdir");
+    @Autowired
+    private S3FileStorageService fileStorageService;
 
     @Autowired
-    public OcrControllerV5(@Value("${file.upload-dir}") String uploadDir) {
-        this.uploadDir = uploadDir;
+    public OcrControllerV5() {
     }
 
     // ✅ 식재료 키워드
@@ -324,21 +326,7 @@ public class OcrControllerV5 {
 
                 String resultPath = "";
 
-                // 프로젝트 루트 대신 static 폴더 경로 사용
-                String staticPath = new File(uploadDir).getAbsolutePath();
-                String basePath = staticPath + "/" + "receipt/" + saleId + "/";
-
-                Path dirPath = Paths.get(basePath);
-                Files.createDirectories(dirPath); // 폴더 없으면 생성
-
-                String originalFileName = file.getOriginalFilename();
-                String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-                Path filePath = dirPath.resolve(uniqueFileName);
-
-                file.transferTo(filePath.toFile()); // 파일 저장
-
-                // 브라우저 접근용 경로 반환
-                resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+                resultPath = fileStorageService.upload(file, "receipt", saleId);
                 purchase.put("receipt_image", resultPath);
             }
 
@@ -444,17 +432,7 @@ public class OcrControllerV5 {
 
     // ✅ fallback용 이미지 저장 로직 분리
     private void attachReceiptImage(Map<String, Object> purchase, MultipartFile file, String saleId) throws Exception {
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + "receipt/" + saleId + "/";
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath);
-
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
-
-        file.transferTo(filePath.toFile());
-        String resultPath = "/image/" + "receipt" + "/" + saleId + "/" + uniqueFileName;
+        String resultPath = fileStorageService.upload(file, "receipt", saleId);
         purchase.put("receipt_image", resultPath);
     }
 

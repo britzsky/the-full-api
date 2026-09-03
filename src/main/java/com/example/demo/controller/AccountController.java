@@ -44,19 +44,22 @@ import com.example.demo.dao.Coordinate;
 import com.example.demo.service.AccountService;
 import com.example.demo.service.GeocodingService;
 import com.example.demo.service.HeadOfficeService;
+import com.example.demo.service.S3FileStorageService;
 import com.example.demo.utils.DateUtils;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 @RestController
 public class AccountController {
+	private static final String uploadDir = System.getProperty("java.io.tmpdir");
 
 	private final OcrController ocrController;
 
 	private final AccountService accountService;
 	private final HeadOfficeService headOfficeService;
 	private GeocodingService geocodingService;
-	private final String uploadDir;
+	@Autowired
+	private S3FileStorageService fileStorageService;
 
 	private static final Logger log =
 	        LoggerFactory.getLogger(AccountController.class);
@@ -78,11 +81,10 @@ public class AccountController {
 			HeadOfficeService headOfficeService,
 			GeocodingService geocodingService,
 			WebConfig webConfig,
-			@Value("${file.upload-dir}") String uploadDir, OcrController ocrController) {
+			OcrController ocrController) {
 		this.accountService = accountService;
 		this.headOfficeService = headOfficeService;
 		this.geocodingService = geocodingService;
-		this.uploadDir = uploadDir;
 		this.ocrController = ocrController;
 	}
 
@@ -111,25 +113,12 @@ public class AccountController {
 	@GetMapping("/Account/AccountStoredFileView")
 	public ResponseEntity<?> AccountStoredFileView(@RequestParam("file_path") String filePathText) {
 		try {
-			Path filePath = resolveStoredFilePath(filePathText);
-			if (filePath == null || !Files.exists(filePath)) {
+			if (!fileStorageService.exists(filePathText)) {
 				return ResponseEntity.notFound().build();
 			}
-
-			Resource resource = new UrlResource(filePath.toUri());
-			if (!resource.exists()) {
-				return ResponseEntity.notFound().build();
-			}
-
-			String detectedContentType = Files.probeContentType(filePath);
-			MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
-			if (detectedContentType != null && !detectedContentType.trim().isEmpty()) {
-				mediaType = MediaType.parseMediaType(detectedContentType);
-			}
-
-			return ResponseEntity.ok()
-					.contentType(mediaType)
-					.body(resource);
+			return ResponseEntity.status(302)
+					.location(fileStorageService.createPresignedGetUrl(filePathText).toURI())
+					.build();
 		} catch (Exception e) {
 			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
 		}
@@ -1017,7 +1006,9 @@ public class AccountController {
 	}
 
 	private String saveFile(String accountId, String type, MultipartFile file) throws IOException {
-		// 프로젝트 루트 대신 static 폴더 경로 사용
+		if (fileStorageService != null) {
+			return fileStorageService.upload(file, accountId, type);
+		}
 		String staticPath = new File(uploadDir).getAbsolutePath();
 		String basePath = staticPath + "/" + accountId + "/" + type + "/";
 		Path dirPath = Paths.get(basePath);
@@ -1034,6 +1025,9 @@ public class AccountController {
 	}
 
 	private String saveReceiptFile(String saleId, MultipartFile file) throws IOException {
+		if (fileStorageService != null) {
+			return fileStorageService.upload(file, "receipt", saleId);
+		}
 
 		// 프로젝트 루트 대신 static 폴더 경로 사용
 		String staticPath = new File(uploadDir).getAbsolutePath();
@@ -1649,6 +1643,9 @@ public class AccountController {
 	 * comment : 거래처 파일업로드 공통
 	 */
 	private String saveFile(MultipartFile file, String type, String gubun, String folder) throws IOException {
+		if (fileStorageService != null) {
+			return fileStorageService.upload(file, type, gubun, folder);
+		}
 
 		String resultPath = "";
 
@@ -1681,6 +1678,24 @@ public class AccountController {
 			// ✅ 삭제할 파일 경로 구성
 			Path filePath2 = Paths.get(uploadDir + filePath);
 			File file = filePath2.toFile();
+			if (fileStorageService != null) {
+				if (!fileStorageService.exists(filePath)) {
+					obj.addProperty("code", 404);
+					obj.addProperty("message", "파일이 존재하지 않습니다: " + filePath);
+					return obj.toString();
+				}
+				fileStorageService.delete(filePath);
+				Map<String, Object> s3ParamMap = new HashMap<String, Object>();
+				s3ParamMap.put("account_id", accountId);
+				s3ParamMap.put("year", year);
+				s3ParamMap.put("month", month);
+				s3ParamMap.put("file_yn", file_yn);
+				s3ParamMap.put("deadline_file", null);
+				int s3Result = accountService.AccountDeadlineFilesSave(s3ParamMap);
+				obj.addProperty("code", s3Result > 0 ? 200 : 500);
+				obj.addProperty("message", s3Result > 0 ? "파일 삭제 성공" : "DB 파일 정보 삭제 실패");
+				return obj.toString();
+			}
 
 			if (!file.exists()) {
 				obj.addProperty("code", 404);

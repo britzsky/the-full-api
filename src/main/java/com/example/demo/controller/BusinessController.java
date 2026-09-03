@@ -23,23 +23,23 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.example.demo.WebConfig;
 import com.example.demo.service.BusinessService;
+import com.example.demo.service.S3FileStorageService;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 @RestController
 public class BusinessController {
+	private static final String uploadDir = System.getProperty("java.io.tmpdir");
 
 	private final BusinessService businessService;
-	private final String uploadDir;
+	@Autowired
+	private S3FileStorageService fileStorageService;
 	
     @Autowired
     public BusinessController(
-	    		BusinessService businessService, 
-	    		WebConfig webConfig,  
-	    		@Value("${file.upload-dir}") String uploadDir
-    		) {
+            BusinessService businessService,
+            WebConfig webConfig) {
     	this.businessService = businessService;
-    	this.uploadDir = uploadDir;
     }
     
     /* 
@@ -117,23 +117,10 @@ public class BusinessController {
     	    @RequestParam("folder") String folder) throws IOException {
     	
     	int iResult = 0;
-    	String resultPath = "";
-    	
-        // 프로젝트 루트 대신 static 폴더 경로 사용
-        String staticPath = new File(uploadDir).getAbsolutePath();
-        String basePath = staticPath + "/" + "type/" + gubun + "/" + folder +  "/";
-        
-        Path dirPath = Paths.get(basePath);
-        Files.createDirectories(dirPath); // 폴더 없으면 생성
-
-        String originalFileName = file.getOriginalFilename();
-        String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-        Path filePath = dirPath.resolve(uniqueFileName);
-
-        file.transferTo(filePath.toFile()); // 파일 저장
+		String resultPath = fileStorageService.upload(file, type, gubun, folder);
         
         // 브라우저 접근용 경로 반환
-        resultPath = "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName;
+        // resultPath는 S3 업로드가 반환한 기존 호환 경로(/image/**)를 사용한다.
         
         // Map을 MyBatis로 저장
         Map<String, Object> paramMap = new HashMap<>();
@@ -141,7 +128,7 @@ public class BusinessController {
         if (type.equals("car")) {
         	paramMap.put("car_number", folder);
         	paramMap.put("service_dt", gubun);
-        	paramMap.put("exterior_image", "/image/" + type + "/" + gubun + "/" + folder + "/" + uniqueFileName);
+			paramMap.put("exterior_image", resultPath);
         	
         	iResult += businessService.CarSave(paramMap);
         }
@@ -366,6 +353,19 @@ public class BusinessController {
         JsonObject obj = new JsonObject();
         try {
             // ✅ 삭제할 파일 경로 구성
+            if (fileStorageService != null) {
+                String storedPath = String.valueOf(param.get("exterior_image"));
+                if (!fileStorageService.exists(storedPath)) {
+                    obj.addProperty("code", 404);
+                    obj.addProperty("message", "파일이 존재하지 않습니다: " + storedPath);
+                    return obj.toString();
+                }
+                fileStorageService.delete(storedPath);
+                int s3Result = businessService.CarFileDelete(param);
+                obj.addProperty("code", s3Result > 0 ? 200 : 500);
+                obj.addProperty("message", s3Result > 0 ? "파일 삭제 성공" : "DB 파일 정보 삭제 실패");
+                return obj.toString();
+            }
             Path filePath2 = Paths.get("src/main/resources/static" + param.get("exterior_image"));
             File file = filePath2.toFile();
 
@@ -413,14 +413,6 @@ public class BusinessController {
 
 	    try {
 
-	        // ------------------------------
-	        // 1) 이미지 저장 경로 구성
-	        // ------------------------------
-	        String staticPath = new File(uploadDir).getAbsolutePath();
-	        String basePath = staticPath + "/" + "car/" + service_dt + "/" + car_number + "/";
-	        Path dirPath = Paths.get(basePath);
-	        Files.createDirectories(dirPath); // 폴더 없으면 생성
-
 	        List<Map<String, Object>> insertedFiles = new ArrayList<>();
 	        // ------------------------------
 	        // 2) 업로드 파일 저장 처리
@@ -428,12 +420,7 @@ public class BusinessController {
 	        for (MultipartFile file : files) {
 
 	            String originalFileName = file.getOriginalFilename();
-	            String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-
-	            Path filePath = dirPath.resolve(uniqueFileName);
-	            file.transferTo(filePath.toFile());
-
-	            String imagePath = "/image/car/" + service_dt + "/" + car_number + "/" + uniqueFileName;
+	            String imagePath = fileStorageService.upload(file, "car", service_dt, car_number);
 
 	            // ------------------------------
 	            // 4) DB 저장
@@ -614,6 +601,19 @@ public class BusinessController {
         JsonObject obj = new JsonObject();
         try {
             // ✅ 삭제할 파일 경로 구성
+            if (fileStorageService != null) {
+                String storedPath = String.valueOf(param.get("image_path"));
+                if (!fileStorageService.exists(storedPath)) {
+                    obj.addProperty("code", 404);
+                    obj.addProperty("message", "파일이 존재하지 않습니다: " + storedPath);
+                    return obj.toString();
+                }
+                fileStorageService.delete(storedPath);
+                int s3Result = businessService.AccountEventFileDelete(param);
+                obj.addProperty("code", s3Result > 0 ? 200 : 500);
+                obj.addProperty("message", s3Result > 0 ? "파일 삭제 성공" : "DB 파일 정보 삭제 실패");
+                return obj.toString();
+            }
             Path filePath2 = Paths.get("src/main/resources/static" + param.get("image_path"));
             File file = filePath2.toFile();
 
@@ -699,15 +699,6 @@ public class BusinessController {
 	    try {
 
 	        // ------------------------------
-	        // 1) 이미지 저장 경로 구성
-	        // ------------------------------
-	    	String staticPath = new File(uploadDir).getAbsolutePath();
-	        String basePath = staticPath + "/" + "event/" + eventId + "/";
-	    	
-	        Path dirPath = Paths.get(basePath);
-	        Files.createDirectories(dirPath); // 폴더 없으면 생성
-
-	        // ------------------------------
 	        // 2) DB에 저장할 image_order 조회
 	        // ------------------------------
 	        int nextOrder = businessService.GetNextImageOrder(eventId); 
@@ -721,12 +712,7 @@ public class BusinessController {
 	        for (MultipartFile file : files) {
 
 	            String originalFileName = file.getOriginalFilename();
-	            String uniqueFileName = UUID.randomUUID() + "_" + originalFileName;
-
-	            Path filePath = dirPath.resolve(uniqueFileName);
-	            file.transferTo(filePath.toFile());
-
-	            String imagePath = "/image/event/" + eventId + "/" + uniqueFileName;
+	            String imagePath = fileStorageService.upload(file, "event", String.valueOf(eventId));
 
 	            // ------------------------------
 	            // 4) DB 저장
