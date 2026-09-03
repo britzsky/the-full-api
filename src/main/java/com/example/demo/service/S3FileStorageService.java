@@ -11,12 +11,18 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -105,6 +111,55 @@ public class S3FileStorageService {
                 .getObjectRequest(getRequest.build())
                 .build();
         return s3Presigner.presignGetObject(presignRequest).url();
+    }
+
+    /**
+     * S3 오브젝트를 302 리다이렉트가 아니라 서버가 직접 받아 그대로 스트리밍한다.
+     * 브라우저 navigation(주소창 이동, a 태그 클릭)이 아니라 fetch()로 바이트를 직접 읽어야 하는
+     * 화면(첨부파일 zip 일괄 다운로드, PDF/엑셀 미리보기, 파일시스템 저장 등)에서는 302 응답이
+     * S3로 리다이렉트되는 순간 브라우저가 S3 오리진에 대해 CORS 검사를 하게 되는데, S3 버킷에
+     * 프론트 오리진을 허용하는 CORS 설정이 없으면 그 요청이 전부 실패한다.
+     * same-origin 응답으로 그대로 흘려보내면 이 문제 자체가 발생하지 않는다.
+     */
+    public ResponseEntity<InputStreamResource> streamObject(String storedPath, boolean download) {
+        requireConfiguredBucket();
+        String objectKey = toObjectKey(storedPath);
+        GetObjectRequest getRequest = GetObjectRequest.builder()
+                .bucket(bucket)
+                .key(physicalKey(objectKey))
+                .build();
+
+        ResponseInputStream<GetObjectResponse> s3Object;
+        try {
+            s3Object = s3Client.getObject(getRequest);
+        } catch (NoSuchKeyException e) {
+            return ResponseEntity.notFound().build();
+        }
+        GetObjectResponse meta = s3Object.response();
+
+        String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
+                .replace("\r", "")
+                .replace("\n", "");
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20");
+
+        HttpHeaders headers = new HttpHeaders();
+        MediaType mediaType;
+        try {
+            mediaType = (meta.contentType() == null || meta.contentType().isBlank())
+                    ? MediaType.APPLICATION_OCTET_STREAM
+                    : MediaType.parseMediaType(meta.contentType());
+        } catch (Exception e) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        headers.setContentType(mediaType);
+        if (meta.contentLength() != null) {
+            headers.setContentLength(meta.contentLength());
+        }
+        headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                (download ? "attachment" : "inline") + "; filename*=UTF-8''" + encodedFilename);
+
+        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(s3Object));
     }
 
     public StoredObjectMetadata metadata(String storedPath) {

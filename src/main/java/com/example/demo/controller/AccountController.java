@@ -108,17 +108,14 @@ public class AccountController {
 	/*
 	 * part : 회계/현장/운영
 	 * method : AccountStoredFileView
-	 * comment : 집계표/매입마감/거래처 등록 첨부파일 미리보기용 파일 스트림 조회
+	 * comment : 집계표/매입마감/거래처 등록 첨부파일 미리보기/다운로드용 파일 스트림 조회
+	 *           (302로 S3에 리다이렉트하면 fetch() 기반 zip 일괄다운로드/미리보기 blob 로드가
+	 *            S3 CORS 설정 유무에 따라 실패하므로, 서버가 직접 스트리밍한다)
 	 */
 	@GetMapping("/Account/AccountStoredFileView")
 	public ResponseEntity<?> AccountStoredFileView(@RequestParam("file_path") String filePathText) {
 		try {
-			if (!fileStorageService.exists(filePathText)) {
-				return ResponseEntity.notFound().build();
-			}
-			return ResponseEntity.status(302)
-					.location(fileStorageService.createPresignedGetUrl(filePathText).toURI())
-					.build();
+			return fileStorageService.streamObject(filePathText, false);
 		} catch (Exception e) {
 			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
 		}

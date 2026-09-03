@@ -613,12 +613,9 @@ public class HeadOfficeController {
 			}
 
 			String imagePathText = asText(matchedFile.get("image_path"));
-			if (!fileStorageService.exists(imagePathText)) {
-				return ResponseEntity.notFound().build();
-			}
-			return ResponseEntity.status(302)
-					.location(fileStorageService.createPresignedGetUrl(imagePathText).toURI())
-					.build();
+			// 302로 S3에 리다이렉트하면 fetch() 기반 다운로드/미리보기 blob 로드가
+			// S3 CORS 설정 유무에 따라 실패하므로, 서버가 직접 스트리밍한다.
+			return fileStorageService.streamObject(imagePathText, false);
 		} catch (Exception e) {
 			return ResponseEntity.internalServerError().body(e.getClass().getName() + ": " + e.getMessage());
 		}
