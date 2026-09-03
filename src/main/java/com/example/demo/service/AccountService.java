@@ -1544,9 +1544,9 @@ public class AccountService {
 		return accountMapper.SelectApprovedDeviceOwner(paramMap);
 	}
 
-	// 출, 퇴근 기록 -> 같은 사람이 같은 device_token으로 이미 승인받은 다른 phone_last4 행 조회 (이중 승인 방지)
-	public Map<String, Object> SelectApprovedDeviceByOwnerToken(Map<String, Object> paramMap) {
-		return accountMapper.SelectApprovedDeviceByOwnerToken(paramMap);
+	// 출, 퇴근 기록 -> 같은 사람(account_id+user_name)이 이미 다른 phone_last4로 승인받은 행 조회 (이중 승인/동명이인 확인용)
+	public Map<String, Object> SelectApprovedDeviceBySameName(Map<String, Object> paramMap) {
+		return accountMapper.SelectApprovedDeviceBySameName(paramMap);
 	}
 
 	// 출, 퇴근 기록 -> 위에서 찾은 예전 행의 승인 해제 (이중 승인 정리)

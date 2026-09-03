@@ -19,6 +19,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,13 @@ public class AccountController {
 	// tb_member_device_conflict_log.event_type: 대리출근 의심 이력을 감지한 시점
 	private static final int DEVICE_CONFLICT_EVENT_CONFIRM = 1; // 본인확인(CommuteDeviceOwnerCheck) 단계에서 감지
 	private static final int DEVICE_CONFLICT_EVENT_APPROVE = 2; // 기기승인(CommuteDeviceApprove) 단계에서 감지
+
+	// ✅ CommuteDeviceApprove 동시요청(관리자 더블클릭, 같은 device_token에 대한 동시 승인 시도 등) 방지용
+	//    device_token 단위 락. "이 device_token이 이미 승인되어 있는지" 확인부터 실제 승인까지를
+	//    하나의 device_token에 대해서는 한 번에 하나씩만 처리되도록 묶는다.
+	//    ⚠ 서버가 여러 인스턴스로 스케일아웃되면 JVM 내 락만으로는 부족하다 - 그때는 DB 트랜잭션 +
+	//    SELECT ... FOR UPDATE 같은 DB 레벨 락으로 바꿔야 한다.
+	private static final ConcurrentHashMap<String, Object> DEVICE_APPROVE_LOCKS = new ConcurrentHashMap<>();
 
 	@Autowired
 	public AccountController(
@@ -3526,9 +3534,21 @@ public class AccountController {
 	/*
 	 * method : CommuteDeviceApprove
 	 * comment : 출, 퇴근 기록 -> 등록기기 요청 승인/반려 (account_id + user_name + phone_last4 기준)
-	 *           승인 시 (1) 다른 사람 이름으로 이미 승인된 기기면 거부, (2) 같은 사람이 다른
-	 *           phone_last4로 이미 이 기기를 승인받아 놓은 예전 행이 있으면 그 행의 승인을 해제해서
-	 *           device_token 하나당 승인 행이 항상 1개만 남도록 정리한다(이중 승인 방지).
+	 *           승인 시 이름이 같은 다른 행이 이미 이 device_token을 승인받아 놓았는지 확인해서:
+	 *           (1) 이름이 다른데 같은 기기가 이미 승인돼 있으면 대리출근 확실 -> 무조건 거부(409).
+	 *           (2) 이름은 같은데 phone_last4가 다른 행이 이미 승인돼 있으면, 그 행의 device_token이
+	 *               이번 것과 같은지(sameDevice)에 따라 다르게 확인받는다:
+	 *               - 같은 기기: 본인(번호 오타/변경)일 가능성이 높다. "같은 사람 맞는지"만 확인하고,
+	 *                 "다른 사람"이라고 답해도 승인은 거부한다(같은 기기가 두 사람에게 동시에 승인되는
+	 *                 것 자체를 절대 허용하지 않기 위함 - stale_decision=DIFFERENT_PERSON + sameDevice
+	 *                 조합은 409로 막는다).
+	 *               - 다른 기기: 동명이인(진짜 다른 사람)일 가능성이 높다. "같은 사람(기기변경)인지
+	 *                 다른 사람(동명이인)인지"를 확인받아, 같은 사람이면 예전 행을 정리하고, 다른
+	 *                 사람이면 예전 행은 그대로 두고 이번 요청만 승인한다(둘 다 안전 - 기기가 다르므로
+	 *                 이중승인 위험이 없다).
+	 *           관리자가 아직 확인하지 않은 첫 호출은 code="428"(needs_confirm)로 판단에 필요한 정보
+	 *           (same_device, stale_phone_last4, stale_device_name)를 내려주고, 관리자가 고른 결과를
+	 *           stale_decision("SAME_PERSON" | "DIFFERENT_PERSON")으로 다시 요청해야 실제로 처리된다.
 	 */
 	@PostMapping("/Account/CommuteDeviceApprove")
 	public String CommuteDeviceApprove(@RequestBody Map<String, Object> paramMap) {
@@ -3538,6 +3558,7 @@ public class AccountController {
 		String userName = normalizeCommuteText(paramMap.get("user_name"));
 		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
 		String approve = normalizeCommuteText(paramMap.get("approve")).toUpperCase();
+		String staleDecision = normalizeCommuteText(paramMap.get("stale_decision")).toUpperCase();
 
 		if (accountId.isEmpty() || userName.isEmpty()) {
 			obj.addProperty("code", "400");
@@ -3555,6 +3576,15 @@ public class AccountController {
 				Map<String, Object> pendingInfo = accountService.CommuteDeviceInfo(paramMap);
 				String pendingToken = pendingInfo == null ? "" : normalizeCommuteText(pendingInfo.get("pending_device_token"));
 
+				// ✅ 동시 클릭 방지: 이 device_token에 대해서는 아래 "이미 승인돼 있는지 확인 ->
+				//    (필요 시 정리) -> 실제 승인"이 한 번에 하나씩만 실행되도록 device_token 단위로
+				//    잠근다. 잠그지 않으면 서로 다른 관리자(또는 더블클릭)가 같은 기기에 대한 승인을
+				//    거의 동시에 요청했을 때, 둘 다 "아직 이중승인 아님"으로 확인을 통과해버려 결국
+				//    같은 기기가 두 행에서 동시에 승인되는 경합 상태가 생길 수 있다.
+				Object approveLock = pendingToken.isEmpty() ? new Object()
+						: DEVICE_APPROVE_LOCKS.computeIfAbsent(pendingToken, k -> new Object());
+
+				synchronized (approveLock) {
 				if (!pendingToken.isEmpty()) {
 					Map<String, Object> ownerCheck = new HashMap<>();
 					ownerCheck.put("account_id", accountId);
@@ -3588,30 +3618,83 @@ public class AccountController {
 						return obj.toString();
 					}
 
-					// ✅ 이중 승인 방지: 대리출근 의심(다른 사람)은 아니지만, 같은 사람(account_id+user_name)이
-					//    예전에 다른 phone_last4(번호 오타/변경)로 이미 이 device_token을 승인받은 행이
-					//    남아있을 수 있다. 그대로 두면 같은 기기가 두 행에서 동시에 "승인됨" 상태가 되므로,
-					//    이번 승인 직전에 그 예전 행을 찾아 승인 해제해서 device_token당 승인 행이
-					//    하나만 남도록 정리한다.
-					Map<String, Object> staleOwnerCheck = new HashMap<>();
-					staleOwnerCheck.put("account_id", accountId);
-					staleOwnerCheck.put("user_name", userName);
-					staleOwnerCheck.put("phone_last4", phoneLast4);
-					staleOwnerCheck.put("device_token", pendingToken);
+					// ✅ 이름은 같은 다른 phone_last4 행이 이미 승인되어 있는지 확인 (device_token은
+					//    조건에 안 넣고 같이 받아와서 아래서 sameDevice를 직접 판단한다).
+					Map<String, Object> staleCheck = new HashMap<>();
+					staleCheck.put("account_id", accountId);
+					staleCheck.put("user_name", userName);
+					staleCheck.put("phone_last4", phoneLast4);
 
-					Map<String, Object> staleRow = accountService.SelectApprovedDeviceByOwnerToken(staleOwnerCheck);
+					Map<String, Object> staleRow = accountService.SelectApprovedDeviceBySameName(staleCheck);
 
 					if (staleRow != null) {
-						Map<String, Object> clearParam = new HashMap<>();
-						clearParam.put("account_id", normalizeCommuteText(staleRow.get("account_id")));
-						clearParam.put("user_name", normalizeCommuteText(staleRow.get("user_name")));
-						clearParam.put("phone_last4", normalizeCommuteText(staleRow.get("phone_last4")));
-						accountService.ClearDeviceApproval(clearParam);
+						String staleLast4 = normalizeCommuteText(staleRow.get("phone_last4"));
+						String staleDeviceToken = normalizeCommuteText(staleRow.get("device_token"));
+						String staleDeviceName = normalizeCommuteText(staleRow.get("device_name"));
+						boolean sameDevice = !staleDeviceToken.isEmpty() && staleDeviceToken.equals(pendingToken);
+
+						if (staleDecision.isEmpty()) {
+							// 관리자가 아직 판단하지 않았다 - 처리하지 않고 확인부터 요청한다.
+							obj.addProperty("code", "428");
+							obj.addProperty("needs_confirm", true);
+							obj.addProperty("same_device", sameDevice);
+							obj.addProperty("stale_phone_last4", staleLast4);
+							obj.addProperty("stale_device_name", staleDeviceName);
+							obj.addProperty(
+									"msg",
+									sameDevice
+											? ("이 기기는 이미 " + userName + "(" + staleLast4 + ")님으로 승인되어 있습니다.\n"
+													+ "같은 사람이 맞으면 계속 진행해주세요.")
+											: (userName + "(" + staleLast4 + ")님으로 이미 다른 기기("
+													+ (staleDeviceName.isEmpty() ? "등록된 기기" : staleDeviceName) + ")가 승인되어 있습니다.\n"
+													+ "같은 사람이 기기를 바꾼 것인지, 이름만 같은 다른 사람(동명이인)인지 확인해주세요.")
+							);
+							return obj.toString();
+						}
+
+						if ("DIFFERENT_PERSON".equals(staleDecision)) {
+							if (sameDevice) {
+								// 같은 기기인데 "다른 사람"이라고 확인했다 - 그러면 같은 기기가 두
+								// 사람에게 동시에 승인되어버리므로, 이 조합은 대리출근 의심으로 보고
+								// 승인 자체를 막는다(이력도 남긴다).
+								try {
+									Map<String, Object> logParam = new HashMap<>();
+									logParam.put("account_id", accountId);
+									logParam.put("user_name", userName);
+									logParam.put("phone_last4", phoneLast4);
+									logParam.put("device_token", pendingToken);
+									logParam.put("device_name", normalizeCommuteText(pendingInfo.get("pending_device_name")));
+									logParam.put("owner_account_id", accountId);
+									logParam.put("owner_user_name", userName);
+									logParam.put("owner_phone_last4", staleLast4);
+									logParam.put("event_type", DEVICE_CONFLICT_EVENT_APPROVE);
+									accountService.InsertMemberDeviceConflictLog(logParam);
+								} catch (Exception ignore) {
+									// 이력 저장 실패는 무시
+								}
+
+								obj.addProperty("code", "409");
+								obj.addProperty(
+										"msg",
+										"같은 기기가 이미 " + userName + "(" + staleLast4 + ")님에게 승인되어 있어, 다른 사람이라면 이 요청은 승인할 수 없습니다."
+								);
+								return obj.toString();
+							}
+							// 기기가 다르면 동명이인이 확실하므로, 예전 행은 그대로 두고 이번 요청만 승인 진행.
+						} else if ("SAME_PERSON".equals(staleDecision)) {
+							// 같은 사람(번호 정정/기기변경)이 맞다고 확인 - 예전 행의 승인을 해제한다.
+							Map<String, Object> clearParam = new HashMap<>();
+							clearParam.put("account_id", normalizeCommuteText(staleRow.get("account_id")));
+							clearParam.put("user_name", normalizeCommuteText(staleRow.get("user_name")));
+							clearParam.put("phone_last4", staleLast4);
+							accountService.ClearDeviceApproval(clearParam);
+						}
 					}
 				}
 
 				accountService.CommuteDeviceApprove(paramMap);
 				obj.addProperty("msg", "기기 등록을 승인했습니다.");
+				} // synchronized (approveLock)
 			} else {
 				accountService.CommuteDeviceReject(paramMap);
 				obj.addProperty("msg", "기기 등록 요청을 반려했습니다.");

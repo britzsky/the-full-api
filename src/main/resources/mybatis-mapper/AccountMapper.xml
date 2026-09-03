@@ -58,7 +58,7 @@
 			20260831171325
  		)
 	</select>
-	
+
 	<select id="AccountListV2" parameterType="map" resultType="hashmap">
 		SELECT T.account_id,
 			   T.account_name,
@@ -4207,22 +4207,23 @@
 		LIMIT 1
 	</select>
 
-	<!-- 출, 퇴근 기록 -> 같은 사람(account_id+user_name)이 이미 이 device_token으로 승인받은
-		 "다른 phone_last4 행"이 있는지 조회. 뒷자리를 다르게 입력해서 새 행으로 등록/승인하는
-		 경우, 예전 행에 같은 기기가 승인 상태로 남아 하나의 device_token이 두 행에 걸쳐 이중
-		 승인되는 것을 막기 위해 기기승인(CommuteDeviceApprove) 시점에 사용한다. -->
-	<select id="SelectApprovedDeviceByOwnerToken" parameterType="map" resultType="hashmap">
-		SELECT account_id, user_name, phone_last4
+	<!-- 출, 퇴근 기록 -> 같은 사람(account_id+user_name)이 이미 "다른 phone_last4"로 승인받은
+		 행이 있는지 조회. device_token은 조건에 넣지 않고 같이 SELECT만 해서, 호출한 쪽(Java)이
+		 이번에 승인하려는 device_token과 비교해 "같은 기기인지"를 판단하게 한다.
+		 - 기기까지 같으면: 본인이 뒷자리를 잘못 입력했거나 번호를 바꾼 경우일 가능성이 높다.
+		 - 기기가 다르면: 동명이인(진짜 다른 사람)일 가능성이 높다.
+		 기기승인(CommuteDeviceApprove) 시점에, 관리자에게 어느 쪽인지 확인받기 위해 사용한다. -->
+	<select id="SelectApprovedDeviceBySameName" parameterType="map" resultType="hashmap">
+		SELECT account_id, user_name, phone_last4, device_token, device_name
 		FROM tb_member_device
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
-			AND device_token = #{device_token}
 			AND approve_yn = 'Y'
 			AND phone_last4 != #{phone_last4}
 		LIMIT 1
 	</select>
 
-	<!-- 출, 퇴근 기록 -> 위 SelectApprovedDeviceByOwnerToken으로 찾은 예전 행의 승인을 해제한다.
+	<!-- 출, 퇴근 기록 -> 위 SelectApprovedDeviceBySameName으로 찾은 예전 행의 승인을 해제한다.
 		 같은 기기가 새 phone_last4 행으로 다시 승인되므로, 예전 행은 더 이상 유효한 등록기기가
 		 아니다(비워두지 않으면 그 기기가 두 행에서 동시에 "승인됨"으로 남는다). -->
 	<update id="ClearDeviceApproval" parameterType="map">
