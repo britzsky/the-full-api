@@ -1763,4 +1763,120 @@ public class OperateController {
 
         return obj.toString();
     }
+
+    /*
+     * part : 운영
+     * method : MenuList
+     * comment : 운영관리 -> 메뉴 관리 -> 메뉴 목록 조회
+     */
+    @GetMapping("/operate/menulist")
+    public String MenuList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.MenuList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : MenuSave
+     * comment : 운영관리 -> 메뉴 관리 -> 메뉴 신규 등록/수정
+     */
+    @PostMapping("/MenuRecipe/MenuSave")
+    public String MenuSave(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.MenuSave(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : MenuDelete
+     * comment : 운영관리 -> 메뉴 관리 -> 메뉴 논리삭제
+     */
+    @PostMapping("/MenuRecipe/MenuDelete")
+    public String MenuDelete(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.MenuDelete(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeDetailList
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> menu_id 기준 식재료 상세 목록 조회
+     */
+    @GetMapping("/MenuRecipe/RecipeDetailList")
+    public String RecipeDetailList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.RecipeDetailList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeDetailSave
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 상세 행 일괄 저장(upsert)
+     * payload : { menu_id, user_id, rows: [ {recipe_detail_id?, ingredient_id, qty_raw, ...}, ... ] }
+     */
+    @SuppressWarnings("unchecked")
+    @PostMapping("/MenuRecipe/RecipeDetailSave")
+    public String RecipeDetailSave(@RequestBody Map<String, Object> payload) {
+        String menuId = (String) payload.get("menu_id");
+        String userId = (String) payload.get("user_id");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.getOrDefault("rows", new ArrayList<>());
+
+        List<Map<String, Object>> resultList = operateService.RecipeDetailSaveAll(menuId, rows, userId);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeDetailDelete
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 상세 행 삭제
+     */
+    @PostMapping("/MenuRecipe/RecipeDetailDelete")
+    public String RecipeDetailDelete(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.RecipeDetailDelete(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientSearchList
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 자동완성 검색
+     */
+    @GetMapping("/MenuRecipe/IngredientSearchList")
+    public String IngredientSearchList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.IngredientSearchList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientQuickSave
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 즉석 등록
+     */
+    @PostMapping("/MenuRecipe/IngredientQuickSave")
+    public String IngredientQuickSave(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.IngredientQuickSave(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeInfoGet
+     * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 정보 조회
+     */
+    @GetMapping("/MenuRecipe/RecipeInfoGet")
+    public String RecipeInfoGet(@RequestParam Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.RecipeInfoGet(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeInfoSave
+     * comment : 운영관리 -> 레시피 관리 -> 레시피 정보(제목/조리순서/보관방법/알레르기) 저장
+     */
+    @PostMapping("/MenuRecipe/RecipeInfoSave")
+    public String RecipeInfoSave(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.RecipeInfoSave(paramMap);
+        return new Gson().toJson(result);
+    }
 }

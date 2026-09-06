@@ -693,4 +693,123 @@ public class OperateService {
 
 		return item.getElementsByTagName(tagName).item(0).getTextContent();
 	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) =====
+
+	public List<Map<String, Object>> MenuList(Map<String, Object> paramMap) {
+		return operateMapper.MenuList(paramMap);
+	}
+
+	// 메뉴 신규 등록/수정 (menu_id 있으면 수정, 없으면 신규 채번 후 upsert)
+	@Transactional
+	public Map<String, Object> MenuSave(Map<String, Object> paramMap) {
+		String menuId = (String) paramMap.get("menu_id");
+
+		if (menuId == null || menuId.isBlank()) {
+			menuId = operateMapper.NewMenuId();
+			paramMap.put("menu_id", menuId);
+		}
+
+		operateMapper.MenuUpsert(paramMap);
+
+		return operateMapper.MenuOne(paramMap);
+	}
+
+	public int MenuDelete(Map<String, Object> paramMap) {
+		return operateMapper.MenuDelete(paramMap);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 레시피 정보) =====
+
+	public Map<String, Object> RecipeInfoGet(Map<String, Object> paramMap) {
+		Map<String, Object> recipeInfo = operateMapper.RecipeInfoByMenuId(paramMap);
+		return recipeInfo != null ? recipeInfo : new HashMap<>();
+	}
+
+	@Transactional
+	public Map<String, Object> RecipeInfoSave(Map<String, Object> paramMap) {
+		String menuId = (String) paramMap.get("menu_id");
+		Map<String, Object> recipeInfo = ensureRecipeInfo(menuId, (String) paramMap.get("user_id"));
+
+		paramMap.put("recipe_id", recipeInfo.get("recipe_id"));
+		operateMapper.RecipeInfoUpdate(paramMap);
+
+		Map<String, Object> lookup = new HashMap<>();
+		lookup.put("menu_id", menuId);
+		return operateMapper.RecipeInfoByMenuId(lookup);
+	}
+
+	// menu_id에 해당하는 tb_recipe_info가 없으면 빈 레코드를 만들어 recipe_id를 발급한다.
+	private Map<String, Object> ensureRecipeInfo(String menuId, String userId) {
+		Map<String, Object> lookup = new HashMap<>();
+		lookup.put("menu_id", menuId);
+		Map<String, Object> existing = operateMapper.RecipeInfoByMenuId(lookup);
+		if (existing != null) return existing;
+
+		Map<String, Object> menu = operateMapper.MenuOne(lookup);
+		String menuName = menu != null ? String.valueOf(menu.get("menu_name")) : "";
+
+		Map<String, Object> insertMap = new HashMap<>();
+		insertMap.put("menu_id", menuId);
+		insertMap.put("menu_name", menuName);
+		insertMap.put("title", menuName);
+		insertMap.put("summary", null);
+		insertMap.put("servings_note", null);
+		insertMap.put("steps_json", null);
+		insertMap.put("tips_json", null);
+		insertMap.put("storage_json", null);
+		insertMap.put("allergens_json", null);
+		insertMap.put("user_id", userId);
+		operateMapper.RecipeInfoInsert(insertMap); // insertMap에 recipe_id가 채워짐(useGeneratedKeys)
+
+		return operateMapper.RecipeInfoByMenuId(lookup);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 식재료 상세) =====
+
+	public List<Map<String, Object>> RecipeDetailList(Map<String, Object> paramMap) {
+		return operateMapper.RecipeDetailListByMenuId(paramMap);
+	}
+
+	// 한 메뉴의 식재료 행 배열을 통째로 upsert (recipe_detail_id 있으면 수정, 없으면 신규)
+	@Transactional
+	public List<Map<String, Object>> RecipeDetailSaveAll(String menuId, List<Map<String, Object>> rows, String userId) {
+		Map<String, Object> recipeInfo = ensureRecipeInfo(menuId, userId);
+		Object recipeId = recipeInfo.get("recipe_id");
+
+		for (Map<String, Object> row : rows) {
+			row.put("menu_id", menuId);
+			row.put("recipe_id", recipeId);
+			row.put("user_id", userId);
+
+			Object detailId = row.get("recipe_detail_id");
+			if (detailId == null || String.valueOf(detailId).isBlank()) {
+				row.put("recipe_detail_id", null); // 빈 문자열이면 AUTO_INCREMENT가 신규 채번하도록 null로 정규화
+			}
+			operateMapper.RecipeDetailUpsert(row);
+		}
+
+		Map<String, Object> lookup = new HashMap<>();
+		lookup.put("menu_id", menuId);
+		return operateMapper.RecipeDetailListByMenuId(lookup);
+	}
+
+	public int RecipeDetailDelete(Map<String, Object> paramMap) {
+		return operateMapper.RecipeDetailDelete(paramMap);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) =====
+
+	public List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap) {
+		return operateMapper.IngredientSearchList(paramMap);
+	}
+
+	// 식재료 즉석 등록: 이름/기준단위만 받아 새 ingredient_id를 채번해 등록
+	@Transactional
+	public Map<String, Object> IngredientQuickSave(Map<String, Object> paramMap) {
+		String ingredientId = operateMapper.NewIngredientId();
+		paramMap.put("ingredient_id", ingredientId);
+		operateMapper.IngredientInsert(paramMap);
+		return operateMapper.IngredientOne(paramMap);
+	}
 }

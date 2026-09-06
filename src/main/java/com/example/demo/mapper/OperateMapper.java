@@ -86,4 +86,27 @@ public interface OperateMapper {
 	int SaveCallHistory(Map<String, Object> paramMap);											// 긴급인력관리 -> 연락 이력 저장
 	int HolidaySave(Map<String, Object> paramMap);												// 공공데이터 공휴일 정보 저장
 	List<Map<String, Object>> HolidayList(Map<String, Object> paramMap);						// 공휴일 목록 조회
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) =====
+	List<Map<String, Object>> MenuList(Map<String, Object> paramMap);							// 메뉴 관리 -> 메뉴 목록 조회
+	Map<String, Object> MenuOne(Map<String, Object> paramMap);									// 메뉴 관리 -> 메뉴 단건 조회
+	String NewMenuId();																			// 메뉴 관리 -> 신규 menu_id 채번
+	int MenuUpsert(Map<String, Object> paramMap);												// 메뉴 관리 -> 메뉴 신규 등록/수정(upsert)
+	int MenuDelete(Map<String, Object> paramMap);												// 메뉴 관리 -> 메뉴 논리삭제(del_yn=Y)
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 레시피 정보) =====
+	Map<String, Object> RecipeInfoByMenuId(Map<String, Object> paramMap);						// 레시피 관리 -> menu_id 기준 레시피 정보 조회
+	int RecipeInfoInsert(Map<String, Object> paramMap);											// 레시피 관리 -> 레시피 정보(빈 레코드 포함) 신규 등록
+	int RecipeInfoUpdate(Map<String, Object> paramMap);											// 레시피 관리 -> 레시피 정보 수정
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 식재료 상세) =====
+	List<Map<String, Object>> RecipeDetailListByMenuId(Map<String, Object> paramMap);			// 메뉴/레시피 관리 -> menu_id 기준 식재료 상세 목록 조회
+	int RecipeDetailUpsert(Map<String, Object> paramMap);										// 메뉴/레시피 관리 -> 식재료 상세 행 신규 등록/수정(upsert)
+	int RecipeDetailDelete(Map<String, Object> paramMap);										// 메뉴/레시피 관리 -> 식재료 상세 행 삭제
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) =====
+	List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap);				// 식재료 자동완성 검색
+	Map<String, Object> IngredientOne(Map<String, Object> paramMap);							// 식재료 단건 조회
+	String NewIngredientId();																	// 식재료 관리 -> 신규 ingredient_id 채번
+	int IngredientInsert(Map<String, Object> paramMap);											// 식재료 즉석 등록
 }

@@ -5,11 +5,16 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -37,27 +42,33 @@ public class S3FileStorageService {
 
     private static final String LEGACY_PREFIX = "/image/";
 
+    private final boolean s3Enabled;
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final String bucket;
     private final String keyPrefix;
     private final Duration presignedUrlDuration;
+    private final Path localStorageDir;
 
     public S3FileStorageService(
-            S3Client s3Client,
-            S3Presigner s3Presigner,
-            @Value("${aws.s3.bucket}") String bucket,
+            ObjectProvider<S3Client> s3Client,
+            ObjectProvider<S3Presigner> s3Presigner,
+            @Value("${aws.s3.enabled:true}") boolean s3Enabled,
+            @Value("${aws.s3.bucket:}") String bucket,
             @Value("${aws.s3.key-prefix:}") String keyPrefix,
-            @Value("${aws.s3.presigned-url-duration:10m}") Duration presignedUrlDuration) {
-        this.s3Client = s3Client;
-        this.s3Presigner = s3Presigner;
+            @Value("${aws.s3.presigned-url-duration:10m}") Duration presignedUrlDuration,
+            @Value("${local.storage.dir:./local-uploads}") String localStorageDir) {
+        this.s3Enabled = s3Enabled;
+        this.s3Client = s3Client.getIfAvailable();
+        this.s3Presigner = s3Presigner.getIfAvailable();
         this.bucket = bucket;
         this.keyPrefix = normalizePrefix(keyPrefix);
         this.presignedUrlDuration = presignedUrlDuration;
+        this.localStorageDir = Paths.get(localStorageDir).toAbsolutePath().normalize();
     }
 
     public String upload(MultipartFile file, String... pathSegments) throws IOException {
-        requireConfiguredBucket();
+        if (s3Enabled) requireConfiguredBucket();
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("업로드할 파일이 없습니다.");
         }
@@ -70,6 +81,15 @@ public class S3FileStorageService {
         String objectKey = (prefix.isEmpty() ? "" : prefix + "/")
                 + UUID.randomUUID() + "_" + originalFilename;
         String physicalKey = physicalKey(objectKey);
+
+        if (!s3Enabled) {
+            Path target = resolveLocalPath(physicalKey);
+            Files.createDirectories(target.getParent());
+            try (var inputStream = file.getInputStream()) {
+                Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return LEGACY_PREFIX + objectKey;
+        }
 
         PutObjectRequest.Builder request = PutObjectRequest.builder()
                 .bucket(bucket)
@@ -93,6 +113,11 @@ public class S3FileStorageService {
     }
 
     private URL createPresignedGetUrl(String storedPath, boolean download) {
+        if (!s3Enabled) {
+            throw new UnsupportedOperationException(
+                    "로컬 저장 모드(aws.s3.enabled=false)에서는 presigned URL을 지원하지 않습니다. "
+                            + "/image/** 또는 /download/image/** 스트리밍 엔드포인트를 사용하세요.");
+        }
         requireConfiguredBucket();
         String objectKey = toObjectKey(storedPath);
         GetObjectRequest.Builder getRequest = GetObjectRequest.builder()
@@ -122,8 +147,47 @@ public class S3FileStorageService {
      * same-origin 응답으로 그대로 흘려보내면 이 문제 자체가 발생하지 않는다.
      */
     public ResponseEntity<InputStreamResource> streamObject(String storedPath, boolean download) {
-        requireConfiguredBucket();
         String objectKey = toObjectKey(storedPath);
+
+        if (!s3Enabled) {
+            Path localPath = resolveLocalPath(physicalKey(objectKey));
+            if (!Files.exists(localPath)) {
+                return ResponseEntity.notFound().build();
+            }
+            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
+                    .replace("\r", "")
+                    .replace("\n", "");
+            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                    .replace("+", "%20");
+
+            HttpHeaders headers = new HttpHeaders();
+            MediaType mediaType;
+            try {
+                String probed = Files.probeContentType(localPath);
+                mediaType = (probed == null || probed.isBlank())
+                        ? MediaType.APPLICATION_OCTET_STREAM
+                        : MediaType.parseMediaType(probed);
+            } catch (Exception e) {
+                mediaType = MediaType.APPLICATION_OCTET_STREAM;
+            }
+            headers.setContentType(mediaType);
+            try {
+                headers.setContentLength(Files.size(localPath));
+            } catch (IOException ignored) {
+                // content-length는 부가 정보라 실패해도 스트리밍 자체는 계속한다.
+            }
+            headers.set(HttpHeaders.CONTENT_DISPOSITION,
+                    (download ? "attachment" : "inline") + "; filename*=UTF-8''" + encodedFilename);
+
+            try {
+                return ResponseEntity.ok().headers(headers)
+                        .body(new InputStreamResource(Files.newInputStream(localPath)));
+            } catch (IOException e) {
+                throw new IllegalStateException("로컬 파일을 읽을 수 없습니다: " + localPath, e);
+            }
+        }
+
+        requireConfiguredBucket();
         GetObjectRequest getRequest = GetObjectRequest.builder()
                 .bucket(bucket)
                 .key(physicalKey(objectKey))
@@ -163,8 +227,23 @@ public class S3FileStorageService {
     }
 
     public StoredObjectMetadata metadata(String storedPath) {
-        requireConfiguredBucket();
         String objectKey = toObjectKey(storedPath);
+
+        if (!s3Enabled) {
+            Path localPath = resolveLocalPath(physicalKey(objectKey));
+            if (!Files.exists(localPath)) {
+                throw NoSuchKeyException.builder().message("로컬 파일이 없습니다: " + localPath).build();
+            }
+            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1);
+            try {
+                String contentType = Files.probeContentType(localPath);
+                return new StoredObjectMetadata(filename, contentType, Files.size(localPath));
+            } catch (IOException e) {
+                throw new IllegalStateException("로컬 파일 정보를 읽을 수 없습니다: " + localPath, e);
+            }
+        }
+
+        requireConfiguredBucket();
         HeadObjectResponse response = s3Client.headObject(HeadObjectRequest.builder()
                 .bucket(bucket)
                 .key(physicalKey(objectKey))
@@ -187,10 +266,21 @@ public class S3FileStorageService {
 
     public void delete(String storedPath) {
         if (storedPath == null || storedPath.isBlank()) return;
+        String objectKey = toObjectKey(storedPath);
+
+        if (!s3Enabled) {
+            try {
+                Files.deleteIfExists(resolveLocalPath(physicalKey(objectKey)));
+            } catch (IOException e) {
+                throw new IllegalStateException("로컬 파일을 삭제할 수 없습니다: " + storedPath, e);
+            }
+            return;
+        }
+
         requireConfiguredBucket();
         s3Client.deleteObject(DeleteObjectRequest.builder()
                 .bucket(bucket)
-                .key(physicalKey(toObjectKey(storedPath)))
+                .key(physicalKey(objectKey))
                 .build());
     }
 
@@ -251,6 +341,19 @@ public class S3FileStorageService {
         if (bucket == null || bucket.isBlank()) {
             throw new IllegalStateException("AWS_S3_BUCKET 환경변수 또는 aws.s3.bucket 설정이 필요합니다.");
         }
+    }
+
+    /**
+     * aws.s3.enabled=false(로컬 실행)일 때만 쓰인다. physicalKey(키 접두사 포함 오브젝트 키)를
+     * local.storage.dir 아래의 실제 파일 경로로 변환하며, '..' 등으로 저장 루트 밖으로 벗어나는
+     * 경로는 차단한다.
+     */
+    private Path resolveLocalPath(String physicalKey) {
+        Path resolved = localStorageDir.resolve(physicalKey).normalize();
+        if (!resolved.startsWith(localStorageDir)) {
+            throw new IllegalArgumentException("허용되지 않는 파일 경로입니다.");
+        }
+        return resolved;
     }
 
     public record StoredObjectMetadata(String filename, String contentType, long contentLength) {}

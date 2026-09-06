@@ -2750,7 +2750,7 @@
     	country_name=#{country_name},
     	holiday_name=#{holiday_name},
     	holiday_sn=#{holiday_sn},
-    	updated_at=NOW()
+    	updated_at=DATE_ADD(NOW(), INTERVAL 9 HOUR)
     </insert>
 
     <select id="HolidayList" parameterType="map" resultType="map">
@@ -2763,4 +2763,202 @@
     	  AND MONTH(holiday_date) = #{month}
     	ORDER BY holiday_date
     </select>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) ===== -->
+
+	<select id="MenuList" parameterType="map" resultType="hashmap">
+		SELECT menu_id, source_row, menu_name_raw, menu_name, food_type, food_type_reason,
+			food_type_confidence, menu_img, menu_type, menu_gubun, meal_plan_type,
+			calories_per_serving, del_yn,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			DATE_FORMAT(mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+			user_id
+		FROM tb_menu_master
+		WHERE del_yn = 'N'
+		<if test="keyword != null and keyword != ''">
+			AND menu_name LIKE CONCAT('%', #{keyword}, '%')
+		</if>
+		<if test="food_type != null and food_type != ''">
+			AND food_type = #{food_type}
+		</if>
+		<if test="menu_type != null and menu_type != ''">
+			AND menu_type = #{menu_type}
+		</if>
+		<if test="menu_gubun != null and menu_gubun != ''">
+			AND menu_gubun = #{menu_gubun}
+		</if>
+		<if test="meal_plan_type != null and meal_plan_type != ''">
+			AND meal_plan_type = #{meal_plan_type}
+		</if>
+		ORDER BY created_at DESC
+	</select>
+
+	<select id="MenuOne" parameterType="map" resultType="hashmap">
+		SELECT menu_id, source_row, menu_name_raw, menu_name, food_type, food_type_reason,
+			food_type_confidence, menu_img, menu_type, menu_gubun, meal_plan_type,
+			calories_per_serving, del_yn,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			DATE_FORMAT(mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+			user_id
+		FROM tb_menu_master
+		WHERE menu_id = #{menu_id}
+	</select>
+
+	<select id="NewMenuId" resultType="String">
+		SELECT CONCAT('MENU',
+			CASE WHEN next_num &lt; 1000 THEN LPAD(next_num, 3, '0') ELSE CAST(next_num AS CHAR) END)
+		FROM (
+			SELECT IFNULL(MAX(CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)), 0) + 1 AS next_num
+			FROM tb_menu_master
+			WHERE menu_id REGEXP '^MENU[0-9]+$'
+			FOR UPDATE
+		) t
+	</select>
+
+	<insert id="MenuUpsert" parameterType="map">
+		INSERT INTO tb_menu_master
+			(menu_id, menu_name_raw, menu_name, food_type, food_type_reason, food_type_confidence,
+			 menu_img, menu_type, menu_gubun, meal_plan_type, calories_per_serving, del_yn,
+			 created_at, mod_at, user_id)
+		VALUES
+			(#{menu_id}, #{menu_name_raw}, #{menu_name}, #{food_type}, #{food_type_reason}, #{food_type_confidence},
+			 #{menu_img}, #{menu_type}, #{menu_gubun}, #{meal_plan_type}, #{calories_per_serving}, 'N',
+			 DATE_ADD(NOW(), INTERVAL 9 HOUR), NULL, #{user_id})
+		ON DUPLICATE KEY UPDATE
+			menu_name_raw = #{menu_name_raw},
+			menu_name = #{menu_name},
+			food_type = #{food_type},
+			food_type_reason = #{food_type_reason},
+			food_type_confidence = #{food_type_confidence},
+			menu_img = #{menu_img},
+			menu_type = #{menu_type},
+			menu_gubun = #{menu_gubun},
+			meal_plan_type = #{meal_plan_type},
+			calories_per_serving = #{calories_per_serving},
+			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+			user_id = #{user_id}
+	</insert>
+
+	<update id="MenuDelete" parameterType="map">
+		UPDATE tb_menu_master
+		SET del_yn = 'Y', mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR), user_id = #{user_id}
+		WHERE menu_id = #{menu_id}
+	</update>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 레시피 정보) ===== -->
+
+	<select id="RecipeInfoByMenuId" parameterType="map" resultType="hashmap">
+		SELECT recipe_id, menu_id, menu_name, title, summary, servings_note,
+			ingredients_json, steps_json, tips_json, storage_json, allergens_json, recipe_json,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			DATE_FORMAT(mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+			user_id
+		FROM tb_recipe_info
+		WHERE menu_id = #{menu_id}
+	</select>
+
+	<insert id="RecipeInfoInsert" parameterType="map" useGeneratedKeys="true" keyProperty="recipe_id">
+		INSERT INTO tb_recipe_info
+			(menu_id, menu_name, title, summary, servings_note, steps_json, tips_json, storage_json, allergens_json, created_at, user_id)
+		VALUES
+			(#{menu_id}, #{menu_name}, #{title}, #{summary}, #{servings_note},
+			 #{steps_json}, #{tips_json}, #{storage_json}, #{allergens_json}, DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+	</insert>
+
+	<update id="RecipeInfoUpdate" parameterType="map">
+		UPDATE tb_recipe_info
+		<set>
+			<if test="title != null">title = #{title},</if>
+			<if test="summary != null">summary = #{summary},</if>
+			<if test="servings_note != null">servings_note = #{servings_note},</if>
+			<if test="steps_json != null">steps_json = #{steps_json},</if>
+			<if test="tips_json != null">tips_json = #{tips_json},</if>
+			<if test="storage_json != null">storage_json = #{storage_json},</if>
+			<if test="allergens_json != null">allergens_json = #{allergens_json},</if>
+			<if test="user_id != null">user_id = #{user_id},</if>
+			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		</set>
+		WHERE recipe_id = #{recipe_id}
+	</update>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 식재료 상세) ===== -->
+
+	<select id="RecipeDetailListByMenuId" parameterType="map" resultType="hashmap">
+		SELECT rd.recipe_detail_id, rd.recipe_id, rd.menu_id, rd.ingredient_id, rd.ingredient_seq,
+			rd.ingredient_name_raw, rd.qty_raw, rd.qty_num, rd.qty_unit, rd.recipe_yield_servings,
+			rd.qty_base, rd.base_unit, rd.qty_per_person, rd.review_flag,
+			DATE_FORMAT(rd.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			DATE_FORMAT(rd.mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+			rd.user_id,
+			im.ingredient_name_std, im.base_unit AS ingredient_base_unit
+		FROM tb_recipe_detail rd
+		LEFT JOIN tb_ingredient_master im ON im.ingredient_id = rd.ingredient_id
+		WHERE rd.menu_id = #{menu_id}
+		ORDER BY rd.ingredient_seq ASC, rd.recipe_detail_id ASC
+	</select>
+
+	<insert id="RecipeDetailUpsert" parameterType="map">
+		INSERT INTO tb_recipe_detail
+			(recipe_detail_id, recipe_id, menu_id, ingredient_id, ingredient_seq, ingredient_name_raw,
+			 qty_raw, qty_num, qty_unit, recipe_yield_servings, qty_base, base_unit, qty_per_person,
+			 review_flag, created_at, user_id)
+		VALUES
+			(#{recipe_detail_id}, #{recipe_id}, #{menu_id}, #{ingredient_id}, IFNULL(#{ingredient_seq}, 1), #{ingredient_name_raw},
+			 #{qty_raw}, #{qty_num}, #{qty_unit}, #{recipe_yield_servings}, #{qty_base}, #{base_unit}, #{qty_per_person},
+			 #{review_flag}, DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+		ON DUPLICATE KEY UPDATE
+			ingredient_id = #{ingredient_id},
+			ingredient_seq = IFNULL(#{ingredient_seq}, ingredient_seq),
+			ingredient_name_raw = #{ingredient_name_raw},
+			qty_raw = #{qty_raw},
+			qty_num = #{qty_num},
+			qty_unit = #{qty_unit},
+			recipe_yield_servings = #{recipe_yield_servings},
+			qty_base = #{qty_base},
+			base_unit = #{base_unit},
+			qty_per_person = #{qty_per_person},
+			review_flag = #{review_flag},
+			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR),
+			user_id = #{user_id}
+	</insert>
+
+	<delete id="RecipeDetailDelete" parameterType="map">
+		DELETE FROM tb_recipe_detail WHERE recipe_detail_id = #{recipe_detail_id}
+	</delete>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) ===== -->
+
+	<select id="IngredientSearchList" parameterType="map" resultType="hashmap">
+		SELECT ingredient_id, ingredient_name_std, category_name, base_unit, order_unit, convert_value
+		FROM tb_ingredient_master
+		WHERE ingredient_name_std LIKE CONCAT('%', #{keyword}, '%')
+		ORDER BY ingredient_name_std ASC
+		LIMIT 20
+	</select>
+
+	<select id="IngredientOne" parameterType="map" resultType="hashmap">
+		SELECT ingredient_id, ingredient_name_std, category_name, base_unit, order_unit, convert_value
+		FROM tb_ingredient_master
+		WHERE ingredient_id = #{ingredient_id}
+	</select>
+
+	<select id="NewIngredientId" resultType="String">
+		SELECT CONCAT('IG',
+			CASE WHEN next_num &lt; 1000 THEN LPAD(next_num, 3, '0') ELSE CAST(next_num AS CHAR) END)
+		FROM (
+			SELECT IFNULL(MAX(CAST(SUBSTRING(ingredient_id, 3) AS UNSIGNED)), 0) + 1 AS next_num
+			FROM tb_ingredient_master
+			WHERE ingredient_id REGEXP '^IG[0-9]+$'
+			FOR UPDATE
+		) t
+	</select>
+
+	<insert id="IngredientInsert" parameterType="map">
+		INSERT INTO tb_ingredient_master
+			(ingredient_id, ingredient_name_std, category_name, base_unit, order_unit, convert_value, created_at, user_id)
+		VALUES
+			(#{ingredient_id}, #{ingredient_name_std}, #{category_name}, #{base_unit},
+			 #{order_unit}, IFNULL(#{convert_value}, 1), DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+	</insert>
+
 </mapper>

@@ -655,7 +655,8 @@
 					    ROUND(IFNULL(total_business_profit / NULLIF(sales_total, 0) * 100, 0), 1) AS total_business_profit_ratio,
 					
 					    -- [7. 기존 기타 항목들]
-					    utility_bills_note,
+					    -- 월 전체 합계 행에는 특정 거래처 하나의 비고만 섞여 나오면 안 되므로 비움
+					    NULL AS utility_bills_note,
 					    not_budget_cost,
 					    ROUND(IFNULL(not_budget_cost / NULLIF(sales_total, 0) * 100, 0), 1) AS not_budget_ratio,
 					    etc_indirect_cost,
@@ -981,12 +982,13 @@
 				        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
 				        SUM(IFNULL(person_total, 0)) AS person_total,
 				        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
-				        SUM(IFNULL(business_profit, 0)) AS business_profit,
-				        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
-				        
+				        -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
+				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0) END) AS business_profit,
+				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0) END) AS total_business_profit,
+
 				        SUM(IFNULL(sales_total, 0)) AS sales_total,
 				        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
-				        
+
 				        SUM(IFNULL(living_estimate, 0)) AS living_estimate,
 				        SUM(IFNULL(basic_estimate, 0)) AS basic_estimate,
 
@@ -997,8 +999,6 @@
 				    <if test="month != ''">
 				        AND month = #{month}
 			        </if>
-			        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
-	        		AND (basic_cost != 0 OR basic_cost2 != 0)
 				    GROUP BY account_id, year, month
 				) AS aggregated_data
 		                 JOIN tb_account T
@@ -1085,10 +1085,11 @@
 				    ifnull(person_total_ratio,0) as person_total_ratio,
 				    ifnull(indirect_total,0) as indirect_total,
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
-				    ifnull(business_profit,0) as business_profit,
-				    ifnull(business_profit_ratio,0) as business_profit_ratio,
-				    ifnull(total_business_profit,0) as total_business_profit,
-				    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
+				    -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(business_profit,0) END as business_profit,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(business_profit_ratio,0) END as business_profit_ratio,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(total_business_profit,0) END as total_business_profit,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(total_business_profit_ratio,0) END as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -1107,8 +1108,6 @@
 				<if test="month != ''">
 		            AND T.month = #{month}
 		        </if>
-		        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
-	        	AND (basic_cost != 0 OR basic_cost2 != 0)
 		        <if test="account_id != 'ALL'">
 		            AND T.account_id = #{account_id}
 		        </if>
@@ -1263,9 +1262,10 @@
 		        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
 		        SUM(IFNULL(person_total, 0)) AS person_total,
 		        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
-		        SUM(IFNULL(business_profit, 0)) AS business_profit,
-		        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
-		        
+		        -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
+		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0) END) AS business_profit,
+		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0) END) AS total_business_profit,
+
 		        SUM(IFNULL(sales_total, 0)) AS sales_total,
 		        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
 		        
@@ -1280,8 +1280,6 @@
 		    <if test="month != ''">
 		        AND month = #{month}
 	        </if>
-	        -- 일반식비 입금 전에는 총 영업이익에 포함되지 않는다 (basic_cost2를 쓰는 거래처는 basic_cost2로 대체 확인)
-	        AND (basic_cost != 0 OR basic_cost2 != 0)
 		    GROUP BY account_id, year
 		) AS aggregated_data
                  JOIN tb_account T
