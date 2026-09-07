@@ -1024,11 +1024,27 @@ public class OperateController {
         }
 
         if (iResult > 0) {
-            // year/month 세팅 후 BudgetTotalSave
+            // 같은 거래처의 월 예산 집계는 날짜별 식수 행과 관계없이 한 번만 처리
+            Set<String> budgetSeen = new LinkedHashSet<>();
             for (Map<String, Object> paramMap : paramList) {
-                paramMap.put("year", paramMap.get("diner_year"));
-                paramMap.put("month", paramMap.get("diner_month"));
-                iResult += operateService.BudgetTotalSave(paramMap);
+                String year = String.valueOf(paramMap.getOrDefault("diner_year", ""));
+                String month = String.valueOf(paramMap.getOrDefault("diner_month", ""));
+                String accountId = String.valueOf(paramMap.getOrDefault("account_id", ""));
+                String key = year + "_" + month + "_" + accountId;
+                if (year.isEmpty() || month.isEmpty() || accountId.isEmpty())
+                    continue;
+                if (!budgetSeen.add(key))
+                    continue;
+
+                try {
+                    Map<String, Object> budgetParam = new HashMap<>(paramMap);
+                    budgetParam.put("year", Integer.parseInt(year));
+                    budgetParam.put("month", Integer.parseInt(month));
+                    iResult += operateService.BudgetTotalSave(budgetParam);
+                } catch (Exception e) {
+                    System.err.println(
+                            "[AccountDinnersNumberSave] BudgetTotalSave 실패: " + key + " / " + e.getMessage());
+                }
             }
 
             // 마지막: 년/월+거래처 조합 중복 없이 ProfitLossTotalSave 호출

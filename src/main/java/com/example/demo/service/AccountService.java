@@ -327,6 +327,20 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 통합 출근부 -> tb_account_record 기준, 특정 직원의 해당 연/월 재택근무(20) 등록된 거래처 확인용 조회
+	public List<Map<String, Object>> AccountIntegrationHomeRecordMonthList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountMapper.AccountIntegrationHomeRecordMonthList(paramMap);
+		return resultList;
+	}
+
+	// 통합 출근부 -> 재등록 시, 해당 연/월의 기존 재택근무(type=20)만 먼저 삭제(직원 단위, 다른 근무기록은 유지)
+	public int AccountRecordType20DeleteByMonth(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountRecordType20DeleteByMonth(paramMap);
+		return iResult;
+	}
+
 	// 거래처 -> 직영 거래처 목록 조회
 	public List<Map<String, Object>> AccountDirectList() {
 		List<Map<String, Object>> resultList = new ArrayList<>();

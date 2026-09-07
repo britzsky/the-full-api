@@ -1958,7 +1958,8 @@
 			20260122072114,
 			20260122072245,
 			20260122072529,
-			20260122072732
+			20260122072732,
+			20260219024021 -- 사랑복지센터: 식수/예산을 사랑복지요양원(20250819193615)에 통합 운영 중이라 예산관리 화면에서 제외
  		)
  		AND a.del_yn = 'N'
  		<if test='account_id !=null'>
@@ -2805,10 +2806,11 @@
 	</select>
 
 	<select id="NewMenuId" resultType="String">
-		SELECT CONCAT('MENU',
-			CASE WHEN next_num &lt; 1000 THEN LPAD(next_num, 3, '0') ELSE CAST(next_num AS CHAR) END)
+		<!-- MENU10000부터 시작(0채움 5자리 고정) : 문자열 정렬이 숫자 순서와 항상 일치하도록 함.
+		     기존에 MENU001처럼 작은 번호 데이터가 있어도 GREATEST로 10000 미만은 10000으로 끌어올림. -->
+		SELECT CONCAT('MENU', LPAD(next_num, 5, '0'))
 		FROM (
-			SELECT IFNULL(MAX(CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)), 0) + 1 AS next_num
+			SELECT GREATEST(IFNULL(MAX(CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)), 0), 9999) + 1 AS next_num
 			FROM tb_menu_master
 			WHERE menu_id REGEXP '^MENU[0-9]+$'
 			FOR UPDATE

@@ -670,6 +670,20 @@
 		  </foreach>
 	</delete>
 
+	<!-- 통합 출근부: 특정 직원(member_id)이 해당 연/월에 이미 재택근무(type=20)로
+	     등록해 둔 거래처(account_id)를 확인용으로 조회 (재등록 전 매핑 목록과 대조해볼 수 있도록)
+	     ※ 통합(position_type=7) 직원의 실제 출근 데이터는 tb_account_util_record가 아니라
+	        tb_account_record에 저장된다 (AccountRecordSheetList의 통합 직원 UNION 브랜치 참고) -->
+	<select id="AccountIntegrationHomeRecordMonthList" parameterType="map" resultType="map">
+		SELECT account_id, COUNT(*) AS reg_days
+		FROM tb_account_record
+		WHERE record_year = #{year}
+		  AND record_month = #{month}
+		  AND member_id = #{member_id}
+		  AND type = 20
+		GROUP BY account_id
+	</select>
+
 	<select id="AccountRecordDispatchList" parameterType="map" resultType="hashmap">
       SELECT
           subquery.member_id,
@@ -903,7 +917,17 @@
 		AND record_date = #{old_record_date}
 		AND type = #{old_type}
 	</update>
-	
+
+	<!-- 통합 출근부: 재등록 시 해당 직원의 해당 연/월 기존 재택근무(type=20)만 먼저 삭제하고 다시 채운다.
+	     type=20만 지우므로 그 달의 다른 근무기록(연차/결근 등)은 건드리지 않는다. -->
+	<delete id="AccountRecordType20DeleteByMonth" parameterType="map">
+		DELETE FROM tb_account_record
+		WHERE record_year = #{record_year}
+		  AND record_month = #{record_month}
+		  AND member_id = #{member_id}
+		  AND type = 20
+	</delete>
+
 	<insert id="AccountMemberRecRecordSave" parameterType="map">
 		INSERT INTO tb_account_rec_record
 		(account_id, member_id, record_date, type, record_year, record_month, start_time, end_time, note, salary)

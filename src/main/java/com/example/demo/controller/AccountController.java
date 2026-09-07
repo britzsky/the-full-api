@@ -219,6 +219,85 @@ public class AccountController {
 	}
 
 	/*
+	 * method : AccountIntegrationHomeRecordMonthList
+	 * comment : 통합 출근부 -> 특정 직원(member_id)이 해당 연/월(year, month)에
+	 *           tb_account_record에 이미 재택근무(type=20)로 등록해 둔 거래처(account_id) 목록을 확인용으로 조회
+	 *           ※ 통합(position_type=7) 직원의 실제 근무기록은 tb_account_util_record가 아니라
+	 *              tb_account_record에 저장된다 (AccountRecordSheetList의 통합 직원 UNION 브랜치 참고)
+	 */
+	@GetMapping("/Account/AccountIntegrationHomeRecordMonthList")
+	public String AccountIntegrationHomeRecordMonthList(@RequestParam(required = false) Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = accountService.AccountIntegrationHomeRecordMonthList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * method : AccountIntegrationHomeRecordSave
+	 * comment : 통합 출근부 -> 매핑 목록에 있는 업장 × 평일(공휴일 제외)마다 재택근무(type=20)를
+	 *           tb_account_record에 일괄 등록(upsert). 재등록 시 해당 직원의 그 연/월 기존
+	 *           재택근무(type=20)만 먼저 삭제한 뒤 다시 채운다(다른 근무기록은 건드리지 않음).
+	 *           ※ 일반 출근부 저장(/Account/AccountRecordSave)은 연차/초과 대장, 손익 처리 등
+	 *              부가 로직이 얽혀 있어 재사용하지 않고, tb_account_record insert만 별도로 수행한다.
+	 */
+	@PostMapping("/Account/AccountIntegrationHomeRecordSave")
+	public String AccountIntegrationHomeRecordSave(@RequestBody Map<String, Object> payload) {
+
+		List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
+
+		int savedCount = 0;
+		List<Map<String, Object>> failedRows = new ArrayList<>();
+
+		if (rows != null && !rows.isEmpty()) {
+			// ✅ member_id + 연/월 조합별로 기존 재택근무(type=20)만 먼저 삭제(다른 근무기록은 유지)
+			Map<String, Map<String, Object>> deleteParamsByKey = new java.util.LinkedHashMap<>();
+			for (Map<String, Object> row : rows) {
+				Object memberId = row.get("member_id");
+				Object recordYear = row.get("record_year");
+				Object recordMonth = row.get("record_month");
+				String key = memberId + "_" + recordYear + "_" + recordMonth;
+				if (!deleteParamsByKey.containsKey(key)) {
+					Map<String, Object> deleteParam = new HashMap<>();
+					deleteParam.put("member_id", memberId);
+					deleteParam.put("record_year", recordYear);
+					deleteParam.put("record_month", recordMonth);
+					deleteParamsByKey.put(key, deleteParam);
+				}
+			}
+			for (Map<String, Object> deleteParam : deleteParamsByKey.values()) {
+				accountService.AccountRecordType20DeleteByMonth(deleteParam);
+			}
+
+			for (Map<String, Object> row : rows) {
+				try {
+					int iResult = accountService.AccountMemberRecordSave(row);	// tb_account_record upsert
+					if (iResult > 0) {
+						savedCount += 1;
+					} else {
+						failedRows.add(row);
+					}
+				} catch (Exception e) {
+					failedRows.add(row);
+				}
+			}
+		}
+
+		JsonObject obj = new JsonObject();
+		if (savedCount > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		obj.addProperty("savedCount", savedCount);
+		obj.addProperty("failedCount", failedRows.size());
+
+		return obj.toString();
+	}
+
+	/*
 	 * method : AccountUtilRecordExcelSave
 	 * comment : 유틸 출근부 -> 엑셀 업로드 일괄 등록(upsert)
 	 *           PK(연/월/일자/거래처/직원)가 완전히 같은 행만 UPDATE되고,

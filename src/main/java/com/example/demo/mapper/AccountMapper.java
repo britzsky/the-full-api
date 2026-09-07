@@ -25,6 +25,8 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountRecordSheetList(Map<String, Object> paramMap); 					// 출근부 -> 출근현황
 	int AccountUtilRecordSave(Map<String, Object> paramMap);											// 출근부 -> 유틸 출근부 -> 엑셀 업로드 등록(upsert)
 	int AccountUtilRecordDeleteByMonth(Map<String, Object> paramMap);									// 출근부 -> 유틸 출근부 -> 엑셀 재업로드 시 기존 배정 삭제(연/월/직원 단위)
+	List<Map<String, Object>> AccountIntegrationHomeRecordMonthList(Map<String, Object> paramMap);		// 출근부 -> 통합 출근부 -> tb_account_record 기준, 특정 직원의 해당 연/월 재택근무(20) 등록된 거래처 확인용 조회
+	int AccountRecordType20DeleteByMonth(Map<String, Object> paramMap);								// 출근부 -> 통합 출근부 -> 재등록 시 기존 재택근무(type=20)만 삭제(연/월/직원 단위, 다른 근무기록 유지)
 	List<Map<String, Object>> AccountMemberRecordTime(Map<String, Object> paramMap);					// 출근부 -> 출근현황 출퇴근 시간 조회
 	int AccountMemberRecordSave(Map<String, Object> paramMap);											// 출근부 -> 상용출근 정보 저장
 	int AccountMemberRecRecordSave(Map<String, Object> paramMap);										// 출근부 -> 채용현황 출근 정보 저장
