@@ -696,11 +696,27 @@ public class OperateService {
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) =====
 
+	// page/pageSize가 같이 넘어오면 해당 페이지만, 없으면(과거 호출 호환) 전체를 조회한다.
 	public List<Map<String, Object>> MenuList(Map<String, Object> paramMap) {
+		Object pageSize = paramMap.get("pageSize");
+		if (pageSize != null && !String.valueOf(pageSize).isBlank()) {
+			int page = Integer.parseInt(String.valueOf(paramMap.getOrDefault("page", "1")));
+			int size = Integer.parseInt(String.valueOf(pageSize));
+			// 쿼리 파라미터로 넘어온 값은 문자열이라, LIMIT 바인딩 시 MyBatis가 숫자가 아닌
+			// 문자열로 렌더링해 SQL 문법 에러가 난다(LIMIT ?, '20'). 반드시 Integer로 되돌려 넣는다.
+			paramMap.put("pageSize", size);
+			paramMap.put("offset", Math.max(0, (page - 1) * size));
+		}
 		return operateMapper.MenuList(paramMap);
 	}
 
+	// 메뉴 목록 전체 건수 (MenuList와 동일한 검색 조건 기준, 페이지네이션 표시용)
+	public int MenuListCount(Map<String, Object> paramMap) {
+		return operateMapper.MenuListCount(paramMap);
+	}
+
 	// 메뉴 신규 등록/수정 (menu_id 있으면 수정, 없으면 신규 채번 후 upsert)
+	// menu_name_raw는 별도 입력 화면이 없어 일단 menu_name과 동일하게 채운다(추후 키워드 용도로 분리 예정).
 	@Transactional
 	public Map<String, Object> MenuSave(Map<String, Object> paramMap) {
 		String menuId = (String) paramMap.get("menu_id");
@@ -708,6 +724,11 @@ public class OperateService {
 		if (menuId == null || menuId.isBlank()) {
 			menuId = operateMapper.NewMenuId();
 			paramMap.put("menu_id", menuId);
+		}
+
+		Object menuNameRaw = paramMap.get("menu_name_raw");
+		if (menuNameRaw == null || String.valueOf(menuNameRaw).isBlank()) {
+			paramMap.put("menu_name_raw", paramMap.get("menu_name"));
 		}
 
 		operateMapper.MenuUpsert(paramMap);
@@ -755,10 +776,12 @@ public class OperateService {
 		insertMap.put("title", menuName);
 		insertMap.put("summary", null);
 		insertMap.put("servings_note", null);
+		insertMap.put("ingredients_json", null);
 		insertMap.put("steps_json", null);
 		insertMap.put("tips_json", null);
 		insertMap.put("storage_json", null);
 		insertMap.put("allergens_json", null);
+		insertMap.put("recipe_json", null);
 		insertMap.put("user_id", userId);
 		operateMapper.RecipeInfoInsert(insertMap); // insertMap에 recipe_id가 채워짐(useGeneratedKeys)
 
@@ -805,11 +828,97 @@ public class OperateService {
 	}
 
 	// 식재료 즉석 등록: 이름/기준단위만 받아 새 ingredient_id를 채번해 등록
+	// 같은 표준명(대소문자/앞뒤공백 무시)의 식재료가 이미 있으면 새로 만들지 않고 기존 것을 그대로 반환한다.
+	// ingredient_name_raw는 별도 입력 화면이 없어 일단 ingredient_name_std와 동일하게 채운다(추후 키워드 용도로 분리 예정).
 	@Transactional
 	public Map<String, Object> IngredientQuickSave(Map<String, Object> paramMap) {
+		Map<String, Object> existing = operateMapper.IngredientByName(paramMap);
+		if (existing != null) return existing;
+
+		Object nameRaw = paramMap.get("ingredient_name_raw");
+		if (nameRaw == null || String.valueOf(nameRaw).isBlank()) {
+			paramMap.put("ingredient_name_raw", paramMap.get("ingredient_name_std"));
+		}
+
 		String ingredientId = operateMapper.NewIngredientId();
 		paramMap.put("ingredient_id", ingredientId);
 		operateMapper.IngredientInsert(paramMap);
 		return operateMapper.IngredientOne(paramMap);
+	}
+
+	// 식재료 단건 상세 조회 (레시피/메뉴 화면에서 식재료 상세 보완용)
+	public Map<String, Object> IngredientGet(Map<String, Object> paramMap) {
+		return operateMapper.IngredientOne(paramMap);
+	}
+
+	// 식재료 상세정보 수정. 표준명이 바뀌면 원본명도 같이 맞춰준다(위와 동일한 이유).
+	@Transactional
+	public Map<String, Object> IngredientUpdate(Map<String, Object> paramMap) {
+		Object nameStd = paramMap.get("ingredient_name_std");
+		if (nameStd != null && !String.valueOf(nameStd).isBlank()) {
+			paramMap.put("ingredient_name_raw", nameStd);
+		}
+		operateMapper.IngredientUpdate(paramMap);
+		return operateMapper.IngredientOne(paramMap);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) =====
+
+	public List<Map<String, Object>> RecipeVideoList(Map<String, Object> paramMap) {
+		return operateMapper.RecipeVideoListByMenuId(paramMap);
+	}
+
+	// video_id 없으면 신규 등록, 있으면 수정. 저장 후 최신 목록을 통째로 돌려준다.
+	@Transactional
+	public List<Map<String, Object>> RecipeVideoSave(Map<String, Object> paramMap) {
+		String menuId = (String) paramMap.get("menu_id");
+		String userId = (String) paramMap.get("user_id");
+		Map<String, Object> recipeInfo = ensureRecipeInfo(menuId, userId);
+		paramMap.put("recipe_id", recipeInfo.get("recipe_id"));
+
+		Object videoId = paramMap.get("video_id");
+		if (videoId == null || String.valueOf(videoId).isBlank()) {
+			operateMapper.RecipeVideoInsert(paramMap);
+		} else {
+			operateMapper.RecipeVideoUpdate(paramMap);
+		}
+
+		Map<String, Object> lookup = new HashMap<>();
+		lookup.put("menu_id", menuId);
+		return operateMapper.RecipeVideoListByMenuId(lookup);
+	}
+
+	public int RecipeVideoDelete(Map<String, Object> paramMap) {
+		return operateMapper.RecipeVideoDelete(paramMap);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 이미지) =====
+
+	public List<Map<String, Object>> RecipeImageList(Map<String, Object> paramMap) {
+		return operateMapper.RecipeImageListByMenuId(paramMap);
+	}
+
+	// 이미지 파일은 공용 업로드 엔드포인트로 먼저 올리고, 여기서는 그 결과(file_url 등) 메타정보만 저장한다.
+	@Transactional
+	public List<Map<String, Object>> RecipeImageSave(Map<String, Object> paramMap) {
+		String menuId = (String) paramMap.get("menu_id");
+		String userId = (String) paramMap.get("user_id");
+		Map<String, Object> recipeInfo = ensureRecipeInfo(menuId, userId);
+		paramMap.put("recipe_id", recipeInfo.get("recipe_id"));
+		paramMap.put("file_id", java.util.UUID.randomUUID().toString());
+
+		operateMapper.RecipeImageInsert(paramMap);
+
+		Map<String, Object> lookup = new HashMap<>();
+		lookup.put("menu_id", menuId);
+		return operateMapper.RecipeImageListByMenuId(lookup);
+	}
+
+	public int RecipeImageSetPrimary(Map<String, Object> paramMap) {
+		return operateMapper.RecipeImageSetPrimary(paramMap);
+	}
+
+	public int RecipeImageDelete(Map<String, Object> paramMap) {
+		return operateMapper.RecipeImageDelete(paramMap);
 	}
 }

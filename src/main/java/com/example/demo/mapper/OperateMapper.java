@@ -88,7 +88,8 @@ public interface OperateMapper {
 	List<Map<String, Object>> HolidayList(Map<String, Object> paramMap);						// 공휴일 목록 조회
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) =====
-	List<Map<String, Object>> MenuList(Map<String, Object> paramMap);							// 메뉴 관리 -> 메뉴 목록 조회
+	List<Map<String, Object>> MenuList(Map<String, Object> paramMap);							// 메뉴 관리 -> 메뉴 목록 조회 (page/pageSize 있으면 해당 페이지만)
+	int MenuListCount(Map<String, Object> paramMap);											// 메뉴 관리 -> 메뉴 목록 전체 건수 (페이지네이션용)
 	Map<String, Object> MenuOne(Map<String, Object> paramMap);									// 메뉴 관리 -> 메뉴 단건 조회
 	String NewMenuId();																			// 메뉴 관리 -> 신규 menu_id 채번
 	int MenuUpsert(Map<String, Object> paramMap);												// 메뉴 관리 -> 메뉴 신규 등록/수정(upsert)
@@ -107,6 +108,20 @@ public interface OperateMapper {
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) =====
 	List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap);				// 식재료 자동완성 검색
 	Map<String, Object> IngredientOne(Map<String, Object> paramMap);							// 식재료 단건 조회
+	Map<String, Object> IngredientByName(Map<String, Object> paramMap);						// 식재료 표준명 완전일치 단건 조회(중복 등록 방지용)
 	String NewIngredientId();																	// 식재료 관리 -> 신규 ingredient_id 채번
 	int IngredientInsert(Map<String, Object> paramMap);											// 식재료 즉석 등록
+	int IngredientUpdate(Map<String, Object> paramMap);											// 식재료 상세정보 수정
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) =====
+	List<Map<String, Object>> RecipeVideoListByMenuId(Map<String, Object> paramMap);			// menu_id 기준 영상 목록 조회
+	int RecipeVideoInsert(Map<String, Object> paramMap);											// 영상 신규 등록
+	int RecipeVideoUpdate(Map<String, Object> paramMap);											// 영상 수정
+	int RecipeVideoDelete(Map<String, Object> paramMap);											// 영상 삭제
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 이미지) =====
+	List<Map<String, Object>> RecipeImageListByMenuId(Map<String, Object> paramMap);			// menu_id 기준 이미지 목록 조회
+	int RecipeImageInsert(Map<String, Object> paramMap);											// 이미지 메타정보 등록
+	int RecipeImageSetPrimary(Map<String, Object> paramMap);										// 대표 이미지 지정
+	int RecipeImageDelete(Map<String, Object> paramMap);											// 이미지 삭제
 }

@@ -1793,6 +1793,17 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : MenuListCount
+     * comment : 운영관리 -> 메뉴 관리 -> 메뉴 목록 전체 건수 (페이지네이션용, MenuList와 동일한 검색 조건)
+     */
+    @GetMapping("/operate/menulistcount")
+    public String MenuListCount(@RequestParam Map<String, Object> paramMap) {
+        int count = operateService.MenuListCount(paramMap);
+        return new Gson().toJson(count);
+    }
+
+    /*
+     * part : 운영
      * method : MenuSave
      * comment : 운영관리 -> 메뉴 관리 -> 메뉴 신규 등록/수정
      */
@@ -1876,6 +1887,28 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : IngredientGet
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 단건 상세 조회
+     */
+    @GetMapping("/MenuRecipe/IngredientGet")
+    public String IngredientGet(@RequestParam Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.IngredientGet(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientUpdate
+     * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 상세정보 수정
+     */
+    @PostMapping("/MenuRecipe/IngredientUpdate")
+    public String IngredientUpdate(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.IngredientUpdate(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
      * method : RecipeInfoGet
      * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 정보 조회
      */
@@ -1893,6 +1926,83 @@ public class OperateController {
     @PostMapping("/MenuRecipe/RecipeInfoSave")
     public String RecipeInfoSave(@RequestBody Map<String, Object> paramMap) {
         Map<String, Object> result = operateService.RecipeInfoSave(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeVideoList
+     * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 영상(유튜브 링크) 목록 조회
+     */
+    @GetMapping("/MenuRecipe/RecipeVideoList")
+    public String RecipeVideoList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.RecipeVideoList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeVideoSave
+     * comment : 운영관리 -> 레시피 관리 -> 레시피 영상 신규 등록/수정
+     */
+    @PostMapping("/MenuRecipe/RecipeVideoSave")
+    public String RecipeVideoSave(@RequestBody Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.RecipeVideoSave(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeVideoDelete
+     * comment : 운영관리 -> 레시피 관리 -> 레시피 영상 삭제
+     */
+    @PostMapping("/MenuRecipe/RecipeVideoDelete")
+    public String RecipeVideoDelete(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.RecipeVideoDelete(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeImageList
+     * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 이미지 목록 조회
+     */
+    @GetMapping("/MenuRecipe/RecipeImageList")
+    public String RecipeImageList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.RecipeImageList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeImageSave
+     * comment : 운영관리 -> 레시피 관리 -> 레시피 이미지 메타정보 등록(파일 자체는 공용 업로드 API로 먼저 업로드)
+     */
+    @PostMapping("/MenuRecipe/RecipeImageSave")
+    public String RecipeImageSave(@RequestBody Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.RecipeImageSave(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeImageSetPrimary
+     * comment : 운영관리 -> 레시피 관리 -> 대표 이미지 지정
+     */
+    @PostMapping("/MenuRecipe/RecipeImageSetPrimary")
+    public String RecipeImageSetPrimary(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.RecipeImageSetPrimary(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : RecipeImageDelete
+     * comment : 운영관리 -> 레시피 관리 -> 레시피 이미지 삭제
+     */
+    @PostMapping("/MenuRecipe/RecipeImageDelete")
+    public String RecipeImageDelete(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.RecipeImageDelete(paramMap);
         return new Gson().toJson(result);
     }
 }

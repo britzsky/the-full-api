@@ -1975,6 +1975,8 @@
 		     매출만 먼저 들어오고 인건비가 아직 없는 등 하나라도 비어있으면 2개월 전 실적으로 대체(base_year/base_month) -->
 		<!-- ✅ base_month 기준 인건비 비율 45% 이상 업장만 조회 -->
 		<!-- ✅ base_month 기준 전월/전전월 인건비·매출 금액도 함께 내려서 프론트에서 3개월 합계 추이를 계산 -->
+		<!-- ✅ recent_month_person_cost/recent_month_dispatch_cost: base_month와 무관하게 조회월-1(전월) 기준의 인건비·파출비
+		     (매출은 2개월, 인건비·파출비는 1개월 지연되어 입력되므로 서로 다른 기준월 사용) -->
 		SELECT t.*,
 			   ROUND(t.person_total / t.sales_total * 100, 1) AS person_ratio
 		FROM (
@@ -1988,6 +1990,18 @@
 				   (SELECT m0.person_total FROM tb_account_managerment_table m0
 					 WHERE m0.account_id = b.account_id AND m0.year = b.base_year AND m0.month = b.base_month
 					 LIMIT 1) AS person_total,
+				   <!-- ✅ 전월(조회월-1, base_month 아님) 인건비/파출비 - 매출은 2개월 전(base_month) 기준이지만
+				        인건비·파출비는 급여 마감 시점상 1개월 전(전월)까지만 입력되어 있어 별도로 조회 -->
+				   (SELECT mc.person_cost FROM tb_account_managerment_table mc
+					 WHERE mc.account_id = b.account_id
+					   AND mc.year  = <![CDATA[ CASE WHEN #{month} = 1 THEN #{year} - 1 ELSE #{year} END ]]>
+					   AND mc.month = <![CDATA[ CASE WHEN #{month} = 1 THEN 12 ELSE #{month} - 1 END ]]>
+					 LIMIT 1) AS recent_month_person_cost,
+				   (SELECT mc.dispatch_cost FROM tb_account_managerment_table mc
+					 WHERE mc.account_id = b.account_id
+					   AND mc.year  = <![CDATA[ CASE WHEN #{month} = 1 THEN #{year} - 1 ELSE #{year} END ]]>
+					   AND mc.month = <![CDATA[ CASE WHEN #{month} = 1 THEN 12 ELSE #{month} - 1 END ]]>
+					 LIMIT 1) AS recent_month_dispatch_cost,
 				   (SELECT m1.sales_total FROM tb_account_managerment_table m1
 					 WHERE m1.account_id = b.account_id
 					   AND m1.year  = <![CDATA[ CASE WHEN b.base_month = 1 THEN b.base_year - 1 ELSE b.base_year END ]]>
@@ -2767,14 +2781,8 @@
 
 	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (메뉴 마스터) ===== -->
 
-	<select id="MenuList" parameterType="map" resultType="hashmap">
-		SELECT menu_id, source_row, menu_name_raw, menu_name, food_type, food_type_reason,
-			food_type_confidence, menu_img, menu_type, menu_gubun, meal_plan_type,
-			calories_per_serving, del_yn,
-			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
-			DATE_FORMAT(mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
-			user_id
-		FROM tb_menu_master
+	<!-- MenuList/MenuListCount가 공유하는 검색 조건 (둘의 결과 건수가 항상 일치해야 페이지네이션이 맞으므로 하나로 통일) -->
+	<sql id="menuListWhere">
 		WHERE del_yn = 'N'
 		<if test="keyword != null and keyword != ''">
 			AND menu_name LIKE CONCAT('%', #{keyword}, '%')
@@ -2791,7 +2799,37 @@
 		<if test="meal_plan_type != null and meal_plan_type != ''">
 			AND meal_plan_type = #{meal_plan_type}
 		</if>
-		ORDER BY created_at DESC
+	</sql>
+
+	<select id="MenuList" parameterType="map" resultType="hashmap">
+		SELECT menu_id, source_row, menu_name_raw, menu_name, food_type, food_type_reason,
+			food_type_confidence, menu_img, menu_type, menu_gubun, meal_plan_type,
+			calories_per_serving, del_yn,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			DATE_FORMAT(mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+			user_id
+		FROM tb_menu_master
+		<include refid="menuListWhere" />
+		<!-- menu_id 채번 자리수가 3자리 고정이 아니라 999 이후 자연스럽게 늘어나므로(MENU1000...),
+		     문자열 정렬(menu_id ASC) 대신 뒤 숫자만 잘라 숫자로 비교해야 순서가 항상 맞는다. -->
+		<choose>
+			<when test="sortDir == 'desc'">
+				ORDER BY CAST(SUBSTRING(menu_id, 5) AS UNSIGNED) DESC, menu_id DESC
+			</when>
+			<otherwise>
+				ORDER BY CAST(SUBSTRING(menu_id, 5) AS UNSIGNED) ASC, menu_id ASC
+			</otherwise>
+		</choose>
+		<!-- pageSize가 넘어올 때만 페이지 단위로 잘라서 조회한다 (offset은 서비스단에서 (page-1)*pageSize로 계산). -->
+		<if test="pageSize != null and pageSize != ''">
+			LIMIT #{offset}, #{pageSize}
+		</if>
+	</select>
+
+	<select id="MenuListCount" parameterType="map" resultType="int">
+		SELECT COUNT(*)
+		FROM tb_menu_master
+		<include refid="menuListWhere" />
 	</select>
 
 	<select id="MenuOne" parameterType="map" resultType="hashmap">
@@ -2806,11 +2844,11 @@
 	</select>
 
 	<select id="NewMenuId" resultType="String">
-		<!-- MENU10000부터 시작(0채움 5자리 고정) : 문자열 정렬이 숫자 순서와 항상 일치하도록 함.
-		     기존에 MENU001처럼 작은 번호 데이터가 있어도 GREATEST로 10000 미만은 10000으로 끌어올림. -->
-		SELECT CONCAT('MENU', LPAD(next_num, 5, '0'))
+		<!-- MENU001부터 시작(0채움 3자리). 999개를 넘어가면 자리수가 자연스럽게 늘어나(MENU1000...)
+		     문자열 정렬은 더 이상 숫자 순서와 안 맞을 수 있어, 정렬은 항상 아래 menu_id 뒤 숫자만 캐스팅해서(ORDER BY CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)) 처리해야 한다. -->
+		SELECT CONCAT('MENU', LPAD(next_num, 3, '0'))
 		FROM (
-			SELECT GREATEST(IFNULL(MAX(CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)), 0), 9999) + 1 AS next_num
+			SELECT IFNULL(MAX(CAST(SUBSTRING(menu_id, 5) AS UNSIGNED)), 0) + 1 AS next_num
 			FROM tb_menu_master
 			WHERE menu_id REGEXP '^MENU[0-9]+$'
 			FOR UPDATE
@@ -2819,19 +2857,17 @@
 
 	<insert id="MenuUpsert" parameterType="map">
 		INSERT INTO tb_menu_master
-			(menu_id, menu_name_raw, menu_name, food_type, food_type_reason, food_type_confidence,
+			(menu_id, source_row, menu_name_raw, menu_name, food_type, food_type_reason, food_type_confidence,
 			 menu_img, menu_type, menu_gubun, meal_plan_type, calories_per_serving, del_yn,
 			 created_at, mod_at, user_id)
 		VALUES
-			(#{menu_id}, #{menu_name_raw}, #{menu_name}, #{food_type}, #{food_type_reason}, #{food_type_confidence},
+			(#{menu_id}, #{source_row}, #{menu_name_raw}, #{menu_name}, #{food_type}, #{food_type_reason}, #{food_type_confidence},
 			 #{menu_img}, #{menu_type}, #{menu_gubun}, #{meal_plan_type}, #{calories_per_serving}, 'N',
 			 DATE_ADD(NOW(), INTERVAL 9 HOUR), NULL, #{user_id})
 		ON DUPLICATE KEY UPDATE
 			menu_name_raw = #{menu_name_raw},
 			menu_name = #{menu_name},
 			food_type = #{food_type},
-			food_type_reason = #{food_type_reason},
-			food_type_confidence = #{food_type_confidence},
 			menu_img = #{menu_img},
 			menu_type = #{menu_type},
 			menu_gubun = #{menu_gubun},
@@ -2839,6 +2875,10 @@
 			calories_per_serving = #{calories_per_serving},
 			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR),
 			user_id = #{user_id}
+			<!-- 화면에는 입력란이 없는 필드라 값이 넘어올 때만 갱신한다(안 넘어오면 기존 값을 null로 덮어쓰지 않음) -->
+			<if test="source_row != null">, source_row = #{source_row}</if>
+			<if test="food_type_reason != null">, food_type_reason = #{food_type_reason}</if>
+			<if test="food_type_confidence != null">, food_type_confidence = #{food_type_confidence}</if>
 	</insert>
 
 	<update id="MenuDelete" parameterType="map">
@@ -2861,10 +2901,10 @@
 
 	<insert id="RecipeInfoInsert" parameterType="map" useGeneratedKeys="true" keyProperty="recipe_id">
 		INSERT INTO tb_recipe_info
-			(menu_id, menu_name, title, summary, servings_note, steps_json, tips_json, storage_json, allergens_json, created_at, user_id)
+			(menu_id, menu_name, title, summary, servings_note, ingredients_json, steps_json, tips_json, storage_json, allergens_json, recipe_json, created_at, user_id)
 		VALUES
 			(#{menu_id}, #{menu_name}, #{title}, #{summary}, #{servings_note},
-			 #{steps_json}, #{tips_json}, #{storage_json}, #{allergens_json}, DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+			 #{ingredients_json}, #{steps_json}, #{tips_json}, #{storage_json}, #{allergens_json}, #{recipe_json}, DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
 	</insert>
 
 	<update id="RecipeInfoUpdate" parameterType="map">
@@ -2873,10 +2913,12 @@
 			<if test="title != null">title = #{title},</if>
 			<if test="summary != null">summary = #{summary},</if>
 			<if test="servings_note != null">servings_note = #{servings_note},</if>
+			<if test="ingredients_json != null">ingredients_json = #{ingredients_json},</if>
 			<if test="steps_json != null">steps_json = #{steps_json},</if>
 			<if test="tips_json != null">tips_json = #{tips_json},</if>
 			<if test="storage_json != null">storage_json = #{storage_json},</if>
 			<if test="allergens_json != null">allergens_json = #{allergens_json},</if>
+			<if test="recipe_json != null">recipe_json = #{recipe_json},</if>
 			<if test="user_id != null">user_id = #{user_id},</if>
 			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR)
 		</set>
@@ -2892,7 +2934,7 @@
 			DATE_FORMAT(rd.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
 			DATE_FORMAT(rd.mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
 			rd.user_id,
-			im.ingredient_name_std, im.base_unit AS ingredient_base_unit
+			im.ingredient_name_std, im.base_unit AS ingredient_base_unit, im.category_name
 		FROM tb_recipe_detail rd
 		LEFT JOIN tb_ingredient_master im ON im.ingredient_id = rd.ingredient_id
 		WHERE rd.menu_id = #{menu_id}
@@ -2938,10 +2980,29 @@
 		LIMIT 20
 	</select>
 
+	<!-- menu_usage_count는 저장된 값 대신 tb_recipe_detail을 직접 세어 실시간 값으로 내려준다(누적 컬럼은 갱신 로직이 없어 신뢰 불가). -->
+	<sql id="ingredientFullColumns">
+		im.ingredient_id, im.ingredient_name_raw, im.ingredient_name_std, im.category_name, im.base_unit, im.order_unit,
+		im.convert_value, im.storage_type,
+		(SELECT COUNT(DISTINCT rd.menu_id) FROM tb_recipe_detail rd WHERE rd.ingredient_id = im.ingredient_id) AS menu_usage_count,
+		im.safe_stock_qty, im.lead_time_days, im.needs_review, im.note,
+		DATE_FORMAT(im.created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+		DATE_FORMAT(im.mod_at, '%Y-%m-%d %H:%i:%s') AS mod_at,
+		im.user_id
+	</sql>
+
 	<select id="IngredientOne" parameterType="map" resultType="hashmap">
-		SELECT ingredient_id, ingredient_name_std, category_name, base_unit, order_unit, convert_value
-		FROM tb_ingredient_master
-		WHERE ingredient_id = #{ingredient_id}
+		SELECT <include refid="ingredientFullColumns" />
+		FROM tb_ingredient_master im
+		WHERE im.ingredient_id = #{ingredient_id}
+	</select>
+
+	<!-- 식재료 표준명 완전일치(대소문자/앞뒤공백 무시) 단건 조회 : 즉석 등록 시 중복 생성 방지용 -->
+	<select id="IngredientByName" parameterType="map" resultType="hashmap">
+		SELECT <include refid="ingredientFullColumns" />
+		FROM tb_ingredient_master im
+		WHERE TRIM(LOWER(im.ingredient_name_std)) = TRIM(LOWER(#{ingredient_name_std}))
+		LIMIT 1
 	</select>
 
 	<select id="NewIngredientId" resultType="String">
@@ -2957,10 +3018,98 @@
 
 	<insert id="IngredientInsert" parameterType="map">
 		INSERT INTO tb_ingredient_master
-			(ingredient_id, ingredient_name_std, category_name, base_unit, order_unit, convert_value, created_at, user_id)
+			(ingredient_id, ingredient_name_raw, ingredient_name_std, category_name, base_unit, order_unit, convert_value,
+			 storage_type, safe_stock_qty, lead_time_days, needs_review, note, created_at, user_id)
 		VALUES
-			(#{ingredient_id}, #{ingredient_name_std}, #{category_name}, #{base_unit},
-			 #{order_unit}, IFNULL(#{convert_value}, 1), DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+			(#{ingredient_id}, #{ingredient_name_raw}, #{ingredient_name_std}, #{category_name}, #{base_unit},
+			 #{order_unit}, IFNULL(#{convert_value}, 1), #{storage_type}, IFNULL(#{safe_stock_qty}, 0),
+			 IFNULL(#{lead_time_days}, 0), IFNULL(#{needs_review}, 0), #{note}, DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
 	</insert>
+
+	<!-- 식재료 상세정보 수정 (레시피/메뉴 화면에서 식재료를 클릭해 상세를 보완할 때 사용) -->
+	<update id="IngredientUpdate" parameterType="map">
+		UPDATE tb_ingredient_master
+		<set>
+			<if test="ingredient_name_raw != null">ingredient_name_raw = #{ingredient_name_raw},</if>
+			<if test="ingredient_name_std != null">ingredient_name_std = #{ingredient_name_std},</if>
+			<if test="category_name != null">category_name = #{category_name},</if>
+			<if test="base_unit != null">base_unit = #{base_unit},</if>
+			<if test="order_unit != null">order_unit = #{order_unit},</if>
+			<if test="convert_value != null">convert_value = #{convert_value},</if>
+			<if test="storage_type != null">storage_type = #{storage_type},</if>
+			<if test="safe_stock_qty != null">safe_stock_qty = #{safe_stock_qty},</if>
+			<if test="lead_time_days != null">lead_time_days = #{lead_time_days},</if>
+			<if test="needs_review != null">needs_review = #{needs_review},</if>
+			<if test="note != null">note = #{note},</if>
+			<if test="user_id != null">user_id = #{user_id},</if>
+			mod_at = DATE_ADD(NOW(), INTERVAL 9 HOUR)
+		</set>
+		WHERE ingredient_id = #{ingredient_id}
+	</update>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) ===== -->
+
+	<select id="RecipeVideoListByMenuId" parameterType="map" resultType="hashmap">
+		SELECT video_id, recipe_id, menu_id, title, url, description, sort_order,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at,
+			user_id
+		FROM tb_recipe_video
+		WHERE menu_id = #{menu_id}
+		ORDER BY sort_order ASC, video_id ASC
+	</select>
+
+	<insert id="RecipeVideoInsert" parameterType="map" useGeneratedKeys="true" keyProperty="video_id">
+		INSERT INTO tb_recipe_video
+			(recipe_id, menu_id, title, url, description, sort_order, created_at, user_id)
+		VALUES
+			(#{recipe_id}, #{menu_id}, #{title}, #{url}, #{description}, IFNULL(#{sort_order}, 0),
+			 DATE_ADD(NOW(), INTERVAL 9 HOUR), #{user_id})
+	</insert>
+
+	<update id="RecipeVideoUpdate" parameterType="map">
+		UPDATE tb_recipe_video
+		<set>
+			<if test="title != null">title = #{title},</if>
+			<if test="url != null">url = #{url},</if>
+			<if test="description != null">description = #{description},</if>
+			<if test="sort_order != null">sort_order = #{sort_order},</if>
+			<if test="user_id != null">user_id = #{user_id},</if>
+		</set>
+		WHERE video_id = #{video_id}
+	</update>
+
+	<delete id="RecipeVideoDelete" parameterType="map">
+		DELETE FROM tb_recipe_video WHERE video_id = #{video_id}
+	</delete>
+
+	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 이미지) ===== -->
+
+	<select id="RecipeImageListByMenuId" parameterType="map" resultType="hashmap">
+		SELECT image_id, recipe_id, menu_id, file_id, file_name, file_url, file_path, file_size,
+			is_primary, sort_order,
+			DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') AS created_at
+		FROM tb_recipe_image
+		WHERE menu_id = #{menu_id}
+		ORDER BY sort_order ASC, image_id ASC
+	</select>
+
+	<insert id="RecipeImageInsert" parameterType="map" useGeneratedKeys="true" keyProperty="image_id">
+		INSERT INTO tb_recipe_image
+			(recipe_id, menu_id, file_id, file_name, file_url, file_path, file_size, is_primary, sort_order, created_at)
+		VALUES
+			(#{recipe_id}, #{menu_id}, #{file_id}, #{file_name}, #{file_url}, #{file_path}, #{file_size},
+			 IFNULL(#{is_primary}, 'N'), IFNULL(#{sort_order}, 0), DATE_ADD(NOW(), INTERVAL 9 HOUR))
+	</insert>
+
+	<!-- 대표 이미지 지정: 같은 메뉴 내 나머지는 자동으로 N 처리 -->
+	<update id="RecipeImageSetPrimary" parameterType="map">
+		UPDATE tb_recipe_image
+		SET is_primary = CASE WHEN image_id = #{image_id} THEN 'Y' ELSE 'N' END
+		WHERE menu_id = #{menu_id}
+	</update>
+
+	<delete id="RecipeImageDelete" parameterType="map">
+		DELETE FROM tb_recipe_image WHERE image_id = #{image_id}
+	</delete>
 
 </mapper>

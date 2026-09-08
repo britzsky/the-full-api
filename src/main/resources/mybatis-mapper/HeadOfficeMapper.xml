@@ -1696,6 +1696,7 @@
 			   END AS tm_user_name,
 			   ep.tm_sign,
 			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
+			   ep.tm_comment,
 			   CASE
 			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN COALESCE(
 			       NULLIF(ep.payer_user, ''),
@@ -1738,9 +1739,11 @@
 			   END AS payer_user_name,
 			   ep.payer_sign,
 			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
+			   ep.payer_comment,
 			   ep.ceo_user,
 			   ep.ceo_sign,
 			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt,
+			   ep.ceo_comment,
 			   CASE
 			   	 WHEN IFNULL(ep.tm_sign, '') = '3' OR IFNULL(ep.payer_sign, '') = '3' OR IFNULL(ep.ceo_sign, '') = '3'
 			   	 	THEN '반려'
@@ -1886,6 +1889,7 @@
 			   END AS tm_user,
 			   ep.tm_sign,
 			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
+			   ep.tm_comment,
 			   CASE
 			     WHEN IFNULL(ep.payer_user, '') != ''
 			       THEN (SELECT stored_second.user_name FROM tb_user stored_second WHERE stored_second.user_id = ep.payer_user LIMIT 1)
@@ -1928,9 +1932,11 @@
 			   END AS payer_user,
 			   ep.payer_sign,
 			   DATE_FORMAT(ep.payer_dt, '%Y-%m-%d %H:%i:%s') AS payer_dt,
+			   ep.payer_comment,
 			   ep.ceo_user,
 			   ep.ceo_sign,
-			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt
+			   DATE_FORMAT(ep.ceo_dt, '%Y-%m-%d %H:%i:%s') AS ceo_dt,
+			   ep.ceo_comment
 		FROM tb_headoffice_electronic_payment ep
 		LEFT JOIN tb_electronic_payment_type ept
 		  ON CAST(ept.doc_type AS CHAR) = CAST(ep.doc_type AS CHAR)
@@ -2188,6 +2194,7 @@
 					END,
 			tm_sign = #{action_status},
 			tm_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			tm_comment = #{comment},
 			reg_read_dt = NULL,
 			status = CASE
 					   WHEN #{action_status} = '3'
@@ -2228,6 +2235,7 @@
 		UPDATE tb_headoffice_electronic_payment
 		SET ceo_sign = #{action_status},
 			ceo_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			ceo_comment = #{comment},
 			reg_read_dt = NULL,
 			tm_read_dt = NULL,
 			payer_read_dt = NULL,
@@ -2261,6 +2269,7 @@
 					END,
 			payer_sign = #{action_status},
 			payer_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			payer_comment = #{comment},
 			reg_read_dt = NULL,
 			tm_read_dt = NULL,
 			status = CASE
@@ -2335,13 +2344,18 @@
 		  AND pr.idx = #{idx}
 		  AND UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
 		  AND (
-			ep.tm_user = #{user_id}
+			(
+				<!-- 1차 결재자(tm_user 본인) - 본인이 1차 결재를 이미 완료했으면 더 이상 수정 불가 -->
+				ep.tm_user = #{user_id}
+				AND IFNULL(ep.tm_sign, '') != '4'
+			)
 			OR ep.payer_user = #{user_id}
 			OR (
-				<!-- 1차 결재자(tm_user)가 아직 배정되지 않은 FP 문서는
-				     거래처-사용자 매핑(tb_account_purchase_mapping)에 걸린 사용자가 1차 결재자 역할을 한다.
-				     (실제 tm_user 컬럼은 1차 결재 저장 시점에야 채워지므로, 그 전에도 매핑된 사용자는 값을 저장할 수 있어야 한다.) -->
-				IFNULL(ep.tm_user, '') = ''
+				<!-- 거래처-사용자 매핑(tb_account_purchase_mapping)에 걸린 사용자는 tm_user 컬럼에
+				     이미 다른 사람이 배정돼 있어도(거래처 담당자 재배정 등) 1차 결재자로 인정한다.
+				     (ElectronicPaymentManageTmSignSave와 동일한 기준)
+				     단, 1차 결재가 이미 완료된 문서는 매핑된 사용자도 더 이상 수정할 수 없다. -->
+				IFNULL(ep.tm_sign, '') != '4'
 				AND EXISTS (
 					SELECT 1
 					FROM tb_account_purchase_mapping pam
@@ -2353,9 +2367,10 @@
 				)
 			)
 			OR (
-				<!-- 1차 결재자(tm_user)가 없는 FP 문서는 같은 부서 팀장이 2차 결재자 역할을 대신한다. -->
-				IFNULL(ep.payer_user, '') = ''
-				AND EXISTS (
+				<!-- 1차 결재자(tm_user)와 같은 부서 팀장은 payer_user 컬럼에 이미 다른 사람이
+				     배정돼 있어도 2차 결재자로 인정한다(ElectronicPaymentManagePayerSignSave와 동일한 기준).
+				     2차 결재자는 1차 결재 완료 이후가 본연의 수정 구간이므로 tm_sign 여부와 무관하게 허용한다. -->
+				EXISTS (
 					SELECT 1
 					FROM tb_user first_approver
 					JOIN tb_user second_approver
