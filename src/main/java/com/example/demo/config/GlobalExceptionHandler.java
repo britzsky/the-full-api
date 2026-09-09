@@ -22,6 +22,13 @@ public class GlobalExceptionHandler {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
 	}
 
+	// 서비스단에서 사용자에게 그대로 보여줄 의도로 던진 검증 오류(예: 삭제 불가 사유)는
+	// 아래 전역 Exception 핸들러가 "서버 오류가 발생했습니다."로 뭉개기 전에 메시지를 그대로 내려준다.
+	@ExceptionHandler(IllegalStateException.class)
+	public ResponseEntity<String> handleIllegalState(IllegalStateException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+	}
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<String> handleException(Exception e) {
         log.error("🚨 전역 예외 발생: {}", e.getMessage(), e);

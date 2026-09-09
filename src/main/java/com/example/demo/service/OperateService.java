@@ -12,6 +12,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -392,6 +393,13 @@ public class OperateService {
 	public List<Map<String, Object>> PersonCostBudgetList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();
 		resultList = operateMapper.PersonCostBudgetList(paramMap);
+		return resultList;
+	}
+
+	// 업장별 일반 직원 급여와 유틸·통합 배부액을 포함한 인건비 예산 현황을 조회
+	public List<Map<String, Object>> PersonCostBudgetProjectionList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.PersonCostBudgetProjectionList(paramMap);
 		return resultList;
 	}
 
@@ -823,6 +831,25 @@ public class OperateService {
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) =====
 
+	// page/pageSize가 같이 넘어오면 해당 페이지만, 없으면(과거 호출 호환) 전체를 조회한다. (MenuList와 동일한 패턴)
+	public List<Map<String, Object>> IngredientList(Map<String, Object> paramMap) {
+		Object pageSize = paramMap.get("pageSize");
+		if (pageSize != null && !String.valueOf(pageSize).isBlank()) {
+			int page = Integer.parseInt(String.valueOf(paramMap.getOrDefault("page", "1")));
+			int size = Integer.parseInt(String.valueOf(pageSize));
+			// 쿼리 파라미터로 넘어온 값은 문자열이라, LIMIT 바인딩 시 MyBatis가 숫자가 아닌
+			// 문자열로 렌더링해 SQL 문법 에러가 난다(LIMIT ?, '20'). 반드시 Integer로 되돌려 넣는다.
+			paramMap.put("pageSize", size);
+			paramMap.put("offset", Math.max(0, (page - 1) * size));
+		}
+		return operateMapper.IngredientList(paramMap);
+	}
+
+	// 식재료 목록 전체 건수 (IngredientList와 동일한 검색 조건 기준, 페이지네이션 표시용)
+	public int IngredientListCount(Map<String, Object> paramMap) {
+		return operateMapper.IngredientListCount(paramMap);
+	}
+
 	public List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap) {
 		return operateMapper.IngredientSearchList(paramMap);
 	}
@@ -860,6 +887,27 @@ public class OperateService {
 		}
 		operateMapper.IngredientUpdate(paramMap);
 		return operateMapper.IngredientOne(paramMap);
+	}
+
+	// 식재료 관리 탭 전용 신규 등록/수정 (ingredient_id 있으면 수정, 없으면 신규 채번 후 등록).
+	// 기존 IngredientQuickSave/IngredientUpdate를 그대로 재사용해 이름 중복 방지·raw 자동 동기화 로직을 공유한다.
+	@Transactional
+	public Map<String, Object> IngredientSave(Map<String, Object> paramMap) {
+		Object ingredientId = paramMap.get("ingredient_id");
+		if (ingredientId == null || String.valueOf(ingredientId).isBlank()) {
+			return IngredientQuickSave(paramMap);
+		}
+		return IngredientUpdate(paramMap);
+	}
+
+	// 식재료 삭제. 레시피에서 이미 사용 중인 식재료는 tb_recipe_detail의 FK(ON DELETE RESTRICT)에 걸려
+	// DataIntegrityViolationException이 나는데, 이걸 화면에서 이해할 수 있는 메시지로 바꿔서 던진다.
+	public int IngredientDelete(Map<String, Object> paramMap) {
+		try {
+			return operateMapper.IngredientDelete(paramMap);
+		} catch (DataIntegrityViolationException e) {
+			throw new IllegalStateException("이미 레시피에서 사용 중인 식재료라 삭제할 수 없습니다.");
+		}
 	}
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) =====

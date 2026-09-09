@@ -1140,6 +1140,19 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : PersonCostBudgetProjectionList
+     * comment : 급식사업부 -> 운영관리 -> 인건비 예산 현황 및 예상 계산 조회
+     */
+    @GetMapping("Operate/PersonCostBudgetProjectionList")
+    public String PersonCostBudgetProjectionList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = new ArrayList<>();
+        resultList = operateService.PersonCostBudgetProjectionList(paramMap);
+
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
      * method : BudgetTableSave
      * comment : 급식사업부 -> 운영관리 -> 예산관리 저장
      */
@@ -1860,6 +1873,50 @@ public class OperateController {
     @PostMapping("/MenuRecipe/RecipeDetailDelete")
     public String RecipeDetailDelete(@RequestBody Map<String, Object> paramMap) {
         int result = operateService.RecipeDetailDelete(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientList
+     * comment : 운영관리 -> 식재료 관리 -> 식재료 목록 조회 (page/pageSize 있으면 해당 페이지만)
+     */
+    @GetMapping("/MenuRecipe/IngredientList")
+    public String IngredientList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.IngredientList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientListCount
+     * comment : 운영관리 -> 식재료 관리 -> 식재료 목록 전체 건수 (페이지네이션용, IngredientList와 동일한 검색 조건)
+     */
+    @GetMapping("/MenuRecipe/IngredientListCount")
+    public String IngredientListCount(@RequestParam Map<String, Object> paramMap) {
+        int count = operateService.IngredientListCount(paramMap);
+        return new Gson().toJson(count);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientSave
+     * comment : 운영관리 -> 식재료 관리 -> 식재료 신규 등록/수정
+     */
+    @PostMapping("/MenuRecipe/IngredientSave")
+    public String IngredientSave(@RequestBody Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.IngredientSave(paramMap);
+        return new Gson().toJson(result);
+    }
+
+    /*
+     * part : 운영
+     * method : IngredientDelete
+     * comment : 운영관리 -> 식재료 관리 -> 식재료 삭제 (레시피에서 사용 중이면 거부)
+     */
+    @PostMapping("/MenuRecipe/IngredientDelete")
+    public String IngredientDelete(@RequestBody Map<String, Object> paramMap) {
+        int result = operateService.IngredientDelete(paramMap);
         return new Gson().toJson(result);
     }
 

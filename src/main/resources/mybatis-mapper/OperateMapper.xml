@@ -2074,6 +2074,227 @@
 		ORDER BY (t.person_total / t.sales_total) DESC
 	</select>
 
+	<!-- 인건비 예산 화면 전용 조회 -->
+	<select id="PersonCostBudgetProjectionList" parameterType="map" resultType="map">
+		<!-- [1] 파라미터 : 조회 연/월의 시작일·종료일·일수 + 유틸/통합 고정단가 -->
+		WITH params AS (
+			SELECT
+				STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d') AS month_start,
+				LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')) AS month_end,
+				DAY(LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'))) AS month_days,
+				3600000 AS utility_month_salary,      <!-- 유틸 직원 월 고정액 -->
+				330000 AS integration_account_cost    <!-- 통합 직원, 업장 1곳당 고정단가 -->
+		),
+
+		<!-- [2] 재직기간 계산 : 직원별로 이번 달과 겹치는 재직 구간(cost_start~cost_end)만 추림 -->
+		member_period AS (
+			SELECT
+				am.member_id,
+				am.account_id,
+				IFNULL(am.position_type, 0) AS position_type,
+				IFNULL(am.salary, 0) AS monthly_salary,
+				GREATEST(COALESCE(DATE(am.act_join_dt), DATE(am.join_dt), p.month_start), p.month_start) AS cost_start,
+				LEAST(COALESCE(DATE(am.del_dt), p.month_end), p.month_end) AS cost_end,
+				p.month_days,
+				p.utility_month_salary,
+				p.integration_account_cost
+			FROM tb_account_members am
+			CROSS JOIN params p
+			WHERE COALESCE(DATE(am.act_join_dt), DATE(am.join_dt), p.month_start) <![CDATA[ <= ]]> p.month_end
+			  AND (am.del_dt IS NULL OR DATE(am.del_dt) <![CDATA[ >= ]]> p.month_start)
+			  AND (IFNULL(am.del_yn, 'N') != 'Y' OR am.del_dt IS NOT NULL)
+		),
+		member_month_cost AS (
+			-- 재직 구간만큼 급여를 일할 계산 (전 직군 공통, 유틸/통합은 아래에서 별도 배분 방식 적용)
+			SELECT
+				mp.*,
+				(mp.monthly_salary / mp.month_days) * (DATEDIFF(mp.cost_end, mp.cost_start) + 1) AS prorated_salary
+			FROM member_period mp
+			WHERE mp.cost_start <![CDATA[ <= ]]> mp.cost_end
+		),
+
+		<!-- [3-A] 일반 직원 인건비 (position_type 6=유틸, 7=통합 제외) : 일할 급여 합산 -->
+		regular_cost AS (
+			SELECT
+				mc.account_id,
+				ROUND(SUM(mc.prorated_salary), 0) AS regular_person_cost
+			FROM member_month_cost mc
+			WHERE mc.position_type NOT IN (6, 7)
+			GROUP BY mc.account_id
+		),
+
+		<!-- [3-A-1] 채용 진행중(tb_account_rec_management, use_yn='D') 인원 인건비
+		     - 실입사일(act_join_dt)이 과거~오늘이면 그만큼만 일할 계산해서 반영, 미래면 아직 비용 발생 전이라 반영 안 함
+		     - 매 조회 시점(CURDATE()) 기준으로 매번 새로 계산되므로 별도 저장/최신화 로직이 필요 없고,
+		       채용취소로 대상에서 빠지면(use_yn != 'D') 자동으로 제외됨 -->
+		rec_period AS (
+			SELECT
+				rm.member_id,
+				rm.account_id,
+				IFNULL(rm.salary, 0) AS monthly_salary,
+				GREATEST(COALESCE(DATE(rm.act_join_dt), p.month_start), p.month_start) AS cost_start,
+				<!-- 오늘 날짜(KST) 기준으로 캡: DB 서버 NOW()는 UTC라 다른 쿼리와 동일하게 KST로 변환해서 사용 -->
+				LEAST(p.month_end, DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))) AS cost_end,
+				p.month_days
+			FROM tb_account_rec_management rm
+			CROSS JOIN params p
+			WHERE rm.use_yn = 'D'
+			  AND COALESCE(DATE(rm.act_join_dt), p.month_start) <![CDATA[ <= ]]> p.month_end
+		),
+		rec_month_cost AS (
+			-- cost_start > cost_end(=실입사일이 오늘보다 미래이거나, 조회월이 아직 시작 전인 경우)는 자동으로 제외됨
+			SELECT
+				rp.*,
+				(rp.monthly_salary / rp.month_days) * (DATEDIFF(rp.cost_end, rp.cost_start) + 1) AS prorated_salary
+			FROM rec_period rp
+			WHERE rp.cost_start <![CDATA[ <= ]]> rp.cost_end
+		),
+		rec_cost AS (
+			SELECT
+				account_id,
+				ROUND(SUM(prorated_salary), 0) AS rec_person_cost
+			FROM rec_month_cost
+			GROUP BY account_id
+		),
+
+		<!-- [3-B] 유틸 직원(position_type=6) 인건비 -->
+		utility_attendance AS (
+			-- 유틸 직원이 업장별로 출근한 일수 (한 업장에서 며칠 근무했는지)
+			SELECT
+				ur.member_id,
+				ur.account_id,
+				COUNT(*) AS workplace_days
+			FROM tb_account_util_record ur
+			JOIN member_month_cost mc
+			  ON mc.member_id = ur.member_id
+			 AND mc.position_type = 6
+			WHERE ur.record_year = #{year}
+			  AND ur.record_month = #{month}
+			  AND ur.is_present = 'Y'
+			  AND NULLIF(ur.account_id, '') IS NOT NULL
+			  AND STR_TO_DATE(
+				  CONCAT(ur.record_year, '-', LPAD(ur.record_month, 2, '0'), '-', LPAD(ur.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND mc.cost_end
+			GROUP BY ur.member_id, ur.account_id
+		),
+		utility_total_days AS (
+			-- 유틸 직원의 이번 달 전체 출근일수 (업장 구분 없이 합산)
+			SELECT member_id, SUM(workplace_days) AS total_days
+			FROM utility_attendance
+			GROUP BY member_id
+		),
+		utility_cost AS (
+			SELECT
+				ua.account_id,
+				ROUND(SUM(
+					(mc.utility_month_salary / mc.month_days)
+					* (DATEDIFF(mc.cost_end, mc.cost_start) + 1)
+					/ utd.total_days
+					* ua.workplace_days
+				), 0) AS utility_person_cost
+			FROM utility_attendance ua
+			JOIN utility_total_days utd ON utd.member_id = ua.member_id
+			JOIN member_month_cost mc ON mc.member_id = ua.member_id AND mc.position_type = 6
+			GROUP BY ua.account_id
+		),
+		<!-- [3-C] 통합 직원(position_type=7) 인건비 -->
+		integration_workplace AS (
+			SELECT DISTINCT
+				ar.member_id,
+				ar.account_id
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type = 7
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 20
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND mc.cost_end
+		),
+		integration_cost AS (
+			SELECT
+				iw.account_id,
+				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost
+			FROM integration_workplace iw
+			JOIN member_month_cost mc ON mc.member_id = iw.member_id AND mc.position_type = 7
+			GROUP BY iw.account_id
+		),
+		<!-- [4] 매출 대비 인건비 45% 이상 업장 필터링 -->
+		account_base AS (
+			SELECT
+				a.account_id,
+				a.account_name,
+				CASE WHEN #{month} <![CDATA[ <= ]]> 2 THEN #{year} - 1 ELSE #{year} END AS base_year,
+				CASE WHEN #{month} <![CDATA[ <= ]]> 2 THEN #{month} + 10 ELSE #{month} - 2 END AS base_month
+			FROM tb_account a
+			WHERE a.del_yn = 'N'
+			  AND a.account_id NOT IN (
+				20260122065002,
+				20260122071337,
+				20260122071857,
+				20260122072114,
+				20260122072245,
+				20260122072529,
+				20260122072732
+			  )
+			<if test='account_id != null'>
+				AND a.account_id = #{account_id}
+			</if>
+		),
+		account_result AS (
+			SELECT
+				ab.account_id,
+				ab.account_name,
+				ab.base_year,
+				ab.base_month,
+				(SELECT m.sales_total
+				 FROM tb_account_managerment_table m
+				 WHERE m.account_id = ab.account_id AND m.year = ab.base_year AND m.month = ab.base_month
+				 LIMIT 1) AS sales_total,
+				(SELECT m.person_total
+				 FROM tb_account_managerment_table m
+				 WHERE m.account_id = ab.account_id AND m.year = ab.base_year AND m.month = ab.base_month
+				 LIMIT 1) AS person_total
+			FROM account_base ab
+			WHERE ab.base_year IS NOT NULL AND ab.base_month IS NOT NULL
+		),
+		eligible_account AS (
+			SELECT
+				ar.*,
+				ROUND(ar.person_total / ar.sales_total * 100, 1) AS person_ratio
+			FROM account_result ar
+			WHERE ar.sales_total IS NOT NULL
+			  AND ar.sales_total > 0
+			  AND ar.person_total IS NOT NULL
+			  AND ROUND(ar.person_total / ar.sales_total * 100, 1) <![CDATA[ >= ]]> 45
+		)
+
+		<!-- [5] 최종 결과 : [3-A]+[3-A-1]+[3-B]+[3-C]를 합산해 당월 인건비(current_month_person_cost) 산출 -->
+		SELECT
+			ea.*,
+			IFNULL(rc.regular_person_cost, 0) AS regular_person_cost,
+			IFNULL(rec.rec_person_cost, 0) AS rec_person_cost,
+			IFNULL(uc.utility_person_cost, 0) AS utility_person_cost,
+			IFNULL(ic.integration_person_cost, 0) AS integration_person_cost,
+			ROUND(
+				IFNULL(rc.regular_person_cost, 0)
+				+ IFNULL(rec.rec_person_cost, 0)
+				+ IFNULL(uc.utility_person_cost, 0)
+				+ IFNULL(ic.integration_person_cost, 0),
+				0
+			) AS current_month_person_cost
+		FROM eligible_account ea
+		LEFT JOIN regular_cost rc ON rc.account_id = ea.account_id
+		LEFT JOIN rec_cost rec ON rec.account_id = ea.account_id
+		LEFT JOIN utility_cost uc ON uc.account_id = ea.account_id
+		LEFT JOIN integration_cost ic ON ic.account_id = ea.account_id
+		ORDER BY (ea.person_total / ea.sales_total) DESC
+	</select>
+
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
 		<!-- ✅ status_yn 미전달(기존 호출) 시에도 기존 동작 유지되도록 기본값 N 사용 -->
 		<bind name="statusYn" value="status_yn != null and status_yn != '' ? status_yn : 'N'" />
@@ -2991,6 +3212,38 @@
 		im.user_id
 	</sql>
 
+	<!-- IngredientList/IngredientListCount가 공유하는 검색 조건 -->
+	<sql id="ingredientListWhere">
+		<where>
+			<if test="keyword != null and keyword != ''">
+				AND im.ingredient_name_std LIKE CONCAT('%', #{keyword}, '%')
+			</if>
+			<if test="category_name != null and category_name != ''">
+				AND im.category_name = #{category_name}
+			</if>
+			<if test="storage_type != null and storage_type != ''">
+				AND im.storage_type = #{storage_type}
+			</if>
+		</where>
+	</sql>
+
+	<select id="IngredientList" parameterType="map" resultType="hashmap">
+		SELECT <include refid="ingredientFullColumns" />
+		FROM tb_ingredient_master im
+		<include refid="ingredientListWhere" />
+		ORDER BY CAST(SUBSTRING(im.ingredient_id, 3) AS UNSIGNED) ASC, im.ingredient_id ASC
+		<!-- pageSize가 넘어올 때만 페이지 단위로 잘라서 조회한다 (offset은 서비스단에서 (page-1)*pageSize로 계산). -->
+		<if test="pageSize != null and pageSize != ''">
+			LIMIT #{offset}, #{pageSize}
+		</if>
+	</select>
+
+	<select id="IngredientListCount" parameterType="map" resultType="int">
+		SELECT COUNT(*)
+		FROM tb_ingredient_master im
+		<include refid="ingredientListWhere" />
+	</select>
+
 	<select id="IngredientOne" parameterType="map" resultType="hashmap">
 		SELECT <include refid="ingredientFullColumns" />
 		FROM tb_ingredient_master im
@@ -3046,6 +3299,12 @@
 		</set>
 		WHERE ingredient_id = #{ingredient_id}
 	</update>
+
+	<!-- 식재료 삭제. tb_recipe_detail이 ingredient_id를 FK ON DELETE RESTRICT로 참조하고 있어서
+	     레시피에서 사용 중인 식재료는 DB가 알아서 막아준다(서비스단에서 DataIntegrityViolationException로 받아 안내). -->
+	<delete id="IngredientDelete" parameterType="map">
+		DELETE FROM tb_ingredient_master WHERE ingredient_id = #{ingredient_id}
+	</delete>
 
 	<!-- ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) ===== -->
 

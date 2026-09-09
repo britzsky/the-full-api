@@ -57,6 +57,7 @@ public interface OperateMapper {
 	List<Map<String, Object>> BudgetStandardList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영관리 -> 예산관리(예산기준) 조회
 	List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 	List<Map<String, Object>> PersonCostBudgetList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영관리 -> 예산관리(인건비, 매출대비 45% 이상) 조회
+	List<Map<String, Object>> PersonCostBudgetProjectionList(Map<String, Object> paramMap); 	// 급식사업부 -> 운영관리 -> 인건비 예산 현황 및 예상 계산 조회
 	List<Map<String, Object>> AnnualLeaveList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 정보 조회
 	int AnnualLeaveDelete(Map<String, Object> paramMap); 										// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 항목 삭제
 	int AnnualLeaveDeleteProcedureRecords(Map<String, Object> paramMap); 						// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 프로시저 생성 연차 레코드 일괄 삭제
@@ -106,12 +107,15 @@ public interface OperateMapper {
 	int RecipeDetailDelete(Map<String, Object> paramMap);										// 메뉴/레시피 관리 -> 식재료 상세 행 삭제
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 식재료 마스터) =====
+	List<Map<String, Object>> IngredientList(Map<String, Object> paramMap);					// 식재료 관리 -> 식재료 목록 조회 (page/pageSize 있으면 해당 페이지만)
+	int IngredientListCount(Map<String, Object> paramMap);										// 식재료 관리 -> 식재료 목록 전체 건수 (페이지네이션용)
 	List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap);				// 식재료 자동완성 검색
 	Map<String, Object> IngredientOne(Map<String, Object> paramMap);							// 식재료 단건 조회
 	Map<String, Object> IngredientByName(Map<String, Object> paramMap);						// 식재료 표준명 완전일치 단건 조회(중복 등록 방지용)
 	String NewIngredientId();																	// 식재료 관리 -> 신규 ingredient_id 채번
 	int IngredientInsert(Map<String, Object> paramMap);											// 식재료 즉석 등록
 	int IngredientUpdate(Map<String, Object> paramMap);											// 식재료 상세정보 수정
+	int IngredientDelete(Map<String, Object> paramMap);											// 식재료 관리 -> 식재료 삭제
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) =====
 	List<Map<String, Object>> RecipeVideoListByMenuId(Map<String, Object> paramMap);			// menu_id 기준 영상 목록 조회
