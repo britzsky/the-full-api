@@ -2062,4 +2062,16 @@ public class OperateController {
         int result = operateService.RecipeImageDelete(paramMap);
         return new Gson().toJson(result);
     }
+
+    /*
+     * part : 운영
+     * method : RecipeBundleGet
+     * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 정보/식재료 상세/영상/이미지를 한 번에 조회
+     *           (메뉴 선택 시 RecipeInfoGet+RecipeDetailList+RecipeVideoList+RecipeImageList 4번 호출을 1번으로 축소)
+     */
+    @GetMapping("/MenuRecipe/RecipeBundleGet")
+    public String RecipeBundleGet(@RequestParam Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.RecipeBundleGet(paramMap);
+        return new Gson().toJson(result);
+    }
 }

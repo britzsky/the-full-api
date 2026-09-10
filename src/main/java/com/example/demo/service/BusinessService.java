@@ -18,6 +18,7 @@ public class BusinessService {
 	public BusinessService(BusinessMapper businessMapper) {
 		this.businessMapper = businessMapper;
 	}
+	// 저장 시 사용할 고유 key(현재 일시 기반) 생성 - 고객사/거래처 등록 등에서 공용으로 사용
 	public String NowDateKey() {
 		String accountKey = businessMapper.NowDateKey();
 		return accountKey;

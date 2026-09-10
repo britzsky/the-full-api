@@ -40,6 +40,7 @@ public class OperateService {
 		this.headOfficeMapper = headOfficeMapper;
 	}
 
+	// 저장 시 사용할 고유 key(현재 일시 기반) 생성 - 거래처/직원/긴급인력 등 여러 화면에서 공용으로 사용
 	public String NowDateKey() {
 		String accountKey = operateMapper.NowDateKey();
 		return accountKey;
@@ -174,6 +175,7 @@ public class OperateService {
 		return resultList;
 	}
 
+	// 급식사업부 -> 운영관리 -> 집계표 저장 후 손익표 합계·예산·소모품 예산 누계를 한 번에 갱신 (집계표 저장 트랜잭션 내부에서 호출)
 	@Transactional(rollbackFor = Exception.class) // ✅ 전체 작업 트랜잭션
 	public int processProfitLoss(Map<String, Object> param) {
 
@@ -420,6 +422,7 @@ public class OperateService {
 		return 1;
 	}
 
+	// 급식사업부 -> 운영관리 -> 예산관리 저장 프로시저 호출 + 소모품 예산 누계 갱신
 	@Transactional(rollbackFor = Exception.class) // ✅ 전체 작업 트랜잭션
 	public int BudgetTotalSave(Map<String, Object> param) {
 
@@ -744,17 +747,20 @@ public class OperateService {
 		return operateMapper.MenuOne(paramMap);
 	}
 
+	// 운영관리 -> 메뉴 관리 -> 메뉴 논리삭제
 	public int MenuDelete(Map<String, Object> paramMap) {
 		return operateMapper.MenuDelete(paramMap);
 	}
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (표준 레시피 정보) =====
 
+	// 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 정보 조회
 	public Map<String, Object> RecipeInfoGet(Map<String, Object> paramMap) {
 		Map<String, Object> recipeInfo = operateMapper.RecipeInfoByMenuId(paramMap);
 		return recipeInfo != null ? recipeInfo : new HashMap<>();
 	}
 
+	// 운영관리 -> 레시피 관리 -> 레시피 정보(제목/조리순서/보관방법/알레르기) 저장
 	@Transactional
 	public Map<String, Object> RecipeInfoSave(Map<String, Object> paramMap) {
 		String menuId = (String) paramMap.get("menu_id");
@@ -798,6 +804,7 @@ public class OperateService {
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 식재료 상세) =====
 
+	// 운영관리 -> 메뉴/레시피 관리 -> menu_id 기준 식재료 상세 목록 조회
 	public List<Map<String, Object>> RecipeDetailList(Map<String, Object> paramMap) {
 		return operateMapper.RecipeDetailListByMenuId(paramMap);
 	}
@@ -825,6 +832,7 @@ public class OperateService {
 		return operateMapper.RecipeDetailListByMenuId(lookup);
 	}
 
+	// 운영관리 -> 메뉴/레시피 관리 -> 식재료 상세 행 삭제
 	public int RecipeDetailDelete(Map<String, Object> paramMap) {
 		return operateMapper.RecipeDetailDelete(paramMap);
 	}
@@ -850,6 +858,7 @@ public class OperateService {
 		return operateMapper.IngredientListCount(paramMap);
 	}
 
+	// 운영관리 -> 메뉴/레시피 관리 -> 식재료 자동완성 검색
 	public List<Map<String, Object>> IngredientSearchList(Map<String, Object> paramMap) {
 		return operateMapper.IngredientSearchList(paramMap);
 	}
@@ -912,6 +921,7 @@ public class OperateService {
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 영상 - 유튜브 링크) =====
 
+	// 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 영상(유튜브 링크) 목록 조회
 	public List<Map<String, Object>> RecipeVideoList(Map<String, Object> paramMap) {
 		return operateMapper.RecipeVideoListByMenuId(paramMap);
 	}
@@ -936,12 +946,14 @@ public class OperateService {
 		return operateMapper.RecipeVideoListByMenuId(lookup);
 	}
 
+	// 운영관리 -> 레시피 관리 -> 레시피 영상 삭제
 	public int RecipeVideoDelete(Map<String, Object> paramMap) {
 		return operateMapper.RecipeVideoDelete(paramMap);
 	}
 
 	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 이미지) =====
 
+	// 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 이미지 목록 조회
 	public List<Map<String, Object>> RecipeImageList(Map<String, Object> paramMap) {
 		return operateMapper.RecipeImageListByMenuId(paramMap);
 	}
@@ -962,11 +974,26 @@ public class OperateService {
 		return operateMapper.RecipeImageListByMenuId(lookup);
 	}
 
+	// 운영관리 -> 레시피 관리 -> 대표 이미지 지정
 	public int RecipeImageSetPrimary(Map<String, Object> paramMap) {
 		return operateMapper.RecipeImageSetPrimary(paramMap);
 	}
 
+	// 운영관리 -> 레시피 관리 -> 레시피 이미지 삭제
 	public int RecipeImageDelete(Map<String, Object> paramMap) {
 		return operateMapper.RecipeImageDelete(paramMap);
+	}
+
+	// ===== 급식사업부 -> 운영관리 -> 메뉴/레시피 관리 (레시피 관리 탭 진입 시 한 번에 조회) =====
+
+	// 레시피 관리 탭에서 메뉴 선택 시 정보/식재료 상세/영상/이미지를 각각 4번 호출하던 것을
+	// 1번의 요청으로 합쳐 내려준다.
+	public Map<String, Object> RecipeBundleGet(Map<String, Object> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		result.put("info", RecipeInfoGet(paramMap));
+		result.put("details", RecipeDetailList(paramMap));
+		result.put("videos", RecipeVideoList(paramMap));
+		result.put("images", RecipeImageList(paramMap));
+		return result;
 	}
 }

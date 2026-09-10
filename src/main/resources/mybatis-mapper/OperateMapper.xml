@@ -53,7 +53,9 @@
 		AND ats.count_month = #{month}
 		WHERE amv.account_id = #{account_id}
         AND amv.del_yn = 'N'
-		ORDER BY CASE WHEN amv.type IN (1002, 1003) THEN 2 WHEN amv.type IN (1000, 1008) THEN 1 ELSE 0 END asc, amv.type asc
+		ORDER BY CASE WHEN amv.type IN (1002, 1003) THEN 2 WHEN amv.type IN (1000, 1008) THEN 1 ELSE 0 END asc,
+			CASE amv.type WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 1042 THEN 5 ELSE 6 END asc,
+			amv.type asc
 	</select>
 
 	<select id="TallySheetAllList" parameterType="map" resultType="hashmap">
@@ -773,6 +775,7 @@
 		SELECT am.member_id,
 			   am.name,
 		       am.position,
+		       am.position_type,
                t.doc_id,
                t.doc_type_id,
                t.doc_type_name,
@@ -786,7 +789,7 @@
         (
         SELECT amf.member_id,
 			   amf.doc_id,
-		       amft.doc_type_id,
+		       amf.doc_type_id,
 		       amft.doc_type_name,
 		       amft.doc_sub_name,
 		       DATE_FORMAT(amf.issue_dt, '%Y-%m-%d') as issue_dt,
@@ -795,11 +798,12 @@
 		       amf.note
         FROM tb_account_members_files amf
 		LEFT OUTER JOIN tb_account_members_files_type amft
-		ON amft.doc_type_id = amf.doc_type_id 
-        LIMIT 1 
+		ON amft.doc_type_id = amf.doc_type_id
 		) t
         ON t.member_id = am.member_id
         WHERE am.account_id = #{account_id}
+        AND del_yn = 'N'
+        ORDER BY am.position_type, t.doc_type_id
 	</select>
 	
 	<select id="AccountTypeForFileList" parameterType="map" resultType="hashmap">
@@ -822,8 +826,8 @@
 	        #{member_id},
 	        #{doc_type_id},
 	        #{file_path},
-	        #{issue_dt},
-	        #{expiry_dt},
+	        NULLIF(#{issue_dt}, ''),
+	        NULLIF(#{expiry_dt}, ''),
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	        #{user_id},
 	        #{note}
@@ -832,8 +836,8 @@
 	    member_id = #{member_id},
 	    doc_type_id = #{doc_type_id},
 	    file_path = #{file_path},
-	    issue_dt = #{issue_dt},
-	    expiry_dt = #{expiry_dt},
+	    issue_dt = NULLIF(#{issue_dt}, ''),
+	    expiry_dt = NULLIF(#{expiry_dt}, ''),
 	    update_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d'),
 	    user_id = #{user_id},
 	    note = #{note}
@@ -2076,12 +2080,17 @@
 
 	<!-- 인건비 예산 화면 전용 조회 -->
 	<select id="PersonCostBudgetProjectionList" parameterType="map" resultType="map">
-		<!-- [1] 파라미터 : 조회 연/월의 시작일·종료일·일수 + 유틸/통합 고정단가 -->
+		<!-- [1] 파라미터 : 조회 연/월의 시작일·종료일·일수 + 유틸/통합 고정단가 + 오늘(KST) -->
 		WITH params AS (
 			SELECT
 				STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d') AS month_start,
 				LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')) AS month_end,
 				DAY(LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'))) AS month_days,
+				<!-- 🔹 금일 기준 인건비 계산의 기준일(KST). 조회 월이 과거면 month_end로 캡되어 당월 값과 같아지고,
+				     미래면 cost_start보다 작아져 자동으로 0원 처리된다.
+				     ⚠️ TEMP(로컬 전용): 로컬 DB 서버 시간이 이미 KST라 +09:00 변환하면 하루 밀림 → 요청으로 임시 0시간(DATE(NOW()))으로 낮춤.
+				        운영 배포 전에 DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))로 되돌릴 것! -->
+				DATE(NOW()) AS today,
 				3600000 AS utility_month_salary,      <!-- 유틸 직원 월 고정액 -->
 				330000 AS integration_account_cost    <!-- 통합 직원, 업장 1곳당 고정단가 -->
 		),
@@ -2095,6 +2104,7 @@
 				IFNULL(am.salary, 0) AS monthly_salary,
 				GREATEST(COALESCE(DATE(am.act_join_dt), DATE(am.join_dt), p.month_start), p.month_start) AS cost_start,
 				LEAST(COALESCE(DATE(am.del_dt), p.month_end), p.month_end) AS cost_end,
+				p.today,
 				p.month_days,
 				p.utility_month_salary,
 				p.integration_account_cost
@@ -2108,17 +2118,62 @@
 			-- 재직 구간만큼 급여를 일할 계산 (전 직군 공통, 유틸/통합은 아래에서 별도 배분 방식 적용)
 			SELECT
 				mp.*,
-				(mp.monthly_salary / mp.month_days) * (DATEDIFF(mp.cost_end, mp.cost_start) + 1) AS prorated_salary
+				(mp.monthly_salary / mp.month_days) * (DATEDIFF(mp.cost_end, mp.cost_start) + 1) AS prorated_salary,
+				<!-- 🔹 금일 기준 : cost_end를 오늘로 한번 더 캡해서 같은 방식으로 일할 계산 (오늘 이전 구간이면 0으로 처리) -->
+				(mp.monthly_salary / mp.month_days)
+					* GREATEST(DATEDIFF(LEAST(mp.cost_end, mp.today), mp.cost_start) + 1, 0) AS prorated_salary_today
 			FROM member_period mp
 			WHERE mp.cost_start <![CDATA[ <= ]]> mp.cost_end
+		),
+
+		<!-- [3-A'] 근무타입 마스터(tb_account_member_work_system) 기반 금일 인건비 근사치 개선
+		     - "인사팀 260910_ERP예산관리 프로그램_급여 참고자료.xlsx"의 3.근무타입 시트를 근거로
+		       daily_standard_hours(1일 소정근로시간)/monthly_standard_hours(월 소정근로시간) 컬럼을 추가해두었음(worktype_master_migration.sql)
+		     - tb_account_members에는 work_system(문자열) 컬럼이 없고, tb_account_members.idx가 바로
+		       tb_account_member_work_system.idx를 가리키는 FK다 (기존 AccountMapper.xml의 AccountInfoList_3
+		       쿼리 "T3.idx = T2.idx" 연결과 동일한 방식으로 확인됨) -->
+		<!-- 오늘까지 "근무로 인정"되는 날짜 수: 결근(type=4)만 빼고 나머지 기록은 전부 근무일로 인정 -->
+		regular_worked_days_today AS (
+			SELECT
+				ar.member_id,
+				COUNT(DISTINCT ar.record_date) AS worked_days_today
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type != 4
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND LEAST(mc.cost_end, mc.today)
+			GROUP BY ar.member_id
+		),
+		regular_cost_today_by_hours AS (
+			-- 시급(월급/월소정근로시간) × 1일 소정근로시간 × 오늘까지 실제 인정 근무일수
+			SELECT
+				rd.member_id,
+				(mc.monthly_salary / ws.monthly_standard_hours) * ws.daily_standard_hours * rd.worked_days_today AS cost_today_hours
+			FROM regular_worked_days_today rd
+			JOIN member_month_cost mc ON mc.member_id = rd.member_id
+			JOIN tb_account_members am ON am.member_id = rd.member_id
+			JOIN tb_account_member_work_system ws
+			  ON ws.idx = am.idx
+			 AND IFNULL(ws.del_yn, 'N') != 'Y'
+			 AND ws.daily_standard_hours IS NOT NULL
+			 AND ws.monthly_standard_hours > 0
 		),
 
 		<!-- [3-A] 일반 직원 인건비 (position_type 6=유틸, 7=통합 제외) : 일할 급여 합산 -->
 		regular_cost AS (
 			SELECT
 				mc.account_id,
-				ROUND(SUM(mc.prorated_salary), 0) AS regular_person_cost
+				ROUND(SUM(mc.prorated_salary), 0) AS regular_person_cost,
+				<!-- 근무타입 마스터에 소정근로시간이 매칭되면 시급 역산 방식, 못 찾으면 기존 달력 일할계산으로 폴백 -->
+				ROUND(SUM(IFNULL(rcth.cost_today_hours, mc.prorated_salary_today)), 0) AS regular_person_cost_today
 			FROM member_month_cost mc
+			LEFT JOIN regular_cost_today_by_hours rcth ON rcth.member_id = mc.member_id
 			WHERE mc.position_type NOT IN (6, 7)
 			GROUP BY mc.account_id
 		),
@@ -2133,8 +2188,8 @@
 				rm.account_id,
 				IFNULL(rm.salary, 0) AS monthly_salary,
 				GREATEST(COALESCE(DATE(rm.act_join_dt), p.month_start), p.month_start) AS cost_start,
-				<!-- 오늘 날짜(KST) 기준으로 캡: DB 서버 NOW()는 UTC라 다른 쿼리와 동일하게 KST로 변환해서 사용 -->
-				LEAST(p.month_end, DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))) AS cost_end,
+				<!-- params.today와 동일한 기준일을 재사용 (직접 CONVERT_TZ를 또 계산하지 않도록 통일) -->
+				LEAST(p.month_end, p.today) AS cost_end,
 				p.month_days
 			FROM tb_account_rec_management rm
 			CROSS JOIN params p
@@ -2150,6 +2205,8 @@
 			WHERE rp.cost_start <![CDATA[ <= ]]> rp.cost_end
 		),
 		rec_cost AS (
+			-- rec_month_cost.cost_end가 이미 LEAST(month_end, 오늘)로 캡되어 있어서
+			-- rec_person_cost 자체가 항상 "오늘 기준" 값과 같다 (과거 월 조회 시엔 오늘>=month_end라 당월 전체 값과도 같아짐)
 			SELECT
 				account_id,
 				ROUND(SUM(prorated_salary), 0) AS rec_person_cost
@@ -2223,6 +2280,165 @@
 			JOIN member_month_cost mc ON mc.member_id = iw.member_id AND mc.position_type = 7
 			GROUP BY iw.account_id
 		),
+
+		<!-- [3-B'] 유틸 인건비, 금일(오늘까지) 버전 : 출근 집계를 record_date <= 오늘로 한번 더 제한 -->
+		utility_attendance_today AS (
+			SELECT
+				ur.member_id,
+				ur.account_id,
+				COUNT(*) AS workplace_days_today
+			FROM tb_account_util_record ur
+			JOIN member_month_cost mc
+			  ON mc.member_id = ur.member_id
+			 AND mc.position_type = 6
+			WHERE ur.record_year = #{year}
+			  AND ur.record_month = #{month}
+			  AND ur.is_present = 'Y'
+			  AND NULLIF(ur.account_id, '') IS NOT NULL
+			  AND STR_TO_DATE(
+				  CONCAT(ur.record_year, '-', LPAD(ur.record_month, 2, '0'), '-', LPAD(ur.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND LEAST(mc.cost_end, mc.today)
+			GROUP BY ur.member_id, ur.account_id
+		),
+		utility_total_days_today AS (
+			SELECT member_id, SUM(workplace_days_today) AS total_days_today
+			FROM utility_attendance_today
+			GROUP BY member_id
+		),
+		utility_cost_today AS (
+			SELECT
+				ua.account_id,
+				ROUND(SUM(
+					mc.prorated_salary_today
+					/ utd.total_days_today
+					* ua.workplace_days_today
+				), 0) AS utility_person_cost_today
+			FROM utility_attendance_today ua
+			JOIN utility_total_days_today utd ON utd.member_id = ua.member_id
+			JOIN member_month_cost mc ON mc.member_id = ua.member_id AND mc.position_type = 6
+			GROUP BY ua.account_id
+		),
+		<!-- [3-C'] 통합 인건비, 금일(오늘까지) 버전 -->
+		integration_workplace_today AS (
+			SELECT DISTINCT
+				ar.member_id,
+				ar.account_id
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type = 7
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 20
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND LEAST(mc.cost_end, mc.today)
+		),
+		integration_cost_today AS (
+			SELECT
+				iw.account_id,
+				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost_today
+			FROM integration_workplace_today iw
+			JOIN member_month_cost mc ON mc.member_id = iw.member_id AND mc.position_type = 7
+			GROUP BY iw.account_id
+		),
+
+		<!-- [3-D] 금일 기준 인건비 괄호 안 상세 내역 (전부 record_date <= 오늘로 제한) -->
+		<!-- 초과(type=3) : 출근부 입력 시 note 컬럼에 0.5시간 단위로 자동 계산되어 저장된 초과 시간을 합산 -->
+		overtime_detail AS (
+			SELECT
+				ar.account_id,
+				ROUND(SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))), 1) AS overtime_hours
+			FROM tb_account_record ar
+			CROSS JOIN params p
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 3
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) <![CDATA[ <= ]]> p.today
+			GROUP BY ar.account_id
+		),
+		<!-- 결근(type=4) : 횟수 -->
+		absence_detail AS (
+			SELECT
+				ar.account_id,
+				COUNT(*) AS absence_count
+			FROM tb_account_record ar
+			CROSS JOIN params p
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 4
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) <![CDATA[ <= ]]> p.today
+			GROUP BY ar.account_id
+		),
+		<!-- 파출(외부 인력) : tb_account_members_dispatch(명부) + tb_account_record_dispatch(일자별 출근/금액) -->
+		dispatch_detail AS (
+			SELECT
+				d.account_id,
+				SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) ELSE 0 END) AS dispatch_amount,
+				SUM(CASE WHEN r.is_present = 'Y' THEN 1 ELSE 0 END) AS dispatch_count
+			FROM tb_account_members_dispatch d
+			JOIN tb_account_record_dispatch r
+			  ON r.account_id = d.account_id
+			 AND r.member_id = d.member_id
+			 AND r.record_year = d.record_year
+			 AND r.record_month = d.record_month
+			CROSS JOIN params p
+			WHERE d.record_year = #{year}
+			  AND d.record_month = #{month}
+			  AND STR_TO_DATE(
+				  CONCAT(r.record_year, '-', LPAD(r.record_month, 2, '0'), '-', LPAD(r.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) <![CDATA[ <= ]]> p.today
+			GROUP BY d.account_id
+		),
+		<!-- 직원파출(type=6) : 다른 업장 소속 직원이 이 업장으로 파출되어 근무한 금액. 기록은 파출을 받은(이) 업장의 출근부에 남는다 -->
+		employee_dispatch_detail AS (
+			SELECT
+				ar.account_id,
+				SUM(IFNULL(ar.salary, 0)) AS employee_dispatch_amount,
+				COUNT(*) AS employee_dispatch_count
+			FROM tb_account_record ar
+			CROSS JOIN params p
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 6
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) <![CDATA[ <= ]]> p.today
+			GROUP BY ar.account_id
+		),
+		<!-- 유틸 : 이 업장에 출근한 유틸 인원 횟수 -->
+		util_detail AS (
+			-- ⚠️ 유틸 전용 테이블(tb_account_util_record)이지만 실제로는 다른 직군(통합 등) 기록이 잘못 섞여 들어오는
+			--    경우가 있어서, utility_attendance(기존 메인 계산)와 동일하게 position_type=6(유틸) 인원만 카운트한다
+			SELECT
+				ur.account_id,
+				COUNT(*) AS util_count
+			FROM tb_account_util_record ur
+			JOIN member_month_cost mc
+			  ON mc.member_id = ur.member_id
+			 AND mc.position_type = 6
+			CROSS JOIN params p
+			WHERE ur.record_year = #{year}
+			  AND ur.record_month = #{month}
+			  AND ur.is_present = 'Y'
+			  AND NULLIF(ur.account_id, '') IS NOT NULL
+			  AND STR_TO_DATE(
+				  CONCAT(ur.record_year, '-', LPAD(ur.record_month, 2, '0'), '-', LPAD(ur.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) <![CDATA[ <= ]]> p.today
+			GROUP BY ur.account_id
+		),
+
 		<!-- [4] 매출 대비 인건비 45% 이상 업장 필터링 -->
 		account_base AS (
 			SELECT
@@ -2273,7 +2489,9 @@
 			  AND ROUND(ar.person_total / ar.sales_total * 100, 1) <![CDATA[ >= ]]> 45
 		)
 
-		<!-- [5] 최종 결과 : [3-A]+[3-A-1]+[3-B]+[3-C]를 합산해 당월 인건비(current_month_person_cost) 산출 -->
+		<!-- [5] 최종 결과 : [3-A]+[3-A-1]+[3-B]+[3-C]를 합산해 당월 인건비(current_month_person_cost) 산출
+		     + 같은 항목들을 오늘까지로 캡해 금일 기준 인건비(today_person_cost) 산출
+		     + 초과/결근/파출(직원파출)/유틸 상세 내역(전부 오늘까지 누계)을 함께 반환 -->
 		SELECT
 			ea.*,
 			IFNULL(rc.regular_person_cost, 0) AS regular_person_cost,
@@ -2286,12 +2504,34 @@
 				+ IFNULL(uc.utility_person_cost, 0)
 				+ IFNULL(ic.integration_person_cost, 0),
 				0
-			) AS current_month_person_cost
+			) AS current_month_person_cost,
+			ROUND(
+				IFNULL(rc.regular_person_cost_today, 0)
+				+ IFNULL(rec.rec_person_cost, 0)
+				+ IFNULL(uct.utility_person_cost_today, 0)
+				+ IFNULL(ict.integration_person_cost_today, 0),
+				0
+			) AS today_person_cost,
+			IFNULL(od.overtime_hours, 0) AS overtime_hours,
+			IFNULL(ad.absence_count, 0) AS absence_count,
+			IFNULL(dd.dispatch_amount, 0) + IFNULL(edd.employee_dispatch_amount, 0) AS dispatch_total_amount,
+			IFNULL(dd.dispatch_amount, 0) AS dispatch_amount,
+			IFNULL(dd.dispatch_count, 0) AS dispatch_count,
+			IFNULL(edd.employee_dispatch_amount, 0) AS employee_dispatch_amount,
+			IFNULL(edd.employee_dispatch_count, 0) AS employee_dispatch_count,
+			IFNULL(ud.util_count, 0) AS util_count
 		FROM eligible_account ea
 		LEFT JOIN regular_cost rc ON rc.account_id = ea.account_id
 		LEFT JOIN rec_cost rec ON rec.account_id = ea.account_id
 		LEFT JOIN utility_cost uc ON uc.account_id = ea.account_id
 		LEFT JOIN integration_cost ic ON ic.account_id = ea.account_id
+		LEFT JOIN utility_cost_today uct ON uct.account_id = ea.account_id
+		LEFT JOIN integration_cost_today ict ON ict.account_id = ea.account_id
+		LEFT JOIN overtime_detail od ON od.account_id = ea.account_id
+		LEFT JOIN absence_detail ad ON ad.account_id = ea.account_id
+		LEFT JOIN dispatch_detail dd ON dd.account_id = ea.account_id
+		LEFT JOIN employee_dispatch_detail edd ON edd.account_id = ea.account_id
+		LEFT JOIN util_detail ud ON ud.account_id = ea.account_id
 		ORDER BY (ea.person_total / ea.sales_total) DESC
 	</select>
 

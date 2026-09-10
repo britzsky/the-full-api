@@ -98,6 +98,7 @@ public class HeadOfficeService {
 		return resultList;
 	}
 
+	// 본사 -> 회계관리 -> 손익표 합계/예산/소모품 예산 누계를 한 번에 갱신
 	@Transactional(rollbackFor = Exception.class) // 전체 업무 트랜잭션 관리
 	public int processProfitLoss(Map<String, Object> param) {
 
@@ -409,10 +410,12 @@ public class HeadOfficeService {
 		return headOfficeMapper.EvaluationFormUsers();
 	}
 
+	// 인사 -> 평가 설정 -> 평가 타입(문서종류) 목록 조회
 	public List<Map<String, Object>> EvaluationTypeList() {
 		return headOfficeMapper.EvaluationTypeList();
 	}
 
+	// 인사 -> 평가 설정 -> 평가 타입 신규 등록/수정 (doc_id 없으면 신규, 있으면 수정)
 	public int EvaluationTypeSave(Map<String, Object> paramMap) {
 		String docId = String.valueOf(paramMap.getOrDefault("doc_id", "")).trim();
 		if (docId.isEmpty())
@@ -420,6 +423,7 @@ public class HeadOfficeService {
 		return headOfficeMapper.EvaluationTypeUpdate(paramMap);
 	}
 
+	// 인사 -> 평가 설정 -> 평가 타입 삭제(del_yn=Y)
 	public int EvaluationTypeDelete(Map<String, Object> paramMap) {
 		return headOfficeMapper.EvaluationTypeDelete(paramMap);
 	}
