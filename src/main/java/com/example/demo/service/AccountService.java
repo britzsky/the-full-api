@@ -1808,9 +1808,18 @@ public class AccountService {
 		Map<String, Object> body = welstoryCallApi("payer-rep-soldto", accessToken, dataHeader);
 
 		Object dataBody = body.get("dataBody");
-		if (!(dataBody instanceof Map))
+		if (!(dataBody instanceof Map)) {
+			// dataBody 자체가 없으면 응답 구조가 예상과 다르다는 뜻 -> 원인 파악을 위해 응답 전체를 남긴다
+			log.warn("[WelstorySync] payer-rep-soldto 응답 형식 이상, body={}", body);
 			return List.of();
-		Object data = ((Map<String, Object>) dataBody).get("data");
+		}
+		Map<String, Object> db = (Map<String, Object>) dataBody;
+		if (!"S0000".equals(db.get("resCd"))) {
+			// receiveDetail과 동일하게, 정상(S0000)이 아니면 반드시 로그를 남겨서 원인(토큰만료/IP차단/파라미터오류 등)을 알 수 있게 함
+			log.warn("[WelstorySync] payer-rep-soldto 오류 resCd={} resMsg={}", db.get("resCd"), db.get("resMsg"));
+			return List.of();
+		}
+		Object data = db.get("data");
 		return data instanceof List ? (List<Map<String, Object>>) data : List.of();
 	}
 

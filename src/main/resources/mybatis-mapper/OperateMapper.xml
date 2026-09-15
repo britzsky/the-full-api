@@ -2091,10 +2091,8 @@
 				LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d')) AS month_end,
 				DAY(LAST_DAY(STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-01'), '%Y-%m-%d'))) AS month_days,
 				<!-- 🔹 금일 기준 인건비 계산의 기준일(KST). 조회 월이 과거면 month_end로 캡되어 당월 값과 같아지고,
-				     미래면 cost_start보다 작아져 자동으로 0원 처리된다.
-				     ⚠️ TEMP(로컬 전용): 로컬 DB 서버 시간이 이미 KST라 +09:00 변환하면 하루 밀림 → 요청으로 임시 0시간(DATE(NOW()))으로 낮춤.
-				        운영 배포 전에 DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))로 되돌릴 것! -->
-				DATE(NOW()) AS today,
+				     미래면 cost_start보다 작아져 자동으로 0원 처리된다. -->
+				DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00')) AS today,
 				3600000 AS utility_month_salary,      <!-- 유틸 직원 월 고정액 -->
 				330000 AS integration_account_cost    <!-- 통합 직원, 업장 1곳당 고정단가 -->
 		),
@@ -2138,6 +2136,22 @@
 			  AND (am.del_dt IS NULL OR DATE(am.del_dt) <![CDATA[ >= ]]> p.month_start)
 			  AND (IFNULL(am.del_yn, 'N') != 'Y' OR am.del_dt IS NOT NULL)
 		),
+		<!-- 🔹 "당월 예상" 계산의 신뢰 구간 : 직원별로 이번 달 tb_account_record에 실제 마지막으로 기록이 남은 날짜.
+		     출근부가 월초에 한 달치를 미리 다 채워두는 업장도 있지만, 일부 업장은 특정 날짜(예: 업장휴무)까지만
+		     기록해두고 그 이후로는 아예 손을 안 댄 채로 방치되기도 함 — 이 경우 "기록이 없으니 정상근무"로
+		     월말까지 그대로 밀어붙이면 실제로는 아무도 확인 안 한 날짜까지 정상근무로 예상해버리는 꼴이 됨.
+		     그래서 직원별 마지막 기록일까지만 "당월 예상"에 반영하고, 그 이후는 0원 처리한다.
+		     (이번 달에 기록이 하나도 없는 직원은 원래 정상 출근일엔 기록을 안 남기는 근무형태일 수 있어서
+		      예외 처리 — 이 경우엔 기존처럼 월말까지 그대로 일할계산한다.) -->
+		member_last_record_month AS (
+			SELECT
+				ar.member_id,
+				MAX(ar.record_date) AS last_record_date
+			FROM tb_account_record ar
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			GROUP BY ar.member_id
+		),
 		member_month_cost AS (
 			-- 재직 구간만큼 급여를 일할 계산 (전 직군 공통, 유틸/통합은 아래에서 별도 배분 방식 적용)
 			SELECT
@@ -2145,8 +2159,32 @@
 				(mp.monthly_salary / mp.month_days) * (DATEDIFF(mp.cost_end, mp.cost_start) + 1) AS prorated_salary,
 				<!-- 🔹 금일 기준 : cost_end를 오늘로 한번 더 캡해서 같은 방식으로 일할 계산 (오늘 이전 구간이면 0으로 처리) -->
 				(mp.monthly_salary / mp.month_days)
-					* GREATEST(DATEDIFF(LEAST(mp.cost_end, mp.today), mp.cost_start) + 1, 0) AS prorated_salary_today
+					* GREATEST(DATEDIFF(LEAST(mp.cost_end, mp.today), mp.cost_start) + 1, 0) AS prorated_salary_today,
+				<!-- 🔹 당월 예상 : cost_end를 "이 직원의 이번 달 마지막 출근부 기록일"로 한번 더 캡한 날짜.
+				     기록이 하나도 없으면 lrm.last_record_date가 NULL이라 COALESCE로 원래 cost_end 그대로 사용(폴백).
+				     결근/초과/조퇴 집계(regular_*_month)와 일할계산(prorated_salary_month_capped) 둘 다 이 날짜를 기준으로 삼는다. -->
+				LEAST(
+					mp.cost_end,
+					COALESCE(
+						STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-', LPAD(lrm.last_record_date, 2, '0')), '%Y-%m-%d'),
+						mp.cost_end
+					)
+				) AS cost_end_month_capped,
+				(mp.monthly_salary / mp.month_days)
+					* GREATEST(
+						DATEDIFF(
+							LEAST(
+								mp.cost_end,
+								COALESCE(
+									STR_TO_DATE(CONCAT(#{year}, '-', LPAD(#{month}, 2, '0'), '-', LPAD(lrm.last_record_date, 2, '0')), '%Y-%m-%d'),
+									mp.cost_end
+								)
+							),
+							mp.cost_start
+						) + 1,
+					0) AS prorated_salary_month_capped
 			FROM member_period mp
+			LEFT JOIN member_last_record_month lrm ON lrm.member_id = mp.member_id
 			WHERE mp.cost_start <![CDATA[ <= ]]> mp.cost_end
 		),
 
@@ -2264,7 +2302,7 @@
 			  AND STR_TO_DATE(
 				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
 				  '%Y-%m-%d'
-			  ) BETWEEN mc.cost_start AND mc.cost_end
+			  ) BETWEEN mc.cost_start AND mc.cost_end_month_capped
 			GROUP BY ar.member_id
 		),
 		regular_overtime_hours_month AS (
@@ -2281,7 +2319,7 @@
 			  AND STR_TO_DATE(
 				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
 				  '%Y-%m-%d'
-			  ) BETWEEN mc.cost_start AND mc.cost_end
+			  ) BETWEEN mc.cost_start AND mc.cost_end_month_capped
 			GROUP BY ar.member_id
 		),
 		regular_early_leave_hours_month AS (
@@ -2298,13 +2336,13 @@
 			  AND STR_TO_DATE(
 				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
 				  '%Y-%m-%d'
-			  ) BETWEEN mc.cost_start AND mc.cost_end
+			  ) BETWEEN mc.cost_start AND mc.cost_end_month_capped
 			GROUP BY ar.member_id
 		),
 		regular_cost_month_by_hours AS (
 			SELECT
 				mc.member_id,
-				mc.prorated_salary
+				mc.prorated_salary_month_capped
 					- ((mc.monthly_salary / mc.month_days) * IFNULL(adm.absence_days_month, 0))
 					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(elm.early_leave_hours, 0))
 					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(otm.overtime_hours, 0) * 1.5) AS cost_month_hours
@@ -2332,7 +2370,14 @@
 				ROUND(SUM(mc.prorated_salary), 0) AS regular_person_cost,
 				<!-- 근무타입 마스터 매칭되면 결근/조퇴 차감 + 초과수당 가산 방식, 못 찾으면 기존 달력 일할계산으로 폴백 -->
 				ROUND(SUM(IFNULL(rcth.cost_today_hours, mc.prorated_salary_today)), 0) AS regular_person_cost_today,
-				ROUND(SUM(IFNULL(rcmh.cost_month_hours, mc.prorated_salary)), 0) AS estimated_regular_person_cost
+				<!-- 🔹 폴백도 prorated_salary가 아니라 prorated_salary_month_capped(직원별 마지막 출근부 기록일까지만
+				     반영) 사용 — 출근부가 중간에 끊긴 업장이 월말까지 정상근무로 처리되는 걸 방지 -->
+				ROUND(SUM(IFNULL(rcmh.cost_month_hours, mc.prorated_salary_month_capped)), 0) AS estimated_regular_person_cost,
+				<!-- 🔹 인건비 확보금액(인건비×120%) : 직원 개인별로 1.2를 곱한 뒤 합산한다(계정 합계에 나중에 ×1.2 하는 게
+				     아님 — 인건비 확보금액은 "직원마다" 계산해야 한다는 요구사항). -->
+				ROUND(SUM(mc.prorated_salary * 1.2), 0) AS regular_person_cost_secured,
+				ROUND(SUM(IFNULL(rcth.cost_today_hours, mc.prorated_salary_today) * 1.2), 0) AS regular_person_cost_today_secured,
+				ROUND(SUM(IFNULL(rcmh.cost_month_hours, mc.prorated_salary_month_capped) * 1.2), 0) AS estimated_regular_person_cost_secured
 			FROM member_month_cost mc
 			LEFT JOIN regular_cost_today_by_hours rcth ON rcth.member_id = mc.member_id
 			LEFT JOIN regular_cost_month_by_hours rcmh ON rcmh.member_id = mc.member_id
@@ -2371,7 +2416,8 @@
 			-- rec_person_cost 자체가 항상 "오늘 기준" 값과 같다 (과거 월 조회 시엔 오늘>=month_end라 당월 전체 값과도 같아짐)
 			SELECT
 				account_id,
-				ROUND(SUM(prorated_salary), 0) AS rec_person_cost
+				ROUND(SUM(prorated_salary), 0) AS rec_person_cost,
+				ROUND(SUM(prorated_salary * 1.2), 0) AS rec_person_cost_secured
 			FROM rec_month_cost
 			GROUP BY account_id
 		),
@@ -2411,7 +2457,14 @@
 					* (DATEDIFF(mc.cost_end, mc.cost_start) + 1)
 					/ utd.total_days
 					* ua.workplace_days
-				), 0) AS utility_person_cost
+				), 0) AS utility_person_cost,
+				ROUND(SUM(
+					(mc.utility_month_salary / mc.month_days)
+					* (DATEDIFF(mc.cost_end, mc.cost_start) + 1)
+					/ utd.total_days
+					* ua.workplace_days
+					* 1.2
+				), 0) AS utility_person_cost_secured
 			FROM utility_attendance ua
 			JOIN utility_total_days utd ON utd.member_id = ua.member_id
 			JOIN member_month_cost mc ON mc.member_id = ua.member_id AND mc.position_type = 6
@@ -2437,7 +2490,8 @@
 		integration_cost AS (
 			SELECT
 				iw.account_id,
-				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost
+				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost,
+				ROUND(COUNT(*) * MAX(mc.integration_account_cost) * 1.2, 0) AS integration_person_cost_secured
 			FROM integration_workplace iw
 			JOIN member_month_cost mc ON mc.member_id = iw.member_id AND mc.position_type = 7
 			GROUP BY iw.account_id
@@ -2475,7 +2529,13 @@
 					mc.prorated_salary_today
 					/ utd.total_days_today
 					* ua.workplace_days_today
-				), 0) AS utility_person_cost_today
+				), 0) AS utility_person_cost_today,
+				ROUND(SUM(
+					mc.prorated_salary_today
+					/ utd.total_days_today
+					* ua.workplace_days_today
+					* 1.2
+				), 0) AS utility_person_cost_today_secured
 			FROM utility_attendance_today ua
 			JOIN utility_total_days_today utd ON utd.member_id = ua.member_id
 			JOIN member_month_cost mc ON mc.member_id = ua.member_id AND mc.position_type = 6
@@ -2501,7 +2561,8 @@
 		integration_cost_today AS (
 			SELECT
 				iw.account_id,
-				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost_today
+				COUNT(*) * MAX(mc.integration_account_cost) AS integration_person_cost_today,
+				ROUND(COUNT(*) * MAX(mc.integration_account_cost) * 1.2, 0) AS integration_person_cost_today_secured
 			FROM integration_workplace_today iw
 			JOIN member_month_cost mc ON mc.member_id = iw.member_id AND mc.position_type = 7
 			GROUP BY iw.account_id
@@ -2545,6 +2606,7 @@
 			SELECT
 				d.account_id,
 				SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) ELSE 0 END) AS dispatch_amount,
+				ROUND(SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) * 1.2 ELSE 0 END), 0) AS dispatch_amount_secured,
 				SUM(CASE WHEN r.is_present = 'Y' THEN 1 ELSE 0 END) AS dispatch_count
 			FROM tb_account_members_dispatch d
 			JOIN tb_account_record_dispatch r
@@ -2566,6 +2628,7 @@
 			SELECT
 				ar.account_id,
 				SUM(IFNULL(ar.salary, 0)) AS employee_dispatch_amount,
+				ROUND(SUM(IFNULL(ar.salary, 0) * 1.2), 0) AS employee_dispatch_amount_secured,
 				COUNT(*) AS employee_dispatch_count
 			FROM tb_account_record ar
 			CROSS JOIN params p
@@ -2626,6 +2689,7 @@
 			SELECT
 				d.account_id,
 				SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) ELSE 0 END) AS dispatch_amount_month,
+				ROUND(SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) * 1.2 ELSE 0 END), 0) AS dispatch_amount_month_secured,
 				SUM(CASE WHEN r.is_present = 'Y' THEN 1 ELSE 0 END) AS dispatch_count_month
 			FROM tb_account_members_dispatch d
 			JOIN tb_account_record_dispatch r
@@ -2641,6 +2705,7 @@
 			SELECT
 				ar.account_id,
 				SUM(IFNULL(ar.salary, 0)) AS employee_dispatch_amount_month,
+				ROUND(SUM(IFNULL(ar.salary, 0) * 1.2), 0) AS employee_dispatch_amount_month_secured,
 				COUNT(*) AS employee_dispatch_count_month
 			FROM tb_account_record ar
 			WHERE ar.record_year = #{year}
@@ -2758,6 +2823,34 @@
 				+ IFNULL(eddm.employee_dispatch_amount_month, 0),
 				0
 			) AS estimated_month_person_cost,
+			<!-- 🔹 인건비 확보금액(인건비×120%) : 당월/금일/당월예상 각각에 대해, 계정 합계에 ×1.2 하는 게 아니라
+			     직원 개인별로 1.2를 곱한 값을 각 하위 CTE에서 합산해 올라온 값들을 그대로 더한 것 —
+			     그래서 "직원마다 계산"이라는 요구사항대로 결과가 나온다. -->
+			ROUND(
+				IFNULL(rc.regular_person_cost_secured, 0)
+				+ IFNULL(rec.rec_person_cost_secured, 0)
+				+ IFNULL(uc.utility_person_cost_secured, 0)
+				+ IFNULL(ic.integration_person_cost_secured, 0),
+				0
+			) AS current_month_person_cost_secured,
+			ROUND(
+				IFNULL(rc.regular_person_cost_today_secured, 0)
+				+ IFNULL(rec.rec_person_cost_secured, 0)
+				+ IFNULL(uct.utility_person_cost_today_secured, 0)
+				+ IFNULL(ict.integration_person_cost_today_secured, 0)
+				+ IFNULL(dd.dispatch_amount_secured, 0)
+				+ IFNULL(edd.employee_dispatch_amount_secured, 0),
+				0
+			) AS today_person_cost_secured,
+			ROUND(
+				IFNULL(rc.estimated_regular_person_cost_secured, 0)
+				+ IFNULL(rec.rec_person_cost_secured, 0)
+				+ IFNULL(uc.utility_person_cost_secured, 0)
+				+ IFNULL(ic.integration_person_cost_secured, 0)
+				+ IFNULL(ddm.dispatch_amount_month_secured, 0)
+				+ IFNULL(eddm.employee_dispatch_amount_month_secured, 0),
+				0
+			) AS estimated_month_person_cost_secured,
 			IFNULL(od.overtime_hours, 0) AS overtime_hours,
 			IFNULL(ad.absence_count, 0) AS absence_count,
 			IFNULL(dd.dispatch_amount, 0) + IFNULL(edd.employee_dispatch_amount, 0) AS dispatch_total_amount,
