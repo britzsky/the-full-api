@@ -5,7 +5,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1583,15 +1582,15 @@ public class AccountService {
 	//   WelstorySyncScheduler(매일 17시 KST)
 	//     -> WelstoryPurchaseSync()                         제휴사 2곳 순회
 	//       -> welstorySyncOneClient(client)                 client 하나: 토큰발급 -> 사업장(soldTo) 목록조회
-	//         -> welstorySyncReceiveDetail(soldTo 하나)       입고내역 조회 -> clientOrd(주문번호)별로 그룹핑
-	//           -> AccountPurchaseSave(master 1행)            주문 1건 = tb_account_purchase_tally 1 row
-	//           -> AccountPurchaseDetailSave(detail N행)      주문 안의 품목들 = tb_account_purchase_tally_detail N rows
+	//         -> welstorySyncReceiveDetail(soldTo 하나)       그날 입고내역 전체 조회
+	//           -> AccountPurchaseSave(master 1행)            "하루당 1 master" = tb_account_purchase_tally 1 row
+	//           -> AccountPurchaseDetailSave(detail N행)      그날 전체 품목(주문 여러 건 섞여있어도) = tb_account_purchase_tally_detail N rows
 	//
 	// account_id는 tb_account.welstory_soldto 컬럼(soldTo 코드 매핑, 수동 등록해둔 값)으로 조회하며,
 	// 매핑이 없는 soldTo(신규 사업장 등)는 저장하지 않고 경고 로그만 남기고 건너뛴다.
 
 	// 진입점. 스케줄러가 이 메서드 하나만 호출한다.
-	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된 주문 건수 합계를 반환
+	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된 master(soldTo/날짜) 건수 합계를 반환
 	// 오늘자 입고내역 동기화 (스케줄러가 매일 부르는 기본 진입점)
 	// LocalDate.now()가 아니라 Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
 	// 자정 근처(KST 00~09시, UTC로는 전날)에 날짜가 하루 어긋날 수 있다 (guid와 동일한 이유).
@@ -1651,98 +1650,99 @@ public class AccountService {
 	}
 
 	// 사업장(soldTo) 1곳의 오늘자 입고내역을 조회해서 저장한다.
-	// 웰스토리는 입고내역을 품목(line) 단위 배열로 주는데, 같은 clientOrd(주문번호)에 여러 품목이 묶여 있으므로
-	// clientOrd 단위로 그룹핑해서 "주문 1건 = master 1행(tb_account_purchase_tally) + 품목별 detail N행" 형태로 변환한다.
+	// [사용자 확정] "하루당 한 마스터"로 저장한다: 그날 이 soldTo(=account_id)에 여러 주문(clientOrd)이 있어도
+	// clientOrd별로 쪼개지 않고 전부 하나의 master 1행(tb_account_purchase_tally) 밑에
+	// detail N행(tb_account_purchase_tally_detail, 그날의 전체 품목 라인)으로 저장한다.
 	private int welstorySyncReceiveDetail(String accessToken, String soldTo, String accountId, String payerNm,
 			String reqDeliveryDate) {
-		List<Map<String, Object>> items = welstoryReceiveDetail(accessToken, soldTo, reqDeliveryDate);
-		if (items.isEmpty()) {
+		List<Map<String, Object>> lines = welstoryReceiveDetail(accessToken, soldTo, reqDeliveryDate);
+		if (lines.isEmpty()) {
 			return 0;
 		}
 
-		// clientOrd(주문번호) -> 그 주문에 속한 품목 라인들. LinkedHashMap이라 응답에 온 순서 그대로 유지됨
-		Map<String, List<Map<String, Object>>> byClientOrd = new LinkedHashMap<>();
-		for (Map<String, Object> item : items) {
-			String clientOrd = String.valueOf(item.get("clientOrd"));
-			byClientOrd.computeIfAbsent(clientOrd, k -> new ArrayList<>()).add(item);
+		// ---- master(하루 단위) 합계 계산 ----
+		// 기존 프론트(AccountPurchaseDeadlineTab.js)의 과세/면세 집계 로직과 동일한 기준을 따름:
+		//   total   = 모든 품목의 totAmt(품목 합계금액) 합
+		//   vat     = 모든 품목의 vat(부가세) 합
+		//   tax     = 과세 품목(taxCode가 'Full TAX' 또는 'CONS')의 (totAmt - vat) = 공급가액 합
+		//   taxFree = 면세 품목(taxCode가 'No TAX')의 totAmt 합
+		long total = 0, vat = 0, tax = 0, taxFree = 0;
+		for (Map<String, Object> line : lines) {
+			long amount = welstoryAsLong(line.get("totAmt"));
+			long lineVat = welstoryAsLong(line.get("vat"));
+			total += amount;
+			vat += lineVat;
+			if (welstoryIsTaxable(String.valueOf(line.get("taxCode")))) {
+				tax += (amount - lineVat);
+			} else {
+				taxFree += amount;
+			}
 		}
 
-		int saved = 0;
-		for (Map.Entry<String, List<Map<String, Object>>> entry : byClientOrd.entrySet()) {
-			String clientOrd = entry.getKey();
-			List<Map<String, Object>> lines = entry.getValue();
+		// ---- master row 저장: tb_account_purchase_tally (PK = sale_id) ----
+		// sale_id = account_id + "_" + 입고일 -> 이 사업장의 이 날짜를 가리키는 고유키.
+		// 스케줄러가 재실행돼도(같은 날짜) 항상 같은 sale_id라 ON DUPLICATE KEY UPDATE로 덮어쓰기만 되고 중복 row가 안 생긴다.
+		String saleId = accountId + "_" + reqDeliveryDate;
 
-			// ---- master(주문 단위) 합계 계산 ----
-			// 기존 프론트(AccountPurchaseDeadlineTab.js)의 과세/면세 집계 로직과 동일한 기준을 따름:
-			//   total   = 모든 품목의 totAmt(품목 합계금액) 합
-			//   vat     = 모든 품목의 vat(부가세) 합
-			//   tax     = 과세 품목(taxCode가 'Full TAX' 또는 'CONS')의 (totAmt - vat) = 공급가액 합
-			//   taxFree = 면세 품목(taxCode가 'No TAX')의 totAmt 합
-			long total = 0, vat = 0, tax = 0, taxFree = 0;
-			for (Map<String, Object> line : lines) {
-				long amount = welstoryAsLong(line.get("totAmt"));
-				long lineVat = welstoryAsLong(line.get("vat"));
-				total += amount;
-				vat += lineVat;
-				if (welstoryIsTaxable(String.valueOf(line.get("taxCode")))) {
-					tax += (amount - lineVat);
-				} else {
-					taxFree += amount;
-				}
-			}
+		Map<String, Object> master = new HashMap<>();
+		master.put("account_id", accountId);
+		master.put("sale_id", saleId);
+		master.put("type", "1"); // 삼성웰스토리 계열 고정 type (기존 "거래처 마감 자료" 화면의 type 1~4 중 1번 사용, 사용자 확정값)
+		master.put("saleDate", welstoryToIsoDate(String.valueOf(lines.get(0).get("billDate")))); // 입고일(YYYYMMDD) -> "YYYY-MM-DD"
+		master.put("total", total);
+		master.put("discount", 0); // 웰스토리 입고내역엔 할인 개념이 없어서 항상 0
+		master.put("vat", vat);
+		master.put("taxFree", taxFree);
+		master.put("tax", tax);
+		master.put("use_name", "삼성웰스토리(주)"); // 고정값(사용자 확정) — 사업장명(soldToNm)이 아니라 공급처명 고정 표기
+		master.put("buyer", payerNm); // 구매자(제휴사)명: "주식회사 더채움" 또는 "더채움(위탁급식)"
+		// 나중에 이 row가 어느 soldTo에서 왔는지 추적할 수 있도록 note에 남겨둠 (별도 컬럼이 없어서)
+		master.put("note", "웰스토리 API 자동연동 (soldTo=" + soldTo + ")");
+		master.put("user_id", WELSTORY_SYNC_USER_ID);
+		AccountPurchaseSave(master);
 
-			// ---- master row 저장: tb_account_purchase_tally (PK = sale_id) ----
-			// sale_id에 clientOrd(웰스토리 주문번호)를 그대로 사용 -> 스케줄러가 재실행돼도
-			// 같은 주문이면 ON DUPLICATE KEY UPDATE로 덮어쓰기만 되고 중복 row가 생기지 않는다.
-			Map<String, Object> master = new HashMap<>();
-			master.put("account_id", accountId);
-			master.put("sale_id", clientOrd);
-			master.put("type", "1"); // 삼성웰스토리 계열 고정 type (기존 "거래처 마감 자료" 화면의 type 1~4 중 1번 사용, 사용자 확정값)
-			master.put("saleDate", welstoryToIsoDate(String.valueOf(lines.get(0).get("billDate")))); // 입고일(YYYYMMDD) -> "YYYY-MM-DD"
-			master.put("total", total);
-			master.put("discount", 0); // 웰스토리 입고내역엔 할인 개념이 없어서 항상 0
-			master.put("vat", vat);
-			master.put("taxFree", taxFree);
-			master.put("tax", tax);
-			master.put("use_name", "삼성웰스토리(주)"); // 고정값(사용자 확정) — 사업장명(soldToNm)이 아니라 공급처명 고정 표기
-			master.put("buyer", payerNm); // 구매자(제휴사)명: "주식회사 더채움" 또는 "더채움(위탁급식)"
-			// 나중에 이 row가 어느 soldTo/주문유형에서 왔는지 추적할 수 있도록 note에 남겨둠 (별도 컬럼이 없어서)
-			master.put("note", "웰스토리 API 자동연동 (soldTo=" + soldTo + ", orderType=" + lines.get(0).get("orderType") + ")");
-			master.put("user_id", WELSTORY_SYNC_USER_ID);
-			AccountPurchaseSave(master);
+		// ---- detail row 저장: tb_account_purchase_tally_detail (PK = item_id + sale_id) ----
+		// 품목 한 줄(clientOrd + clientOrdItem)마다 한 행씩 저장. 하루에 주문(clientOrd)이 여러 건 있을 수 있고
+		// clientOrdItem 번호는 주문 안에서만 유일(주문마다 1번부터 다시 시작)하므로, item_id는 clientOrdItem을
+		// 그대로 쓰지 않고 clientOrd까지 합쳐서 하루 전체에서 유일한 값이 되도록 만든다.
+		for (Map<String, Object> line : lines) {
+			boolean taxable = welstoryIsTaxable(String.valueOf(line.get("taxCode")));
+			// taxCode='CONS'는 가이드상 "소모품"을 의미 -> itemType(상품구분)을 소모품(2)으로 매핑,
+			// 그 외(Full TAX/No TAX)는 식재료(1)로 간주 (웰스토리는 식자재 발주 API라 '경관식'은 별도 신호가 없어 사용하지 않음)
+			boolean isCons = "CONS".equalsIgnoreCase(String.valueOf(line.get("taxCode")));
+			long amount = welstoryAsLong(line.get("totAmt"));
+			long lineVat = welstoryAsLong(line.get("vat"));
+			String clientOrd = String.valueOf(line.get("clientOrd"));
 
-			// ---- detail row 저장: tb_account_purchase_tally_detail (PK = item_id + sale_id) ----
-			// 품목 한 줄(clientOrdItem)마다 한 행씩 저장
-			for (Map<String, Object> line : lines) {
-				boolean taxable = welstoryIsTaxable(String.valueOf(line.get("taxCode")));
-				// taxCode='CONS'는 가이드상 "소모품"을 의미 -> itemType(상품구분)을 소모품(2)으로 매핑,
-				// 그 외(Full TAX/No TAX)는 식재료(1)로 간주 (웰스토리는 식자재 발주 API라 '경관식'은 별도 신호가 없어 사용하지 않음)
-				boolean isCons = "CONS".equalsIgnoreCase(String.valueOf(line.get("taxCode")));
-				long amount = welstoryAsLong(line.get("totAmt"));
-				long lineVat = welstoryAsLong(line.get("vat"));
-
-				Map<String, Object> detail = new HashMap<>();
-				// item_id 컬럼은 DB에서 int AUTO_INCREMENT로 정의돼 있지만,
-				// 여기서는 웰스토리가 주는 clientOrdItem(주문 내 품목 일련번호, 예: "000001")을 정수로 변환해 명시적으로 채운다.
-				// (sale_id, item_id) 조합이 매 실행마다 항상 동일해야 ON DUPLICATE KEY UPDATE가 "새 행 추가"가 아니라
-				// "기존 행 갱신"으로 동작한다 -> 그래야 스케줄러를 몇 번 재실행해도(테스트로 1분마다 돌려도) 중복 저장되지 않음.
-				detail.put("item_id", (int) welstoryAsLong(line.get("clientOrdItem")));
-				detail.put("sale_id", clientOrd); // master와 연결되는 FK
-				detail.put("name", line.get("itemName"));
-				detail.put("qty", line.get("billQty")); // 주문수량(ordQty)이 아니라 실제 입고수량(billQty) 사용 - 이 화면은 입고/정산 기준이라서
-				detail.put("amount", amount); // 품목 합계금액(totAmt, 부가세 포함)
-				detail.put("unitPrice", line.get("unitPrice"));
-				detail.put("vat", lineVat);
-				detail.put("tax", taxable ? (amount - lineVat) : 0); // 공급가액(과세일 때만). 면세면 0
-				detail.put("taxType", taxable ? "1" : "2"); // 기존 화면 코드값: 1=과세, 2=면세
-				detail.put("itemType", isCons ? "2" : "1"); // 기존 화면 코드값: 1=식재료, 2=소모품
-				detail.put("note", line.get("standard")); // 규격(standard) 정보를 참고용으로 note에 저장 (전용 컬럼 없음)
-				detail.put("user_id", WELSTORY_SYNC_USER_ID);
-				AccountPurchaseDetailSave(detail);
-			}
-			saved++; // 처리한 주문(clientOrd) 건수
+			Map<String, Object> detail = new HashMap<>();
+			detail.put("item_id", welstoryDailyItemId(clientOrd, line.get("clientOrdItem")));
+			detail.put("sale_id", saleId); // master와 연결되는 FK
+			detail.put("name", line.get("itemName"));
+			detail.put("qty", line.get("billQty")); // 주문수량(ordQty)이 아니라 실제 입고수량(billQty) 사용 - 이 화면은 입고/정산 기준이라서
+			detail.put("amount", amount); // 품목 합계금액(totAmt, 부가세 포함)
+			detail.put("unitPrice", line.get("unitPrice"));
+			detail.put("vat", lineVat);
+			detail.put("tax", taxable ? (amount - lineVat) : 0); // 공급가액(과세일 때만). 면세면 0
+			detail.put("taxType", taxable ? "1" : "2"); // 기존 화면 코드값: 1=과세, 2=면세
+			detail.put("itemType", isCons ? "2" : "1"); // 기존 화면 코드값: 1=식재료, 2=소모품
+			// 규격(standard) + 주문번호(clientOrd)를 참고용으로 note에 저장 (전용 컬럼이 없고, 여러 주문이 한 master로 합쳐져서
+			// 어느 주문 소속 품목인지 구분할 수 있는 유일한 단서라 반드시 남겨둔다)
+			detail.put("note", line.get("standard") + " (" + clientOrd + ")");
+			detail.put("user_id", WELSTORY_SYNC_USER_ID);
+			AccountPurchaseDetailSave(detail);
 		}
-		return saved;
+		return 1; // 이 soldTo/날짜에 대해 master 1건 저장(=처리 성공)
+	}
+
+	// detail.item_id(int) 생성: clientOrdItem은 "그 주문 안에서만" 유일해서(주문마다 1번부터 다시 시작),
+	// 하루에 여러 주문(clientOrd)이 섞이면 그대로 쓸 수 없다.
+	// clientOrd의 해시값을 상위 자릿수로, clientOrdItem을 하위 2자리로 붙여서 "이 날짜 전체에서 유일한" 정수를 만든다.
+	// clientOrd 문자열 자체의 해시라서 몇 번을 재실행해도, 다른 주문이 추가/삭제돼도 항상 같은 값이 나옴(순서에 의존하지 않음)
+	// -> ON DUPLICATE KEY UPDATE가 매번 같은 행을 정확히 다시 찾아서 안전하게 재실행(idempotent)된다.
+	private int welstoryDailyItemId(String clientOrd, Object clientOrdItem) {
+		int clientOrdHash = Math.abs(clientOrd.hashCode()) % 1_000_000;
+		int itemNo = (int) (welstoryAsLong(clientOrdItem) % 100);
+		return clientOrdHash * 100 + itemNo;
 	}
 
 	// 웰스토리 taxCode 문자열을 과세/면세 boolean으로 변환.
