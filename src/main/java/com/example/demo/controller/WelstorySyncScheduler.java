@@ -23,7 +23,7 @@ public class WelstorySyncScheduler {
 
 	// 매일 17시(KST) 웰스토리 입고내역을 조회하여 tb_account_purchase_tally(_detail)에 저장.
 	// TODO: 테스트용으로 5분마다 실행되게 임시로 바꿔둠 — 확인 끝나면 기본값 "0 0 17 * * *"로 되돌릴 것
-	@Scheduled(cron = "${welstory.sync.cron:0 */5 * * * *}", zone = "Asia/Seoul")
+	@Scheduled(cron = "${welstory.sync.cron:0 */1 * * * *}", zone = "Asia/Seoul")
 	public void runWelstoryPurchaseSync() {
 		try {
 			log.info("[WelstorySyncScheduler] 웰스토리 입고내역 동기화 시작");

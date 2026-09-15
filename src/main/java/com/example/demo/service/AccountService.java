@@ -1593,8 +1593,10 @@ public class AccountService {
 	// 진입점. 스케줄러가 이 메서드 하나만 호출한다.
 	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된 주문 건수 합계를 반환
 	// 오늘자 입고내역 동기화 (스케줄러가 매일 부르는 기본 진입점)
+	// LocalDate.now()가 아니라 Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
+	// 자정 근처(KST 00~09시, UTC로는 전날)에 날짜가 하루 어긋날 수 있다 (guid와 동일한 이유).
 	public int WelstoryPurchaseSync() {
-		String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+		String today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 		return WelstoryPurchaseSync(today);
 	}
 
@@ -1614,8 +1616,12 @@ public class AccountService {
 	//      -> 사업장 목록을 하드코딩하지 않고 매번 API로 받아오므로, 웰스토리 쪽에 사업장이 추가/변경돼도 코드 수정 불필요
 	//   3) 사업장마다 tb_account 매핑을 확인해서 있는 것만, reqDeliveryDate 기준 입고내역 동기화
 	private int welstorySyncOneClient(String clientId, String clientSecret, String reqDeliveryDate) {
-		// application-secret*.properties에 값이 없으면(=이 client 미사용 설정) 조용히 스킵
+		// application-secret*.properties에서 client_id/secret을 못 읽어온 경우.
+		// (0건만 찍히고 다른 로그가 전혀 없다면 대부분 이 케이스 — 이 서버에서 실제 로딩되는 secret 파일에
+		//  welstory.client1.id/secret, welstory.client2.id/secret 값이 비어있다는 뜻)
 		if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
+			log.warn("[WelstorySync] welstory.clientN.id/secret 프로퍼티가 비어있어 스킵함 (clientId blank={})",
+					clientId == null || clientId.isBlank());
 			return 0;
 		}
 		int saved = 0;
@@ -1768,8 +1774,13 @@ public class AccountService {
 	// 웰스토리 API 호출 시 http header에 실어 보내는 guid(거래 식별자) 생성.
 	// 가이드 스펙: "거래일시(17자리, yyyyMMddHHmmssSSS) + seq(2자리)" = 총 19자리이며, 모든 거래를 통틀어 중복되면 안 됨.
 	// 같은 밀리초 안에 연속 호출돼 타임스탬프가 겹치는 경우를 대비해 seq를 1~99 사이에서 순환시켜 뒤에 붙인다.
+	//
+	// LocalDateTime.now()는 서버(JVM) 로컬 시간대를 쓰는데, 배포 서버가 UTC라서 이걸 그대로 쓰면
+	// guid에 KST가 아니라 UTC 시각이 박혀 웰스토리 쪽에서 "GUID가 거래시간과 오차가 큽니다(E1007)"로 거절한다.
+	// 그래서 반드시 Asia/Seoul로 고정해서 시각을 뽑아야 한다.
 	private String welstoryNextGuid() {
-		String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+		String ts = LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
+				.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
 		int seq = (welstoryGuidSeq.incrementAndGet() % 99) + 1;
 		return ts + String.format("%02d", seq);
 	}
