@@ -1083,6 +1083,10 @@
 				AND T.del_yn = #{del_yn}
 	 		</if>
 			<choose>
+				<!-- ✅ member_id가 있으면 최우선으로 그 사람만 정확히 매칭 (이름 LIKE로 동명이인 오매칭 방지, 2026-09-15) -->
+				<when test='member_id != null and member_id != ""'>
+					AND T.member_id = #{member_id}
+				</when>
 				<when test='name != null and name != ""'>
 					AND T.name LIKE CONCAT('%', #{name}, '%')
 				</when>
@@ -2103,13 +2107,33 @@
 				IFNULL(am.position_type, 0) AS position_type,
 				IFNULL(am.salary, 0) AS monthly_salary,
 				GREATEST(COALESCE(DATE(am.act_join_dt), DATE(am.join_dt), p.month_start), p.month_start) AS cost_start,
-				LEAST(COALESCE(DATE(am.del_dt), p.month_end), p.month_end) AS cost_end,
+				<!-- 🔹 N근N휴/격일 로테이션 근무자(work_system 이름에 "N근N휴" 또는 "격일" 패턴)가 퇴사하면,
+				     퇴사일 다음날까지 재직으로 인정하는 관행이 있음("260910_ERP예산관리 프로그램_급여 참고자료.xlsx"
+				     2.직원관리 시트 S21/S22 코멘트: 2근1휴 근로자는 퇴사일 다음 휴무일까지 근무일로 인정 →
+				     차감일이 하루 줄어듦). 정확한 로테이션 위상(그날이 근무일인지 휴무일인지)까지는 알 수 없어서
+				     참고자료에 확인된 대로 균일하게 +1일만 보정한다. 입사(시작일)는 보정 안 함 — 참고자료에도
+				     퇴사 케이스만 있었음. -->
+				LEAST(
+					COALESCE(
+						CASE
+							WHEN am.del_dt IS NOT NULL
+							 AND (ws.work_system REGEXP '^[0-9]+근[0-9]+휴' OR ws.work_system LIKE '격일%')
+							THEN DATE_ADD(DATE(am.del_dt), INTERVAL 1 DAY)
+							ELSE DATE(am.del_dt)
+						END,
+						p.month_end
+					),
+					p.month_end
+				) AS cost_end,
 				p.today,
 				p.month_days,
 				p.utility_month_salary,
 				p.integration_account_cost
 			FROM tb_account_members am
 			CROSS JOIN params p
+			LEFT JOIN tb_account_member_work_system ws
+			  ON ws.idx = am.idx
+			 AND IFNULL(ws.del_yn, 'N') != 'Y'
 			WHERE COALESCE(DATE(am.act_join_dt), DATE(am.join_dt), p.month_start) <![CDATA[ <= ]]> p.month_end
 			  AND (am.del_dt IS NULL OR DATE(am.del_dt) <![CDATA[ >= ]]> p.month_start)
 			  AND (IFNULL(am.del_yn, 'N') != 'Y' OR am.del_dt IS NOT NULL)
@@ -2132,18 +2156,63 @@
 		     - tb_account_members에는 work_system(문자열) 컬럼이 없고, tb_account_members.idx가 바로
 		       tb_account_member_work_system.idx를 가리키는 FK다 (기존 AccountMapper.xml의 AccountInfoList_3
 		       쿼리 "T3.idx = T2.idx" 연결과 동일한 방식으로 확인됨) -->
-		<!-- 오늘까지 "근무로 인정"되는 날짜 수: 결근(type=4)만 빼고 나머지 기록은 전부 근무일로 인정 -->
-		regular_worked_days_today AS (
+		<!-- 오늘까지 결근(type=4) 처리된 날짜 수만 집계.
+		     ⚠️ tb_account_record는 초과/결근/연차/파출 등 "특이사항"만 저장되고(RecordSheetTab.js의 저장 로직상
+		     아무 것도 입력 안 한 정상 출근일은 row 자체가 안 생김), 정상 출근일에는 기록이 없다.
+		     그래서 "기록이 있는 날 수"를 근무일로 세면(예전 방식) 정상 출근일이 전부 빠져 금일 인건비가
+		     실제보다 크게 낮게 잡히는 문제가 있었음 — 담당자가 출근부를 보고 인건비를 입력할 때 하는 판단
+		     ("특이사항 없으면 정상 출근")과 반대 방향이었다. 아래처럼 "결근한 날만 세서 차감"하는 방식으로
+		     바꿔서 같은 판단 방식을 SQL로 재현한다. -->
+		regular_absence_days_today AS (
 			SELECT
 				ar.member_id,
-				COUNT(DISTINCT ar.record_date) AS worked_days_today
+				COUNT(DISTINCT ar.record_date) AS absence_days_today
 			FROM tb_account_record ar
 			JOIN member_month_cost mc
 			  ON mc.member_id = ar.member_id
 			 AND mc.position_type NOT IN (6, 7)
 			WHERE ar.record_year = #{year}
 			  AND ar.record_month = #{month}
-			  AND ar.type != 4
+			  AND ar.type = 4
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND LEAST(mc.cost_end, mc.today)
+			GROUP BY ar.member_id
+		),
+		<!-- 초과(type=3) : 참고자료 "1.급여대장"의 연장/초과수당(=시급×시간×1.5) 산식 근거로
+		     직원별 시간을 오늘까지/당월로 각각 집계 (note에 0.5시간 단위로 저장된 값, 기존 overtime_detail과
+		     동일 방식이지만 여기선 계정 합계가 아니라 "직원별" 시급 계산에 쓰기 위해 member 단위로 별도 집계) -->
+		regular_overtime_hours_today AS (
+			SELECT
+				ar.member_id,
+				SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))) AS overtime_hours
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 3
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND LEAST(mc.cost_end, mc.today)
+			GROUP BY ar.member_id
+		),
+		<!-- 조기퇴근(type=17) : note에 이미 음수(-N시간)로 저장돼 있어서 그대로 더하면 차감이 된다.
+		     참고자료 근태차감(V열, "=-(...)")과 같은 성격의 "일한 시간이 줄어든 만큼 시급으로 차감" 항목. -->
+		regular_early_leave_hours_today AS (
+			SELECT
+				ar.member_id,
+				SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))) AS early_leave_hours
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 17
 			  AND STR_TO_DATE(
 				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
 				  '%Y-%m-%d'
@@ -2151,29 +2220,122 @@
 			GROUP BY ar.member_id
 		),
 		regular_cost_today_by_hours AS (
-			-- 시급(월급/월소정근로시간) × 1일 소정근로시간 × 오늘까지 실제 인정 근무일수
+			-- 🔹 "260910_ERP예산관리 프로그램_급여 참고자료.xlsx"의 "1.급여대장" 시트 V열(근태차감)
+			--    실제 셀 수식을 exceljs로 직접 열어서 확인한 결과:
+			--    V7 = -(월급 / $Q$3 / N8 × VLOOKUP(...,20,0))
+			--    여기서 $Q$3는 "3.근무타입" 시트가 아니라 "1.급여대장" 시트 자체의 Q3이고,
+			--    Q3 = P3(말일=31)-O3(초일=1)+1 = 그냥 "이번 달 전체 일수"였다(주 단위 4.3452가 아니었음).
+			--    N8은 그 직원 행의 "1일 소정근로시간"(근무타입 마스터 값), VLOOKUP(...,20,0)은
+			--    "2.직원관리" 시트 20번째 컬럼 = "결근시간"(시간 단위, 직접 입력값).
+			--    즉 시급 = 월급 ÷ 월전체일수 ÷ 일소정근로시간 (소정근로시간이 아니라 달력일수 기준).
+			--    결근 "하루"는 시급×일소정시간 = 월급÷월전체일수 이므로 결국 달력 일할계산과 같아진다.
 			SELECT
-				rd.member_id,
-				(mc.monthly_salary / ws.monthly_standard_hours) * ws.daily_standard_hours * rd.worked_days_today AS cost_today_hours
-			FROM regular_worked_days_today rd
-			JOIN member_month_cost mc ON mc.member_id = rd.member_id
-			JOIN tb_account_members am ON am.member_id = rd.member_id
+				mc.member_id,
+				mc.prorated_salary_today
+					- ((mc.monthly_salary / mc.month_days) * IFNULL(ad.absence_days_today, 0))
+					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(el.early_leave_hours, 0))
+					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(ot.overtime_hours, 0) * 1.5) AS cost_today_hours
+			FROM member_month_cost mc
+			JOIN tb_account_members am ON am.member_id = mc.member_id
 			JOIN tb_account_member_work_system ws
 			  ON ws.idx = am.idx
 			 AND IFNULL(ws.del_yn, 'N') != 'Y'
 			 AND ws.daily_standard_hours IS NOT NULL
 			 AND ws.monthly_standard_hours > 0
+			LEFT JOIN regular_absence_days_today ad ON ad.member_id = mc.member_id
+			LEFT JOIN regular_overtime_hours_today ot ON ot.member_id = mc.member_id
+			LEFT JOIN regular_early_leave_hours_today el ON el.member_id = mc.member_id
+			WHERE mc.position_type NOT IN (6, 7)
 		),
-
-		<!-- [3-A] 일반 직원 인건비 (position_type 6=유틸, 7=통합 제외) : 일할 급여 합산 -->
+		<!-- 🔹 "당월 예상 인건비"용 : 위 _today 집계와 같은 계산이지만 오늘 캡 없이 "이번 달 전체"(cost_start~cost_end)로 집계.
+		     출근부는 담당자가 월초에 한 달치를 미리 다 입력해두는 방식이라, 오늘 이후 날짜의 특이사항도 이미 반영되어 있음.
+		     그래서 today 캡 없이 그대로 합산하면 "출근부에 이미 적힌 내용 기준으로 이 달 전체가 얼마로 예상되는지"가 된다. -->
+		regular_absence_days_month AS (
+			SELECT
+				ar.member_id,
+				COUNT(DISTINCT ar.record_date) AS absence_days_month
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 4
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND mc.cost_end
+			GROUP BY ar.member_id
+		),
+		regular_overtime_hours_month AS (
+			SELECT
+				ar.member_id,
+				SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))) AS overtime_hours
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 3
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND mc.cost_end
+			GROUP BY ar.member_id
+		),
+		regular_early_leave_hours_month AS (
+			SELECT
+				ar.member_id,
+				SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))) AS early_leave_hours
+			FROM tb_account_record ar
+			JOIN member_month_cost mc
+			  ON mc.member_id = ar.member_id
+			 AND mc.position_type NOT IN (6, 7)
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 17
+			  AND STR_TO_DATE(
+				  CONCAT(ar.record_year, '-', LPAD(ar.record_month, 2, '0'), '-', LPAD(ar.record_date, 2, '0')),
+				  '%Y-%m-%d'
+			  ) BETWEEN mc.cost_start AND mc.cost_end
+			GROUP BY ar.member_id
+		),
+		regular_cost_month_by_hours AS (
+			SELECT
+				mc.member_id,
+				mc.prorated_salary
+					- ((mc.monthly_salary / mc.month_days) * IFNULL(adm.absence_days_month, 0))
+					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(elm.early_leave_hours, 0))
+					+ ((mc.monthly_salary / mc.month_days / ws.daily_standard_hours) * IFNULL(otm.overtime_hours, 0) * 1.5) AS cost_month_hours
+			FROM member_month_cost mc
+			JOIN tb_account_members am ON am.member_id = mc.member_id
+			JOIN tb_account_member_work_system ws
+			  ON ws.idx = am.idx
+			 AND IFNULL(ws.del_yn, 'N') != 'Y'
+			 AND ws.daily_standard_hours IS NOT NULL
+			 AND ws.monthly_standard_hours > 0
+			LEFT JOIN regular_absence_days_month adm ON adm.member_id = mc.member_id
+			LEFT JOIN regular_overtime_hours_month otm ON otm.member_id = mc.member_id
+			LEFT JOIN regular_early_leave_hours_month elm ON elm.member_id = mc.member_id
+			WHERE mc.position_type NOT IN (6, 7)
+		),
+		<!-- [3-A] 일반 직원 인건비 (position_type 6=유틸, 7=통합 제외) : 일할 급여 합산
+		     ⚠️ 당월 인건비(regular_person_cost)는 결근/초과/조퇴 같은 출근부 조정 없이,
+		     순수하게 재직기간(중도입사/퇴사만 반영)으로 일할계산한 salary 그대로다.
+		     결근/초과/조퇴 조정은 "금일 기준"(regular_person_cost_today)과 "당월 예상"(estimated_regular_person_cost)에만
+		     들어간다 — 그래서 이미 끝난 달이라도 당월≠금일 기준이 정상이며, 실제 확정 인건비(person_cost)와
+		     비교해야 할 대상은 항상 금일 기준 쪽이다. -->
 		regular_cost AS (
 			SELECT
 				mc.account_id,
 				ROUND(SUM(mc.prorated_salary), 0) AS regular_person_cost,
-				<!-- 근무타입 마스터에 소정근로시간이 매칭되면 시급 역산 방식, 못 찾으면 기존 달력 일할계산으로 폴백 -->
-				ROUND(SUM(IFNULL(rcth.cost_today_hours, mc.prorated_salary_today)), 0) AS regular_person_cost_today
+				<!-- 근무타입 마스터 매칭되면 결근/조퇴 차감 + 초과수당 가산 방식, 못 찾으면 기존 달력 일할계산으로 폴백 -->
+				ROUND(SUM(IFNULL(rcth.cost_today_hours, mc.prorated_salary_today)), 0) AS regular_person_cost_today,
+				ROUND(SUM(IFNULL(rcmh.cost_month_hours, mc.prorated_salary)), 0) AS estimated_regular_person_cost
 			FROM member_month_cost mc
 			LEFT JOIN regular_cost_today_by_hours rcth ON rcth.member_id = mc.member_id
+			LEFT JOIN regular_cost_month_by_hours rcmh ON rcmh.member_id = mc.member_id
 			WHERE mc.position_type NOT IN (6, 7)
 			GROUP BY mc.account_id
 		),
@@ -2439,6 +2601,68 @@
 			GROUP BY ur.account_id
 		),
 
+		<!-- [3-E] "당월 예상 인건비" 괄호 안 상세 내역 : [3-D]와 동일하지만 오늘 캡 없이 이번 달 전체(cost_start~cost_end 무관, record_year/month만) 집계 -->
+		overtime_detail_month AS (
+			SELECT
+				ar.account_id,
+				ROUND(SUM(CAST(NULLIF(ar.note, '') AS DECIMAL(10,1))), 1) AS overtime_hours_month
+			FROM tb_account_record ar
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 3
+			GROUP BY ar.account_id
+		),
+		absence_detail_month AS (
+			SELECT
+				ar.account_id,
+				COUNT(*) AS absence_count_month
+			FROM tb_account_record ar
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 4
+			GROUP BY ar.account_id
+		),
+		dispatch_detail_month AS (
+			SELECT
+				d.account_id,
+				SUM(CASE WHEN r.is_present = 'Y' THEN IFNULL(r.salary, 0) ELSE 0 END) AS dispatch_amount_month,
+				SUM(CASE WHEN r.is_present = 'Y' THEN 1 ELSE 0 END) AS dispatch_count_month
+			FROM tb_account_members_dispatch d
+			JOIN tb_account_record_dispatch r
+			  ON r.account_id = d.account_id
+			 AND r.member_id = d.member_id
+			 AND r.record_year = d.record_year
+			 AND r.record_month = d.record_month
+			WHERE d.record_year = #{year}
+			  AND d.record_month = #{month}
+			GROUP BY d.account_id
+		),
+		employee_dispatch_detail_month AS (
+			SELECT
+				ar.account_id,
+				SUM(IFNULL(ar.salary, 0)) AS employee_dispatch_amount_month,
+				COUNT(*) AS employee_dispatch_count_month
+			FROM tb_account_record ar
+			WHERE ar.record_year = #{year}
+			  AND ar.record_month = #{month}
+			  AND ar.type = 6
+			GROUP BY ar.account_id
+		),
+		util_detail_month AS (
+			SELECT
+				ur.account_id,
+				COUNT(*) AS util_count_month
+			FROM tb_account_util_record ur
+			JOIN member_month_cost mc
+			  ON mc.member_id = ur.member_id
+			 AND mc.position_type = 6
+			WHERE ur.record_year = #{year}
+			  AND ur.record_month = #{month}
+			  AND ur.is_present = 'Y'
+			  AND NULLIF(ur.account_id, '') IS NOT NULL
+			GROUP BY ur.account_id
+		),
+
 		<!-- [4] 매출 대비 인건비 45% 이상 업장 필터링 -->
 		account_base AS (
 			SELECT
@@ -2478,15 +2702,24 @@
 			FROM account_base ab
 			WHERE ab.base_year IS NOT NULL AND ab.base_month IS NOT NULL
 		),
+		<!-- 🔹 원래는 인건비 비율(전전월 매출 기준) 45% 이상 업장만 보여줬는데,
+		     비율은 45% 미만이라도 "금일 기준"으로 초과/결근/파출/직원파출/유틸 중 하나라도 찍혀 있으면
+		     그것도 눈에 보여야 확인이 되므로 OR 조건으로 추가함. -->
 		eligible_account AS (
 			SELECT
 				ar.*,
-				ROUND(ar.person_total / ar.sales_total * 100, 1) AS person_ratio
+				CASE WHEN ar.sales_total > 0 THEN ROUND(IFNULL(ar.person_total, 0) / ar.sales_total * 100, 1) ELSE NULL END AS person_ratio
 			FROM account_result ar
 			WHERE ar.sales_total IS NOT NULL
 			  AND ar.sales_total > 0
-			  AND ar.person_total IS NOT NULL
-			  AND ROUND(ar.person_total / ar.sales_total * 100, 1) <![CDATA[ >= ]]> 45
+			  AND (
+				  (ar.person_total IS NOT NULL AND ROUND(ar.person_total / ar.sales_total * 100, 1) <![CDATA[ >= ]]> 45)
+				  OR EXISTS (SELECT 1 FROM overtime_detail od0 WHERE od0.account_id = ar.account_id)
+				  OR EXISTS (SELECT 1 FROM absence_detail ad0 WHERE ad0.account_id = ar.account_id)
+				  OR EXISTS (SELECT 1 FROM dispatch_detail dd0 WHERE dd0.account_id = ar.account_id)
+				  OR EXISTS (SELECT 1 FROM employee_dispatch_detail edd0 WHERE edd0.account_id = ar.account_id)
+				  OR EXISTS (SELECT 1 FROM util_detail ud0 WHERE ud0.account_id = ar.account_id)
+			  )
 		)
 
 		<!-- [5] 최종 결과 : [3-A]+[3-A-1]+[3-B]+[3-C]를 합산해 당월 인건비(current_month_person_cost) 산출
@@ -2509,9 +2742,22 @@
 				IFNULL(rc.regular_person_cost_today, 0)
 				+ IFNULL(rec.rec_person_cost, 0)
 				+ IFNULL(uct.utility_person_cost_today, 0)
-				+ IFNULL(ict.integration_person_cost_today, 0),
+				+ IFNULL(ict.integration_person_cost_today, 0)
+				+ IFNULL(dd.dispatch_amount, 0)
+				+ IFNULL(edd.employee_dispatch_amount, 0),
 				0
 			) AS today_person_cost,
+			<!-- 🔹 당월 예상 인건비 : salary(중도입퇴사) + 결근/초과/조퇴 조정을 "오늘 캡 없이 이번 달 전체" 출근부 기준으로 계산 + 파출비/직원파출비(이번 달 전체).
+			     출근부가 월초에 미리 다 채워지는 방식이라, 이렇게 하면 "지금까지 출근부에 적힌 내용 그대로면 이번 달 인건비가 얼마로 예상되는지"를 보여준다. -->
+			ROUND(
+				IFNULL(rc.estimated_regular_person_cost, 0)
+				+ IFNULL(rec.rec_person_cost, 0)
+				+ IFNULL(uc.utility_person_cost, 0)
+				+ IFNULL(ic.integration_person_cost, 0)
+				+ IFNULL(ddm.dispatch_amount_month, 0)
+				+ IFNULL(eddm.employee_dispatch_amount_month, 0),
+				0
+			) AS estimated_month_person_cost,
 			IFNULL(od.overtime_hours, 0) AS overtime_hours,
 			IFNULL(ad.absence_count, 0) AS absence_count,
 			IFNULL(dd.dispatch_amount, 0) + IFNULL(edd.employee_dispatch_amount, 0) AS dispatch_total_amount,
@@ -2519,8 +2765,16 @@
 			IFNULL(dd.dispatch_count, 0) AS dispatch_count,
 			IFNULL(edd.employee_dispatch_amount, 0) AS employee_dispatch_amount,
 			IFNULL(edd.employee_dispatch_count, 0) AS employee_dispatch_count,
-			IFNULL(ud.util_count, 0) AS util_count
+			IFNULL(ud.util_count, 0) AS util_count,
+			IFNULL(odm.overtime_hours_month, 0) AS overtime_hours_month,
+			IFNULL(adm2.absence_count_month, 0) AS absence_count_month,
+			IFNULL(ddm.dispatch_amount_month, 0) AS dispatch_amount_month,
+			IFNULL(eddm.employee_dispatch_amount_month, 0) AS employee_dispatch_amount_month,
+			IFNULL(udm.util_count_month, 0) AS util_count_month,
+			pcbn.note AS note
 		FROM eligible_account ea
+		LEFT JOIN tb_account_person_cost_budget_note pcbn
+		  ON pcbn.account_id = ea.account_id AND pcbn.year = #{year} AND pcbn.month = #{month}
 		LEFT JOIN regular_cost rc ON rc.account_id = ea.account_id
 		LEFT JOIN rec_cost rec ON rec.account_id = ea.account_id
 		LEFT JOIN utility_cost uc ON uc.account_id = ea.account_id
@@ -2532,8 +2786,25 @@
 		LEFT JOIN dispatch_detail dd ON dd.account_id = ea.account_id
 		LEFT JOIN employee_dispatch_detail edd ON edd.account_id = ea.account_id
 		LEFT JOIN util_detail ud ON ud.account_id = ea.account_id
+		LEFT JOIN overtime_detail_month odm ON odm.account_id = ea.account_id
+		LEFT JOIN absence_detail_month adm2 ON adm2.account_id = ea.account_id
+		LEFT JOIN dispatch_detail_month ddm ON ddm.account_id = ea.account_id
+		LEFT JOIN employee_dispatch_detail_month eddm ON eddm.account_id = ea.account_id
+		LEFT JOIN util_detail_month udm ON udm.account_id = ea.account_id
 		ORDER BY (ea.person_total / ea.sales_total) DESC
 	</select>
+
+	<!-- 급식사업부 -> 운영관리 -> 인건비 예산 현황 비고 저장(업장+연도+월 단위, 없으면 새로 생성) -->
+	<insert id="PersonCostBudgetNoteSave" parameterType="map">
+		INSERT INTO tb_account_person_cost_budget_note
+			(account_id, year, month, note, update_id, update_dt)
+		VALUES
+			(#{account_id}, #{year}, #{month}, #{note}, #{user_id}, NOW())
+		ON DUPLICATE KEY UPDATE
+			note = VALUES(note),
+			update_id = VALUES(update_id),
+			update_dt = VALUES(update_dt)
+	</insert>
 
 	<select id="BudgetTotalSave" statementType="CALLABLE" parameterType="map">
 		<!-- ✅ status_yn 미전달(기존 호출) 시에도 기존 동작 유지되도록 기본값 N 사용 -->

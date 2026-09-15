@@ -37,7 +37,7 @@ import com.google.gson.JsonObject;
 
 @RestController
 public class OperateController {
-	private static final String uploadDir = System.getProperty("java.io.tmpdir");
+    private static final String uploadDir = System.getProperty("java.io.tmpdir");
 
     private final AccountService accountService;
     private final OperateService operateService;
@@ -1061,8 +1061,8 @@ public class OperateController {
 
                 try {
                     Map<String, Object> profitParam = new HashMap<>();
-                    profitParam.put("year",       Integer.parseInt(year));
-                    profitParam.put("month",      Integer.parseInt(month));
+                    profitParam.put("year", Integer.parseInt(year));
+                    profitParam.put("month", Integer.parseInt(month));
                     profitParam.put("account_id", accountId);
                     // callProfitLossTotalSave 내부에서 SuppliesBudgetSave까지 처리
                     operateService.callProfitLossTotalSave(profitParam);
@@ -1153,6 +1153,30 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : PersonCostBudgetNoteSave
+     * comment : 급식사업부 -> 운영관리 -> 인건비 예산 현황 비고 저장
+     */
+    @PostMapping("Operate/PersonCostBudgetNoteSave")
+    private String PersonCostBudgetNoteSave(@RequestBody Map<String, Object> paramMap) {
+        Object noteValue = paramMap.get("note");
+        paramMap.put("note", noteValue == null ? "" : noteValue.toString());
+
+        int iResult = operateService.PersonCostBudgetNoteSave(paramMap);
+
+        JsonObject obj = new JsonObject();
+        if (iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "실패");
+        }
+
+        return obj.toString();
+    }
+
+    /*
+     * part : 운영
      * method : BudgetTableSave
      * comment : 급식사업부 -> 운영관리 -> 예산관리 저장
      */
@@ -1192,27 +1216,27 @@ public class OperateController {
      * part : 운영
      * method : SuppliesBudgetSave
      * comment : 소모품 예산 누계 저장 — 소모품 관련 저장 화면에서 저장 성공 시 호출
-     *           tb_account_supplies_budget 테이블의 예산/사용/잔여/누계를 갱신
+     * tb_account_supplies_budget 테이블의 예산/사용/잔여/누계를 갱신
      */
     @PostMapping("Operate/SuppliesBudgetSave")
     public String SuppliesBudgetSave(@RequestBody Map<String, Object> paramMap) {
         JsonObject obj = new JsonObject();
         try {
-            int    year      = Integer.parseInt(String.valueOf(paramMap.get("year")));
-            int    month     = Integer.parseInt(String.valueOf(paramMap.get("month")));
+            int year = Integer.parseInt(String.valueOf(paramMap.get("year")));
+            int month = Integer.parseInt(String.valueOf(paramMap.get("month")));
             String accountId = String.valueOf(paramMap.get("account_id"));
 
             Map<String, Object> param = new HashMap<>();
-            param.put("year",       year);
-            param.put("month",      month);
+            param.put("year", year);
+            param.put("month", month);
             param.put("account_id", accountId);
 
             operateService.SuppliesBudgetSave(param);
 
-            obj.addProperty("code",    200);
+            obj.addProperty("code", 200);
             obj.addProperty("message", "성공");
         } catch (Exception e) {
-            obj.addProperty("code",    400);
+            obj.addProperty("code", 400);
             obj.addProperty("message", e.getMessage());
         }
         return obj.toString();
@@ -1227,7 +1251,7 @@ public class OperateController {
     public String BudgetNoteCarryOverNow(@RequestBody Map<String, Object> paramMap) {
         Map<String, Object> result = new HashMap<>();
         try {
-            int year  = Integer.parseInt(String.valueOf(paramMap.get("year")));
+            int year = Integer.parseInt(String.valueOf(paramMap.get("year")));
             int month = Integer.parseInt(String.valueOf(paramMap.get("month")));
             int updated = budgetNoteCarryOverScheduler.carryOver(year, month);
             result.put("code", 200);
@@ -1852,7 +1876,8 @@ public class OperateController {
      * part : 운영
      * method : RecipeDetailSave
      * comment : 운영관리 -> 메뉴/레시피 관리 -> 식재료 상세 행 일괄 저장(upsert)
-     * payload : { menu_id, user_id, rows: [ {recipe_detail_id?, ingredient_id, qty_raw, ...}, ... ] }
+     * payload : { menu_id, user_id, rows: [ {recipe_detail_id?, ingredient_id,
+     * qty_raw, ...}, ... ] }
      */
     @SuppressWarnings("unchecked")
     @PostMapping("/MenuRecipe/RecipeDetailSave")
@@ -2067,7 +2092,8 @@ public class OperateController {
      * part : 운영
      * method : RecipeBundleGet
      * comment : 운영관리 -> 레시피 관리 -> menu_id 기준 레시피 정보/식재료 상세/영상/이미지를 한 번에 조회
-     *           (메뉴 선택 시 RecipeInfoGet+RecipeDetailList+RecipeVideoList+RecipeImageList 4번 호출을 1번으로 축소)
+     * (메뉴 선택 시 RecipeInfoGet+RecipeDetailList+RecipeVideoList+RecipeImageList 4번
+     * 호출을 1번으로 축소)
      */
     @GetMapping("/MenuRecipe/RecipeBundleGet")
     public String RecipeBundleGet(@RequestParam Map<String, Object> paramMap) {

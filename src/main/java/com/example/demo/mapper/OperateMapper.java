@@ -58,6 +58,7 @@ public interface OperateMapper {
 	List<Map<String, Object>> MealsNumberList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 예산관리(배식횟수) 조회
 	List<Map<String, Object>> PersonCostBudgetList(Map<String, Object> paramMap); 				// 급식사업부 -> 운영관리 -> 예산관리(인건비, 매출대비 45% 이상) 조회
 	List<Map<String, Object>> PersonCostBudgetProjectionList(Map<String, Object> paramMap); 	// 급식사업부 -> 운영관리 -> 인건비 예산 현황 및 예상 계산 조회
+	int PersonCostBudgetNoteSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 인건비 예산 현황 비고 저장
 	List<Map<String, Object>> AnnualLeaveList(Map<String, Object> paramMap); 					// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 정보 조회
 	int AnnualLeaveDelete(Map<String, Object> paramMap); 										// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 연차 항목 삭제
 	int AnnualLeaveDeleteProcedureRecords(Map<String, Object> paramMap); 						// 급식사업부 -> 운영관리 -> 현장관리 -> 근태관리 -> 프로시저 생성 연차 레코드 일괄 삭제

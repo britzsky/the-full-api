@@ -405,6 +405,13 @@ public class OperateService {
 		return resultList;
 	}
 
+	// 급식사업부 -> 운영관리 -> 인건비 예산 현황 비고 저장(업장+연도+월 단위, 없으면 생성)
+	public int PersonCostBudgetNoteSave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = operateMapper.PersonCostBudgetNoteSave(paramMap);
+		return iResult;
+	}
+
 	// 급식사업부 -> 운영관리 -> 예산관리 저장
 	public int BudgetTableSave(Map<String, Object> paramMap) {
 		return operateMapper.BudgetTableSave(paramMap);
