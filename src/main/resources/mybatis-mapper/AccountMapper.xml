@@ -2204,6 +2204,11 @@
 		AND am.biz_no != ''
 	</select>
 	
+	<!-- 웰스토리 API 연동: soldTo(웰스토리 사업장코드) 조회 -->
+	<select id="AccountIdByWelstorySoldTo" parameterType="string" resultType="string">
+		SELECT account_id FROM tb_account WHERE welstory_soldto = #{soldTo} LIMIT 1
+	</select>
+
 	<insert id="AccountPurchaseSave" parameterType="map">
 		INSERT INTO tb_account_purchase_tally
 	    <trim prefix="(" suffix=")" suffixOverrides=",">

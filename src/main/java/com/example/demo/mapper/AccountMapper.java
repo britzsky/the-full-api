@@ -73,6 +73,7 @@ public interface AccountMapper {
 	int AccountOverTimeLedgerDelete(Map<String, Object> paramMap);										// 출근부 -> 초과관리 기존 데이터 삭제
 	int AccountOverTimeLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 초과관리 저장
 	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
+	String AccountIdByWelstorySoldTo(String soldTo);													// 회계 -> 웰스토리 account_id 조회
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
 	void AccountPurchaseTallyDelete(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 삭제

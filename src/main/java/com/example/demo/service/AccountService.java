@@ -1,13 +1,28 @@
 package com.example.demo.service;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.example.demo.mapper.AccountMapper;
 import com.example.demo.mapper.HeadOfficeMapper;
@@ -16,10 +31,39 @@ import com.example.demo.mapper.OperateMapper;
 @Service
 public class AccountService {
 
+	private static final Logger log = LoggerFactory.getLogger(AccountService.class);
+
 	AccountMapper accountMapper;
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
 	private final S3FileStorageService fileStorageService;
+
+	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
+	// WelstorySyncScheduler가 매일 17시(KST)에 WelstoryPurchaseSync()를 호출 ->
+	// 제휴사 2곳의 API를 각각 호출해 오늘자 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
+
+	// 웰스토리 API 게이트웨이 base url (토큰발급: /oauth/2.0/token, 서비스: /fdapi/service/*)
+	private static final String WELSTORY_BASE_URL = "https://welgw.welstory.com";
+	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값(실제 로그인 사용자가 없으므로)
+	private static final String WELSTORY_SYNC_USER_ID = "SYSTEM";
+	// 웰스토리 REST 호출 전용 RestTemplate (프로젝트 내 다른 외부 API 연동도 필드로 각자 생성하는 방식과 동일)
+	private final RestTemplate restTemplate = new RestTemplate();
+	// guid(19자리 거래식별자) 뒤에 붙는 2자리 seq 채번용 카운터.
+	// 같은 밀리초에 여러 번 호출돼도 guid가 중복되지 않도록 함(가이드 스펙: 거래마다 고유해야 함)
+	private final AtomicInteger welstoryGuidSeq = new AtomicInteger(0);
+
+	// 제휴사 1: 주식회사 더채움 (payerCode A0275453) - 관리자에게 발급받은 OAuth client_credentials
+	// application-secret*.properties 에 실제 값이 들어있고, 여기 base 파일에는 빈 값(플레이스홀더)만 존재
+	@Value("${welstory.client1.id:}")
+	private String welstoryClient1Id;
+	@Value("${welstory.client1.secret:}")
+	private String welstoryClient1Secret;
+
+	// 제휴사 2: 더채움(위탁급식) (payerCode A0195993) - client1과 별개의 OAuth 인증정보
+	@Value("${welstory.client2.id:}")
+	private String welstoryClient2Id;
+	@Value("${welstory.client2.secret:}")
+	private String welstoryClient2Secret;
 
 	// 문자열에서 숫자만 추출(최대 길이 제한)
 	private static String keepOnlyDigits(String value, int maxLen) {
@@ -1531,5 +1575,287 @@ public class AccountService {
 	// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
 	public List<Map<String, Object>> CommuteRecordList(Map<String, Object> paramMap) {
 		return accountMapper.CommuteRecordList(paramMap);
+	}
+
+	// ===================== 웰스토리 SW-FD 주문API 연동 (로직) =====================
+	//
+	// 전체 흐름 요약
+	//   WelstorySyncScheduler(매일 17시 KST)
+	//     -> WelstoryPurchaseSync()                         제휴사 2곳 순회
+	//       -> welstorySyncOneClient(client)                 client 하나: 토큰발급 -> 사업장(soldTo) 목록조회
+	//         -> welstorySyncReceiveDetail(soldTo 하나)       입고내역 조회 -> clientOrd(주문번호)별로 그룹핑
+	//           -> AccountPurchaseSave(master 1행)            주문 1건 = tb_account_purchase_tally 1 row
+	//           -> AccountPurchaseDetailSave(detail N행)      주문 안의 품목들 = tb_account_purchase_tally_detail N rows
+	//
+	// account_id는 tb_account.welstory_soldto 컬럼(soldTo 코드 매핑, 수동 등록해둔 값)으로 조회하며,
+	// 매핑이 없는 soldTo(신규 사업장 등)는 저장하지 않고 경고 로그만 남기고 건너뛴다.
+
+	// 진입점. 스케줄러가 이 메서드 하나만 호출한다.
+	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된 주문 건수 합계를 반환
+	// 오늘자 입고내역 동기화 (스케줄러가 매일 부르는 기본 진입점)
+	public int WelstoryPurchaseSync() {
+		String today = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+		return WelstoryPurchaseSync(today);
+	}
+
+	// 특정 날짜(reqDeliveryDate, "YYYYMMDD") 입고내역 동기화.
+	// 스케줄러가 하루 놓쳤거나(서버 재시작 등) 과거 특정일 데이터를 다시 받아야 할 때
+	// 이 오버로드를 날짜만 바꿔서 그대로 재사용하면 된다 (수동 백필용).
+	public int WelstoryPurchaseSync(String yyyyMMdd) {
+		int total = 0;
+		total += welstorySyncOneClient(welstoryClient1Id, welstoryClient1Secret, yyyyMMdd);
+		total += welstorySyncOneClient(welstoryClient2Id, welstoryClient2Secret, yyyyMMdd);
+		return total;
+	}
+
+	// 제휴사(client) 1곳 처리:
+	//   1) 토큰 발급
+	//   2) payer-rep-soldto로 이 client 소속 사업장(soldTo) 전체 목록을 받아옴
+	//      -> 사업장 목록을 하드코딩하지 않고 매번 API로 받아오므로, 웰스토리 쪽에 사업장이 추가/변경돼도 코드 수정 불필요
+	//   3) 사업장마다 tb_account 매핑을 확인해서 있는 것만, reqDeliveryDate 기준 입고내역 동기화
+	private int welstorySyncOneClient(String clientId, String clientSecret, String reqDeliveryDate) {
+		// application-secret*.properties에 값이 없으면(=이 client 미사용 설정) 조용히 스킵
+		if (clientId == null || clientId.isBlank() || clientSecret == null || clientSecret.isBlank()) {
+			return 0;
+		}
+		int saved = 0;
+		try {
+			// 토큰은 이 client 동기화 1회 실행 동안만 재사용(30일 유효하지만 매번 재발급해도 문제는 없음, 단순화를 위해 매 실행마다 새로 받음)
+			String accessToken = welstoryIssueToken(clientId, clientSecret);
+
+			for (Map<String, Object> soldToRow : welstoryListSoldTo(accessToken)) {
+				String soldTo = String.valueOf(soldToRow.get("soldTo"));
+				// tb_account.welstory_soldto = soldTo 로 등록해둔 거래처(account_id)를 찾는다.
+				// (welstory_soldto_mapping.sql로 미리 채워둔 매핑 — 신규 사업장은 아직 매핑이 없어서 여기서 걸러짐)
+				String accountId = accountMapper.AccountIdByWelstorySoldTo(soldTo);
+				if (accountId == null || accountId.isBlank()) {
+					log.warn("[WelstorySync] tb_account 매핑 없는 soldTo 스킵: {}", soldTo);
+					continue;
+				}
+				// buyer(구매자명) 컬럼에 쓸 payerNm은 payer-receive-detail 응답엔 없고
+				// payer-rep-soldto 응답(soldToRow)에만 있어서 여기서 미리 꺼내 넘겨준다.
+				String payerNm = String.valueOf(soldToRow.get("payerNm"));
+				saved += welstorySyncReceiveDetail(accessToken, soldTo, accountId, payerNm, reqDeliveryDate);
+			}
+		} catch (Exception e) {
+			// 제휴사 1곳이 실패해도(토큰 만료/네트워크 오류 등) 다른 제휴사 처리는 계속되도록 여기서 막는다
+			log.error("[WelstorySync] client 동기화 실패: {}", clientId, e);
+		}
+		return saved;
+	}
+
+	// 사업장(soldTo) 1곳의 오늘자 입고내역을 조회해서 저장한다.
+	// 웰스토리는 입고내역을 품목(line) 단위 배열로 주는데, 같은 clientOrd(주문번호)에 여러 품목이 묶여 있으므로
+	// clientOrd 단위로 그룹핑해서 "주문 1건 = master 1행(tb_account_purchase_tally) + 품목별 detail N행" 형태로 변환한다.
+	private int welstorySyncReceiveDetail(String accessToken, String soldTo, String accountId, String payerNm,
+			String reqDeliveryDate) {
+		List<Map<String, Object>> items = welstoryReceiveDetail(accessToken, soldTo, reqDeliveryDate);
+		if (items.isEmpty()) {
+			return 0;
+		}
+
+		// clientOrd(주문번호) -> 그 주문에 속한 품목 라인들. LinkedHashMap이라 응답에 온 순서 그대로 유지됨
+		Map<String, List<Map<String, Object>>> byClientOrd = new LinkedHashMap<>();
+		for (Map<String, Object> item : items) {
+			String clientOrd = String.valueOf(item.get("clientOrd"));
+			byClientOrd.computeIfAbsent(clientOrd, k -> new ArrayList<>()).add(item);
+		}
+
+		int saved = 0;
+		for (Map.Entry<String, List<Map<String, Object>>> entry : byClientOrd.entrySet()) {
+			String clientOrd = entry.getKey();
+			List<Map<String, Object>> lines = entry.getValue();
+
+			// ---- master(주문 단위) 합계 계산 ----
+			// 기존 프론트(AccountPurchaseDeadlineTab.js)의 과세/면세 집계 로직과 동일한 기준을 따름:
+			//   total   = 모든 품목의 totAmt(품목 합계금액) 합
+			//   vat     = 모든 품목의 vat(부가세) 합
+			//   tax     = 과세 품목(taxCode가 'Full TAX' 또는 'CONS')의 (totAmt - vat) = 공급가액 합
+			//   taxFree = 면세 품목(taxCode가 'No TAX')의 totAmt 합
+			long total = 0, vat = 0, tax = 0, taxFree = 0;
+			for (Map<String, Object> line : lines) {
+				long amount = welstoryAsLong(line.get("totAmt"));
+				long lineVat = welstoryAsLong(line.get("vat"));
+				total += amount;
+				vat += lineVat;
+				if (welstoryIsTaxable(String.valueOf(line.get("taxCode")))) {
+					tax += (amount - lineVat);
+				} else {
+					taxFree += amount;
+				}
+			}
+
+			// ---- master row 저장: tb_account_purchase_tally (PK = sale_id) ----
+			// sale_id에 clientOrd(웰스토리 주문번호)를 그대로 사용 -> 스케줄러가 재실행돼도
+			// 같은 주문이면 ON DUPLICATE KEY UPDATE로 덮어쓰기만 되고 중복 row가 생기지 않는다.
+			Map<String, Object> master = new HashMap<>();
+			master.put("account_id", accountId);
+			master.put("sale_id", clientOrd);
+			master.put("type", "1"); // 삼성웰스토리 계열 고정 type (기존 "거래처 마감 자료" 화면의 type 1~4 중 1번 사용, 사용자 확정값)
+			master.put("saleDate", welstoryToIsoDate(String.valueOf(lines.get(0).get("billDate")))); // 입고일(YYYYMMDD) -> "YYYY-MM-DD"
+			master.put("total", total);
+			master.put("discount", 0); // 웰스토리 입고내역엔 할인 개념이 없어서 항상 0
+			master.put("vat", vat);
+			master.put("taxFree", taxFree);
+			master.put("tax", tax);
+			master.put("use_name", "삼성웰스토리(주)"); // 고정값(사용자 확정) — 사업장명(soldToNm)이 아니라 공급처명 고정 표기
+			master.put("buyer", payerNm); // 구매자(제휴사)명: "주식회사 더채움" 또는 "더채움(위탁급식)"
+			// 나중에 이 row가 어느 soldTo/주문유형에서 왔는지 추적할 수 있도록 note에 남겨둠 (별도 컬럼이 없어서)
+			master.put("note", "웰스토리 API 자동연동 (soldTo=" + soldTo + ", orderType=" + lines.get(0).get("orderType") + ")");
+			master.put("user_id", WELSTORY_SYNC_USER_ID);
+			AccountPurchaseSave(master);
+
+			// ---- detail row 저장: tb_account_purchase_tally_detail (PK = item_id + sale_id) ----
+			// 품목 한 줄(clientOrdItem)마다 한 행씩 저장
+			for (Map<String, Object> line : lines) {
+				boolean taxable = welstoryIsTaxable(String.valueOf(line.get("taxCode")));
+				// taxCode='CONS'는 가이드상 "소모품"을 의미 -> itemType(상품구분)을 소모품(2)으로 매핑,
+				// 그 외(Full TAX/No TAX)는 식재료(1)로 간주 (웰스토리는 식자재 발주 API라 '경관식'은 별도 신호가 없어 사용하지 않음)
+				boolean isCons = "CONS".equalsIgnoreCase(String.valueOf(line.get("taxCode")));
+				long amount = welstoryAsLong(line.get("totAmt"));
+				long lineVat = welstoryAsLong(line.get("vat"));
+
+				Map<String, Object> detail = new HashMap<>();
+				// item_id 컬럼은 DB에서 int AUTO_INCREMENT로 정의돼 있지만,
+				// 여기서는 웰스토리가 주는 clientOrdItem(주문 내 품목 일련번호, 예: "000001")을 정수로 변환해 명시적으로 채운다.
+				// (sale_id, item_id) 조합이 매 실행마다 항상 동일해야 ON DUPLICATE KEY UPDATE가 "새 행 추가"가 아니라
+				// "기존 행 갱신"으로 동작한다 -> 그래야 스케줄러를 몇 번 재실행해도(테스트로 1분마다 돌려도) 중복 저장되지 않음.
+				detail.put("item_id", (int) welstoryAsLong(line.get("clientOrdItem")));
+				detail.put("sale_id", clientOrd); // master와 연결되는 FK
+				detail.put("name", line.get("itemName"));
+				detail.put("qty", line.get("billQty")); // 주문수량(ordQty)이 아니라 실제 입고수량(billQty) 사용 - 이 화면은 입고/정산 기준이라서
+				detail.put("amount", amount); // 품목 합계금액(totAmt, 부가세 포함)
+				detail.put("unitPrice", line.get("unitPrice"));
+				detail.put("vat", lineVat);
+				detail.put("tax", taxable ? (amount - lineVat) : 0); // 공급가액(과세일 때만). 면세면 0
+				detail.put("taxType", taxable ? "1" : "2"); // 기존 화면 코드값: 1=과세, 2=면세
+				detail.put("itemType", isCons ? "2" : "1"); // 기존 화면 코드값: 1=식재료, 2=소모품
+				detail.put("note", line.get("standard")); // 규격(standard) 정보를 참고용으로 note에 저장 (전용 컬럼 없음)
+				detail.put("user_id", WELSTORY_SYNC_USER_ID);
+				AccountPurchaseDetailSave(detail);
+			}
+			saved++; // 처리한 주문(clientOrd) 건수
+		}
+		return saved;
+	}
+
+	// 웰스토리 taxCode 문자열을 과세/면세 boolean으로 변환.
+	// 가이드 기준: 'Full TAX'(과세), 'CONS'(소모품, 과세) -> true / 'No TAX'(면세) -> false
+	private boolean welstoryIsTaxable(String taxCode) {
+		return !"No TAX".equalsIgnoreCase(taxCode);
+	}
+
+	// 웰스토리 응답 필드는 전부 문자열(JSON string)로 오므로, 금액 합산 계산을 위해 안전하게 long으로 변환.
+	// 파싱 실패(null, 빈 문자열, 숫자 아닌 값 등)해도 예외를 던지지 않고 0으로 처리해 전체 동기화가 죽지 않게 함.
+	private long welstoryAsLong(Object v) {
+		if (v == null)
+			return 0L;
+		try {
+			return Long.parseLong(String.valueOf(v).trim());
+		} catch (NumberFormatException e) {
+			return 0L;
+		}
+	}
+
+	// 웰스토리의 billDate("YYYYMMDD", 8자리)를 tb_account_purchase_tally.saleDate에 넣을 수 있는
+	// "YYYY-MM-DD" 형식으로 변환. 길이가 8이 아니면(형식이 이상하면) 원본을 그대로 반환해서 값이 유실되지 않게 함.
+	private String welstoryToIsoDate(String yyyymmdd) {
+		if (yyyymmdd == null || yyyymmdd.length() != 8)
+			return yyyymmdd;
+		return yyyymmdd.substring(0, 4) + "-" + yyyymmdd.substring(4, 6) + "-" + yyyymmdd.substring(6, 8);
+	}
+
+	// 웰스토리 API 호출 시 http header에 실어 보내는 guid(거래 식별자) 생성.
+	// 가이드 스펙: "거래일시(17자리, yyyyMMddHHmmssSSS) + seq(2자리)" = 총 19자리이며, 모든 거래를 통틀어 중복되면 안 됨.
+	// 같은 밀리초 안에 연속 호출돼 타임스탬프가 겹치는 경우를 대비해 seq를 1~99 사이에서 순환시켜 뒤에 붙인다.
+	private String welstoryNextGuid() {
+		String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"));
+		int seq = (welstoryGuidSeq.incrementAndGet() % 99) + 1;
+		return ts + String.format("%02d", seq);
+	}
+
+	// OAuth 접근토큰 발급. "Token 발급 요청" 시트 스펙상 client_id/secret/scope/grant_type을
+	// (http body가 아니라) query parameter로 실어 POST 호출해야 한다.
+	// 토큰은 30일간 유효(expires_in=2592000)하지만 여기서는 매 동기화 실행마다 새로 발급받아 단순하게 처리한다.
+	private String welstoryIssueToken(String clientId, String clientSecret) {
+		String url = UriComponentsBuilder.fromHttpUrl(WELSTORY_BASE_URL + "/oauth/2.0/token")
+				.queryParam("client_id", clientId)
+				.queryParam("client_secret", clientSecret)
+				.queryParam("scope", "oob") // 가이드 고정값
+				.queryParam("grant_type", "client_credentials") // 가이드 고정값
+				.build(false)
+				.toUriString();
+
+		ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(url, HttpMethod.POST,
+				new HttpEntity<>(new HttpHeaders()), new ParameterizedTypeReference<Map<String, Object>>() {
+				});
+		Map<String, Object> res = resp.getBody();
+		if (res == null || res.get("access_token") == null) {
+			// client_id/secret이 잘못됐거나(오류코드 9202 등), IP가 화이트리스트에 없으면 여기서 걸림
+			throw new IllegalStateException("웰스토리 토큰 발급 실패: " + res);
+		}
+		return String.valueOf(res.get("access_token"));
+	}
+
+	// [제휴사별 사업장 조회] API(payer-rep-soldto) 호출.
+	// 이 client(제휴사)에 등록된 사업장(soldTo) 전체 목록을 반환한다(사업장이 많지 않아 페이징 없이 pageRow=100, contYn="N" 고정 한 번만 호출).
+	@SuppressWarnings("unchecked")
+	private List<Map<String, Object>> welstoryListSoldTo(String accessToken) {
+		Map<String, Object> dataHeader = new HashMap<>();
+		dataHeader.put("pageRow", 100);
+		dataHeader.put("contYn", "N"); // 최초 조회이므로 "다음 페이지 없음" 기본값
+		dataHeader.put("nextKey", "");
+		Map<String, Object> body = welstoryCallApi("payer-rep-soldto", accessToken, dataHeader);
+
+		Object dataBody = body.get("dataBody");
+		if (!(dataBody instanceof Map))
+			return List.of();
+		Object data = ((Map<String, Object>) dataBody).get("data");
+		return data instanceof List ? (List<Map<String, Object>>) data : List.of();
+	}
+
+	// [제휴사 사업장 입고내역 조회] API(payer-receive-detail) 호출.
+	// soldTo(사업장) + reqDeliveryDate(입고일, YYYYMMDD) 1건 기준으로 그날 입고된 품목 라인 목록을 반환한다.
+	@SuppressWarnings("unchecked")
+	private List<Map<String, Object>> welstoryReceiveDetail(String accessToken, String soldTo,
+			String reqDeliveryDate) {
+		Map<String, Object> dataHeader = new HashMap<>();
+		dataHeader.put("soldTo", soldTo);
+		dataHeader.put("reqDeliveryDate", reqDeliveryDate);
+		Map<String, Object> body = welstoryCallApi("payer-receive-detail", accessToken, dataHeader);
+
+		Object dataBody = body.get("dataBody");
+		if (!(dataBody instanceof Map))
+			return List.of();
+		Map<String, Object> db = (Map<String, Object>) dataBody;
+		// resCd가 S0000(정상)이 아니면(예: 다른 제휴사 소속 soldTo를 잘못 조회한 경우 E2103) 데이터 없이 경고만 남기고 스킵
+		if (!"S0000".equals(db.get("resCd"))) {
+			log.warn("[WelstorySync] payer-receive-detail 오류 soldTo={} resCd={} resMsg={}", soldTo, db.get("resCd"),
+					db.get("resMsg"));
+			return List.of();
+		}
+		Object data = db.get("data");
+		return data instanceof List ? (List<Map<String, Object>>) data : List.of();
+	}
+
+	// 웰스토리 fdapi/service/* 공통 호출부.
+	// Authorization: Bearer {accessToken} + guid 헤더를 싣고, {"dataHeader":..., "dataBody":{}} 형태의 JSON body로 POST.
+	// (dataBody는 요청에서는 항상 빈 객체 — 모든 조건값은 dataHeader에 들어간다, 웰스토리 API 공통 스펙)
+	private Map<String, Object> welstoryCallApi(String path, String accessToken, Map<String, Object> dataHeader) {
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(accessToken);
+		headers.set("guid", welstoryNextGuid());
+
+		Map<String, Object> payload = new HashMap<>();
+		payload.put("dataHeader", dataHeader);
+		payload.put("dataBody", new HashMap<>());
+
+		ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(WELSTORY_BASE_URL + "/fdapi/service/" + path,
+				HttpMethod.POST, new HttpEntity<>(payload, headers),
+				new ParameterizedTypeReference<Map<String, Object>>() {
+				});
+		Map<String, Object> res = resp.getBody();
+		return res != null ? res : Map.of();
 	}
 }

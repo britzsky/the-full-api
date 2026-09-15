@@ -3266,6 +3266,23 @@ public class AccountController {
 		return obj.toString();
 	}
 
+	// 웰스토리 SW-FD 주문API 입고내역 수동 동기화(백필용).
+	// date 파라미터 없이 호출하면 오늘자, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
+	// 스케줄러가 매일 17시에 자동으로 돌리는 것과 완전히 같은 로직(AccountService.WelstoryPurchaseSync)을 그대로 타므로,
+	// 이미 저장된 날짜를 다시 호출해도 sale_id/item_id 기준 UPDATE만 되고 중복 저장되지 않는다.
+	@PostMapping("/Account/WelstoryPurchaseSyncManual")
+	public String WelstoryPurchaseSyncManual(@RequestParam(required = false) String date) {
+		int saveCount = (date == null || date.isBlank())
+				? accountService.WelstoryPurchaseSync()
+				: accountService.WelstoryPurchaseSync(date);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		obj.addProperty("saveCount", saveCount);
+		return obj.toString();
+	}
+
 	/*
 	 * part    : 현장
 	 * method  : PurchaseRequestUserInfo
