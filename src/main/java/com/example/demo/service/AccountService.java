@@ -1715,27 +1715,27 @@ public class AccountService {
 			String clientOrd = String.valueOf(line.get("clientOrd"));
 
 			// 프론트(AccountPurchaseDeadlineTab, accountPurchaseDeadlineDetailData.js normalizeDetailAmounts)가
-			// 화면에 보여줄 "금액"을 amount 그대로 쓰지 않고 qty*unitPrice로 재계산한다.
-			// 웰스토리의 unitPrice는 부가세 "빼기 전" 단가라서, 그걸 그대로 넣으면 과세 품목은 화면에서
-			// 부가세만큼 적게 표시된다(면세 품목은 부가세가 0이라 문제 없음).
-			// -> 화면 재계산과 결과가 같아지도록, 여기서 unitPrice를 "부가세 포함" 단가(amount/qty)로 바꿔서 저장한다.
-			double qty = welstoryAsDouble(line.get("billQty"));
-			Object unitPriceForSave = qty > 0 ? Math.round(amount / qty) : line.get("unitPrice");
-
+			// 화면/상단합계용 "금액"을 amount 그대로 쓰지 않고 매번 qty*unitPrice로 재계산한다.
+			// unitPrice 컬럼은 int(정수)라서, qty가 소수(예: "2.500")인 품목은 amount/qty를 반올림하는 순간
+			// qty*unitPrice가 원래 amount와 1원 단위로 어긋날 수 있고, 그 오차 때문에 화면이 "값이 다르다"며
+			// 상단 행을 __dirty(빨간색)로 잘못 표시하는 문제가 있었다(qty가 딱 나눠떨어지는 품목만 우연히 안 걸림).
+			// -> qty*unitPrice가 항상 amount와 정확히 같아지도록(오차 발생이 원천적으로 불가능하게)
+			// qty=1, unitPrice=amount로 저장한다. 실제 입고수량/단가는 note에 참고용으로 남겨둔다.
 			Map<String, Object> detail = new HashMap<>();
 			detail.put("item_id", welstoryDailyItemId(clientOrd, line.get("clientOrdItem")));
 			detail.put("sale_id", saleId); // master와 연결되는 FK
 			detail.put("name", line.get("itemName"));
-			detail.put("qty", line.get("billQty")); // 주문수량(ordQty)이 아니라 실제 입고수량(billQty) 사용 - 이 화면은 입고/정산 기준이라서
+			detail.put("qty", "1");
 			detail.put("amount", amount); // 품목 합계금액(totAmt, 부가세 포함)
-			detail.put("unitPrice", unitPriceForSave);
+			detail.put("unitPrice", amount); // qty=1과 곱해 항상 amount와 정확히 일치하도록
 			detail.put("vat", lineVat);
 			detail.put("tax", taxable ? (amount - lineVat) : 0); // 공급가액(과세일 때만). 면세면 0
 			detail.put("taxType", taxable ? "1" : "2"); // 기존 화면 코드값: 1=과세, 2=면세
 			detail.put("itemType", isCons ? "2" : "1"); // 기존 화면 코드값: 1=식재료, 2=소모품
-			// 규격(standard) + 주문번호(clientOrd)를 참고용으로 note에 저장 (전용 컬럼이 없고, 여러 주문이 한 master로 합쳐져서
-			// 어느 주문 소속 품목인지 구분할 수 있는 유일한 단서라 반드시 남겨둔다)
-			detail.put("note", line.get("standard") + " (" + clientOrd + ")");
+			// 규격(standard) + 실제 입고수량/단가 + 주문번호(clientOrd)를 참고용으로 note에 저장
+			// (전용 컬럼이 없고, 여러 주문이 한 master로 합쳐져서 어느 주문 소속 품목인지 구분할 단서도 필요해서 반드시 남겨둔다)
+			detail.put("note", line.get("standard") + " [수량:" + line.get("billQty") + " 단가:" + line.get("unitPrice")
+					+ "] (" + clientOrd + ")");
 			detail.put("user_id", WELSTORY_SYNC_USER_ID);
 			AccountPurchaseDetailSave(detail);
 		}
@@ -1771,16 +1771,6 @@ public class AccountService {
 		}
 	}
 
-	// billQty("2.000" 같은 소수 문자열)를 unitPrice 역산(amount/qty)에 쓰기 위한 double 변환. 실패 시 0
-	private double welstoryAsDouble(Object v) {
-		if (v == null)
-			return 0d;
-		try {
-			return Double.parseDouble(String.valueOf(v).trim());
-		} catch (NumberFormatException e) {
-			return 0d;
-		}
-	}
 
 	// 웰스토리의 billDate("YYYYMMDD", 8자리)를 tb_account_purchase_tally.saleDate에 넣을 수 있는
 	// "YYYY-MM-DD" 형식으로 변환. 길이가 8이 아니면(형식이 이상하면) 원본을 그대로 반환해서 값이 유실되지 않게 함.
