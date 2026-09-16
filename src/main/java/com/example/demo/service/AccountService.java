@@ -38,8 +38,9 @@ public class AccountService {
 	private final S3FileStorageService fileStorageService;
 
 	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
-	// WelstorySyncScheduler가 매일 17시(KST)에 WelstoryPurchaseSync()를 호출 ->
-	// 제휴사 2곳의 API를 각각 호출해 오늘자 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
+	// WelstorySyncScheduler가 매일 10시(KST)에 WelstoryPurchaseSync()를 호출 ->
+	// 제휴사 2곳의 API를 각각 호출해 전날(어제)자 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
+	// (전날 하루치 입고가 마감된 다음날 아침에 도는 구조라 대상일은 "오늘"이 아니라 "어제")
 
 	// 웰스토리 API 게이트웨이 base url (토큰발급: /oauth/2.0/token, 서비스: /fdapi/service/*)
 	private static final String WELSTORY_BASE_URL = "https://welgw.welstory.com";
@@ -1582,13 +1583,13 @@ public class AccountService {
 	// ===================== 웰스토리 SW-FD 주문API 연동 (로직) =====================
 	//
 	// 전체 흐름 요약
-	// WelstorySyncScheduler(매일 17시 KST)
+	// WelstorySyncScheduler(매일 10시 KST)
 	// -> WelstoryPurchaseSync() 제휴사 2곳 순회
 	// -> welstorySyncOneClient(client) client 하나: 토큰발급 -> 사업장(soldTo) 목록조회
-	// -> welstorySyncReceiveDetail(soldTo 하나) 그날 입고내역 전체 조회
+	// -> welstorySyncReceiveDetail(soldTo 하나) 전날 입고내역 전체 조회
 	// -> AccountPurchaseSave(master 1행) "하루당 1 master" = tb_account_purchase_tally
 	// 1 row
-	// -> AccountPurchaseDetailSave(detail N행) 그날 전체 품목(주문 여러 건 섞여있어도) =
+	// -> AccountPurchaseDetailSave(detail N행) 전날 전체 품목(주문 여러 건 섞여있어도) =
 	// tb_account_purchase_tally_detail N rows
 	//
 	// account_id는 tb_account.welstory_soldto 컬럼(soldTo 코드 매핑, 수동 등록해둔 값)으로 조회하며,
@@ -1597,12 +1598,14 @@ public class AccountService {
 	// 진입점. 스케줄러가 이 메서드 하나만 호출한다.
 	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된
 	// master(soldTo/날짜) 건수 합계를 반환
-	// 오늘자 입고내역 동기화 (스케줄러가 매일 부르는 기본 진입점)
-	// LocalDate.now()가 아니라 Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
+	// 전날자 입고내역 동기화 (스케줄러가 매일 아침 부르는 기본 진입점)
+	// 다음날 10시에 돌기 때문에 대상일은 "오늘"이 아니라 "어제". LocalDate.now()가 아니라
+	// Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
 	// 자정 근처(KST 00~09시, UTC로는 전날)에 날짜가 하루 어긋날 수 있다 (guid와 동일한 이유).
 	public int WelstoryPurchaseSync() {
-		String today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-		return WelstoryPurchaseSync(today);
+		String yesterday = LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).minusDays(1)
+				.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+		return WelstoryPurchaseSync(yesterday);
 	}
 
 	// 특정 날짜(reqDeliveryDate, "YYYYMMDD") 입고내역 동기화.
