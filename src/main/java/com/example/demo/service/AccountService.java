@@ -1714,13 +1714,21 @@ public class AccountService {
 			long lineVat = welstoryAsLong(line.get("vat"));
 			String clientOrd = String.valueOf(line.get("clientOrd"));
 
+			// 프론트(AccountPurchaseDeadlineTab, accountPurchaseDeadlineDetailData.js normalizeDetailAmounts)가
+			// 화면에 보여줄 "금액"을 amount 그대로 쓰지 않고 qty*unitPrice로 재계산한다.
+			// 웰스토리의 unitPrice는 부가세 "빼기 전" 단가라서, 그걸 그대로 넣으면 과세 품목은 화면에서
+			// 부가세만큼 적게 표시된다(면세 품목은 부가세가 0이라 문제 없음).
+			// -> 화면 재계산과 결과가 같아지도록, 여기서 unitPrice를 "부가세 포함" 단가(amount/qty)로 바꿔서 저장한다.
+			double qty = welstoryAsDouble(line.get("billQty"));
+			Object unitPriceForSave = qty > 0 ? Math.round(amount / qty) : line.get("unitPrice");
+
 			Map<String, Object> detail = new HashMap<>();
 			detail.put("item_id", welstoryDailyItemId(clientOrd, line.get("clientOrdItem")));
 			detail.put("sale_id", saleId); // master와 연결되는 FK
 			detail.put("name", line.get("itemName"));
 			detail.put("qty", line.get("billQty")); // 주문수량(ordQty)이 아니라 실제 입고수량(billQty) 사용 - 이 화면은 입고/정산 기준이라서
 			detail.put("amount", amount); // 품목 합계금액(totAmt, 부가세 포함)
-			detail.put("unitPrice", line.get("unitPrice"));
+			detail.put("unitPrice", unitPriceForSave);
 			detail.put("vat", lineVat);
 			detail.put("tax", taxable ? (amount - lineVat) : 0); // 공급가액(과세일 때만). 면세면 0
 			detail.put("taxType", taxable ? "1" : "2"); // 기존 화면 코드값: 1=과세, 2=면세
@@ -1760,6 +1768,17 @@ public class AccountService {
 			return Long.parseLong(String.valueOf(v).trim());
 		} catch (NumberFormatException e) {
 			return 0L;
+		}
+	}
+
+	// billQty("2.000" 같은 소수 문자열)를 unitPrice 역산(amount/qty)에 쓰기 위한 double 변환. 실패 시 0
+	private double welstoryAsDouble(Object v) {
+		if (v == null)
+			return 0d;
+		try {
+			return Double.parseDouble(String.valueOf(v).trim());
+		} catch (NumberFormatException e) {
+			return 0d;
 		}
 	}
 
