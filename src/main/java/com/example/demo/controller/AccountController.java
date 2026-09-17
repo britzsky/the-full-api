@@ -3299,7 +3299,7 @@ public class AccountController {
 	 * method  : PurchaseManagerList
 	 * comment : 현장 -> 구입 업장관리 -> 관리자 목록 (department=5, position=2,3)
 	 */
-	@GetMapping("/FieldBoard/PurchaseManagerList")
+	@GetMapping("/Account/PurchaseManagerList")
 	public String PurchaseManagerList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> list = accountService.PurchaseManagerList(paramMap);
 		return new Gson().toJson(list != null ? list : new ArrayList<>());
@@ -3310,7 +3310,7 @@ public class AccountController {
 	 * method  : PurchaseAccountList
 	 * comment : 현장 -> 구입 업장관리 -> 전체 거래처 목록
 	 */
-	@GetMapping("/FieldBoard/PurchaseAccountList")
+	@GetMapping("/Account/PurchaseAccountList")
 	public String PurchaseAccountList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> list = accountService.PurchaseAccountList(paramMap);
 		return new Gson().toJson(list != null ? list : new ArrayList<>());
@@ -3321,7 +3321,7 @@ public class AccountController {
 	 * method  : PurchaseManagerAccountMapList
 	 * comment : 현장 -> 구입 업장관리 -> 관리자별 매핑 거래처 목록
 	 */
-	@GetMapping("/FieldBoard/PurchaseManagerAccountMapList")
+	@GetMapping("/Account/PurchaseManagerAccountMapList")
 	public String PurchaseManagerAccountMapList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> list = accountService.PurchaseManagerAccountMapList(paramMap);
 		return new Gson().toJson(list != null ? list : new ArrayList<>());
@@ -3333,7 +3333,7 @@ public class AccountController {
 	 * comment : 현장 -> 구입 업장관리 -> 관리자-거래처 매핑 저장 (기존 삭제 후 재등록)
 	 */
 	@SuppressWarnings("unchecked")
-	@PostMapping("/FieldBoard/PurchaseManagerAccountMapSave")
+	@PostMapping("/Account/PurchaseManagerAccountMapSave")
 	public String PurchaseManagerAccountMapSave(@RequestBody Map<String, Object> payload) {
 		JsonObject obj = new JsonObject();
 		try {

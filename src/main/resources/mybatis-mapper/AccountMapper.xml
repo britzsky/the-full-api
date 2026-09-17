@@ -2961,7 +2961,6 @@
 	<update id="AccountPurchaseTallyTotalUpdate" parameterType="map">
 		UPDATE tb_account_purchase_tally
 		SET total = #{total},
-		    tax = #{tax},
 		    totalCash = #{totalCash},
 		    mod_id = #{user_id},
 		    mod_dt = DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
@@ -4033,6 +4032,24 @@
 		  account_name
 		FROM tb_account
 		WHERE IFNULL(del_yn, 'N') = 'N'
+		  AND T.account_id not in
+ 		  (
+ 			20260122065002,
+			20260122071337,
+			20260122071857,
+			20260122072114,
+			20260122072245,
+			20260122072529,
+			20260122072732,
+			20260126093618,
+			20260126093730,
+			20260126093808,
+			20260127025350,
+			20260127025437,
+			20260127025657,
+			20260219024021,
+			20260831171325
+ 		  )
 		ORDER BY account_name ASC
 	</select>
 

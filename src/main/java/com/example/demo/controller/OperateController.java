@@ -259,7 +259,6 @@ public class OperateController {
                     Map<String, Object> updateParam = new HashMap<>();
                     updateParam.put("sale_id", existing.get("sale_id"));
                     updateParam.put("total", total);
-                    updateParam.put("tax", 0);
                     updateParam.put("totalCash", total);
                     updateParam.put("user_id", userId);
                     accountMapper.AccountPurchaseTallyTotalUpdate(updateParam);
