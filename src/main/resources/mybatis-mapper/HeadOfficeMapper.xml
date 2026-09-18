@@ -2312,7 +2312,7 @@
 		<!--
 			구매여부(buy_yn) 저장
 			- 소모품 구매 품의서: 고정 결재자(payer_user, 실제로는 iy1)가 결재 완료 전까지 저장
-			- 현장 구매요청서(FP): 구매진행 담당자(si1)가 실제 구매 완료 여부를 저장(결재 완료 이후에도 갱신 가능)
+			- 현장 구매요청서(FP): 구매진행 담당자(sh9)가 실제 구매 완료 여부를 저장(결재 완료 이후에도 갱신 가능)
 		-->
 		UPDATE tb_headoffice_purchase_request pr
 		JOIN tb_headoffice_electronic_payment ep
@@ -2324,7 +2324,7 @@
 			(ep.payer_user = #{user_id} AND IFNULL(ep.payer_sign, '') != '4')
 			OR (
 				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
-				AND #{user_id} = 'si1'
+				AND #{user_id} = 'sh9'
 				AND IFNULL(ep.tm_sign, '') != '3'
 				AND IFNULL(ep.payer_sign, '') != '3'
 				<!-- 구매진행여부가 '진행(Y)'이 아닌 품목은 실제로 구매할 대상이 아니므로 구매여부 체크 자체를 막는다. -->

@@ -4032,7 +4032,7 @@
 		  account_name
 		FROM tb_account
 		WHERE IFNULL(del_yn, 'N') = 'N'
-		  AND T.account_id not in
+		  AND account_id not in
  		  (
  			20260122065002,
 			20260122071337,
