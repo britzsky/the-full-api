@@ -1753,6 +1753,15 @@ public class AccountService {
 			detail.put("user_id", WELSTORY_SYNC_USER_ID);
 			AccountPurchaseDetailSave(detail);
 		}
+
+		// tb_account_purchase_tally(_detail)에만 저장하고 끝나면 집계표(tb_account_tally_sheet)에 반영되지 않는다.
+		// 프론트(AccountPurchaseDeadlineTab)와 동일하게 "상세 저장 -> 마스터 저장" 순서를 지킨 뒤,
+		// AccountController의 일반 저장 경로와 같이 sp_sync_tally_sheet_one_day를 태워 집계표에도 보이게 한다.
+		LocalDate saleLocalDate = LocalDate.parse(String.valueOf(master.get("saleDate")));
+		master.put("year", saleLocalDate.getYear());
+		master.put("month", saleLocalDate.getMonthValue());
+		TallySheetPaymentSave(master);
+
 		return 1; // 이 soldTo/날짜에 대해 master 1건 저장(=처리 성공)
 	}
 
