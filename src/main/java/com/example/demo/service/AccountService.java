@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +37,9 @@ public class AccountService {
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
 	private final S3FileStorageService fileStorageService;
+	// 클래스 내부 self-invocation(this.method())은 스프링 AOP 프록시를 안 거쳐서 @Transactional이
+	// 적용 안 되므로, 트랜잭션이 꼭 걸려야 하는 메서드를 내부에서 호출할 땐 이 프록시 참조(self)를 통해 호출한다.
+	private final AccountService self;
 
 	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
 	// WelstorySyncScheduler가 매일 10시(KST)에 WelstoryPurchaseSync()를 호출 ->
@@ -302,11 +306,13 @@ public class AccountService {
 			AccountMapper accountMapper,
 			HeadOfficeMapper headOfficeMapper,
 			OperateMapper operateMapper,
-			S3FileStorageService fileStorageService) {
+			S3FileStorageService fileStorageService,
+			@Lazy AccountService self) {
 		this.accountMapper = accountMapper;
 		this.headOfficeMapper = headOfficeMapper;
 		this.operateMapper = operateMapper;
 		this.fileStorageService = fileStorageService;
+		this.self = self;
 	}
 
 	// 공통 -> 현재 날짜 키 조회
@@ -1760,7 +1766,8 @@ public class AccountService {
 		LocalDate saleLocalDate = LocalDate.parse(String.valueOf(master.get("saleDate")));
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
-		TallySheetPaymentSave(master);
+		// self(프록시 경유)로 호출해야 @Transactional이 실제로 걸려서, 4단계 중 하나라도 실패하면 전부 롤백된다.
+		self.TallySheetPaymentSave(master);
 
 		return 1; // 이 soldTo/날짜에 대해 master 1건 저장(=처리 성공)
 	}
