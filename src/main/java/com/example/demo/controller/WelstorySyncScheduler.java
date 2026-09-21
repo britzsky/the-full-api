@@ -21,8 +21,9 @@ public class WelstorySyncScheduler {
 		this.accountService = accountService;
 	}
 
-	// 매일 10시(KST) 웰스토리 입고내역을 조회하여 tb_account_purchase_tally(_detail)에 저장.
-	@Scheduled(cron = "${welstory.sync.cron:0 0 10 * * *}", zone = "Asia/Seoul")
+	// 매일 18시(KST) 웰스토리 입고내역을 조회하여 tb_account_purchase_tally(_detail)에 저장.
+	// (당일 저녁에 그날치를 바로 받고, 늦게 확정되는 전일/전전일분도 같이 재조회해서 덮어쓴다)
+	@Scheduled(cron = "${welstory.sync.cron:0 0 18 * * *}", zone = "Asia/Seoul")
 	public void runWelstoryPurchaseSync() {
 		try {
 			log.info("[WelstorySyncScheduler] 웰스토리 입고내역 동기화 시작");
