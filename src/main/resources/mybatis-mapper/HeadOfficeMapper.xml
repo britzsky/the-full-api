@@ -1740,7 +1740,7 @@
 			           ON mapped_manager.user_id = pam2.user_id
 			          AND IFNULL(mapped_manager.del_yn, 'N') = 'N'
 			         JOIN tb_user second_approver
-			           ON second_approver.department = mapped_manager.department
+			           ON second_approver.department = 5
 			          AND second_approver.position = 1
 			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
 			         WHERE pam2.account_id = draft_user.account_id
@@ -1761,7 +1761,7 @@
 			           ON mapped_manager3.user_id = pam3.user_id
 			          AND IFNULL(mapped_manager3.del_yn, 'N') = 'N'
 			         JOIN tb_user second_approver
-			           ON second_approver.department = mapped_manager3.department
+			           ON second_approver.department = 5
 			          AND second_approver.position = 1
 			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
 			         WHERE pam3.account_id = draft_user.account_id
@@ -1934,7 +1934,7 @@
 			           ON mapped_name.user_id = pam_name2.user_id
 			          AND IFNULL(mapped_name.del_yn, 'N') = 'N'
 			         JOIN tb_user second_name
-			           ON second_name.department = mapped_name.department
+			           ON second_name.department = 5
 			          AND second_name.position = 1
 			          AND IFNULL(second_name.del_yn, 'N') = 'N'
 			         WHERE pam_name2.account_id = draft_user.account_id
@@ -1953,7 +1953,7 @@
 			           ON mapped_manager.user_id = pam2.user_id
 			          AND IFNULL(mapped_manager.del_yn, 'N') = 'N'
 			         JOIN tb_user second_approver
-			           ON second_approver.department = mapped_manager.department
+			           ON second_approver.department = 5
 			          AND second_approver.position = 1
 			          AND IFNULL(second_approver.del_yn, 'N') = 'N'
 			         WHERE pam2.account_id = draft_user.account_id
@@ -2213,12 +2213,10 @@
 						THEN COALESCE(
 							(
 								SELECT second_approver.user_id
-								FROM tb_user first_approver
-								JOIN tb_user second_approver
-								  ON second_approver.department = first_approver.department
-								 AND second_approver.position = 1
-								 AND IFNULL(second_approver.del_yn, 'N') = 'N'
-								WHERE first_approver.user_id = #{user_id}
+								FROM tb_user second_approver
+								WHERE second_approver.department = 5
+								  AND second_approver.position = 1
+								  AND IFNULL(second_approver.del_yn, 'N') = 'N'
 								LIMIT 1
 							),
 							ep.payer_user
@@ -2327,12 +2325,10 @@
 				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
 				AND EXISTS (
 					SELECT 1
-					FROM tb_user first_approver
-					JOIN tb_user second_approver
-					  ON second_approver.department = first_approver.department
-					 AND second_approver.position = 1
-					 AND IFNULL(second_approver.del_yn, 'N') = 'N'
-					WHERE first_approver.user_id = ep.tm_user
+					FROM tb_user second_approver
+					WHERE second_approver.department = 5
+					  AND second_approver.position = 1
+					  AND IFNULL(second_approver.del_yn, 'N') = 'N'
 					  AND second_approver.user_id = #{user_id}
 				)
 			)
@@ -2405,12 +2401,10 @@
 				     2차 결재자는 1차 결재 완료 이후가 본연의 수정 구간이므로 tm_sign 여부와 무관하게 허용한다. -->
 				EXISTS (
 					SELECT 1
-					FROM tb_user first_approver
-					JOIN tb_user second_approver
-					  ON second_approver.department = first_approver.department
-					 AND second_approver.position = 1
-					 AND IFNULL(second_approver.del_yn, 'N') = 'N'
-					WHERE first_approver.user_id = ep.tm_user
+					FROM tb_user second_approver
+					WHERE second_approver.department = 5
+					  AND second_approver.position = 1
+					  AND IFNULL(second_approver.del_yn, 'N') = 'N'
 					  AND second_approver.user_id = #{user_id}
 				)
 			)
@@ -2466,12 +2460,10 @@
 					AND IFNULL(ep_second.payer_user, '') = ''
 					AND EXISTS (
 						SELECT 1
-						FROM tb_user first_approver
-						JOIN tb_user second_approver
-						  ON second_approver.department = first_approver.department
-						 AND second_approver.position = 1
-						 AND IFNULL(second_approver.del_yn, 'N') = 'N'
-						WHERE first_approver.user_id = ep_second.tm_user
+						FROM tb_user second_approver
+						WHERE second_approver.department = 5
+						  AND second_approver.position = 1
+						  AND IFNULL(second_approver.del_yn, 'N') = 'N'
 						  AND second_approver.user_id = #{user_id}
 					)
 				)

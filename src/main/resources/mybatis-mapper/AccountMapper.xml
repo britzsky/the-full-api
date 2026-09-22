@@ -3989,7 +3989,7 @@
 		       ON u2.user_id = mgr.user_id
 		      AND IFNULL(u2.del_yn, 'N') = 'N'
 		LEFT JOIN tb_user u3
-		       ON u3.department = u2.department
+		       ON u3.department = 5
 		      AND u3.position = 1
 		      AND IFNULL(u3.del_yn, 'N') = 'N'
 		WHERE u.user_id = #{user_id}
