@@ -570,7 +570,7 @@
 					    (living_estimate + basic_estimate) AS estimate_total,
 					    ROUND(IFNULL(living_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS living_estimate_ratio,
 					    ROUND(IFNULL(basic_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS basic_estimate_ratio,
-					    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 1) AS estimate_total_ratio,
+					    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 2) AS estimate_total_ratio,
 					
 					    -- [2. 매출 항목 및 비율 (Sales)]
 					    living_cost,
@@ -600,7 +600,7 @@
 					    sales_total,
 
 					    -- 매출소계 비율은 항목 비율 합산이 아닌 매출소계 금액 자체로 계산한다(프로시저와 동일).
-					    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+					    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2) AS sales_total_ratio,
 
 					    -- [3. 매입 항목 및 비율 (Purchase)]
 					    food_process,
@@ -624,7 +624,7 @@
 					    ROUND(IFNULL(upfront_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS upfront_cost_ratio,
 
 					    purchase_total,
-					    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1) AS purchase_total_ratio,
+					    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2) AS purchase_total_ratio,
 					
 					    -- [4. 인건비 항목 및 비율 (Labor)]
 					    person_cost,
@@ -632,7 +632,7 @@
 					    dispatch_cost,
 					    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS dispatch_ratio,
 					    person_total,
-					    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+					    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2) AS person_total_ratio,
 					
 					    -- [5. 간접비 및 기타 (Indirect)]
 					    utility_bills,
@@ -642,25 +642,25 @@
 					    duty_secure,
 					    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 4) AS duty_secure_ratio,
 					    indirect_total,
-					    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+					    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2) AS indirect_total_ratio,
 					    
 					    -- [6. 영업이익 (Profit)]
 					    business_profit,
 					    -- 영업이익 비율은 직접 나눗셈이 아닌 소계 비율의 뺄셈으로 계산한다(프로시저·화면과 동일).
 					    ROUND(
-					        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					    , 1) AS business_profit_ratio,
+					        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					    , 2) AS business_profit_ratio,
 					    total_business_profit,
 					    ROUND(
-					        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-					        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1)
-					    , 1) AS total_business_profit_ratio,
+					        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+					        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 2)
+					    , 2) AS total_business_profit_ratio,
 
 					    -- [7. 기존 기타 항목들]
 					    -- 월 전체 합계 행에는 특정 거래처 하나의 비고만 섞여 나오면 안 되므로 비움
@@ -867,7 +867,7 @@
 				    (living_estimate + basic_estimate) AS estimate_total,
 				    ROUND(IFNULL(living_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS living_estimate_ratio,
 				    ROUND(IFNULL(basic_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS basic_estimate_ratio,
-				    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 1) AS estimate_total_ratio,
+				    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 2) AS estimate_total_ratio,
 				
 				    -- [2. 매출 항목 및 비율 (Sales)]
 				    living_cost,
@@ -897,7 +897,7 @@
 				    sales_total,
 
 				    -- 매출소계 비율은 항목 비율 합산이 아닌 매출소계 금액 자체로 계산한다(프로시저와 동일).
-				    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+				    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2) AS sales_total_ratio,
 
 				    -- [3. 매입 항목 및 비율 (Purchase)]
 				    food_process,
@@ -921,7 +921,7 @@
 				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS upfront_cost_ratio,
 
 				    purchase_total,
-				    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1) AS purchase_total_ratio,
+				    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2) AS purchase_total_ratio,
 
 				    -- [4. 인건비 항목 및 비율 (Labor)]
 				    person_cost,
@@ -929,7 +929,7 @@
 				    dispatch_cost,
 				    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS dispatch_ratio,
 				    person_total,
-				    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+				    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2) AS person_total_ratio,
 
 				    -- [5. 간접비 및 기타 (Indirect)]
 				    utility_bills,
@@ -939,25 +939,25 @@
 				    duty_secure,
 				    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 4) AS duty_secure_ratio,
 				    indirect_total,
-				    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+				    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2) AS indirect_total_ratio,
 
 				    -- [6. 영업이익 (Profit)]
 				    business_profit,
 				    -- 영업이익 비율은 직접 나눗셈이 아닌 소계 비율의 뺄셈으로 계산한다(프로시저·화면과 동일).
 				    ROUND(
-				        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				    , 1) AS business_profit_ratio,
+				        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				    , 2) AS business_profit_ratio,
 				    total_business_profit,
 				    ROUND(
-				        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-				        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1)
-				    , 1) AS total_business_profit_ratio,
+				        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+				        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 2)
+				    , 2) AS total_business_profit_ratio,
 
 				    -- [7. 기존 기타 항목들]
 				    utility_bills_note,
@@ -1163,7 +1163,7 @@
 		    (living_estimate + basic_estimate) AS estimate_total,
 		    ROUND(IFNULL(living_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS living_estimate_ratio,
 		    ROUND(IFNULL(basic_estimate / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 4) AS basic_estimate_ratio,
-		    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 1) AS estimate_total_ratio,
+		    ROUND(IFNULL((living_estimate + basic_estimate) / NULLIF(living_estimate + basic_estimate, 0) * 100, 0), 2) AS estimate_total_ratio,
 		
 		    -- [2. 매출 항목 및 비율 (Sales)]
 		    living_cost2,
@@ -1192,7 +1192,7 @@
 		    sales_total,
 
 		    -- 매출소계 비율은 항목 비율 합산이 아닌 매출소계 금액 자체로 계산한다(프로시저와 동일).
-		    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1) AS sales_total_ratio,
+		    ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2) AS sales_total_ratio,
 		
 		    -- [3. 매입 항목 및 비율 (Purchase)]
 		    food_process,
@@ -1213,7 +1213,7 @@
 		    ROUND(IFNULL(not_budget_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS not_budget_ratio,
 		    
 		    purchase_total,
-		    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1) AS purchase_total_ratio,
+		    ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2) AS purchase_total_ratio,
 		
 		    -- [4. 인건비 항목 및 비율 (Labor)]
 		    person_cost,
@@ -1221,7 +1221,7 @@
 		    dispatch_cost,
 		    ROUND(IFNULL(dispatch_cost / NULLIF(sales_total, 0) * 100, 0), 4) AS dispatch_ratio,
 		    person_total,
-		    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1) AS person_total_ratio,
+		    ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2) AS person_total_ratio,
 		
 		    -- [5. 간접비 및 기타 (Indirect)]
 		    utility_bills,
@@ -1231,25 +1231,25 @@
 		    duty_secure,
 		    ROUND(IFNULL(duty_secure / NULLIF(sales_total, 0) * 100, 0), 4) AS duty_secure_ratio,
 		    indirect_total,
-		    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1) AS indirect_total_ratio,
+		    ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2) AS indirect_total_ratio,
 		    
 		    -- [6. 영업이익 (Profit)]
 		    business_profit,
 		    -- 영업이익 비율은 직접 나눗셈이 아닌 소계 비율의 뺄셈으로 계산한다(프로시저·화면과 동일).
 		    ROUND(
-		        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		    , 1) AS business_profit_ratio,
+		        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		    , 2) AS business_profit_ratio,
 		    total_business_profit,
 		    ROUND(
-		        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 1)
-		        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 1)
-		    , 1) AS total_business_profit_ratio,
+		        ROUND(IFNULL(sales_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(purchase_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(person_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        - ROUND(IFNULL(indirect_total / NULLIF(sales_total, 0) * 100, 0), 2)
+		        + ROUND(IFNULL(payback_price / NULLIF(sales_total, 0) * 100, 0), 2)
+		    , 2) AS total_business_profit_ratio,
 		
 		    -- [7. 기존 기타 항목들]
 		    utility_bills_note,
