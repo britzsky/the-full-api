@@ -672,17 +672,19 @@
 					    update_dt
 					
 					FROM (
-					    SELECT 
+					    SELECT
 					        year, month,
 					        -- 매출 기초 데이터
-					        SUM(IFNULL(living_cost, 0)) AS living_cost,
-					        SUM(IFNULL(basic_cost, 0)) AS basic_cost,
-					        SUM(IFNULL(employ_cost, 0)) AS employ_cost,
-					        
+					        -- 강남은 2026년 5월분부터 자체 금액을 living_cost2/basic_cost2/employ_cost2에만
+					        -- 저장하지만 sales_total에는 포함되므로, 전체 합계 화면/엑셀에도 반영되도록 합산한다.
+					        SUM(IFNULL(living_cost, 0) + IFNULL(living_cost2, 0)) AS living_cost,
+					        SUM(IFNULL(basic_cost, 0) + IFNULL(basic_cost2, 0)) AS basic_cost,
+					        SUM(IFNULL(employ_cost, 0) + IFNULL(employ_cost2, 0)) AS employ_cost,
+
 					        SUM(IFNULL(living_cost2, 0)) AS living_cost2,
 					        SUM(IFNULL(basic_cost2, 0)) AS basic_cost2,
 					        SUM(IFNULL(employ_cost2, 0)) AS employ_cost2,
-					        
+
 					        SUM(IFNULL(daycare_cost, 0)) AS daycare_cost,
 					        SUM(IFNULL(daycare_emp_cost, 0)) AS daycare_emp_cost,
 					        SUM(IFNULL(payback_price, 0)) AS payback_price,
