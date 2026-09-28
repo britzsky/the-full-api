@@ -112,6 +112,152 @@
 		ORDER BY a.account_name ASC, amv.account_id, CASE WHEN amv.type IN (1002, 1003) THEN 2 WHEN amv.type IN (1000, 1008) THEN 1 ELSE 0 END ASC, amv.type ASC
 	</select>
 
+	<!-- 거래처 집계표 -> 삼성웰스토리(type 1~4) 거래처별 일자 매입금액 합계 -->
+	<select id="VendorTallyWellstoryList" parameterType="map" resultType="hashmap">
+		SELECT amv.account_id,
+			SUM(IFNULL(ats.day_1, 0)) as day_1,
+			SUM(IFNULL(ats.day_2, 0)) as day_2,
+			SUM(IFNULL(ats.day_3, 0)) as day_3,
+			SUM(IFNULL(ats.day_4, 0)) as day_4,
+			SUM(IFNULL(ats.day_5, 0)) as day_5,
+			SUM(IFNULL(ats.day_6, 0)) as day_6,
+			SUM(IFNULL(ats.day_7, 0)) as day_7,
+			SUM(IFNULL(ats.day_8, 0)) as day_8,
+			SUM(IFNULL(ats.day_9, 0)) as day_9,
+			SUM(IFNULL(ats.day_10, 0)) as day_10,
+			SUM(IFNULL(ats.day_11, 0)) as day_11,
+			SUM(IFNULL(ats.day_12, 0)) as day_12,
+			SUM(IFNULL(ats.day_13, 0)) as day_13,
+			SUM(IFNULL(ats.day_14, 0)) as day_14,
+			SUM(IFNULL(ats.day_15, 0)) as day_15,
+			SUM(IFNULL(ats.day_16, 0)) as day_16,
+			SUM(IFNULL(ats.day_17, 0)) as day_17,
+			SUM(IFNULL(ats.day_18, 0)) as day_18,
+			SUM(IFNULL(ats.day_19, 0)) as day_19,
+			SUM(IFNULL(ats.day_20, 0)) as day_20,
+			SUM(IFNULL(ats.day_21, 0)) as day_21,
+			SUM(IFNULL(ats.day_22, 0)) as day_22,
+			SUM(IFNULL(ats.day_23, 0)) as day_23,
+			SUM(IFNULL(ats.day_24, 0)) as day_24,
+			SUM(IFNULL(ats.day_25, 0)) as day_25,
+			SUM(IFNULL(ats.day_26, 0)) as day_26,
+			SUM(IFNULL(ats.day_27, 0)) as day_27,
+			SUM(IFNULL(ats.day_28, 0)) as day_28,
+			SUM(IFNULL(ats.day_29, 0)) as day_29,
+			SUM(IFNULL(ats.day_30, 0)) as day_30,
+			SUM(IFNULL(ats.day_31, 0)) as day_31
+		FROM tb_account_mapping_v2 amv
+		LEFT OUTER JOIN tb_account_tally_sheet ats
+		ON ats.account_id = amv.account_id
+		AND ats.type = amv.type
+		AND ats.count_year = #{year}
+		AND ats.count_month = #{month}
+		WHERE amv.del_yn = 'N'
+		AND amv.type IN (1, 2, 3, 4)
+		GROUP BY amv.account_id
+	</select>
+
+	<!-- 거래처 집계표 -> 아워홈(type 1042) 거래처별 일자 매입금액 합계 -->
+	<select id="VendorTallyAwhomeList" parameterType="map" resultType="hashmap">
+		SELECT amv.account_id,
+			SUM(IFNULL(ats.day_1, 0)) as day_1,
+			SUM(IFNULL(ats.day_2, 0)) as day_2,
+			SUM(IFNULL(ats.day_3, 0)) as day_3,
+			SUM(IFNULL(ats.day_4, 0)) as day_4,
+			SUM(IFNULL(ats.day_5, 0)) as day_5,
+			SUM(IFNULL(ats.day_6, 0)) as day_6,
+			SUM(IFNULL(ats.day_7, 0)) as day_7,
+			SUM(IFNULL(ats.day_8, 0)) as day_8,
+			SUM(IFNULL(ats.day_9, 0)) as day_9,
+			SUM(IFNULL(ats.day_10, 0)) as day_10,
+			SUM(IFNULL(ats.day_11, 0)) as day_11,
+			SUM(IFNULL(ats.day_12, 0)) as day_12,
+			SUM(IFNULL(ats.day_13, 0)) as day_13,
+			SUM(IFNULL(ats.day_14, 0)) as day_14,
+			SUM(IFNULL(ats.day_15, 0)) as day_15,
+			SUM(IFNULL(ats.day_16, 0)) as day_16,
+			SUM(IFNULL(ats.day_17, 0)) as day_17,
+			SUM(IFNULL(ats.day_18, 0)) as day_18,
+			SUM(IFNULL(ats.day_19, 0)) as day_19,
+			SUM(IFNULL(ats.day_20, 0)) as day_20,
+			SUM(IFNULL(ats.day_21, 0)) as day_21,
+			SUM(IFNULL(ats.day_22, 0)) as day_22,
+			SUM(IFNULL(ats.day_23, 0)) as day_23,
+			SUM(IFNULL(ats.day_24, 0)) as day_24,
+			SUM(IFNULL(ats.day_25, 0)) as day_25,
+			SUM(IFNULL(ats.day_26, 0)) as day_26,
+			SUM(IFNULL(ats.day_27, 0)) as day_27,
+			SUM(IFNULL(ats.day_28, 0)) as day_28,
+			SUM(IFNULL(ats.day_29, 0)) as day_29,
+			SUM(IFNULL(ats.day_30, 0)) as day_30,
+			SUM(IFNULL(ats.day_31, 0)) as day_31
+		FROM tb_account_mapping_v2 amv
+		LEFT OUTER JOIN tb_account_tally_sheet ats
+		ON ats.account_id = amv.account_id
+		AND ats.type = amv.type
+		AND ats.count_year = #{year}
+		AND ats.count_month = #{month}
+		WHERE amv.del_yn = 'N'
+		AND amv.type = 1042
+		GROUP BY amv.account_id
+	</select>
+
+	<!-- 거래처 집계표 -> 경관식(tb_account_purchase_tally_detail.itemType = 3) 거래처별 일자 매입금액 합계 -->
+	<select id="VendorTallyScenicList" parameterType="map" resultType="hashmap">
+		SELECT apt.account_id,
+			SUM(CASE WHEN DAY(apt.saleDate) = 1 THEN d.amt ELSE 0 END) as day_1,
+			SUM(CASE WHEN DAY(apt.saleDate) = 2 THEN d.amt ELSE 0 END) as day_2,
+			SUM(CASE WHEN DAY(apt.saleDate) = 3 THEN d.amt ELSE 0 END) as day_3,
+			SUM(CASE WHEN DAY(apt.saleDate) = 4 THEN d.amt ELSE 0 END) as day_4,
+			SUM(CASE WHEN DAY(apt.saleDate) = 5 THEN d.amt ELSE 0 END) as day_5,
+			SUM(CASE WHEN DAY(apt.saleDate) = 6 THEN d.amt ELSE 0 END) as day_6,
+			SUM(CASE WHEN DAY(apt.saleDate) = 7 THEN d.amt ELSE 0 END) as day_7,
+			SUM(CASE WHEN DAY(apt.saleDate) = 8 THEN d.amt ELSE 0 END) as day_8,
+			SUM(CASE WHEN DAY(apt.saleDate) = 9 THEN d.amt ELSE 0 END) as day_9,
+			SUM(CASE WHEN DAY(apt.saleDate) = 10 THEN d.amt ELSE 0 END) as day_10,
+			SUM(CASE WHEN DAY(apt.saleDate) = 11 THEN d.amt ELSE 0 END) as day_11,
+			SUM(CASE WHEN DAY(apt.saleDate) = 12 THEN d.amt ELSE 0 END) as day_12,
+			SUM(CASE WHEN DAY(apt.saleDate) = 13 THEN d.amt ELSE 0 END) as day_13,
+			SUM(CASE WHEN DAY(apt.saleDate) = 14 THEN d.amt ELSE 0 END) as day_14,
+			SUM(CASE WHEN DAY(apt.saleDate) = 15 THEN d.amt ELSE 0 END) as day_15,
+			SUM(CASE WHEN DAY(apt.saleDate) = 16 THEN d.amt ELSE 0 END) as day_16,
+			SUM(CASE WHEN DAY(apt.saleDate) = 17 THEN d.amt ELSE 0 END) as day_17,
+			SUM(CASE WHEN DAY(apt.saleDate) = 18 THEN d.amt ELSE 0 END) as day_18,
+			SUM(CASE WHEN DAY(apt.saleDate) = 19 THEN d.amt ELSE 0 END) as day_19,
+			SUM(CASE WHEN DAY(apt.saleDate) = 20 THEN d.amt ELSE 0 END) as day_20,
+			SUM(CASE WHEN DAY(apt.saleDate) = 21 THEN d.amt ELSE 0 END) as day_21,
+			SUM(CASE WHEN DAY(apt.saleDate) = 22 THEN d.amt ELSE 0 END) as day_22,
+			SUM(CASE WHEN DAY(apt.saleDate) = 23 THEN d.amt ELSE 0 END) as day_23,
+			SUM(CASE WHEN DAY(apt.saleDate) = 24 THEN d.amt ELSE 0 END) as day_24,
+			SUM(CASE WHEN DAY(apt.saleDate) = 25 THEN d.amt ELSE 0 END) as day_25,
+			SUM(CASE WHEN DAY(apt.saleDate) = 26 THEN d.amt ELSE 0 END) as day_26,
+			SUM(CASE WHEN DAY(apt.saleDate) = 27 THEN d.amt ELSE 0 END) as day_27,
+			SUM(CASE WHEN DAY(apt.saleDate) = 28 THEN d.amt ELSE 0 END) as day_28,
+			SUM(CASE WHEN DAY(apt.saleDate) = 29 THEN d.amt ELSE 0 END) as day_29,
+			SUM(CASE WHEN DAY(apt.saleDate) = 30 THEN d.amt ELSE 0 END) as day_30,
+			SUM(CASE WHEN DAY(apt.saleDate) = 31 THEN d.amt ELSE 0 END) as day_31
+		FROM tb_account_purchase_tally apt
+		JOIN (
+			SELECT sale_id, SUM(amount) as amt
+			FROM tb_account_purchase_tally_detail
+			WHERE itemType = '3'
+			GROUP BY sale_id
+		) d ON d.sale_id = apt.sale_id
+		WHERE apt.saleDate >= STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d')
+		AND apt.saleDate <![CDATA[ < ]]> DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d'), INTERVAL 1 MONTH)
+		GROUP BY apt.account_id
+	</select>
+
+	<!-- 거래처 집계표 -> 거래처별 중식 평균식수 (lunch > 0 인 날짜만 평균, dinersnumbersheet 화면과 동일 기준) -->
+	<select id="VendorTallyLunchAvgList" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+			ROUND(SUM(CASE WHEN lunch > 0 THEN lunch ELSE 0 END) / NULLIF(SUM(CASE WHEN lunch > 0 THEN 1 ELSE 0 END), 0)) as lunch_avg
+		FROM tb_account_diners_number
+		WHERE diner_year = #{year}
+		AND diner_month = #{month}
+		GROUP BY account_id
+	</select>
+
 	<select id="TallySheetNote" parameterType="map" resultType="hashmap">
 		SELECT IFNULL((
 		    SELECT ats.note

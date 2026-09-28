@@ -109,6 +109,27 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : AccountVendorTallyList
+     * comment : 급식사업부 -> 예산 -> 거래처 집계표 (삼성웰스토리/아워홈/경관식/거래처별 평균식수 통합 조회)
+     */
+    @GetMapping("/Operate/AccountVendorTallyList")
+    public String AccountVendorTallyList(@RequestParam Map<String, Object> paramMap) {
+        // tb_account_tally_sheet.count_month 는 "01"~"12" 형태로 저장되어 있어 zero-padding 필요
+        Map<String, Object> tallySheetParam = new HashMap<>(paramMap);
+        int monthValue = Integer.parseInt(tallySheetParam.get("month").toString());
+        tallySheetParam.put("month", String.format("%02d", monthValue));
+
+        Map<String, Object> resultMap = new HashMap<>();
+        resultMap.put("wellstory", operateService.VendorTallyWellstoryList(tallySheetParam));
+        resultMap.put("awhome", operateService.VendorTallyAwhomeList(tallySheetParam));
+        resultMap.put("scenic", operateService.VendorTallyScenicList(paramMap));
+        resultMap.put("lunchAvg", operateService.VendorTallyLunchAvgList(paramMap));
+
+        return new Gson().toJson(resultMap);
+    }
+
+    /*
+     * part : 운영
      * method : TallySheetNote
      * comment : 급식사업부 -> 운영관리 -> 집계표 메모 조회
      */

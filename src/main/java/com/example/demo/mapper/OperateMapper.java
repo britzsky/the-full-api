@@ -11,6 +11,11 @@ public interface OperateMapper {
 	List<Map<String, Object>> TallySheetList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 집계표 조회
 	List<Map<String, Object>> TallySheetAllList(Map<String, Object> paramMap);					// 급식사업부 -> 운영관리 -> 집계표 전체 업장 조회 (엑셀 다운로드 전용)
 	Map<String, Object> TallySheetNote(Map<String, Object> paramMap);							// 급식사업부 -> 운영관리 -> 집계표 메모 조회
+
+	List<Map<String, Object>> VendorTallyWellstoryList(Map<String, Object> paramMap);			// 급식사업부 -> 예산 -> 거래처 집계표 -> 삼성웰스토리(type 1~4) 일자별 매입금액
+	List<Map<String, Object>> VendorTallyAwhomeList(Map<String, Object> paramMap);				// 급식사업부 -> 예산 -> 거래처 집계표 -> 아워홈(type 1042) 일자별 매입금액
+	List<Map<String, Object>> VendorTallyScenicList(Map<String, Object> paramMap);				// 급식사업부 -> 예산 -> 거래처 집계표 -> 경관식(itemType 3) 일자별 매입금액
+	List<Map<String, Object>> VendorTallyLunchAvgList(Map<String, Object> paramMap);				// 급식사업부 -> 예산 -> 거래처 집계표 -> 거래처별 중식 평균식수
 	
 	String NowDateKey();
 	

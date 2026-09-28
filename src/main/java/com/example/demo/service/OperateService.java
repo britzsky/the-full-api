@@ -67,6 +67,34 @@ public class OperateService {
 		return resultList;
 	}
 
+	// 급식사업부 -> 예산 -> 거래처 집계표 -> 삼성웰스토리(type 1~4) 일자별 매입금액
+	public List<Map<String, Object>> VendorTallyWellstoryList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.VendorTallyWellstoryList(paramMap);
+		return resultList;
+	}
+
+	// 급식사업부 -> 예산 -> 거래처 집계표 -> 아워홈(type 1042) 일자별 매입금액
+	public List<Map<String, Object>> VendorTallyAwhomeList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.VendorTallyAwhomeList(paramMap);
+		return resultList;
+	}
+
+	// 급식사업부 -> 예산 -> 거래처 집계표 -> 경관식(itemType 3) 일자별 매입금액
+	public List<Map<String, Object>> VendorTallyScenicList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.VendorTallyScenicList(paramMap);
+		return resultList;
+	}
+
+	// 급식사업부 -> 예산 -> 거래처 집계표 -> 거래처별 중식 평균식수
+	public List<Map<String, Object>> VendorTallyLunchAvgList(Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = new ArrayList<>();
+		resultList = operateMapper.VendorTallyLunchAvgList(paramMap);
+		return resultList;
+	}
+
 	// 급식사업부 -> 운영관리 -> 집계표 메모 조회
 	public Map<String, Object> TallySheetNote(Map<String, Object> paramMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();
