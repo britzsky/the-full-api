@@ -3510,6 +3510,56 @@ public class AccountController {
 	}
 
 	/*
+	 * method : CommuteAppVersionInfo
+	 * comment : 출퇴근 앱 -> 앱 진입 시 강제 업데이트 여부 판단용 최신 요구 버전 조회 (platform: android/ios)
+	 */
+	@GetMapping("/Account/CommuteAppVersionInfo")
+	public String CommuteAppVersionInfo(@RequestParam Map<String, Object> paramMap) {
+		Map<String, Object> result = accountService.CommuteAppVersionInfo(paramMap);
+		return new Gson().toJson(result == null ? new HashMap<>() : result);
+	}
+
+	/*
+	 * method : CommutePrivacyConsentStatus
+	 * comment : 출퇴근 앱 -> 이 사람(account_id+user_name+phone_last4)이 개인정보(이름/휴대폰 뒷자리/GPS 위치/기기식별자)
+	 *           수집에 이미 동의했는지 조회. device_token은 재설치 시 바뀔 수 있어 사람 기준으로 판단한다.
+	 */
+	@GetMapping("/Account/CommutePrivacyConsentStatus")
+	public String CommutePrivacyConsentStatus(@RequestParam Map<String, Object> paramMap) {
+		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
+		Map<String, Object> result = accountService.CommutePrivacyConsentStatus(paramMap);
+		return new Gson().toJson(result == null ? new HashMap<>() : result);
+	}
+
+	/*
+	 * method : CommutePrivacyConsentAgree
+	 * comment : 출퇴근 앱 -> 개인정보 수집 동의 저장. device_token은 참고용으로만 같이 저장하고,
+	 *           동의 여부 판단은 tb_member_device와 동일한 사람 기준(account_id+user_name+phone_last4)으로 한다.
+	 */
+	@PostMapping("/Account/CommutePrivacyConsentAgree")
+	public ResponseEntity<String> CommutePrivacyConsentAgree(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+		String accountId = normalizeCommuteText(paramMap.get("account_id"));
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
+
+		if (accountId.isEmpty() || userName.isEmpty()) {
+			obj.addProperty("msg", "본인 정보를 먼저 확인해 주세요.");
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(obj.toString());
+		}
+
+		try {
+			accountService.CommutePrivacyConsentAgree(paramMap);
+			obj.addProperty("msg", "동의가 저장되었습니다.");
+			return ResponseEntity.ok(obj.toString());
+		} catch (Exception e) {
+			e.printStackTrace();
+			obj.addProperty("msg", "동의 저장 중 오류가 발생했습니다.");
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(obj.toString());
+		}
+	}
+
+	/*
 	 * method : CommuteDeviceInfo
 	 * comment : 출, 퇴근 기록 -> 등록기기(승인/요청) 상태 조회 (account_id + user_name + phone_last4 기준)
 	 */

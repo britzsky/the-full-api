@@ -1586,6 +1586,25 @@ public class AccountService {
 		return accountMapper.CommuteRecordList(paramMap);
 	}
 
+	// 출퇴근 앱 -> 플랫폼별 최신 요구 버전 조회
+	public Map<String, Object> CommuteAppVersionInfo(Map<String, Object> paramMap) {
+		return accountMapper.CommuteAppVersionInfo(paramMap);
+	}
+
+	// 출퇴근 앱 -> 기기별 개인정보 수집 동의 여부 조회
+	public Map<String, Object> CommutePrivacyConsentStatus(Map<String, Object> paramMap) {
+		return accountMapper.CommutePrivacyConsentStatus(paramMap);
+	}
+
+	// 출퇴근 앱 -> 개인정보 수집 동의 저장. 기존 동의 이력이 있으면 갱신하고, 없으면 새로 만든다.
+	public int CommutePrivacyConsentAgree(Map<String, Object> paramMap) {
+		Map<String, Object> existing = accountMapper.CommutePrivacyConsentStatus(paramMap);
+		if (existing == null) {
+			return accountMapper.CommutePrivacyConsentInsert(paramMap);
+		}
+		return accountMapper.CommutePrivacyConsentUpdate(paramMap);
+	}
+
 	// ===================== 웰스토리 SW-FD 주문API 연동 (로직) =====================
 	//
 	// 전체 흐름 요약

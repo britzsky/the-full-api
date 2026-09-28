@@ -4211,12 +4211,14 @@
 		ORDER BY a.account_name, d.user_name
 	</select>
 
-	<!-- 출, 퇴근 기록 -> 사업장 기준 좌표 조회 (원본값 그대로 반환, 거리계산은 클라이언트에서) -->
+	<!-- 출, 퇴근 기록 -> 사업장 기준 좌표 조회 (원본값 그대로 반환, 거리계산은 클라이언트에서)
+		 ✅ radius: 출퇴근 허용 반경(미터). 값이 없는 업장은 기본 100m로 채워서 내려준다. -->
 	<select id="AccountCoordinateInfo" parameterType="map" resultType="hashmap">
 		SELECT
 			account_id,
 			x_coordinate,
-			y_coordinate
+			y_coordinate,
+			IFNULL(radius, 100) AS radius_m
 		FROM tb_account_coordinate
 		WHERE account_id = #{account_id}
 	</select>
@@ -4369,5 +4371,66 @@
 		</where>
 		ORDER BY r.t_date DESC
 	</select>
+
+	<!-- ══════════════════════════════════════════════════════════════════
+	     출퇴근 앱 - 강제 업데이트 버전 조회
+	══════════════════════════════════════════════════════════════════ -->
+
+	<!-- 출퇴근 앱 -> 플랫폼별 최신 요구 버전 조회 -->
+	<select id="CommuteAppVersionInfo" parameterType="map" resultType="hashmap">
+		SELECT
+			platform,
+			version,
+			update_url
+		FROM tb_app_version
+		WHERE platform = #{platform}
+		LIMIT 1
+	</select>
+
+	<!-- ══════════════════════════════════════════════════════════════════
+	     출퇴근 앱 - 개인정보(이름/휴대폰 뒷자리/GPS/기기식별자) 수집 동의
+	     ✅ device_token은 앱 재설치/기기변경 시 값이 바뀔 수 있어(기기식별자 특성) 동의 여부를
+	        device_token만으로 판단하지 않는다. tb_member_device와 동일하게 사람 기준
+	        (account_id + user_name + phone_last4)으로 동의 이력을 조회/저장한다.
+	══════════════════════════════════════════════════════════════════ -->
+
+	<!-- 출퇴근 앱 -> 이 사람(account_id + user_name + phone_last4)이 이미 개인정보 수집에 동의했는지 조회 -->
+	<select id="CommutePrivacyConsentStatus" parameterType="map" resultType="hashmap">
+		SELECT
+			account_id,
+			user_name,
+			phone_last4,
+			agree_yn,
+			DATE_FORMAT(agree_dt, '%Y-%m-%d %H:%i:%s') AS agree_dt
+		FROM tb_commute_privacy_yn
+		WHERE account_id = #{account_id}
+			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
+		ORDER BY mod_dt DESC
+		LIMIT 1
+	</select>
+
+	<!-- 출퇴근 앱 -> 개인정보 수집 동의 신규 저장 -->
+	<insert id="CommutePrivacyConsentInsert" parameterType="map">
+		INSERT INTO tb_commute_privacy_yn
+		(account_id, user_name, phone_last4, device_token, device_name, agree_yn, agree_dt, mod_dt)
+		VALUES
+		(#{account_id}, #{user_name}, #{phone_last4}, #{device_token}, #{device_name}, 'Y',
+		 CONVERT_TZ(NOW(), '+00:00', '+09:00'), CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+	</insert>
+
+	<!-- 출퇴근 앱 -> 개인정보 수집 동의 갱신(기기가 바뀌었거나 재동의한 경우) -->
+	<update id="CommutePrivacyConsentUpdate" parameterType="map">
+		UPDATE tb_commute_privacy_yn
+		SET
+			device_token = #{device_token},
+			device_name = #{device_name},
+			agree_yn = 'Y',
+			agree_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+			mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		WHERE account_id = #{account_id}
+			AND user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
+	</update>
 
 </mapper>
