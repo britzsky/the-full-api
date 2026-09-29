@@ -477,6 +477,13 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 거래처 -> 출근부 -> 저장 시 변경이력 기록 (호출부에서 실패를 무시하도록 감싸서 사용)
+	public int AccountRecordHistorySave(Map<String, Object> paramMap) {
+		int iResult = 0;
+		iResult = accountMapper.AccountRecordHistorySave(paramMap);
+		return iResult;
+	}
+
 	// 거래처 -> 출근부 -> 연차대장 기존 데이터 삭제 (member_id + ledger_dt 기준)
 	public int AccountAnnualLeaveLedgerDelete(Map<String, Object> paramMap) {
 		int iResult = 0;

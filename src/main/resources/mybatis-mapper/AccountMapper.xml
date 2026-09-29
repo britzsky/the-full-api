@@ -954,7 +954,15 @@
 		salary = #{salary},
 		pay_yn = IFNULL(#{pay_yn}, 'N')
 	</insert>
-	
+
+	<!-- 출근부 저장 시(상용/파출/채용) 무엇으로/누가 바꿨는지 남기는 이력 로그. 조회용이 아니라 추적용이라 실패해도 본 저장에 영향 없게 호출부에서 try/catch로 감싼다 -->
+	<insert id="AccountRecordHistorySave" parameterType="map">
+		INSERT INTO tb_account_record_history
+		(account_id, member_id, record_year, record_month, record_date, gubun, type, start_time, end_time, salary, note, pay_yn, user_id, reg_dt)
+		VALUES
+		(#{account_id}, #{member_id}, #{record_year}, #{record_month}, #{record_date}, #{gubun}, #{type}, #{start_time}, #{end_time}, #{salary}, #{note}, #{pay_yn}, #{user_id}, CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+	</insert>
+
 	<insert id="AccountDispatchMemberSave" parameterType="map">
 		INSERT INTO tb_account_members_dispatch
 		(account_id, member_id, name, phone, rrn, account_number, note, del_yn, dispatch_account, record_year, record_month, position_type)

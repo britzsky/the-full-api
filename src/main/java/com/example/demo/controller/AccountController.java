@@ -480,18 +480,36 @@ public class AccountController {
 		List<Map<String, Object>> disRecords = payload.get("disRecords");
 		List<Map<String, Object>> recRecords = payload.get("recRecords");
 
-		boolean bType = true;
+		// ✅ 한 거래처에 상용(nor)/채용예정(rec) 인원이 같이 있으면 한 번의 저장에
+		//    둘 다 섞여 들어올 수 있어, 하나를 고르지 않고 둘 다 각자 처리한다.
+		iResult += processGeneralRecords(normalRecords, true);
+		iResult += processGeneralRecords(recRecords, false);
 
-		// normalRecords, recRecords 를 조건에 따라 담을 List
-		List<Map<String, Object>> objRecords = new ArrayList<Map<String, Object>>();
-		if (!normalRecords.isEmpty()) {
-			bType = true;
-			objRecords = normalRecords;
-		} else if (!recRecords.isEmpty()) {
-			bType = false;
-			objRecords = recRecords;
+		for (Map<String, Object> row : disRecords) {
+			// 파출 지급 저장 시 연/월/일 누락 보정
+			normalizeDispatchRecordDate(row);
+			iResult += accountService.AccountDispatchRecordSave(row);
+			iResult += accountService.processProfitLossV2(row);
+			saveRecordHistory(row);
 		}
 
+		JsonObject obj = new JsonObject();
+
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+
+		return obj.toString();
+	}
+
+	// 출근부 저장: 상용(bType=true)/채용예정(bType=false) 목록을 공통 로직으로 저장하고
+	// 연차/초과 대장까지 반영한다. AccountRecordSave에서 두 목록에 각각 호출한다.
+	private int processGeneralRecords(List<Map<String, Object>> objRecords, boolean bType) {
+		int iResult = 0;
 		for (Map<String, Object> row : objRecords) {
 
 			System.out.println("==================  salary  + " + row.get("salary"));
@@ -513,6 +531,7 @@ public class AccountController {
 				iResult += accountService.AccountMemberRecRecordSave(row);
 				iResult += accountService.processProfitLossV2(row);
 			}
+			saveRecordHistory(row);
 
 			if (row.get("type") != null) {
 
@@ -689,24 +708,7 @@ public class AccountController {
 				}
 			}
 		}
-		for (Map<String, Object> row : disRecords) {
-			// 파출 지급 저장 시 연/월/일 누락 보정
-			normalizeDispatchRecordDate(row);
-			iResult += accountService.AccountDispatchRecordSave(row);
-			iResult += accountService.processProfitLossV2(row);
-		}
-
-		JsonObject obj = new JsonObject();
-
-		if (iResult > 0) {
-			obj.addProperty("code", 200);
-			obj.addProperty("message", "성공");
-		} else {
-			obj.addProperty("code", 400);
-			obj.addProperty("message", "실패");
-		}
-
-		return obj.toString();
+		return iResult;
 	}
 
 	public static String formatNumbers(int year, int month, int day) {
@@ -745,6 +747,29 @@ public class AccountController {
 					row.put("record_date", d.getDayOfMonth());
 				}
 			}
+		}
+	}
+
+	// 출근부 저장(상용/파출/채용) 시 무엇으로/누가 바꿨는지 이력 테이블에 한 줄 남긴다.
+	// 조회/집계에는 영향 없는 부가 기록이라 실패해도 본 저장은 그대로 성공 처리한다.
+	private void saveRecordHistory(Map<String, Object> row) {
+		try {
+			Map<String, Object> historyMap = new HashMap<String, Object>();
+			historyMap.put("account_id", row.get("account_id"));
+			historyMap.put("member_id", row.get("member_id"));
+			historyMap.put("record_year", row.get("record_year"));
+			historyMap.put("record_month", row.get("record_month"));
+			historyMap.put("record_date", row.get("record_date"));
+			historyMap.put("gubun", row.get("gubun"));
+			historyMap.put("type", row.get("type"));
+			historyMap.put("start_time", row.get("start_time"));
+			historyMap.put("end_time", row.get("end_time"));
+			historyMap.put("salary", row.get("salary"));
+			historyMap.put("note", row.get("note"));
+			historyMap.put("pay_yn", row.get("pay_yn"));
+			historyMap.put("user_id", row.get("user_id"));
+			accountService.AccountRecordHistorySave(historyMap);
+		} catch (Exception ignored) {
 		}
 	}
 
