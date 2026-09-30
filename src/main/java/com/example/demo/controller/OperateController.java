@@ -210,13 +210,14 @@ public class OperateController {
      * comment : 급식사업부 -> 운영관리 -> 집계표 저장(거래처 자료입력 저장)
      */
     /**
-     * type 1~4 집계표 행을 tb_account_purchase_tally에 연동한다.
+     * type 1~4(삼성웰스토리), 1042(아워홈) 집계표 행을 tb_account_purchase_tally에 연동한다.
      * sale_id: 입력 당시 시각 yyyyMMddHHmmssSSS (AccountController와 동일한 방식)
      * saleDate: 해당 day_N의 실제 날짜 (YYYY-MM-DD)
      */
     private void syncTallySheetToPurchaseTally(Map<String, Object> paramMap) {
         String typeStr = String.valueOf(paramMap.getOrDefault("type", ""));
-        if (!typeStr.equals("1") && !typeStr.equals("2") && !typeStr.equals("3") && !typeStr.equals("4"))
+        if (!typeStr.equals("1") && !typeStr.equals("2") && !typeStr.equals("3") && !typeStr.equals("4")
+                && !typeStr.equals("1042"))
             return;
 
         String accountId = String.valueOf(paramMap.getOrDefault("account_id", ""));
