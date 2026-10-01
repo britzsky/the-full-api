@@ -122,6 +122,7 @@ public class OcrControllerV2 {
             @RequestParam(value = "use_name", required = false) String use_name,
             @RequestParam(value = "total", required = false) String total,
             @RequestParam(value = "cell_date", required = false) String cell_date,
+            @RequestParam(value = "user_id", required = false) String user_id,
             @RequestParam(value = "skip_date_mismatch_check", required = false) String skip_date_mismatch_check) {
 
         // 파일 저장
@@ -145,6 +146,7 @@ public class OcrControllerV2 {
         purchase.put("use_name", use_name);
         purchase.put("total", total);
         purchase.put("cell_date", cell_date);
+        purchase.put("user_id", user_id);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -264,6 +266,7 @@ public class OcrControllerV2 {
             System.out.println("[OCR] saveType=" + saveType + ", isAccount=" + isAccount + ", isHeadoffice=" + isHeadoffice + ", total(user)=" + purchase.get("total") + ", tallyType=" + purchase.get("tallyType"));
 
             corporateCard.put("account_id", objectValue);
+            corporateCard.put("user_id", user_id);
             corporateCard.put("year", year);
             corporateCard.put("month", month);
             corporateCard.put("receipt_type", receiptType);
@@ -523,6 +526,7 @@ public class OcrControllerV2 {
         boolean isAccount = "account".equalsIgnoreCase(saveType);
 
         corporateCard.put("account_id", purchase.get("account_id"));
+        corporateCard.put("user_id", purchase.get("user_id"));
         corporateCard.put("receipt_type", purchase.get("receipt_type"));
         // fallback에서도 집계표 프로시저용 type을 숫자로 보정한다.
         corporateCard.put("type", resolveTallyType(purchase.get("type"), isAccount));

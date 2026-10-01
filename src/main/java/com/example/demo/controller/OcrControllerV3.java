@@ -130,6 +130,7 @@ public class OcrControllerV3 {
             @RequestParam(value = "saveType", required = false) String saveType,
             @RequestParam(value = "card_brand", required = false) String card_brand,
             @RequestParam(value = "card_no", required = false) String card_no,
+            @RequestParam(value = "user_id", required = false) String user_id,
             @RequestParam(value = "skip_date_mismatch_check", required = false) String skipDateMismatchCheckParam) {
 
         // 다중 업로드 요청(files)과 단일 업로드 요청(file)을 모두 수용한다.
@@ -170,6 +171,7 @@ public class OcrControllerV3 {
         purchase.put("saveType", saveType);
         purchase.put("card_brand", card_brand);
         purchase.put("card_no", card_no);
+        purchase.put("user_id", user_id);
 
         // OCR/파싱 타임아웃용
         ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -206,6 +208,7 @@ public class OcrControllerV3 {
             // tb_account_purchase_tally 저장 map
             Map<String, Object> accountMap = new HashMap<String, Object>();
             accountMap.put("account_id", account_id); // account_id 세팅.
+            accountMap.put("user_id", user_id); // 저장한 사용자 세팅.
 
             // if (result == null || result.meta == null || result.meta.saleDate == null) {
             // return ResponseEntity.badRequest()
@@ -517,6 +520,7 @@ public class OcrControllerV3 {
         String dayStr = baseDate.format(DateTimeFormatter.ofPattern("D"));
 
         accountMap.put("account_id", accountId);
+        accountMap.put("user_id", purchase.get("user_id"));
         accountMap.put("use_name", useName);
         accountMap.put("sale_id", saleId);
         accountMap.put("saleDate", baseDate);

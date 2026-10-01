@@ -389,6 +389,7 @@ public class OcrController {
                     boolean isFirstDetail = detailList.isEmpty();
                     Map<String, Object> detailMap = new HashMap<>();
                     detailMap.put("sale_id", finalSaleId);
+                    detailMap.put("user_id", user_id);
                     detailMap.put("name", r.name);
                     detailMap.put("qty", r.qty);
                     detailMap.put("amount", resolveDetailAmount(r.amount, effectiveTotal, useUserInputTotal, isFirstDetail));
