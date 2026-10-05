@@ -454,8 +454,9 @@ public class HeadOfficeController {
 			// 2) 본문 저장
 			String paymentIdText = String.valueOf(main.getOrDefault("payment_id", "")).trim();
 			boolean isDraftDoc = DOC_KIND_DRAFT.equals(docKind);
-			// FP 구매요청서는 결재 흐름은 유지하되 본문을 소모품 구매 품의서 품목으로 저장한다.
-			boolean isFieldPurchaseRequest = "FP".equalsIgnoreCase(docTypeText);
+			// 현장 구매요청서(FP: 온라인구매, FR: 개인구매)는 결재 흐름은 유지하되 본문을 소모품 구매 품의서 품목으로 저장한다.
+			boolean isFieldPurchaseRequest =
+				"FP".equalsIgnoreCase(docTypeText) || "FR".equalsIgnoreCase(docTypeText);
 			boolean isExpenseDoc = DOC_KIND_PAYMENT.equals(docKind) && !isFieldPurchaseRequest;
 
 			if (!paymentIdText.isEmpty()) {
@@ -2143,6 +2144,8 @@ public class HeadOfficeController {
 		if (key.contains("지출결의서")) return DOC_KIND_PAYMENT;
 		// 현장 구매요청서(FP)는 지출결의서 포맷과 동일하게 처리
 		if (key.contains("구매요청서")) return DOC_KIND_PAYMENT;
+		// 현장 개인구매 결의서(FR)도 구매요청서(FP)와 같은 문서종류로 처리
+		if (key.contains("개인구매")) return DOC_KIND_PAYMENT;
 		return "";
 	}
 

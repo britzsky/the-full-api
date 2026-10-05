@@ -1691,7 +1691,7 @@
 			   ep.department,
 			   draft_user.account_id,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN IFNULL(draft_account.account_name, '')
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') THEN IFNULL(draft_account.account_name, '')
 			     ELSE ''
 			   END AS account_name,
 			   ep.status,
@@ -1702,7 +1702,7 @@
 			   draft_user.user_name AS reg_user_name,
 			   ep.charge_sign,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
 			      AND EXISTS (
 			       SELECT 1
@@ -1715,7 +1715,7 @@
 			     ELSE ep.tm_user
 			   END AS tm_user,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
 			      AND EXISTS (
 			       SELECT 1
@@ -1731,7 +1731,7 @@
 			   DATE_FORMAT(ep.tm_dt, '%Y-%m-%d %H:%i:%s') AS tm_dt,
 			   ep.tm_comment,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN COALESCE(
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') THEN COALESCE(
 			       NULLIF(ep.payer_user, ''),
 			       (
 			         SELECT second_approver.user_id
@@ -1753,7 +1753,7 @@
 			   CASE
 			     WHEN IFNULL(ep.payer_user, '') != ''
 			       THEN (SELECT stored_second.user_name FROM tb_user stored_second WHERE stored_second.user_id = ep.payer_user LIMIT 1)
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			       THEN (
 			         SELECT second_approver.user_name
 			         FROM tb_account_purchase_mapping pam3
@@ -1845,7 +1845,7 @@
 					  		OR ep.payer_user = #{user_id}
 					  		OR (lu.position = 1 AND lu.department = ep.department)
 					  		OR (
-					  			UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+					  			UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 					  			AND EXISTS (
 					  				SELECT 1
 					  				FROM tb_account_purchase_mapping pam
@@ -1884,7 +1884,7 @@
 			   ep.department,
 			   draft_user.account_id,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN IFNULL(draft_account.account_name, '')
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') THEN IFNULL(draft_account.account_name, '')
 			     ELSE ''
 			   END AS account_name,
 			   ep.status,
@@ -1895,7 +1895,7 @@
 			   draft_user.user_name AS reg_user_name,
 			   ep.charge_sign,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
 			      AND EXISTS (
 			       SELECT 1
@@ -1908,7 +1908,7 @@
 			     ELSE (SELECT first_user.user_name FROM tb_user first_user WHERE first_user.user_id = ep.tm_user LIMIT 1)
 			   END AS tm_user_name,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			      AND IFNULL(ep.tm_sign, '') NOT IN ('3', '4')
 			      AND EXISTS (
 			       SELECT 1
@@ -1926,7 +1926,7 @@
 			   CASE
 			     WHEN IFNULL(ep.payer_user, '') != ''
 			       THEN (SELECT stored_second.user_name FROM tb_user stored_second WHERE stored_second.user_id = ep.payer_user LIMIT 1)
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			       THEN (
 			         SELECT second_name.user_name
 			         FROM tb_account_purchase_mapping pam_name2
@@ -1944,7 +1944,7 @@
 			     ELSE ''
 			   END AS payer_user_name,
 			   CASE
-			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN COALESCE(
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') THEN COALESCE(
 			       NULLIF(ep.payer_user, ''),
 			       (
 			         SELECT second_approver.user_id
@@ -1996,7 +1996,7 @@
 			  		  		OR ep.payer_user = #{user_id}
 			  		  		OR (lu.position = 1 AND lu.department = ep.department)
 			  		  		OR (
-			  		  			UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  			UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			  		  			AND EXISTS (
 			  		  				SELECT 1
 			  		  				FROM tb_account_purchase_mapping pam
@@ -2164,7 +2164,7 @@
 			  		  	OR ep.payer_user = #{user_id}
 			  		  	OR (lu.position = 1 AND lu.department = ep.department)
 			  		  	OR (
-			  		  		UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  		UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			  		  		AND EXISTS (
 			  		  			SELECT 1
 			  		  			FROM tb_account_purchase_mapping pam
@@ -2196,7 +2196,7 @@
 	<update id="ElectronicPaymentManageTmSignSave" parameterType="map">
 		UPDATE tb_headoffice_electronic_payment ep
 		SET tm_user = CASE
-						WHEN UPPER(CAST(doc_type AS CHAR)) = 'FP'
+						WHEN UPPER(CAST(doc_type AS CHAR)) IN ('FP', 'FR')
 						 AND EXISTS (
 							SELECT 1
 							FROM tb_account_purchase_mapping pam
@@ -2208,7 +2208,7 @@
 						ELSE ep.tm_user
 					END,
 			payer_user = CASE
-						WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+						WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 						 AND IFNULL(ep.payer_user, '') = ''
 						THEN COALESCE(
 							(
@@ -2232,7 +2232,7 @@
 					     OR IFNULL(ceo_sign, '') = '3'
 					     OR IFNULL(payer_sign, '') = '3'
 					     THEN 3
-					   WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+					   WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 					     AND #{action_status} = '4'
 					     THEN 2
 					   WHEN #{action_status} = '4'
@@ -2249,7 +2249,7 @@
 		  AND (
 			ep.tm_user = #{user_id}
 			OR (
-				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+				UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 				AND EXISTS (
 					SELECT 1
 					FROM tb_account_purchase_mapping pam
@@ -2295,7 +2295,7 @@
 	<update id="ElectronicPaymentManagePayerSignSave" parameterType="map">
 		UPDATE tb_headoffice_electronic_payment ep
 		SET payer_user = CASE
-						WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FP' THEN #{user_id}
+						WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') THEN #{user_id}
 						ELSE ep.payer_user
 					END,
 			payer_sign = #{action_status},
@@ -2322,7 +2322,7 @@
 		  AND (
 			ep.payer_user = #{user_id}
 			OR (
-				UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+				UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 				AND EXISTS (
 					SELECT 1
 					FROM tb_user second_approver
@@ -2431,7 +2431,7 @@
 					<!-- 현장 구매요청서(FP)는 1차 결재자가 아직 배정되지 않았어도
 					     거래처-사용자 매핑(tb_account_purchase_mapping)에 걸린 사용자에게는
 					     결재대기 알림이 떠야 한다. -->
-					UPPER(CAST(ep_first.doc_type AS CHAR)) = 'FP'
+					UPPER(CAST(ep_first.doc_type AS CHAR)) IN ('FP', 'FR')
 					AND IFNULL(ep_first.tm_user, '') = ''
 					AND EXISTS (
 						SELECT 1
@@ -2456,7 +2456,7 @@
 			WHERE (
 				ep_second.payer_user = #{user_id}
 				OR (
-					UPPER(CAST(ep_second.doc_type AS CHAR)) = 'FP'
+					UPPER(CAST(ep_second.doc_type AS CHAR)) IN ('FP', 'FR')
 					AND IFNULL(ep_second.payer_user, '') = ''
 					AND EXISTS (
 						SELECT 1
@@ -2497,7 +2497,7 @@
 			  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
 			  AND (IFNULL(payer_user, '') = '' OR IFNULL(payer_sign, '') = '4')
 			  AND (IFNULL(ceo_user, '') = '' OR IFNULL(ceo_sign, '') = '4')
-			  AND (UPPER(CAST(doc_type AS CHAR)) != 'FP' OR IFNULL(payer_sign, '') = '4')
+			  AND (UPPER(CAST(doc_type AS CHAR)) NOT IN ('FP', 'FR') OR IFNULL(payer_sign, '') = '4')
 			  AND reg_read_dt IS NULL
 
 			UNION
@@ -2695,7 +2695,7 @@
 			  		  	OR ep.payer_user = #{user_id}
 			  		  	OR (lu.position = 1 AND lu.department = ep.department)
 			  		  	OR (
-			  		  		UPPER(CAST(ep.doc_type AS CHAR)) = 'FP'
+			  		  		UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
 			  		  		AND EXISTS (
 			  		  			SELECT 1
 			  		  			FROM tb_account_purchase_mapping pam

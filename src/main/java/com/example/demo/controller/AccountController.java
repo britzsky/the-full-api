@@ -3535,6 +3535,16 @@ public class AccountController {
 	}
 
 	/*
+	 * method : CommuteMemberPhoneList
+	 * comment : 출, 퇴근 기록 -> 출근부 인원(직원/파출) 휴대폰 뒷자리 조회 (year, month)
+	 */
+	@GetMapping("/Account/CommuteMemberPhoneList")
+	public String CommuteMemberPhoneList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.CommuteMemberPhoneList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
 	 * method : CommuteAppVersionInfo
 	 * comment : 출퇴근 앱 -> 앱 진입 시 강제 업데이트 여부 판단용 최신 요구 버전 조회 (platform: android/ios)
 	 */

@@ -1593,6 +1593,11 @@ public class AccountService {
 		return accountMapper.CommuteRecordList(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 출근부 인원 휴대폰 뒷자리 조회 (출퇴근 기록과 이름+뒷자리 매칭용)
+	public List<Map<String, Object>> CommuteMemberPhoneList(Map<String, Object> paramMap) {
+		return accountMapper.CommuteMemberPhoneList(paramMap);
+	}
+
 	// 출퇴근 앱 -> 플랫폼별 최신 요구 버전 조회
 	public Map<String, Object> CommuteAppVersionInfo(Map<String, Object> paramMap) {
 		return accountMapper.CommuteAppVersionInfo(paramMap);

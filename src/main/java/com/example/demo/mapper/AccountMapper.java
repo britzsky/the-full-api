@@ -155,6 +155,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> SelectCommuteIdentitiesByDeviceToken(Map<String, Object> paramMap);		// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
 	Map<String, Object> CommuteTodayStatus(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 조회
 	List<Map<String, Object>> CommuteRecordList(Map<String, Object> paramMap);					// 출, 퇴근 기록 -> 출퇴근 기록 목록 조회
+	List<Map<String, Object>> CommuteMemberPhoneList(Map<String, Object> paramMap);				// 출, 퇴근 기록 -> 출근부 인원 휴대폰 뒷자리 조회
 	Map<String, Object> CommuteAppVersionInfo(Map<String, Object> paramMap);							// 출퇴근 앱 -> 플랫폼별 최신 요구 버전 조회
 	Map<String, Object> CommutePrivacyConsentStatus(Map<String, Object> paramMap);					// 출퇴근 앱 -> 사람(account_id+user_name+phone_last4) 기준 개인정보 수집 동의 여부 조회
 	int CommutePrivacyConsentInsert(Map<String, Object> paramMap);									// 출퇴근 앱 -> 개인정보 수집 동의 신규 저장
