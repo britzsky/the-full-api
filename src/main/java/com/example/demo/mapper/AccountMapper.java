@@ -133,6 +133,9 @@ public interface AccountMapper {
 	int AccountPurchaseTallyV2Delete(Map<String, Object> paramMap);										// 회계 -> 매입집계 삭제
 	Map<String, Object> MonthLockOverrideGet(Map<String, Object> paramMap);								// 회계 -> 월 마감 수정권한 조회
 	int MonthLockOverrideSave(Map<String, Object> paramMap);											// 회계 -> 월 마감 수정권한 저장/수정
+	List<Map<String, Object>> AccountRecordLockList(Map<String, Object> paramMap);						// 출근부 -> 기간 잠금 목록 조회
+	int AccountRecordLockSave(Map<String, Object> paramMap);											// 출근부 -> 기간 잠금/해제 저장
+	Map<String, Object> AccountRecordMonthLockCheck(Map<String, Object> paramMap);						// 출근부 -> 월 단위 일괄 등록 전 잠금 검사
 
 	// 현장 -> 구입요청
 	Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap);							// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)

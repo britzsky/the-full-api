@@ -1473,6 +1473,21 @@ public class AccountService {
 		return accountMapper.MonthLockOverrideSave(paramMap);
 	}
 
+	// 출근부 -> 거래처/연/월 기준 잠금 기간 목록 조회
+	public List<Map<String, Object>> AccountRecordLockList(Map<String, Object> paramMap) {
+		return accountMapper.AccountRecordLockList(paramMap);
+	}
+
+	// 출근부 -> 주간/월간 잠금 및 해제 저장
+	public int AccountRecordLockSave(Map<String, Object> paramMap) {
+		return accountMapper.AccountRecordLockSave(paramMap);
+	}
+
+	// 출근부 -> 월 단위 일괄 등록(유틸/통합) 대상 거래처 중 해당 월 잠금이 있는지 조회
+	public Map<String, Object> AccountRecordMonthLockCheck(Map<String, Object> paramMap) {
+		return accountMapper.AccountRecordMonthLockCheck(paramMap);
+	}
+
 	// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)
 	public Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap) {
 		return accountMapper.PurchaseRequestUserInfo(paramMap);
