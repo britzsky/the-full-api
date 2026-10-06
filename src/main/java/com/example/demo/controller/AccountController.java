@@ -246,6 +246,12 @@ public class AccountController {
 
 		List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
 
+		// 월 전체 재등록이므로 대상 업장에 그 달 잠금(주/월)이 하나라도 있으면 등록하지 않음
+		String lockMessage = findMonthLockMessage(rows, "home");
+		if (lockMessage != null) {
+			return recordLockedResponse(lockMessage);
+		}
+
 		int savedCount = 0;
 		List<Map<String, Object>> failedRows = new ArrayList<>();
 
@@ -311,6 +317,12 @@ public class AccountController {
 	public String AccountUtilRecordExcelSave(@RequestBody Map<String, Object> payload) {
 
 		List<Map<String, Object>> rows = (List<Map<String, Object>>) payload.get("rows");
+
+		// 월 전체 교체 업로드이므로 대상/기존 배정 업장에 그 달 잠금(주/월)이 하나라도 있으면 업로드하지 않음
+		String lockMessage = findMonthLockMessage(rows, "util");
+		if (lockMessage != null) {
+			return recordLockedResponse(lockMessage);
+		}
 
 		int savedCount = 0;
 		List<Map<String, Object>> failedRows = new ArrayList<>();
@@ -479,6 +491,12 @@ public class AccountController {
 		List<Map<String, Object>> normalRecords = payload.get("normalRecords");
 		List<Map<String, Object>> disRecords = payload.get("disRecords");
 		List<Map<String, Object>> recRecords = payload.get("recRecords");
+
+		// 잠긴(마감) 기간이 하나라도 포함되면 전체 저장하지 않음
+		String lockMessage = findRecordLockMessage(normalRecords, disRecords, recRecords);
+		if (lockMessage != null) {
+			return recordLockedResponse(lockMessage);
+		}
 
 		// ✅ 한 거래처에 상용(nor)/채용예정(rec) 인원이 같이 있으면 한 번의 저장에
 		//    둘 다 섞여 들어올 수 있어, 하나를 고르지 않고 둘 다 각자 처리한다.
@@ -2370,38 +2388,35 @@ public class AccountController {
 					mainMap.put("sale_id", saleId);
 				}
 
+				// 저장 전 DB 기준 기존 결제일자/거래처/타입 조회 (변경 전 집계표 칸 재계산용)
+				Map<String, Object> oldPurchase = accountService.AccountPurchaseTallyTotalBySaleId(mainMap);
+
 				iResult += accountService.AccountPurchaseSave(mainMap);
 
-				String saleDate = mainMap.get("saleDate").toString();
-				Object objOrgSaleDate = mainMap.get("orgSaleDate");
-
-				LocalDate date;
-				int year = 0;
-				int month = 0;
-				int day = 0;
 				// 여러 타입의 날짜형식을 매핑.
-				if (objOrgSaleDate != null) {
+				LocalDate date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
 
-					String orgSaleDate = mainMap.get("orgSaleDate").toString();
+				// 결제일자/거래처/타입이 바뀌면 변경 전 값으로 집계표·손익표·예산을 다시 합산
+				if (oldPurchase != null && oldPurchase.get("saleDate") != null) {
+					LocalDate oldDate = DateUtils.parseFlexibleDate(oldPurchase.get("saleDate").toString());
+					String oldAccountId = String.valueOf(oldPurchase.get("account_id"));
+					String oldType = String.valueOf(oldPurchase.get("type"));
 
-					if (!saleDate.equals(orgSaleDate)) {
-						date = DateUtils.parseFlexibleDate(mainMap.get("orgSaleDate").toString());
-						year = date.getYear(); // 2026
-						month = date.getMonthValue(); // 1~12
-						day = date.getDayOfMonth();
-
-						// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
-						mainMap.put("year", year);
-						mainMap.put("month", month);
-						mainMap.put("day", day);
-
-						iResult += accountService.TallySheetPaymentDelete(mainMap);
+					if (!oldDate.equals(date)
+							|| !oldAccountId.equals(String.valueOf(mainMap.get("account_id")))
+							|| !oldType.equals(String.valueOf(mainMap.get("type")))) {
+						Map<String, Object> oldParamMap = new HashMap<>(mainMap);
+						oldParamMap.put("saleDate", oldDate.toString());
+						oldParamMap.put("account_id", oldAccountId);
+						oldParamMap.put("type", oldPurchase.get("type"));
+						oldParamMap.put("year", oldDate.getYear());
+						oldParamMap.put("month", oldDate.getMonthValue());
+						iResult += accountService.TallySheetPaymentSave(oldParamMap);
 					}
 				}
 
-				date = DateUtils.parseFlexibleDate(mainMap.get("saleDate").toString());
-				year = date.getYear(); // 2026
-				month = date.getMonthValue(); // 1~12
+				int year = date.getYear(); // 2026
+				int month = date.getMonthValue(); // 1~12
 
 				// 손익표, 예산 적용을 위해 SaleDate 에서 연도와 월을 추출.
 				mainMap.put("year", year);
@@ -3288,6 +3303,188 @@ public class AccountController {
 			obj.addProperty("code", 400);
 			obj.addProperty("message", "실패");
 		}
+		return obj.toString();
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordLockList
+	 * comment : 출근부 -> 거래처/연/월 기준 잠금 기간 목록 조회
+	 *           (account_id, record_year, record_month)
+	 */
+	@GetMapping("/Account/AccountRecordLockList")
+	public String AccountRecordLockList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.AccountRecordLockList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordLockSave
+	 * comment : 출근부 -> 주간(W)/월간(M) 기간 잠금 및 해제 저장
+	 *           start_day ~ end_day 는 해당 월 안의 일자, lock_yn = Y(잠금) / N(해제)
+	 */
+	@PostMapping("/Account/AccountRecordLockSave")
+	public String AccountRecordLockSave(@RequestBody Map<String, Object> paramMap) {
+		JsonObject obj = new JsonObject();
+
+		Integer startDay = toRecordLockInt(paramMap.get("start_day"));
+		Integer endDay = toRecordLockInt(paramMap.get("end_day"));
+		String lockType = String.valueOf(paramMap.get("lock_type"));
+		String lockYn = String.valueOf(paramMap.get("lock_yn"));
+		String accountId = paramMap.get("account_id") == null ? "" : String.valueOf(paramMap.get("account_id")).trim();
+
+		// 잠금 범위/구분값이 올바르지 않으면 저장하지 않음
+		if (accountId.isEmpty() || startDay == null || endDay == null || startDay < 1 || endDay > 31
+				|| startDay > endDay || !("W".equals(lockType) || "M".equals(lockType))
+				|| !("Y".equals(lockYn) || "N".equals(lockYn))) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "잠금 요청값이 올바르지 않습니다.");
+			return obj.toString();
+		}
+
+		// 월 마감 중에는 주간 잠금/해제 불가 (월 마감 해제 후 진행)
+		if ("W".equals(lockType)) {
+			List<Map<String, Object>> locks = accountService.AccountRecordLockList(paramMap);
+			for (Map<String, Object> lock : locks) {
+				if ("M".equals(String.valueOf(lock.get("lock_type")))) {
+					obj.addProperty("code", 400);
+					obj.addProperty("message", "월 마감되어 있습니다. 월 마감을 먼저 해제한 후 진행해주세요.");
+					return obj.toString();
+				}
+			}
+		}
+
+		int iResult = accountService.AccountRecordLockSave(paramMap);
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
+	}
+
+	// 출근부 잠금 검사용 숫자 변환 (값이 없거나 숫자가 아니면 null)
+	private Integer toRecordLockInt(Object value) {
+		if (value == null)
+			return null;
+		try {
+			return Integer.parseInt(String.valueOf(value).trim());
+		} catch (NumberFormatException e) {
+			return null;
+		}
+	}
+
+	// 저장 요청 행 중 잠긴(마감) 거래처/일자가 있으면 안내 문구를, 없으면 null을 반환하는 메서드
+	// 출근부 저장 / 유틸 엑셀 업로드 / 통합 출근부 등록 API 진입 시 호출된다.
+	@SafeVarargs
+	private final String findRecordLockMessage(List<Map<String, Object>>... rowLists) {
+		// 거래처_연_월 단위로 잠금 목록을 한 번만 조회하기 위한 캐시
+		Map<String, List<Map<String, Object>>> lockCache = new HashMap<>();
+
+		for (List<Map<String, Object>> rows : rowLists) {
+			if (rows == null)
+				continue;
+			for (Map<String, Object> row : rows) {
+				String accountId = row.get("account_id") == null ? "" : String.valueOf(row.get("account_id")).trim();
+				Integer y = toRecordLockInt(row.get("record_year"));
+				Integer m = toRecordLockInt(row.get("record_month"));
+				Integer d = toRecordLockInt(row.get("record_date"));
+				if (accountId.isEmpty() || y == null || m == null || d == null)
+					continue;
+
+				List<Map<String, Object>> locks = lockCache.computeIfAbsent(accountId + "_" + y + "_" + m, k -> {
+					Map<String, Object> p = new HashMap<>();
+					p.put("account_id", accountId);
+					p.put("record_year", y);
+					p.put("record_month", m);
+					return accountService.AccountRecordLockList(p);
+				});
+
+				for (Map<String, Object> lock : locks) {
+					Integer s = toRecordLockInt(lock.get("start_day"));
+					Integer e = toRecordLockInt(lock.get("end_day"));
+					if (s != null && e != null && d >= s && d <= e) {
+						String lockLabel = "M".equals(String.valueOf(lock.get("lock_type"))) ? "월 마감" : "주간 마감";
+						return y + "년 " + m + "월 출근부가 " + lockLabel + "되어 있습니다.\n잠금 해제 후 저장해주세요.";
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	// 월 단위 일괄 등록(유틸 엑셀 / 통합 재택) 전 잠금 검사 메서드
+	// 등록 대상 거래처 또는 기존 배정 거래처에 해당 월 잠금(주/월)이 하나라도 있으면 안내 문구 반환, 없으면 null
+	// source : util(유틸 엑셀 업로드) / home(통합 출근부 재택 등록)
+	private String findMonthLockMessage(List<Map<String, Object>> rows, String source) {
+		if (rows == null || rows.isEmpty())
+			return null;
+
+		Object recordYear = rows.get(0).get("record_year");
+		Object recordMonth = rows.get(0).get("record_month");
+
+		java.util.Set<Object> accountIds = new java.util.LinkedHashSet<>();
+		java.util.Set<Object> memberIds = new java.util.LinkedHashSet<>();
+		for (Map<String, Object> row : rows) {
+			Object aid = row.get("account_id");
+			if (aid != null && !String.valueOf(aid).trim().isEmpty())
+				accountIds.add(aid);
+			Object mid = row.get("member_id");
+			if (mid != null && !String.valueOf(mid).trim().isEmpty())
+				memberIds.add(mid);
+		}
+
+		Map<String, Object> p = new HashMap<>();
+		p.put("record_year", recordYear);
+		p.put("record_month", recordMonth);
+		p.put("account_ids", new ArrayList<>(accountIds));
+		p.put("member_ids", new ArrayList<>(memberIds));
+		p.put("source", source);
+
+		return monthLockMessage(p);
+	}
+
+	// 월 잠금 검사 쿼리를 실행해 잠금이 있으면 안내 문구, 없으면 null 반환
+	// (record_year, record_month, account_ids, member_ids, source)
+	private String monthLockMessage(Map<String, Object> p) {
+		Map<String, Object> lock = accountService.AccountRecordMonthLockCheck(p);
+		if (lock == null)
+			return null;
+
+		Object accountName = lock.get("account_name") != null ? lock.get("account_name") : lock.get("account_id");
+		String lockLabel = "M".equals(String.valueOf(lock.get("lock_type"))) ? "월 마감" : "주간 마감";
+		return accountName + " " + p.get("record_year") + "년 " + p.get("record_month") + "월은 " + lockLabel
+				+ "되어 있습니다.\n월 전체 등록이므로 잠금 해제 후 등록해주세요.";
+	}
+
+	/*
+	 * part : 현장
+	 * method : AccountRecordMonthLockCheck
+	 * comment : 출근부 -> 유틸 엑셀 업로드 / 통합 재택 등록 버튼 클릭 시 사전 잠금 검사
+	 *           (record_year, record_month, account_ids[], member_ids[], source=util|home)
+	 *           잠금이 있으면 code 423 + 안내 문구, 없으면 code 200
+	 */
+	@PostMapping("/Account/AccountRecordMonthLockCheck")
+	public String AccountRecordMonthLockCheck(@RequestBody Map<String, Object> paramMap) {
+		String lockMessage = monthLockMessage(paramMap);
+		if (lockMessage != null) {
+			return recordLockedResponse(lockMessage);
+		}
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("locked", false);
+		return obj.toString();
+	}
+
+	// 마감 기간 포함 시 프론트로 내려주는 응답 (code 423, locked=true)
+	private String recordLockedResponse(String message) {
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 423);
+		obj.addProperty("locked", true);
+		obj.addProperty("message", message);
 		return obj.toString();
 	}
 
