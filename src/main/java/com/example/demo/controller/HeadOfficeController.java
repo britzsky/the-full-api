@@ -649,9 +649,17 @@ public class HeadOfficeController {
      */
 	@PostMapping("HeadOffice/ElectronicPaymentManageSignSave")
 	public String ElectronicPaymentManageSignSave(@RequestBody Map<String, Object> payload) {
-		int iResult = headOfficeService.ElectronicPaymentManageSignSave(payload);
-
 		JsonObject obj = new JsonObject();
+		int iResult;
+		try {
+			iResult = headOfficeService.ElectronicPaymentManageSignSave(payload);
+		} catch (HeadOfficeService.PersonPurchaseTallyException e) {
+			// 개인구매(FR) 최종결재 시 거래처에 개인구매 매핑이 없으면 결재를 취소하고 안내 문구를 내려준다.
+			obj.addProperty("code", 409);
+			obj.addProperty("message", e.getMessage());
+			return obj.toString();
+		}
+
 		if (iResult > 0) {
 			obj.addProperty("code", 200);
 			obj.addProperty("message", "성공");
@@ -661,6 +669,96 @@ public class HeadOfficeController {
 		}
 
 		return obj.toString();
+	}
+
+	/*
+	 * part		: 현장
+     * method 	: PersonPurchaseReceiptSave
+     * comment 	: 현장 -> 구매요청 -> 요청내역 -> 최종 승인된 개인구매 품목들의 구매일자·영수증 일괄 후첨 저장 및 개인구매 관리 반영
+     *            (item_idx / saleDate / files 는 같은 순서의 배열, 하나라도 실패하면 전체 취소)
+     */
+	@PostMapping("FieldBoard/PersonPurchaseReceiptSave")
+	public String PersonPurchaseReceiptSave(
+		@RequestParam("payment_id") String paymentId,
+		@RequestParam("user_id") String userId,
+		@RequestParam("item_idx") List<String> itemIdxList,
+		@RequestParam("saleDate") List<String> saleDateList,
+		@RequestParam("files") MultipartFile[] files
+	) {
+		JsonObject obj = new JsonObject();
+
+		int count = itemIdxList == null ? 0 : itemIdxList.size();
+		boolean invalid = count == 0
+			|| saleDateList == null || saleDateList.size() != count
+			|| files == null || files.length != count;
+		if (!invalid) {
+			for (int i = 0; i < count; i++) {
+				if (asText(saleDateList.get(i)).isEmpty() || files[i] == null || files[i].isEmpty()) invalid = true;
+			}
+		}
+		if (invalid) {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "모든 품목의 구매일자와 영수증을 입력해 주세요.");
+			return obj.toString();
+		}
+
+		// 개인구매 관리 저장과 같은 sale_id 규칙(yyyyMMddHHmmssSSS)으로 품목마다 1ms씩 다르게 채번하고
+		// 영수증도 같은 receipt 경로에 올린다. (업로드 중 실패하면 이미 올린 파일은 지운다)
+		LocalDateTime saleIdBase = LocalDateTime.now();
+		DateTimeFormatter saleIdFormat = DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS");
+		List<String> uploadedPaths = new ArrayList<>();
+		List<Map<String, Object>> rows = new ArrayList<>();
+		try {
+			for (int i = 0; i < count; i++) {
+				String saleId = saleIdBase.plusNanos(i * 1_000_000L).format(saleIdFormat);
+				String receiptImage = fileStorageService.upload(files[i], "receipt", saleId);
+				uploadedPaths.add(receiptImage);
+
+				Map<String, Object> row = new HashMap<>();
+				row.put("item_idx", asText(itemIdxList.get(i)));
+				row.put("saleDate", asText(saleDateList.get(i)));
+				row.put("sale_id", saleId);
+				row.put("receipt_image", receiptImage);
+				rows.add(row);
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+			deleteUploadedReceipts(uploadedPaths);
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "영수증 업로드 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+			return obj.toString();
+		}
+
+		Map<String, Object> param = new HashMap<>();
+		param.put("payment_id", asText(paymentId));
+		param.put("user_id", asText(userId));
+
+		try {
+			headOfficeService.PersonPurchaseReceiptSaveAll(param, rows);
+		} catch (HeadOfficeService.PersonPurchaseTallyException e) {
+			// 전체 롤백됐으므로 방금 올린 영수증 파일도 모두 지운다.
+			deleteUploadedReceipts(uploadedPaths);
+			obj.addProperty("code", 409);
+			obj.addProperty("message", e.getMessage());
+			return obj.toString();
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+			deleteUploadedReceipts(uploadedPaths);
+			obj.addProperty("code", 500);
+			obj.addProperty("message", "개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+			return obj.toString();
+		}
+
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		return obj.toString();
+	}
+
+	// 일괄 후첨 저장이 취소됐을 때 이미 업로드한 영수증 파일들을 지운다. (삭제 실패는 무시)
+	private void deleteUploadedReceipts(List<String> paths) {
+		for (String path : paths) {
+			try { fileStorageService.delete(path); } catch (Exception ignore) { }
+		}
 	}
 
 	/* 

@@ -1700,6 +1700,22 @@
 			   ep.user_id,
 			   ep.reg_user_id,
 			   draft_user.user_name AS reg_user_name,
+			   <!-- 개인구매(FR) 후첨 완료 여부: 모든 품목에 구매일자·영수증이 저장(sale_id 존재)되면 Y, 아니면 N / 그 외 문서는 NULL -->
+			   CASE
+			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) = 'FR' THEN
+			       CASE
+			         WHEN EXISTS (SELECT 1 FROM tb_headoffice_purchase_request prs WHERE prs.payment_id = ep.payment_id)
+			          AND NOT EXISTS (
+			           SELECT 1
+			           FROM tb_headoffice_purchase_request prs
+			           WHERE prs.payment_id = ep.payment_id
+			             AND IFNULL(prs.sale_id, '') = ''
+			          )
+			         THEN 'Y'
+			         ELSE 'N'
+			       END
+			     ELSE NULL
+			   END AS receipt_attach_yn,
 			   ep.charge_sign,
 			   CASE
 			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
@@ -2050,7 +2066,10 @@
 			   R.account_name,
 			   R.payment_type,
 			   R.payment_type_detail,
-			   R.request_dt
+			   R.request_dt,
+			   R.saleDate,
+			   R.receipt_image,
+			   R.sale_id
 		FROM (
 			<!-- 소모품 구매 품의서: 기존 품목 테이블 조회 -->
 			SELECT pr.idx,
@@ -2076,7 +2095,11 @@
 				   NULL AS account_name,
 				   NULL AS payment_type,
 				   NULL AS payment_type_detail,
-				   NULL AS request_dt
+				   NULL AS request_dt,
+				   <!-- 개인구매(FR) 결재 후 후첨한 구매일자/영수증/매입집계 반영 키 -->
+				   DATE_FORMAT(pr.saleDate, '%Y-%m-%d') AS saleDate,
+				   pr.receipt_image,
+				   pr.sale_id
 			FROM tb_headoffice_purchase_request pr
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = pr.payment_id
@@ -2108,7 +2131,10 @@
 				   NULL AS account_name,
 				   NULL AS payment_type,
 				   NULL AS payment_type_detail,
-				   NULL AS request_dt
+				   NULL AS request_dt,
+				   NULL AS saleDate,
+				   NULL AS receipt_image,
+				   NULL AS sale_id
 			FROM tb_headoffice_draft d
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = d.payment_id
@@ -2140,7 +2166,10 @@
 				   pd.account_name AS account_name,
 				   pd.payment_type AS payment_type,
 				   pd.payment_type_detail AS payment_type_detail,
-				   DATE_FORMAT(pd.request_dt, '%Y-%m-%d %H:%i:%s') AS request_dt
+				   DATE_FORMAT(pd.request_dt, '%Y-%m-%d %H:%i:%s') AS request_dt,
+				   NULL AS saleDate,
+				   NULL AS receipt_image,
+				   NULL AS sale_id
 			FROM tb_headoffice_payment_doc pd
 			JOIN tb_headoffice_electronic_payment ep
 			  ON ep.payment_id = pd.payment_id
@@ -2335,6 +2364,49 @@
 		  )
 		  AND (IFNULL(tm_user, '') = '' OR IFNULL(tm_sign, '') = '4')
 		  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
+	</update>
+
+	<!-- 개인구매(FR) 결재 문서의 상태·기안일과 기안자 거래처, 거래처의 개인구매(1008) 매핑 건수를 조회 -->
+	<select id="ElectronicPaymentFrTallyMain" parameterType="map" resultType="hashmap">
+		SELECT UPPER(CAST(ep.doc_type AS CHAR)) AS doc_type,
+			   CAST(ep.status AS CHAR) AS status,
+			   ep.reg_user_id,
+			   drafter.account_id,
+			   drafter.user_name,
+			   (
+				SELECT COUNT(*)
+				FROM tb_account_mapping_v2 amv
+				WHERE amv.account_id = drafter.account_id
+				  AND amv.type = 1008
+			   ) AS mapping_cnt
+		FROM tb_headoffice_electronic_payment ep
+		LEFT JOIN tb_user drafter ON drafter.user_id = ep.reg_user_id
+		WHERE ep.payment_id = #{payment_id}
+	</select>
+
+	<!-- 개인구매(FR) 후첨 대상 품목 1건 조회 (동시 저장 방지를 위해 행 잠금) -->
+	<select id="ElectronicPaymentFrReceiptItem" parameterType="map" resultType="hashmap">
+		SELECT idx,
+			   item_name,
+			   qty,
+			   price,
+			   use_name,
+			   sale_id
+		FROM tb_headoffice_purchase_request
+		WHERE payment_id = #{payment_id}
+		  AND idx = #{item_idx}
+		FOR UPDATE
+	</select>
+
+	<!-- 개인구매(FR) 품목에 구매일자·영수증·매입집계 sale_id를 저장 (이미 반영된 품목은 제외) -->
+	<update id="ElectronicPaymentFrReceiptItemSave" parameterType="map">
+		UPDATE tb_headoffice_purchase_request
+		SET saleDate = DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
+			receipt_image = #{receipt_image},
+			sale_id = #{sale_id}
+		WHERE payment_id = #{payment_id}
+		  AND idx = #{item_idx}
+		  AND IFNULL(sale_id, '') = ''
 	</update>
 
 	<update id="ElectronicPaymentItemBuyYnSave" parameterType="map">

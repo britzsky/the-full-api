@@ -46,6 +46,9 @@ public interface HeadOfficeMapper {
 	int ElectronicPaymentManageTmSignSave(Map<String, Object> paramMap); 							// 본사 -> 전자결재 관리 -> 팀장 결재/반려 저장
 	int ElectronicPaymentManageCeoSignSave(Map<String, Object> paramMap); 							// 본사 -> 전자결재 관리 -> 대표 결재/반려 저장
 	int ElectronicPaymentManagePayerSignSave(Map<String, Object> paramMap); 						// 본사 -> 전자결재 관리 -> 결재자 결재/반려 저장
+	Map<String, Object> ElectronicPaymentFrTallyMain(Map<String, Object> paramMap); 				// 본사 -> 전자결재 관리 -> 개인구매(FR) 최종결재 문서·기안자 거래처 조회
+	Map<String, Object> ElectronicPaymentFrReceiptItem(Map<String, Object> paramMap); 				// 현장 -> 구매요청 -> 개인구매(FR) 후첨 대상 품목 조회
+	int ElectronicPaymentFrReceiptItemSave(Map<String, Object> paramMap); 							// 현장 -> 구매요청 -> 개인구매(FR) 품목 구매일자·영수증·sale_id 저장
 	int ElectronicPaymentItemBuyYnSave(Map<String, Object> paramMap); 								// 본사 -> 전자결재 관리 -> 구매요청품목 저장
 	int ElectronicPaymentItemPurchaseInfoSave(Map<String, Object> paramMap); 						// 본사 -> 전자결재 관리 -> 구매요청품목 예산포함여부/구매진행여부 저장
 	List<Map<String, Object>> ElectronicPaymentNotificationList(Map<String, Object> paramMap); 		// 본사 -> 전자결재 알림 목록

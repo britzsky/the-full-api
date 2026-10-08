@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,12 +15,21 @@ import com.example.demo.mapper.OperateMapper;
 @Service
 public class HeadOfficeService {
 
+	// 개인구매(FR) 최종결재 시 매입집계에 반영할 수 없어 결재를 취소할 때 던지는 예외 (매핑 없음/반영 오류)
+	public static class PersonPurchaseTallyException extends RuntimeException {
+		public PersonPurchaseTallyException(String message) {
+			super(message);
+		}
+	}
+
 	HeadOfficeMapper headOfficeMapper;
 	OperateMapper operateMapper;
+	AccountService accountService;
 
-	public HeadOfficeService(HeadOfficeMapper userMapper, OperateMapper operateMapper) {
+	public HeadOfficeService(HeadOfficeMapper userMapper, OperateMapper operateMapper, AccountService accountService) {
 		this.headOfficeMapper = userMapper;
 		this.operateMapper = operateMapper;
+		this.accountService = accountService;
 	}
 
 	// 본사 -> 주간식단 저장
@@ -253,6 +264,9 @@ public class HeadOfficeService {
 	}
 
 	// 본사 -> 전자결재 관리 -> 결재/반려 저장 (팀장→결재자→대표 순으로 시도)
+	// - 개인구매(FR) 2차 결재 시 기안자 거래처에 개인구매(1008) 연결이 없으면 결재를 롤백하고 본사 연결을 안내한다.
+	//   (실제 매입집계 반영은 결재 후 구매일자·영수증 후첨 저장 시 PersonPurchaseReceiptSave에서 처리)
+	@Transactional(rollbackFor = Exception.class)
 	public int ElectronicPaymentManageSignSave(Map<String, Object> paramMap) {
 		int iResult = headOfficeMapper.ElectronicPaymentManageTmSignSave(paramMap);
 		if (iResult > 0)
@@ -263,7 +277,117 @@ public class HeadOfficeService {
 			return iResult;
 
 		iResult = headOfficeMapper.ElectronicPaymentManagePayerSignSave(paramMap);
+		if (iResult > 0 && "4".equals(String.valueOf(paramMap.get("action_status")))) {
+			Map<String, Object> main = headOfficeMapper.ElectronicPaymentFrTallyMain(paramMap);
+			if (main != null && "FR".equals(String.valueOf(main.get("doc_type"))))
+				checkPersonPurchaseMapping(main);
+		}
 		return iResult;
+	}
+
+	// 현장 -> 구매요청 -> 최종 승인된 개인구매(FR) 문서의 품목들에 구매일자·영수증을 일괄 후첨하고 개인구매 매입집계에 반영한다.
+	// - 품목마다 매입집계 master 1행 저장 → 품목에 saleDate/receipt_image/sale_id 저장(이후 수정 불가)
+	// - 저장한 구매일자별로 집계표·손익표·예산을 한 번씩 재합산
+	// - 결제수단·부가세·과세구분은 비워 두고 회계팀이 개인구매 관리에서 입력
+	// - 한 품목이라도 실패하면 전체 롤백 (일부만 저장되지 않음)
+	@Transactional(rollbackFor = Exception.class)
+	public void PersonPurchaseReceiptSaveAll(Map<String, Object> paramMap, List<Map<String, Object>> rows) {
+		Map<String, Object> main = headOfficeMapper.ElectronicPaymentFrTallyMain(paramMap);
+		if (main == null || !"FR".equals(String.valueOf(main.get("doc_type"))))
+			throw new PersonPurchaseTallyException("개인구매 문서를 찾을 수 없습니다.");
+		if (!String.valueOf(paramMap.get("user_id")).equals(String.valueOf(main.get("reg_user_id"))))
+			throw new PersonPurchaseTallyException("본인이 상신한 문서만 영수증을 첨부할 수 있습니다.");
+		if (!"4".equals(String.valueOf(main.get("status"))))
+			throw new PersonPurchaseTallyException("최종 결재가 완료된 후에 구매일자와 영수증을 첨부할 수 있습니다.");
+		checkPersonPurchaseMapping(main);
+
+		String accountId = String.valueOf(main.get("account_id"));
+		String userId = String.valueOf(paramMap.get("user_id"));
+		// 재합산할 구매일자 → 그 날짜로 저장한 sale_id (같은 날짜는 한 번만 재합산)
+		Map<String, Object> saleIdByDate = new java.util.LinkedHashMap<>();
+
+		for (Map<String, Object> row : rows) {
+			Map<String, Object> itemParam = new HashMap<>(row);
+			itemParam.put("payment_id", paramMap.get("payment_id"));
+
+			Map<String, Object> item = headOfficeMapper.ElectronicPaymentFrReceiptItem(itemParam);
+			if (item == null)
+				throw new PersonPurchaseTallyException("품목을 찾을 수 없습니다. 화면을 새로고침해 주세요.");
+			if (item.get("sale_id") != null && !String.valueOf(item.get("sale_id")).trim().isEmpty())
+				throw new PersonPurchaseTallyException(
+					"'" + item.get("item_name") + "' 품목은 이미 반영되었습니다. 화면을 새로고침해 주세요.");
+
+			try {
+				String saleDate = String.valueOf(row.get("saleDate"));
+				LocalDate.parse(saleDate);
+
+				Map<String, Object> tally = new HashMap<>();
+				tally.put("account_id", accountId);
+				tally.put("sale_id", row.get("sale_id"));
+				tally.put("type", 1008);
+				tally.put("saleDate", saleDate);
+				tally.put("total", toLong(item.get("qty")) * toLong(item.get("price")));
+				tally.put("discount", 0);
+				tally.put("vat", 0);
+				tally.put("taxFree", 0);
+				tally.put("tax", 0);
+				tally.put("totalCash", 0);
+				tally.put("totalCard", 0);
+				tally.put("receipt_image", row.get("receipt_image"));
+				tally.put("note", item.get("item_name"));
+				tally.put("use_name", item.get("use_name"));
+				tally.put("user_id", userId);
+				tally.put("receipt_type", "UNKNOWN");
+				tally.put("buyer", main.get("user_name"));
+				accountService.AccountPurchaseSave(tally);
+
+				if (headOfficeMapper.ElectronicPaymentFrReceiptItemSave(itemParam) == 0)
+					throw new IllegalStateException("품목 후첨 정보 저장 실패: " + row.get("item_idx"));
+
+				saleIdByDate.put(saleDate, row.get("sale_id"));
+			} catch (RuntimeException e) {
+				e.printStackTrace();
+				throw new PersonPurchaseTallyException(
+					"개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+			}
+		}
+
+		try {
+			// 구매일자별 거래처·개인구매 타입 하루치 집계표/손익표/예산 재합산
+			for (Map.Entry<String, Object> entry : saleIdByDate.entrySet()) {
+				LocalDate date = LocalDate.parse(entry.getKey());
+				Map<String, Object> syncParam = new HashMap<>();
+				syncParam.put("account_id", accountId);
+				syncParam.put("sale_id", entry.getValue());
+				syncParam.put("type", 1008);
+				syncParam.put("saleDate", entry.getKey());
+				syncParam.put("year", date.getYear());
+				syncParam.put("month", date.getMonthValue());
+				syncParam.put("user_id", userId);
+				accountService.TallySheetPaymentSave(syncParam);
+			}
+		} catch (RuntimeException e) {
+			e.printStackTrace();
+			throw new PersonPurchaseTallyException(
+				"개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+		}
+	}
+
+	// 기안자 거래처에 개인구매(1008) 매핑이 없으면 본사 연결을 안내하는 예외를 던진다.
+	private void checkPersonPurchaseMapping(Map<String, Object> main) {
+		Object mappingCnt = main.get("mapping_cnt");
+		if (mappingCnt == null || Integer.parseInt(String.valueOf(mappingCnt)) == 0) {
+			throw new PersonPurchaseTallyException(
+				"해당 거래처에 개인구매 연결이 되어 있지 않습니다. 본사에 개인구매 연결을 요청해 주세요.");
+		}
+	}
+
+	// 숫자/문자 혼합 값을 long으로 변환 (비어 있으면 0)
+	private long toLong(Object value) {
+		if (value == null) return 0L;
+		String text = String.valueOf(value).replace(",", "").trim();
+		if (text.isEmpty()) return 0L;
+		return (long) Double.parseDouble(text);
 	}
 
 	// 본사 -> 전자결재 관리 -> 구매요청품목 저장
