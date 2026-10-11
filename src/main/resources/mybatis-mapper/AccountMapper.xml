@@ -4203,16 +4203,21 @@
 		LIMIT 1
 	</select>
 
-	<!-- ✅ PK를 (account_id, user_name, phone_last4)으로 걸지 않으므로 ON DUPLICATE KEY 대신
-		 "있으면 UPDATE, 없으면 INSERT"를 애플리케이션(Service)에서 판단해서 아래 두 개 중 하나를 호출한다.
+	<!-- ✅ "있으면 UPDATE, 없으면 INSERT"를 애플리케이션(Service)에서 판단해서 아래 두 개 중 하나를 호출한다.
 		 ✅ phone_last4: 동명이인(같은 account_id+user_name) 구분용 - commute_migration.sql 참고 -->
 
-	<!-- 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성 -->
+	<!-- 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성
+		 등록 버튼 요청과 CommuteSave 자동 요청이 동시에 들어와 둘 다 INSERT로 오는 경우,
+		 uk_member_device_account_name_phone 유니크 키에 걸리면 새 행 대신 기존 행의 pending_*만 갱신한다. -->
 	<insert id="CommuteDeviceRequestInsert" parameterType="map">
 		INSERT INTO tb_member_device
 		(account_id, user_name, phone_last4, pending_device_token, pending_device_name, request_dt, approve_yn)
 		VALUES
 		(#{account_id}, #{user_name}, #{phone_last4}, #{device_token}, #{device_name}, CONVERT_TZ(NOW(), '+00:00', '+09:00'), 'N')
+		ON DUPLICATE KEY UPDATE
+			pending_device_token = VALUES(pending_device_token),
+			pending_device_name = VALUES(pending_device_name),
+			request_dt = VALUES(request_dt)
 	</insert>
 
 	<!-- 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신) -->
@@ -4227,7 +4232,9 @@
 			AND phone_last4 = #{phone_last4}
 	</update>
 
-	<!-- 출, 퇴근 기록 -> 등록기기 요청 승인: pending -> 승인된 기기로 반영 -->
+	<!-- 출, 퇴근 기록 -> 등록기기 요청 승인: pending -> 승인된 기기로 반영
+		 대기 중인 기기(pending_device_token)가 있는 행만 승인한다. 이미 승인 처리돼 pending이 비어 있는 행에
+		 승인이 다시 들어오면(더블클릭 등) 승인된 device_token이 NULL로 덮이지 않도록 0건 처리된다. -->
 	<update id="CommuteDeviceApprove" parameterType="map">
 		UPDATE tb_member_device
 		SET
@@ -4242,6 +4249,8 @@
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
 			AND phone_last4 = #{phone_last4}
+			AND pending_device_token IS NOT NULL
+			AND pending_device_token != ''
 	</update>
 
 	<!-- 출, 퇴근 기록 -> 등록기기 요청 반려: pending만 초기화, 기존 승인 기기는 유지 -->

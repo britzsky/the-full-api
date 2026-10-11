@@ -4082,7 +4082,12 @@ public class AccountController {
 					}
 				}
 
-				accountService.CommuteDeviceApprove(paramMap);
+				// 대기 중인 기기가 없으면(이미 승인/반려된 요청에 다시 승인이 들어온 경우) 0건 처리된다.
+				if (accountService.CommuteDeviceApprove(paramMap) == 0) {
+					obj.addProperty("code", "409");
+					obj.addProperty("msg", "이미 처리된 요청입니다. 목록을 새로고침해 주세요.");
+					return obj.toString();
+				}
 				obj.addProperty("msg", "기기 등록을 승인했습니다.");
 				} // synchronized (approveLock)
 			} else {
