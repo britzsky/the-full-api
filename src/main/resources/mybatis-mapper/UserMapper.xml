@@ -10,8 +10,9 @@
 
     <insert id="InsertLoginHistory" parameterType="map">
         <!-- ✅ 같은 사용자가 5초 이내 재요청(중복 클릭 등)하면 이력을 또 남기지 않음 -->
-        INSERT INTO tb_login_history (user_id, login_dt)
-        SELECT #{user_id}, DATE_ADD(NOW(), INTERVAL 9 HOUR)
+        <!-- login_type: 로그인 구분 (WEB / ANDROID / IOS) -->
+        INSERT INTO tb_login_history (user_id, login_type, login_dt)
+        SELECT #{user_id}, #{login_type}, DATE_ADD(NOW(), INTERVAL 9 HOUR)
         FROM DUAL
         WHERE NOT EXISTS (
             SELECT 1

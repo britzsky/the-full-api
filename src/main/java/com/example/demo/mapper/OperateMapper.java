@@ -27,6 +27,10 @@ public interface OperateMapper {
 	List<Map<String, Object>> PropertiesList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 기물리스트 조회
 	List<Map<String, Object>> HygieneList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 위생관리 조회
 	int HygieneSave(Map<String, Object> paramMap);												// 급식사업부 -> 운영관리 -> 위생관리 저장
+	List<Map<String, Object>> HygieneCategoryList(Map<String, Object> paramMap);				// 앱 위생점검 -> 거래처별 카테고리 설정 조회
+	int HygieneCategorySave(Map<String, Object> paramMap);										// 앱 위생점검 -> 카테고리 설정 1건 등록/수정
+	int HygieneCategoryDeleteExcept(Map<String, Object> paramMap);								// 앱 위생점검 -> 저장 목록에 없는 카테고리 삭제 처리
+	List<Map<String, Object>> HygieneCheckList(Map<String, Object> paramMap);					// 앱 위생점검 -> 거래처 + 점검일 점검 기록 조회
 	Map<String, Object> HandOverSearch(Map<String, Object> paramMap);							// 급식사업부 -> 운영관리 -> 인수인계서 조회
 	int HandOverSave(Map<String, Object> paramMap);												// 급식사업부 -> 운영관리 -> 인수인계서 저장
 	List<Map<String, Object>> AccountMappingList(Map<String, Object> paramMap);					// 급식사업부 -> 운영관리 -> 집계표 Modal 거래처 매핑 조회

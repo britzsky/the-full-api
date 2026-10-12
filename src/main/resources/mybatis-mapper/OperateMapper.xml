@@ -497,6 +497,7 @@
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        idx,
 	        account_id,
+	        <if test="category_key != null and category_key != ''">category_key,</if>
 	        problem_image,
 	        problem_note,
 	        clean_image,
@@ -513,6 +514,7 @@
 	    <trim prefix="(" suffix=")" suffixOverrides=",">
 	        #{idx},
 	        #{account_id},
+	        <if test="category_key != null and category_key != ''">#{category_key},</if>
 	        #{problem_image},
 	        #{problem_note},
 	        #{clean_image},
@@ -561,6 +563,70 @@
 	        </if>
 	    </trim>
 	</insert>
+	
+	<!-- 앱 위생점검: 거래처별 카테고리 설정 조회 (표시 순서 기준) -->
+	<select id="HygieneCategoryList" parameterType="map" resultType="hashmap">
+		SELECT category_key,
+	        category_name,
+	        IFNULL(description, '') AS description,
+	        sort_no,
+	        use_yn,
+	        main_yn,
+	        status_yn
+		FROM tb_account_hygiene_category
+		WHERE account_id = #{account_id}
+		AND del_yn = 'N'
+		ORDER BY sort_no, id
+	</select>
+	
+	<!-- 앱 위생점검: 카테고리 설정 1건 등록/수정 (account_id + category_key 유니크 키 기준) -->
+	<insert id="HygieneCategorySave" parameterType="map">
+		INSERT INTO tb_account_hygiene_category
+	        (account_id, category_key, category_name, description, sort_no, use_yn, main_yn, status_yn, del_yn, reg_dt, mod_dt)
+	    VALUES
+	        (#{account_id}, #{category_key}, #{category_name}, #{description}, #{sort_no}, #{use_yn}, #{main_yn}, #{status_yn}, 'N',
+	         CONVERT_TZ(NOW(), '+00:00', '+09:00'), CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+	    ON DUPLICATE KEY UPDATE
+	        category_name = VALUES(category_name),
+	        description = VALUES(description),
+	        sort_no = VALUES(sort_no),
+	        use_yn = VALUES(use_yn),
+	        main_yn = VALUES(main_yn),
+	        status_yn = VALUES(status_yn),
+	        del_yn = 'N',
+	        mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+	</insert>
+	
+	<!-- 앱 위생점검: 저장 목록에 없는 카테고리 삭제 처리 (카테고리 관리 화면에서 삭제한 항목) -->
+	<update id="HygieneCategoryDeleteExcept" parameterType="map">
+		UPDATE tb_account_hygiene_category
+		SET del_yn = 'Y',
+		    mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		WHERE account_id = #{account_id}
+		AND del_yn = 'N'
+		AND category_key NOT IN
+		<foreach collection="category_keys" item="category_key" open="(" separator="," close=")">
+			#{category_key}
+		</foreach>
+	</update>
+	
+	<!-- 앱 위생점검: 거래처 + 점검일의 카테고리별 점검 기록 조회 (웹 등록 건인 category_key NULL 제외) -->
+	<select id="HygieneCheckList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+	        category_key,
+	        IFNULL(problem_image, '') AS problem_image,
+	        IFNULL(problem_note, '') AS problem_note,
+	        IFNULL(clean_image, '') AS clean_image,
+	        IFNULL(clean_note, '') AS clean_note,
+	        IFNULL(note, '') AS note,
+	        DATE_FORMAT(reg_dt, '%Y-%m-%d') AS reg_dt
+		FROM tb_account_hygiene_management
+		WHERE account_id = #{account_id}
+		AND reg_dt = #{check_date}
+		AND category_key IS NOT NULL
+		AND del_yn = 'N'
+		ORDER BY idx
+	</select>
 	
 	<select id="HandOverSearch" parameterType="map" resultType="hashmap">
 		SELECT account_id,

@@ -154,6 +154,42 @@ public class OperateService {
 		return iResult;
 	}
 
+	// 앱 위생점검 -> 거래처별 카테고리 설정 조회
+	public List<Map<String, Object>> HygieneCategoryList(Map<String, Object> paramMap) {
+		return operateMapper.HygieneCategoryList(paramMap);
+	}
+
+	// 앱 위생점검 -> 거래처 카테고리 목록 전체 저장 (목록 순서대로 sort_no 부여, 목록에 없는 카테고리는 삭제 처리)
+	@Transactional(rollbackFor = Exception.class)
+	@SuppressWarnings("unchecked")
+	public int HygieneCategorySave(Map<String, Object> paramMap) {
+		Object accountId = paramMap.get("account_id");
+		List<Map<String, Object>> categories = (List<Map<String, Object>>) paramMap.get("categories");
+		List<Object> categoryKeys = new ArrayList<>();
+		int iResult = 0;
+
+		for (int i = 0; i < categories.size(); i++) {
+			Map<String, Object> category = new HashMap<>(categories.get(i));
+			category.put("account_id", accountId);
+			category.put("sort_no", i + 1);
+			categoryKeys.add(category.get("category_key"));
+			iResult += operateMapper.HygieneCategorySave(category);
+		}
+
+		// 저장 목록에 없는 기존 카테고리 삭제 처리
+		Map<String, Object> deleteParam = new HashMap<>();
+		deleteParam.put("account_id", accountId);
+		deleteParam.put("category_keys", categoryKeys);
+		operateMapper.HygieneCategoryDeleteExcept(deleteParam);
+
+		return iResult;
+	}
+
+	// 앱 위생점검 -> 거래처 + 점검일 점검 기록 조회
+	public List<Map<String, Object>> HygieneCheckList(Map<String, Object> paramMap) {
+		return operateMapper.HygieneCheckList(paramMap);
+	}
+
 	// 급식사업부 -> 운영관리 -> 인수인계서 조회
 	public Map<String, Object> HandOverSearch(Map<String, Object> paramMap) {
 		Map<String, Object> resultMap = new HashMap<String, Object>();

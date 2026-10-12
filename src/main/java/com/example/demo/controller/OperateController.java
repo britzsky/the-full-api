@@ -499,6 +499,54 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : HygieneCategoryList
+     * comment : 앱 위생점검 -> 거래처별 카테고리 설정 조회 (account_id)
+     */
+    @GetMapping("Operate/HygieneCategoryList")
+    public String HygieneCategoryList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.HygieneCategoryList(paramMap);
+
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : HygieneCategorySave
+     * comment : 앱 위생점검 -> 거래처 카테고리 목록 전체 저장 ({ account_id, categories: [...] })
+     */
+    @PostMapping("Operate/HygieneCategorySave")
+    public String HygieneCategorySave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        Object categories = paramMap.get("categories");
+
+        // 거래처와 카테고리 목록이 없으면 저장하지 않음 (전체 삭제 방지)
+        if (paramMap.get("account_id") == null || !(categories instanceof List) || ((List<?>) categories).isEmpty()) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "거래처 또는 카테고리 목록이 없습니다.");
+            return obj.toString();
+        }
+
+        int iResult = operateService.HygieneCategorySave(paramMap);
+
+        obj.addProperty("code", iResult > 0 ? 200 : 400);
+        obj.addProperty("message", iResult > 0 ? "성공" : "실패");
+        return obj.toString();
+    }
+
+    /*
+     * part : 운영
+     * method : HygieneCheckList
+     * comment : 앱 위생점검 -> 거래처 + 점검일 카테고리별 점검 기록 조회 (account_id, check_date)
+     */
+    @GetMapping("Operate/HygieneCheckList")
+    public String HygieneCheckList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.HygieneCheckList(paramMap);
+
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
      * method : HandOverSearch
      * comment : 급식사업부 -> 운영관리 -> 인수인계서 조회
      */

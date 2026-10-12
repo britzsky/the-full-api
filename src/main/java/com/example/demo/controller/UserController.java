@@ -66,6 +66,9 @@ public class UserController {
 		try {
 			Map<String, Object> historyParam = new HashMap<>();
 			historyParam.put("user_id", String.valueOf(resultMap.get("user_id")));
+			// 로그인 구분 (앱은 ANDROID / IOS 전달, 값이 없는 웹 로그인은 WEB)
+			String loginType = normalizeText(map.get("login_type")).toUpperCase();
+			historyParam.put("login_type", "ANDROID".equals(loginType) || "IOS".equals(loginType) ? loginType : "WEB");
 			userService.InsertLoginHistory(historyParam);
 		} catch (Exception e) {
 			e.printStackTrace();
