@@ -136,6 +136,7 @@ public interface AccountMapper {
 	List<Map<String, Object>> AccountRecordLockList(Map<String, Object> paramMap);						// 출근부 -> 기간 잠금 목록 조회
 	int AccountRecordLockSave(Map<String, Object> paramMap);											// 출근부 -> 기간 잠금/해제 저장
 	Map<String, Object> AccountRecordMonthLockCheck(Map<String, Object> paramMap);						// 출근부 -> 월 단위 일괄 등록 전 잠금 검사
+	int AccountRecordMonthLockClear(Map<String, Object> paramMap);										// 출근부 -> 해당 연/월 월 잠금 전체 해제
 
 	// 현장 -> 구입요청
 	Map<String, Object> PurchaseRequestUserInfo(Map<String, Object> paramMap);							// 현장 -> 구입요청 -> 사용자 정보 조회 (거래처명 + 1차결재자)

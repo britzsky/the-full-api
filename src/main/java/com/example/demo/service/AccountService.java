@@ -1480,7 +1480,12 @@ public class AccountService {
 
 	// 출근부 -> 주간/월간 잠금 및 해제 저장
 	public int AccountRecordLockSave(Map<String, Object> paramMap) {
-		return accountMapper.AccountRecordLockSave(paramMap);
+		int iResult = accountMapper.AccountRecordLockSave(paramMap);
+		// 월 잠금 해제는 전체 거래처 기준이므로 거래처별로 남아 있던 월 잠금도 함께 해제
+		if ("M".equals(String.valueOf(paramMap.get("lock_type"))) && "N".equals(String.valueOf(paramMap.get("lock_yn")))) {
+			accountMapper.AccountRecordMonthLockClear(paramMap);
+		}
+		return iResult;
 	}
 
 	// 출근부 -> 월 단위 일괄 등록(유틸/통합) 대상 거래처 중 해당 월 잠금이 있는지 조회

@@ -3323,10 +3323,15 @@ public class AccountController {
 	 * method : AccountRecordLockSave
 	 * comment : 출근부 -> 주간(W)/월간(M) 기간 잠금 및 해제 저장
 	 *           start_day ~ end_day 는 해당 월 안의 일자, lock_yn = Y(잠금) / N(해제)
+	 *           월간(M)은 전체 거래처 잠금으로 account_id = 'ALL' 로 저장
 	 */
 	@PostMapping("/Account/AccountRecordLockSave")
 	public String AccountRecordLockSave(@RequestBody Map<String, Object> paramMap) {
 		JsonObject obj = new JsonObject();
+
+		if ("M".equals(String.valueOf(paramMap.get("lock_type")))) {
+			paramMap.put("account_id", "ALL");
+		}
 
 		Integer startDay = toRecordLockInt(paramMap.get("start_day"));
 		Integer endDay = toRecordLockInt(paramMap.get("end_day"));
