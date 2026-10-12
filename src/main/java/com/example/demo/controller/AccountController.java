@@ -3803,6 +3803,28 @@ public class AccountController {
 	}
 
 	/*
+	 * method : CommuteRegisteredAccountList
+	 * comment : 출퇴근 앱 -> 이름 + 휴대폰 뒷자리 + 현재 기기 토큰으로 이미 승인된 근무지 목록 조회(최근 승인 순).
+	 *           앱에서 이름/뒷자리만 입력해도 근무지를 자동 선택하기 위해 사용한다.
+	 */
+	@GetMapping("/Account/CommuteRegisteredAccountList")
+	public String CommuteRegisteredAccountList(@RequestParam Map<String, Object> paramMap) {
+		String userName = normalizeCommuteText(paramMap.get("user_name"));
+		String phoneLast4 = normalizeCommuteText(paramMap.get("phone_last4"));
+		String deviceToken = normalizeCommuteText(paramMap.get("device_token"));
+
+		if (userName.isEmpty() || phoneLast4.isEmpty() || deviceToken.isEmpty()) {
+			return "[]";
+		}
+
+		paramMap.put("user_name", userName);
+		paramMap.put("phone_last4", phoneLast4);
+		paramMap.put("device_token", deviceToken);
+		List<Map<String, Object>> resultList = accountService.CommuteRegisteredAccountList(paramMap);
+		return new Gson().toJson(resultList);
+	}
+
+	/*
 	 * method : CommuteDeviceOwnerCheck
 	 * comment : 출, 퇴근 기록 -> 대리출근 방지: 본인확인 시 이 device_token이 이미 "다른 이름"으로
 	 *           승인돼 있는지 확인한다. 충돌이 감지되면 tb_member_device_conflict_log에 이력을 남긴다.

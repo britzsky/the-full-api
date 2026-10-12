@@ -1537,6 +1537,11 @@ public class AccountService {
 		return accountMapper.CommuteDeviceInfo(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 이름 + 휴대폰 뒷자리 + 기기 토큰으로 승인된 근무지 목록 조회
+	public List<Map<String, Object>> CommuteRegisteredAccountList(Map<String, Object> paramMap) {
+		return accountMapper.CommuteRegisteredAccountList(paramMap);
+	}
+
 	// ✅ 출, 퇴근 기록 -> 등록기기 등록/변경 요청 - tb_member_device에 PK(유니크 제약)가 없으므로
 	// 기존 행이 있는지 먼저 조회해서 있으면 UPDATE, 없으면 INSERT 한다.
 	public int CommuteDeviceRequest(Map<String, Object> paramMap) {

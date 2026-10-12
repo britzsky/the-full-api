@@ -147,6 +147,7 @@ public interface AccountMapper {
 
 	// 출, 퇴근 기록
 	Map<String, Object> AccountCoordinateInfo(Map<String, Object> paramMap);							// 출, 퇴근 기록 -> 사업장 기준 좌표 조회
+	List<Map<String, Object>> CommuteRegisteredAccountList(Map<String, Object> paramMap);				// 출, 퇴근 기록 -> 이름+뒷자리+기기토큰으로 승인된 근무지 목록 조회
 	Map<String, Object> CommuteDeviceInfo(Map<String, Object> paramMap);									// 출, 퇴근 기록 -> 등록기기 정보 조회 (account_id + user_name 기준)
 	int CommuteDeviceRequestInsert(Map<String, Object> paramMap);												// 출, 퇴근 기록 -> 등록기기 등록 요청 신규 생성
 	int CommuteDeviceRequestUpdatePending(Map<String, Object> paramMap);										// 출, 퇴근 기록 -> 등록기기 변경 요청 갱신 (기존 행의 pending_* 갱신)

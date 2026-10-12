@@ -4182,6 +4182,17 @@
 
 	<!-- 출, 퇴근 기록 -> 등록기기 정보 조회 (account_id + user_name 기준) -->
 	<!-- ✅ datetime 컬럼은 반드시 DATE_FORMAT으로 문자열 변환해서 반환 (LocalDateTime을 Gson이 직접 못 다룸) -->
+	<!-- 출, 퇴근 기록 -> 이 기기(device_token)로 이미 승인받은 같은 사람(이름+뒷자리)의 근무지 목록 (최근 승인 순) -->
+	<select id="CommuteRegisteredAccountList" parameterType="map" resultType="hashmap">
+		SELECT account_id, user_name, phone_last4
+		FROM tb_member_device
+		WHERE user_name = #{user_name}
+			AND phone_last4 = #{phone_last4}
+			AND device_token = #{device_token}
+			AND approve_yn = 'Y'
+		ORDER BY approve_dt DESC
+	</select>
+
 	<select id="CommuteDeviceInfo" parameterType="map" resultType="hashmap">
 		SELECT
 			account_id,
