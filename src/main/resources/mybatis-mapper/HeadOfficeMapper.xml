@@ -1486,6 +1486,43 @@
 		GROUP BY T.account_id, A.account_name, T2.type, T2.name, T.count_month
 		ORDER BY A.account_name, T.account_id
     </select>
+
+	<!-- 거래처(type)별 적립금 사용 내역 조회 (삭제 제외, 사용일자 오름차순) -->
+	<select id="ReserveFundUseList" parameterType="map" resultType="hashmap">
+		SELECT R.id,
+			   R.type,
+			   DATE_FORMAT(R.use_date, '%Y-%m-%d') AS use_date,
+			   R.use_amount,
+			   R.memo,
+			   R.reg_user_id,
+			   U.user_name AS reg_user_name,
+			   DATE_FORMAT(R.reg_dt, '%Y-%m-%d %H:%i') AS reg_dt
+		FROM tb_account_point_use R
+		LEFT JOIN tb_user U
+			ON U.user_id = R.reg_user_id
+		WHERE IFNULL(R.del_yn, 'N') = 'N'
+		<if test="type != null and type != ''">
+			AND R.type = #{type}
+		</if>
+		ORDER BY R.use_date ASC, R.id ASC
+	</select>
+
+	<!-- 적립금 사용 내역 등록/수정/삭제 (id 없으면 신규, 있으면 수정, del_yn='Y'면 삭제 처리) -->
+	<insert id="ReserveFundUseSave" parameterType="map">
+		INSERT INTO tb_account_point_use (
+			id, type, use_date, use_amount, memo, del_yn, reg_user_id, reg_dt
+		) VALUES (
+			#{id}, #{type}, #{use_date}, #{use_amount}, #{memo}, IFNULL(#{del_yn}, 'N'), #{user_id},
+			CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		)
+		ON DUPLICATE KEY UPDATE
+			<if test="use_date != null and use_date != ''">use_date = #{use_date},</if>
+			<if test="use_amount != null">use_amount = #{use_amount},</if>
+			<if test="memo != null">memo = #{memo},</if>
+			del_yn = IFNULL(#{del_yn}, 'N'),
+			mod_user_id = #{user_id},
+			mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+	</insert>
     
     <select id="HeadOfficeElectronicPaymentTypeList" parameterType="map" resultType="hashmap">
     	<!-- 전자결재 타입 테이블의 원본 타입코드와 결재선 기준 컬럼을 그대로 내려준다. -->

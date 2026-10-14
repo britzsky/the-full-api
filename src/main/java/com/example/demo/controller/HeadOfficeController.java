@@ -376,8 +376,40 @@ public class HeadOfficeController {
 	@GetMapping("HeadOffice/AccountMappingPurchaseDetailList")
 	public String AccountMappingPurchaseDetailList(@RequestParam Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = headOfficeService.AccountMappingPurchaseDetailList(paramMap);
-		
+
 		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 본사
+     * method 	: ReserveFundUseList
+     * comment 	: 본사 -> 관리표 -> 적립금 관리(거래처별 적립금 사용 내역 조회)
+     */
+	@GetMapping("HeadOffice/ReserveFundUseList")
+	public String ReserveFundUseList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = headOfficeService.ReserveFundUseList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part		: 본사
+     * method 	: ReserveFundUseSave
+     * comment 	: 본사 -> 관리표 -> 적립금 관리(사용 내역 등록/수정/삭제, id 기준 upsert)
+     */
+	@PostMapping("HeadOffice/ReserveFundUseSave")
+	public String ReserveFundUseSave(@RequestBody Map<String, Object> paramMap) {
+		int iResult = headOfficeService.ReserveFundUseSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+		if (iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+		} else {
+			obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+		}
+		return obj.toString();
 	}
 	
 	/* 

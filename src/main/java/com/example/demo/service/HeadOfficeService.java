@@ -160,6 +160,16 @@ public class HeadOfficeService {
 		return resultList;
 	}
 
+	// 본사 -> 적립금 관리 -> 거래처별 적립금 사용 내역 조회
+	public List<Map<String, Object>> ReserveFundUseList(Map<String, Object> paramMap) {
+		return headOfficeMapper.ReserveFundUseList(paramMap);
+	}
+
+	// 본사 -> 적립금 관리 -> 적립금 사용 내역 등록/수정/삭제(upsert)
+	public int ReserveFundUseSave(Map<String, Object> paramMap) {
+		return headOfficeMapper.ReserveFundUseSave(paramMap);
+	}
+
 	// 본사 -> 전자결재 관리 -> 전자결재 문서타입 목록 조회
 	public List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

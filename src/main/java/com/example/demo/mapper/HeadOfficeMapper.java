@@ -25,6 +25,8 @@ public interface HeadOfficeMapper {
 	List<Map<String, Object>> AccountManagermentTableList(Map<String, Object> paramMap); 			// 본사 -> 회계관리 목록 조회
 	List<Map<String, Object>> AccountMappingPurchaseList(Map<String, Object> paramMap); 			// 본사 -> 회계관리 -> 구매맵핑
 	List<Map<String, Object>> AccountMappingPurchaseDetailList(Map<String, Object> paramMap); 		// 본사 -> 회계관리 -> 구매맵핑(날짜별 상세)
+	List<Map<String, Object>> ReserveFundUseList(Map<String, Object> paramMap); 					// 본사 -> 적립금 관리 -> 사용 내역 조회
+	int ReserveFundUseSave(Map<String, Object> paramMap); 											// 본사 -> 적립금 관리 -> 사용 내역 저장(upsert)
 	List<Map<String, Object>> HeadOfficeElectronicPaymentTypeList(Map<String, Object> paramMap); 	// 본사 -> 전자결재 관리 -> 전자결재 문서타입 목록 조회
 	List<Map<String, Object>> HeadOfficeElectronicPaymentList(Map<String, Object> paramMap); 		// 본사 -> 전자결재 관리 -> 결재 문서 목록 조회
 	int HeadOfficeElectronicPaymentSave(Map<String, Object> paramMap); 								// 본사 -> 전자결재 관리 -> 구매요청 품의서 메인 저장(전자결재 maintable)
