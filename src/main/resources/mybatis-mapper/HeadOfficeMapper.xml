@@ -1516,6 +1516,7 @@
 			CONVERT_TZ(NOW(), '+00:00', '+09:00')
 		)
 		ON DUPLICATE KEY UPDATE
+			<if test="type != null">type = #{type},</if>
 			<if test="use_date != null and use_date != ''">use_date = #{use_date},</if>
 			<if test="use_amount != null">use_amount = #{use_amount},</if>
 			<if test="memo != null">memo = #{memo},</if>

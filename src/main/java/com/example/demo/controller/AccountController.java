@@ -3629,8 +3629,30 @@ public class AccountController {
 			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(obj.toString());
 		}
 
+		// 앱에서 본사/영양사 계정으로 로그인한 사용자 아이디 (조리사/조리원은 빈 값)
+		String userId = normalizeCommuteText(paramMap.get("user_id"));
+
 		try {
-			// 1) 등록기기 승인 검증 (account_id + user_name + phone_last4 기준)
+			if (!userId.isEmpty()) {
+				// 로그인 사용자 출퇴근: 기기 승인 대신 계정 상태·이름·근무지(본사 HQ / 영양사 소속 거래처)를 확인
+				Map<String, Object> paramUser = new HashMap<>();
+				paramUser.put("user_id", userId);
+				Map<String, Object> loginUser = accountService.CommuteLoginUserInfo(paramUser);
+
+				String loginUserType = loginUser == null ? "" : normalizeCommuteText(loginUser.get("user_type"));
+				String expectedAccountId = "1".equals(loginUserType) || "2".equals(loginUserType)
+						? "HQ"
+						: "3".equals(loginUserType) ? normalizeCommuteText(loginUser.get("account_id")) : "";
+
+				if (loginUser == null || expectedAccountId.isEmpty() || !expectedAccountId.equals(accountId)
+						|| !userName.equals(normalizeCommuteText(loginUser.get("user_name")))) {
+					obj.addProperty("reason", "LOGIN_USER_INVALID");
+					obj.addProperty("msg", "로그인 계정 정보를 확인할 수 없습니다.\n다시 로그인해 주세요.");
+					return ResponseEntity.status(HttpStatus.FORBIDDEN).body(obj.toString());
+				}
+			}
+
+			// 1) 등록기기 승인 검증 (account_id + user_name + phone_last4 기준, 로그인 사용자는 생략)
 			Map<String, Object> paramDevice = new HashMap<>();
 			paramDevice.put("account_id", accountId);
 			paramDevice.put("user_name", userName);
@@ -3644,7 +3666,7 @@ public class AccountController {
 			boolean isApprovedDevice = "Y".equals(approvedYn) && !approvedToken.isEmpty()
 					&& !deviceToken.isEmpty() && approvedToken.equals(deviceToken);
 
-			if (!isApprovedDevice) {
+			if (userId.isEmpty() && !isApprovedDevice) {
 				// ✅ 승인 대기중인 요청이 이미 이 기기로 올라가 있는 경우와, 완전히 새 기기인 경우를 구분해서 안내
 				boolean alreadyPendingThisDevice = !pendingToken.isEmpty() && !deviceToken.isEmpty()
 						&& pendingToken.equals(deviceToken);
@@ -3677,7 +3699,10 @@ public class AccountController {
 			paramDeviceUsage.put("account_id", accountId);
 			paramDeviceUsage.put("device_token", deviceToken);
 			paramDeviceUsage.put("t_date", tDate);
-			List<Map<String, Object>> todayIdentities = accountService.SelectCommuteIdentitiesByDeviceToken(paramDeviceUsage);
+			// 로그인 사용자는 계정으로 본인 확인이 끝났으므로 기기 기준 대리출근 확인 생략
+			List<Map<String, Object>> todayIdentities = userId.isEmpty()
+					? accountService.SelectCommuteIdentitiesByDeviceToken(paramDeviceUsage)
+					: new java.util.ArrayList<>();
 			for (Map<String, Object> identity : todayIdentities) {
 				String otherUserName = normalizeCommuteText(identity.get("user_name"));
 				String otherPhoneLast4 = normalizeCommuteText(identity.get("phone_last4"));
@@ -3688,8 +3713,9 @@ public class AccountController {
 				}
 			}
 
-			// ✅ 출퇴근 기록에는 user_id를 저장하지 않는다(컬럼만 미리 만들어둠). 식별은 account_id + user_name + phone_last4 기준.
+			// 출퇴근 기록 식별은 account_id + user_name + phone_last4 기준, user_id는 로그인 사용자만 함께 저장
 			Map<String, Object> record = new HashMap<>();
+			record.put("user_id", userId);
 			record.put("user_name", userName);
 			record.put("account_id", accountId);
 			record.put("phone_last4", phoneLast4);
@@ -3722,6 +3748,10 @@ public class AccountController {
 	@GetMapping("/Account/CommuteTodayStatus")
 	public String CommuteTodayStatus(@RequestParam Map<String, Object> paramMap) {
 		paramMap.put("phone_last4", normalizeCommuteText(paramMap.get("phone_last4")));
+		// 조회 기준일: 앱이 보낸 폰 날짜, 없으면(웹·구버전 앱) 서버 기준 한국 날짜
+		if (normalizeCommuteText(paramMap.get("t_date")).isEmpty()) {
+			paramMap.put("t_date", LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString());
+		}
 		Map<String, Object> result = accountService.CommuteTodayStatus(paramMap);
 		return new Gson().toJson(result == null ? new HashMap<>() : result);
 	}

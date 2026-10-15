@@ -185,7 +185,7 @@ public class OperateService {
 		return iResult;
 	}
 
-	// 앱 위생점검 -> 거래처 + 점검일 점검 기록 조회
+	// 앱 위생점검 -> 거래처 점검 기록 누적 조회 (조치 전·후 한 쌍 = 위생관리 한 행)
 	public List<Map<String, Object>> HygieneCheckList(Map<String, Object> paramMap) {
 		return operateMapper.HygieneCheckList(paramMap);
 	}

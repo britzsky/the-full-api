@@ -1582,6 +1582,11 @@ public class AccountService {
 		return accountMapper.CommuteSave(paramMap);
 	}
 
+	// 출, 퇴근 기록 -> 앱 로그인 사용자(본사/영양사) 확인용 사용자 정보 조회
+	public Map<String, Object> CommuteLoginUserInfo(Map<String, Object> paramMap) {
+		return accountMapper.CommuteLoginUserInfo(paramMap);
+	}
+
 	// 출, 퇴근 기록 -> 대리출근 방지: 오늘 이 기기로 이미 찍힌 다른 사람(user_name+phone_last4) 이력 조회
 	public List<Map<String, Object>> SelectCommuteIdentitiesByDeviceToken(Map<String, Object> paramMap) {
 		return accountMapper.SelectCommuteIdentitiesByDeviceToken(paramMap);

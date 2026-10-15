@@ -4415,21 +4415,22 @@
 		 CONVERT_TZ(NOW(), '+00:00', '+09:00'))
 	</insert>
 
-	<!-- 출, 퇴근 기록 -> 출퇴근 기록 저장: 하루(account_id+user_name+phone_last4+t_date) 1행, 출근/퇴근 호출 시 해당 컬럼만 upsert -->
-	<!-- ✅ user_id는 지금은 저장하지 않음(컬럼만 미리 만들어둠). 식별은 user_name + phone_last4(동명이인 구분용) 기준. -->
+	<!-- 출, 퇴근 기록 -> 출퇴근 기록 저장: 하루(account_id+user_name+phone_last4+user_id+t_date) 1행, 출근/퇴근 호출 시 해당 컬럼만 upsert -->
+	<!-- user_id: 로그인 사용자(본사/영양사)는 계정 아이디로 동명이인 구분, 조리사/조리원은 빈 값(phone_last4로 구분) -->
 	<insert id="CommuteSave" parameterType="map">
 		INSERT INTO tb_commute_record
-		(user_name, account_id, phone_last4, t_date, start_time, end_time,
+		(user_id, user_name, account_id, phone_last4, t_date, start_time, end_time,
 		 st_x_coordinate, st_y_coordinate, st_error_margin,
 		 ed_x_coordinate, ed_y_coordinate, ed_error_margin,
 		 device_token, reg_dt)
 		VALUES
-		(#{user_name}, #{account_id}, #{phone_last4}, #{t_date}, #{start_time}, #{end_time},
+		(#{user_id}, #{user_name}, #{account_id}, #{phone_last4}, #{t_date}, #{start_time}, #{end_time},
 		 #{st_x_coordinate}, #{st_y_coordinate}, #{st_error_margin},
 		 #{ed_x_coordinate}, #{ed_y_coordinate}, #{ed_error_margin},
 		 #{device_token}, CONVERT_TZ(NOW(), '+00:00', '+09:00'))
 		ON DUPLICATE KEY UPDATE
 		<trim suffixOverrides=",">
+			<if test="user_id != null and user_id != ''">user_id = #{user_id},</if>
 			<if test="start_time != null">start_time = #{start_time},</if>
 			<if test="st_x_coordinate != null">st_x_coordinate = #{st_x_coordinate},</if>
 			<if test="st_y_coordinate != null">st_y_coordinate = #{st_y_coordinate},</if>
@@ -4443,7 +4444,22 @@
 		</trim>
 	</insert>
 
-	<!-- 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 (account_id + user_name + phone_last4 기준) -->
+	<!-- 출, 퇴근 기록 -> 앱 로그인 사용자(본사/영양사) 확인 (삭제·미승인 계정 제외) -->
+	<select id="CommuteLoginUserInfo" parameterType="map" resultType="hashmap">
+		SELECT
+			user_id,
+			user_name,
+			CAST(user_type AS CHAR) AS user_type,
+			IFNULL(account_id, '') AS account_id
+		FROM tb_user
+		WHERE user_id = #{user_id}
+			AND del_yn = 'N'
+			AND use_yn = 'Y'
+		LIMIT 1
+	</select>
+
+	<!-- 출, 퇴근 기록 -> 오늘자 출퇴근 진행상태 (account_id + user_name + phone_last4 기준, 로그인 사용자는 user_id까지)
+		 기준일 t_date는 컨트롤러에서 정함 (앱이 보낸 폰 날짜, 없으면 서버 한국 날짜) -->
 	<select id="CommuteTodayStatus" parameterType="map" resultType="hashmap">
 		SELECT
 			DATE_FORMAT(t_date, '%Y-%m-%d') AS t_date,
@@ -4453,7 +4469,10 @@
 		WHERE account_id = #{account_id}
 			AND user_name = #{user_name}
 			AND phone_last4 = #{phone_last4}
-			AND t_date = DATE(CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+			<if test="user_id != null and user_id != ''">
+				AND user_id = #{user_id}
+			</if>
+			AND t_date = #{t_date}
 	</select>
 
 	<!-- 출, 퇴근 기록 -> 출퇴근 기록 목록 조회 -->

@@ -536,7 +536,7 @@ public class OperateController {
     /*
      * part : 운영
      * method : HygieneCheckList
-     * comment : 앱 위생점검 -> 거래처 + 점검일 카테고리별 점검 기록 조회 (account_id, check_date)
+     * comment : 앱 위생점검 -> 거래처 카테고리별 점검 기록 누적 조회 (account_id)
      */
     @GetMapping("Operate/HygieneCheckList")
     public String HygieneCheckList(@RequestParam Map<String, Object> paramMap) {
