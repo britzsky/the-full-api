@@ -146,6 +146,7 @@ public class OperateController {
         if (resultMap == null) {
             resultMap = new HashMap<String, Object>();
             resultMap.put("note", "");
+            resultMap.put("note2", "");
         }
         return new Gson().toJson(resultMap);
     }

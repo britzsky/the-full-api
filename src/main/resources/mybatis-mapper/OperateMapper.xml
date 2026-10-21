@@ -267,7 +267,17 @@
 		      AND ats.count_month = #{month}
 		    ORDER BY ats.mod_dt DESC
 		    LIMIT 1
-		), '') AS note
+		), '') AS note,
+		<!-- 현장에서 작성하는 현장 메모 -->
+		IFNULL((
+		    SELECT ats.note2
+		    FROM tb_account_tally_sheet ats
+		    WHERE ats.account_id = #{account_id}
+		      AND ats.count_year = #{year}
+		      AND ats.count_month = #{month}
+		    ORDER BY ats.mod_dt DESC
+		    LIMIT 1
+		), '') AS note2
 	</select>
 	
 	<insert id="TallyNowMonthSave" parameterType="map">
@@ -300,7 +310,12 @@
 
 	<update id="TallySheetNoteSave" parameterType="map">
 		UPDATE tb_account_tally_sheet
-		SET note = #{note}
+		SET
+		<!-- note_type = field 이면 현장 메모, 그 외는 본사 메모 -->
+		<choose>
+			<when test="note_type != null and note_type == 'field'">note2 = #{note}</when>
+			<otherwise>note = #{note}</otherwise>
+		</choose>
 		WHERE account_id = #{account_id}
 		  AND count_year = #{year}
 		  AND count_month = #{month}
@@ -317,6 +332,7 @@
 			day_11, day_12, day_13, day_14, day_15, day_16, day_17, day_18, day_19, day_20,
 			day_21, day_22, day_23, day_24, day_25, day_26, day_27, day_28, day_29, day_30, day_31,
 			note,
+			note2,
 			user_id,
 			mod_dt
 		)
@@ -334,12 +350,18 @@
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-			#{note},
+			<choose>
+				<when test="note_type != null and note_type == 'field'">NULL, #{note},</when>
+				<otherwise>#{note}, NULL,</otherwise>
+			</choose>
 			#{user_id},
 			DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 		)
 		ON DUPLICATE KEY UPDATE
-			note = VALUES(note)
+		<choose>
+			<when test="note_type != null and note_type == 'field'">note2 = VALUES(note2)</when>
+			<otherwise>note = VALUES(note)</otherwise>
+		</choose>
 	</insert>
 	
 	<select id="PropertiesList" parameterType="map" resultType="hashmap">
