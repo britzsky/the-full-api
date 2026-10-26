@@ -22,6 +22,7 @@ public interface BusinessMapper {
 	List<Map<String, Object>> CarFileList(Map<String, Object> paramMap);				// 고객사 관리 -> 법인차량 조회 이미지 조회
 	int CarSave(Map<String, Object> paramMap);											// 고객사 관리 -> 법인차량 저장
 	int CarFileDelete(Map<String, Object> paramMap);									// 고객사 관리 -> 법인차량 이미지 삭제
+	int CarFileLabelSave(Map<String, Object> paramMap);									// 고객사 관리 -> 법인차량 이미지 위치 라벨 수정
 	int CarNewSave(Map<String, Object> paramMap);										// 고객사 관리 -> 법인차량 신규 저장
 	void SaveCarFile(Map<String, Object> param);										// 고객사 관리 -> 법인차량 이미지 저장
 	List<Map<String, Object>> CookWearList(Map<String, Object> paramMap);				// 고객사 관리 -> 조리복 재고 조회

@@ -125,10 +125,12 @@
 			   car_number,
 			   exterior_image,
 		       image_name,
+		       image_label,
 		       DATE_FORMAT(service_dt, '%Y-%m-%d') as service_dt
 		FROM tb_thefull_car_image_management
 		WHERE car_number = #{car_number}
 		AND service_dt = DATE_FORMAT(#{service_dt}, '%Y-%m-%d')
+		ORDER BY image_id
 	</select>
 	
 	<select id="CarSelectList" parameterType="map" resultType="map">
@@ -172,14 +174,22 @@
 	
 	<insert id="SaveCarFile" parameterType="map">
 	    INSERT INTO tb_thefull_car_image_management 
-	    (car_number, service_dt, exterior_image, image_name)
+	    (car_number, service_dt, exterior_image, image_name, image_label)
 	    VALUES (
 	    	#{car_number},
 	        DATE_FORMAT(#{service_dt}, '%Y-%m-%d'),
 	        #{exterior_image},
-	        #{image_name}
+	        #{image_name},
+	        #{image_label}
 	    )
 	</insert>
+	<!-- 등록된 차량 상태 사진의 위치 라벨(앞범퍼, 운전석 문 등)을 수정 -->
+	<update id="CarFileLabelSave" parameterType="map">
+		UPDATE tb_thefull_car_image_management
+		SET image_label = #{image_label}
+		WHERE image_id = #{image_id}
+		AND car_number = #{car_number}
+	</update>
 	
 	<select id="CookWearList" parameterType="map" resultType="map">
 		SELECT type,

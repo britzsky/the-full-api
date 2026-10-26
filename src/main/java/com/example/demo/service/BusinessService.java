@@ -99,6 +99,10 @@ public class BusinessService {
 	public void SaveCarFile(Map<String, Object> param) {
 	    businessMapper.SaveCarFile(param);
 	}
+	// 고객사 관리 -> 법인차량 이미지 위치 라벨 수정
+	public int CarFileLabelSave (Map<String, Object> paramMap) {
+		return businessMapper.CarFileLabelSave(paramMap);
+	}
 	// 고객사 관리 -> 법인차량 신규 저장
 	public int CarNewSave (Map<String, Object> paramMap) {
 		int iResult = 0;

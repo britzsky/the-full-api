@@ -343,7 +343,34 @@ public class BusinessController {
     	return obj.toString();
     }
     
-    /* 
+    /*
+	 * part		: 영업
+     * method 	: CarFileLabelSave
+     * comment 	: 고객사 관리 -> 법인차량 이미지 위치 라벨 수정 (image_id, car_number, image_label 목록)
+     */
+    @PostMapping("Business/CarFileLabelSave")
+    private String CarFileLabelSave(@RequestBody List<Map<String, Object>> paramList) {
+
+    	int iResult = 0;
+
+    	for (Map<String, Object> paramMap : paramList) {
+            iResult += businessService.CarFileLabelSave(paramMap);
+        }
+
+    	JsonObject obj = new JsonObject();
+
+    	if(iResult > 0) {
+			obj.addProperty("code", 200);
+			obj.addProperty("message", "성공");
+    	} else {
+    		obj.addProperty("code", 400);
+			obj.addProperty("message", "실패");
+    	}
+
+    	return obj.toString();
+    }
+
+    /*
 	 * part		: 영업
      * method 	: CarFileDelete
      * comment 	: 고객사 관리 -> 법인차량 이미지 삭제
@@ -406,18 +433,23 @@ public class BusinessController {
 	private String CarFilesUpload(
 	        @RequestParam("car_number") String car_number,
 	        @RequestParam("service_dt") String service_dt,
-	        @RequestParam("files") MultipartFile[] files
+	        @RequestParam("files") MultipartFile[] files,
+	        @RequestParam(value = "labels", required = false) String labels
 	) throws IOException {
 
 	    JsonObject obj = new JsonObject();
 
 	    try {
 
+	        // 파일 순서와 같은 순서의 위치 라벨 목록 (JSON 문자열 배열, 없으면 라벨 없이 저장)
+	        String[] labelArr = (labels == null || labels.isEmpty()) ? new String[0] : new Gson().fromJson(labels, String[].class);
+
 	        List<Map<String, Object>> insertedFiles = new ArrayList<>();
 	        // ------------------------------
 	        // 2) 업로드 파일 저장 처리
 	        // ------------------------------
-	        for (MultipartFile file : files) {
+	        for (int i = 0; i < files.length; i++) {
+	            MultipartFile file = files[i];
 
 	            String originalFileName = file.getOriginalFilename();
 	            String imagePath = fileStorageService.upload(file, "car", service_dt, car_number);
@@ -430,6 +462,7 @@ public class BusinessController {
 	            param.put("service_dt", service_dt);
 	            param.put("exterior_image", imagePath);
 	            param.put("image_name", originalFileName);
+	            param.put("image_label", i < labelArr.length ? labelArr[i] : null);
 
 	            businessService.SaveCarFile(param);
 

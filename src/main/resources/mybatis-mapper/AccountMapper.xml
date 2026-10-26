@@ -4478,6 +4478,7 @@
 	<!-- 출, 퇴근 기록 -> 출퇴근 기록 목록 조회 -->
 	<select id="CommuteRecordList" parameterType="map" resultType="hashmap">
 		SELECT
+			r.user_id,
 			r.user_name,
 			r.phone_last4,
 			r.account_id,
@@ -4512,21 +4513,25 @@
 
 	<!-- 출, 퇴근 기록 -> 출근부 인원의 휴대폰 뒷자리 4자리 조회
 	     출퇴근 기록(이름+휴대폰 뒷자리+업장)과 출근부 인원을 매칭하기 위한 용도.
-	     nor: 직원(tb_account_members) member_id 기준 / dis: 해당 연월 파출인원(tb_account_members_dispatch) 업장+member_id 기준 -->
+	     nor: 직원(tb_account_members) member_id 기준 / dis: 해당 연월 파출인원(tb_account_members_dispatch) 업장+member_id 기준
+	     user_id: 직원에 연결된 ERP 계정 아이디 (ERP 로그인으로 찍은 출퇴근 기록과 매칭) -->
 	<select id="CommuteMemberPhoneList" parameterType="map" resultType="hashmap">
 		SELECT
 			'nor' AS gubun,
 			'' AS account_id,
 			member_id,
-			RIGHT(REPLACE(REPLACE(phone, '-', ''), ' ', ''), 4) AS phone_last4
+			RIGHT(REPLACE(REPLACE(IFNULL(phone, ''), '-', ''), ' ', ''), 4) AS phone_last4,
+			IFNULL(user_id, '') AS user_id
 		FROM tb_account_members
 		WHERE IFNULL(phone, '') != ''
+			OR IFNULL(user_id, '') != ''
 		UNION ALL
 		SELECT
 			'dis' AS gubun,
 			account_id,
 			member_id,
-			RIGHT(REPLACE(REPLACE(phone, '-', ''), ' ', ''), 4) AS phone_last4
+			RIGHT(REPLACE(REPLACE(phone, '-', ''), ' ', ''), 4) AS phone_last4,
+			'' AS user_id
 		FROM tb_account_members_dispatch
 		WHERE record_year = #{year}
 			AND record_month = #{month}

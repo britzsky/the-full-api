@@ -1910,6 +1910,8 @@
 					  				  AND pam.account_id = drafter.account_id
 					  			)
 					  		)
+					  		<!-- 회계팀(department=2) 현장 구매요청서(FP/FR) 전체 조회 -->
+					  		OR (UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') AND lu.department = 2)
 					  		OR (
 					  			#{user_id} = 'iy1'
 					  			AND EXISTS (
@@ -2061,6 +2063,8 @@
 			  		  				  AND pam.account_id = drafter.account_id
 			  		  			)
 			  		  		)
+			  		  		<!-- 회계팀(department=2) 현장 구매요청서(FP/FR) 전체 조회 -->
+			  		  		OR (UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') AND lu.department = 2)
 			  		  		OR (
 		  			  			#{user_id} = 'iy1'
 		  			  			AND EXISTS (
@@ -2242,6 +2246,8 @@
 			  		  			  AND pam.account_id = drafter.account_id
 			  		  		)
 			  		  	)
+			  		  	<!-- 회계팀(department=2) 현장 구매요청서(FP/FR) 전체 조회 -->
+			  		  	OR (UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') AND lu.department = 2)
 			  		  	OR (
 		  			  		#{user_id} = 'iy1'
 		  			  		AND EXISTS (
@@ -2816,6 +2822,8 @@
 			  		  			  AND pam.account_id = drafter.account_id
 			  		  		)
 			  		  	)
+			  		  	<!-- 회계팀(department=2) 현장 구매요청서(FP/FR) 전체 조회 -->
+			  		  	OR (UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR') AND lu.department = 2)
 			  		  	OR (
 		  			  		#{user_id} = 'iy1'
 		  			  		AND EXISTS (
