@@ -1526,16 +1526,17 @@
 		       kitchen_drawing,
 		       nutritionist_room_img,
 		       chef_lounge_img,
-		       meal_service_contract
+		       meal_service_contract,
+		       daycare_meal_service_contract
 		FROM tb_account_info
 		WHERE account_id = #{account_id}
 	</select>
 	
 	<insert id="insertOrUpdateFile" parameterType="map">
 	    INSERT INTO tb_account_info
-	        (account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img, meal_service_contract)
+	        (account_id, business_report, business_regist, kitchen_drawing, chef_lounge_img, nutritionist_room_img, meal_service_contract, daycare_meal_service_contract)
 	    VALUES
-	        (#{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img}, #{meal_service_contract})
+	        (#{account_id}, #{business_report}, #{business_regist}, #{kitchen_drawing}, #{chef_lounge_img}, #{nutritionist_room_img}, #{meal_service_contract}, #{daycare_meal_service_contract})
 	    ON DUPLICATE KEY UPDATE
 	    <trim prefix="" suffix="" suffixOverrides=",">
 	        <if test='business_report != null'>
@@ -1555,6 +1556,9 @@
 	        </if>
 	        <if test='meal_service_contract != null'>
 	            meal_service_contract = #{meal_service_contract},
+	        </if>
+	        <if test='daycare_meal_service_contract != null'>
+	            daycare_meal_service_contract = #{daycare_meal_service_contract},
 	        </if>
 	    </trim>
 	</insert>

@@ -525,7 +525,7 @@ public class BusinessController {
     
     /* 
 	 * part		: 영업
-     * method 	: CarSave
+     * method 	: CookWearSave
      * comment 	: 고객사 관리 -> 조리복 재고 저장
      */
     @SuppressWarnings("unchecked")

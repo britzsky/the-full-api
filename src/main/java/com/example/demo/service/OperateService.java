@@ -154,6 +154,16 @@ public class OperateService {
 		return iResult;
 	}
 
+	// 현장관리 -> 지점업로드 월별 식단표·식판 사진 조회
+	public List<Map<String, Object>> BranchUploadList(Map<String, Object> paramMap) {
+		return operateMapper.BranchUploadList(paramMap);
+	}
+
+	// 현장관리 -> 지점업로드 식단표/식판 사진 경로 저장
+	public int BranchUploadSave(Map<String, Object> paramMap) {
+		return operateMapper.BranchUploadSave(paramMap);
+	}
+
 	// 앱 위생점검 -> 거래처별 카테고리 설정 조회
 	public List<Map<String, Object>> HygieneCategoryList(Map<String, Object> paramMap) {
 		return operateMapper.HygieneCategoryList(paramMap);

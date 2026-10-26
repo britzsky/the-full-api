@@ -1083,7 +1083,8 @@ public class AccountController {
 			@RequestParam(value = "kitchen_drawing", required = false) MultipartFile kitchenDrawing,
 			@RequestParam(value = "nutritionist_room_img", required = false) MultipartFile nutritionistRoomImg,
 			@RequestParam(value = "chef_lounge_img", required = false) MultipartFile chefLoungeImg,
-			@RequestParam(value = "meal_service_contract", required = false) MultipartFile meal_service_contract)
+			@RequestParam(value = "meal_service_contract", required = false) MultipartFile meal_service_contract,
+			@RequestParam(value = "daycare_meal_service_contract", required = false) MultipartFile daycareMealServiceContract)
 			throws IOException {
 		Map<String, Object> filePathMap = new HashMap<>();
 
@@ -1115,6 +1116,12 @@ public class AccountController {
 		if (meal_service_contract != null && !meal_service_contract.isEmpty()) {
 			String path = saveFile(accountId, "meal_service_contract", meal_service_contract);
 			filePathMap.put("meal_service_contract", path);
+		}
+
+		// 주간보호 함께 운영 거래처의 주간보호 위탁급식계약서
+		if (daycareMealServiceContract != null && !daycareMealServiceContract.isEmpty()) {
+			String path = saveFile(accountId, "daycare_meal_service_contract", daycareMealServiceContract);
+			filePathMap.put("daycare_meal_service_contract", path);
 		}
 
 		filePathMap.put("account_id", accountId);

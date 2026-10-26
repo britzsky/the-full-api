@@ -500,6 +500,49 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : BranchUploadList
+     * comment : 현장관리 -> 지점업로드 월별 식단표·식판 사진 조회 (account_id 없으면 전체 거래처)
+     */
+    @GetMapping("Operate/BranchUploadList")
+    public String BranchUploadList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.BranchUploadList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : BranchUploadSave
+     * comment : 현장관리 -> 지점업로드 거래처·급식일자·구분별 식단표/식판 사진 경로 저장 (같은 건이 있으면 보낸 파일만 교체)
+     */
+    @PostMapping("Operate/BranchUploadSave")
+    public String BranchUploadSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        // 거래처·급식일자·구분은 한 건을 구분하는 필수값
+        String accountId = String.valueOf(paramMap.getOrDefault("account_id", "")).trim();
+        String mealDate = String.valueOf(paramMap.getOrDefault("meal_date", "")).trim();
+        String mealType = String.valueOf(paramMap.getOrDefault("meal_type", "")).trim();
+        if (accountId.isEmpty() || mealDate.isEmpty() || !List.of("조식", "중식", "석식", "간식").contains(mealType)) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "거래처, 급식일자, 구분을 확인해 주세요.");
+            return obj.toString();
+        }
+
+        int iResult = operateService.BranchUploadSave(paramMap);
+
+        if (iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "실패");
+        }
+
+        return obj.toString();
+    }
+
+    /*
+     * part : 운영
      * method : HygieneCategoryList
      * comment : 앱 위생점검 -> 거래처별 카테고리 설정 조회 (account_id)
      */
