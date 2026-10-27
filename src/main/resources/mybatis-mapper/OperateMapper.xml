@@ -4373,8 +4373,18 @@
 		LEFT OUTER JOIN tb_account A
 		ON A.account_id = B.account_id
 		WHERE B.del_yn = 'N'
-		AND B.meal_date <![CDATA[ >= ]]> STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d')
-		AND B.meal_date <![CDATA[ < ]]> DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d'), INTERVAL 1 MONTH)
+		<choose>
+			<!-- 기간 조회: 월 경계에 걸친 주차(월~토)까지 포함하는 시작일~종료일 -->
+			<when test="start_date != null and start_date != '' and end_date != null and end_date != ''">
+				AND B.meal_date <![CDATA[ >= ]]> #{start_date}
+				AND B.meal_date <![CDATA[ <= ]]> #{end_date}
+			</when>
+			<!-- 월 조회: 선택 연월 1일 ~ 말일 -->
+			<otherwise>
+				AND B.meal_date <![CDATA[ >= ]]> STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d')
+				AND B.meal_date <![CDATA[ < ]]> DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d'), INTERVAL 1 MONTH)
+			</otherwise>
+		</choose>
 		<if test="account_id != null and account_id != ''">
 			AND B.account_id = #{account_id}
 		</if>
@@ -4417,9 +4427,21 @@
 				plate_file_name = #{plate_file_name},
 				plate_reg_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
 			</if>
+			<!-- 삭제 요청: 해당 자료 경로·파일명·등록일시 비우기 -->
+			<if test="menu_delete == 'Y'.toString()">
+				menu_file_path = NULL,
+				menu_file_name = NULL,
+				menu_reg_dt = NULL,
+			</if>
+			<if test="plate_delete == 'Y'.toString()">
+				plate_file_path = NULL,
+				plate_file_name = NULL,
+				plate_reg_dt = NULL,
+			</if>
 			mod_user_id = #{user_id},
 			mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00'),
-			del_yn = 'N',
+			<!-- 식단표·식판 사진이 모두 비면 삭제 처리 (위에서 바뀐 값 기준) -->
+			del_yn = IF(menu_file_path IS NULL AND plate_file_path IS NULL, 'Y', 'N'),
 		</trim>
 	</insert>
 
