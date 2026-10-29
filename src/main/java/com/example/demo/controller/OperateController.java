@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -174,6 +176,21 @@ public class OperateController {
         List<Map<String, Object>> nowList = (List<Map<String, Object>>) payload.get("nowList");
         List<Map<String, Object>> beforeList = (List<Map<String, Object>>) payload.get("beforeList");
 
+        // 현장 화면 저장 요청이면 서버 시각(KST) 기준으로 본월·전월 마감 여부를 다시 확인
+        if (payload.get("close_check_year") != null && payload.get("close_check_month") != null) {
+            YearMonth nowYm = YearMonth.of(
+                    Integer.parseInt(String.valueOf(payload.get("close_check_year")).trim()),
+                    Integer.parseInt(String.valueOf(payload.get("close_check_month")).trim()));
+
+            if ((!nowList.isEmpty() && isTallyMonthClosed(nowYm))
+                    || (!beforeList.isEmpty() && isTallyMonthClosed(nowYm.minusMonths(1)))) {
+                JsonObject closed = new JsonObject();
+                closed.addProperty("code", 403);
+                closed.addProperty("message", "말일 밤 11시(23:00) 이후에는 해당 월 집계표를 저장할 수 없습니다.");
+                return closed.toString();
+            }
+        }
+
         // 본월 집계표 저장
         if (!nowList.isEmpty()) {
             for (Map<String, Object> paramMap : nowList) {
@@ -203,6 +220,12 @@ public class OperateController {
         }
 
         return obj.toString();
+    }
+
+    // 해당 연월 말일 23:00(KST)이 지났는지 확인하는 함수 (현장 집계표 입력 마감 기준)
+    private boolean isTallyMonthClosed(YearMonth ym) {
+        LocalDateTime closeAt = ym.atEndOfMonth().atTime(23, 0);
+        return !LocalDateTime.now(ZoneId.of("Asia/Seoul")).isBefore(closeAt);
     }
 
     /*
