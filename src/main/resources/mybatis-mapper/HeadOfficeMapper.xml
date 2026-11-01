@@ -2414,6 +2414,7 @@
 	<select id="ElectronicPaymentFrTallyMain" parameterType="map" resultType="hashmap">
 		SELECT UPPER(CAST(ep.doc_type AS CHAR)) AS doc_type,
 			   CAST(ep.status AS CHAR) AS status,
+			   CAST(ep.tm_sign AS CHAR) AS tm_sign,
 			   ep.reg_user_id,
 			   drafter.account_id,
 			   drafter.user_name,
@@ -2442,7 +2443,23 @@
 		FOR UPDATE
 	</select>
 
-	<!-- 개인구매(FR) 품목에 구매일자·영수증·매입집계 sale_id를 저장 (이미 반영된 품목은 제외) -->
+	<!-- 개인구매(FR) 2차 결재 시 매입집계에 반영할 문서 품목 전체 조회 -->
+	<select id="ElectronicPaymentFrReceiptItemList" parameterType="map" resultType="hashmap">
+		SELECT idx,
+			   item_name,
+			   qty,
+			   price,
+			   use_name,
+			   sale_id,
+			   DATE_FORMAT(saleDate, '%Y-%m-%d') AS saleDate,
+			   receipt_image
+		FROM tb_headoffice_purchase_request
+		WHERE payment_id = #{payment_id}
+		ORDER BY idx ASC
+		FOR UPDATE
+	</select>
+
+	<!-- 개인구매(FR) 품목에 구매일자·영수증·매입집계 sale_id를 저장 (이미 후첨된 품목은 제외) -->
 	<update id="ElectronicPaymentFrReceiptItemSave" parameterType="map">
 		UPDATE tb_headoffice_purchase_request
 		SET saleDate = DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),

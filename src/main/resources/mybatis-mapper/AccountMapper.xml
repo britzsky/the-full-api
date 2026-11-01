@@ -2221,6 +2221,35 @@
 		SELECT account_id FROM tb_account WHERE welstory_soldto = #{soldTo} LIMIT 1
 	</select>
 
+	<!-- 아워홈 API 연동: busiplcd(아워홈 사업장코드)로 거래처 조회 -->
+	<select id="AccountIdByOurhomeBusiplcd" parameterType="string" resultType="string">
+		SELECT account_id FROM tb_account WHERE ourhome_busiplcd = #{busiplcd} LIMIT 1
+	</select>
+
+	<!-- 같은 거래처·입고일에 API가 아닌 경로(현장 수기 입력 등)로 저장된 아워홈(1042) 매입 건수 -->
+	<select id="OurhomeManualPurchaseCount" parameterType="map" resultType="int">
+		SELECT COUNT(*)
+		  FROM tb_account_purchase_tally
+		 WHERE account_id = #{account_id}
+		   AND type = 1042
+		   AND saleDate = #{saleDate}
+		   AND sale_id != #{sale_id}
+	</select>
+
+	<!-- 매입집계 상세를 sale_id 단위로 전체 삭제 (아워홈 하루치 상세를 최신 주문 기준으로 다시 넣기 전) -->
+	<delete id="PurchaseTallyDetailDeleteBySaleId" parameterType="map">
+		DELETE FROM tb_account_purchase_tally_detail
+		 WHERE sale_id = #{sale_id}
+	</delete>
+
+	<!-- 공급사(웰스토리·아워홈) API 호출 전문 저장: 요청 전문(tokenInfo+params)과 결과코드·건수, 실패 시 응답 원문 -->
+	<insert id="SupplierApiLogSave" parameterType="map">
+		INSERT INTO tb_supplier_api_log
+			(type, api_type, account_id, request_json, response_json, row_count, success_yn, reg_dt)
+		VALUES
+			(#{type}, #{api_type}, #{account_id}, #{request_json}, #{response_json}, #{row_count}, #{success_yn}, CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+	</insert>
+
 	<insert id="AccountPurchaseSave" parameterType="map">
 		INSERT INTO tb_account_purchase_tally
 	    <trim prefix="(" suffix=")" suffixOverrides=",">

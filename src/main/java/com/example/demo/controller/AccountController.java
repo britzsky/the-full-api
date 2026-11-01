@@ -3517,6 +3517,57 @@ public class AccountController {
 		return obj.toString();
 	}
 
+	// 아워홈 주문 입고내역 수동 동기화(백필용).
+	// date 없이 호출하면 당일/전일/전전일, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
+	// 스케줄러와 같은 로직(AccountService.OurhomePurchaseSync)이라 재실행해도 sale_id 기준으로 갱신만 된다.
+	@PostMapping("/Account/OurhomePurchaseSyncManual")
+	public String OurhomePurchaseSyncManual(@RequestParam(required = false) String date) {
+		int saveCount = (date == null || date.isBlank())
+				? accountService.OurhomePurchaseSync()
+				: accountService.OurhomePurchaseSync(date);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		obj.addProperty("saveCount", saveCount);
+		return obj.toString();
+	}
+
+	// 웰스토리 판가 전문 수동 수집(테스트·재수집용).
+	// year(순기년도 YYYY) + period(순기 2자리)의 전체 판가를 사업장마다 조회해 tb_supplier_api_log에 저장한다.
+	// soldTo(웰스토리 사업장코드)를 넘기면 그 사업장만 조회한다.
+	@PostMapping("/Account/WelstoryPriceSyncManual")
+	public String WelstoryPriceSyncManual(@RequestParam String year, @RequestParam String period,
+			@RequestParam(required = false) String soldTo) {
+		Map<String, Object> result = accountService.WelstoryPriceSync(year, period, soldTo);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		obj.addProperty("success", (Integer) result.get("success"));
+		obj.addProperty("empty", (Integer) result.get("empty"));
+		obj.addProperty("failed", (Integer) result.get("failed"));
+		obj.addProperty("failedSites", (String) result.get("failedSites"));
+		return obj.toString();
+	}
+
+	// 아워홈 판가 전문 수동 수집(테스트·재수집용).
+	// date(납품일, YYYYMMDD)가 발주 가능일인 아워홈 사업장마다 판가 전체를 조회해 tb_supplier_api_log에 저장한다.
+	// siteCode(아워홈 사업장코드)를 넘기면 그 사업장만 조회한다.
+	@PostMapping("/Account/OurhomePriceSyncManual")
+	public String OurhomePriceSyncManual(@RequestParam String date, @RequestParam(required = false) String siteCode) {
+		Map<String, Object> result = accountService.OurhomePriceSync(date, siteCode);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		obj.addProperty("success", (Integer) result.get("success"));
+		obj.addProperty("skipped", (Integer) result.get("skipped"));
+		obj.addProperty("failed", (Integer) result.get("failed"));
+		obj.addProperty("failedSites", (String) result.get("failedSites"));
+		return obj.toString();
+	}
+
 	/*
 	 * part    : 현장
 	 * method  : PurchaseRequestUserInfo

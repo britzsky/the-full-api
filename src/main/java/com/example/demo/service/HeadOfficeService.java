@@ -15,7 +15,7 @@ import com.example.demo.mapper.OperateMapper;
 @Service
 public class HeadOfficeService {
 
-	// 개인구매(FR) 최종결재 시 매입집계에 반영할 수 없어 결재를 취소할 때 던지는 예외 (매핑 없음/반영 오류)
+	// 개인구매(FR) 후첨 또는 2차 결재를 진행할 수 없을 때 안내 문구를 전달하는 예외 (매핑 없음/영수증 미첨부/반영 오류)
 	public static class PersonPurchaseTallyException extends RuntimeException {
 		public PersonPurchaseTallyException(String message) {
 			super(message);
@@ -274,8 +274,8 @@ public class HeadOfficeService {
 	}
 
 	// 본사 -> 전자결재 관리 -> 결재/반려 저장 (팀장→결재자→대표 순으로 시도)
-	// - 개인구매(FR) 2차 결재 시 기안자 거래처에 개인구매(1008) 연결이 없으면 결재를 롤백하고 본사 연결을 안내한다.
-	//   (실제 매입집계 반영은 결재 후 구매일자·영수증 후첨 저장 시 PersonPurchaseReceiptSave에서 처리)
+	// - 개인구매(FR) 2차 결재 시 후첨된 품목을 개인구매 매입집계·집계표에 반영한다.
+	// - 거래처에 개인구매(1008) 연결이 없거나 영수증이 빠진 품목이 있으면 결재를 롤백하고 안내한다.
 	@Transactional(rollbackFor = Exception.class)
 	public int ElectronicPaymentManageSignSave(Map<String, Object> paramMap) {
 		int iResult = headOfficeMapper.ElectronicPaymentManageTmSignSave(paramMap);
@@ -289,16 +289,23 @@ public class HeadOfficeService {
 		iResult = headOfficeMapper.ElectronicPaymentManagePayerSignSave(paramMap);
 		if (iResult > 0 && "4".equals(String.valueOf(paramMap.get("action_status")))) {
 			Map<String, Object> main = headOfficeMapper.ElectronicPaymentFrTallyMain(paramMap);
-			if (main != null && "FR".equals(String.valueOf(main.get("doc_type"))))
+			if (main != null && "FR".equals(String.valueOf(main.get("doc_type")))) {
 				checkPersonPurchaseMapping(main);
+				List<Map<String, Object>> items = headOfficeMapper.ElectronicPaymentFrReceiptItemList(paramMap);
+				for (Map<String, Object> item : items) {
+					if (item.get("sale_id") == null || String.valueOf(item.get("sale_id")).trim().isEmpty())
+						throw new PersonPurchaseTallyException(
+							"구매일자와 영수증이 첨부되지 않은 품목이 있습니다. 기안자가 후첨한 뒤 결재해 주세요.");
+				}
+				reflectPersonPurchaseTally(main, items);
+			}
 		}
 		return iResult;
 	}
 
-	// 현장 -> 구매요청 -> 최종 승인된 개인구매(FR) 문서의 품목들에 구매일자·영수증을 일괄 후첨하고 개인구매 매입집계에 반영한다.
-	// - 품목마다 매입집계 master 1행 저장 → 품목에 saleDate/receipt_image/sale_id 저장(이후 수정 불가)
-	// - 저장한 구매일자별로 집계표·손익표·예산을 한 번씩 재합산
-	// - 결제수단·부가세·과세구분은 비워 두고 회계팀이 개인구매 관리에서 입력
+	// 현장 -> 구매요청 -> 1차 결재가 끝난 개인구매(FR) 문서의 품목들에 구매일자·영수증을 일괄 후첨한다.
+	// - 품목에 saleDate/receipt_image/sale_id 저장(이후 수정 불가), 매입집계 반영은 2차 결재 시 처리
+	// - 이미 최종 결재된 문서는 2차 결재 시점이 지났으므로 후첨 즉시 매입집계에 반영
 	// - 한 품목이라도 실패하면 전체 롤백 (일부만 저장되지 않음)
 	@Transactional(rollbackFor = Exception.class)
 	public void PersonPurchaseReceiptSaveAll(Map<String, Object> paramMap, List<Map<String, Object>> rows) {
@@ -307,14 +314,14 @@ public class HeadOfficeService {
 			throw new PersonPurchaseTallyException("개인구매 문서를 찾을 수 없습니다.");
 		if (!String.valueOf(paramMap.get("user_id")).equals(String.valueOf(main.get("reg_user_id"))))
 			throw new PersonPurchaseTallyException("본인이 상신한 문서만 영수증을 첨부할 수 있습니다.");
-		if (!"4".equals(String.valueOf(main.get("status"))))
-			throw new PersonPurchaseTallyException("최종 결재가 완료된 후에 구매일자와 영수증을 첨부할 수 있습니다.");
+		String status = String.valueOf(main.get("status"));
+		boolean finalApproved = "4".equals(status);
+		if (!finalApproved && (!"4".equals(String.valueOf(main.get("tm_sign"))) || "3".equals(status)))
+			throw new PersonPurchaseTallyException("1차 결재가 완료된 후에 구매일자와 영수증을 첨부할 수 있습니다.");
 		checkPersonPurchaseMapping(main);
 
-		String accountId = String.valueOf(main.get("account_id"));
-		String userId = String.valueOf(paramMap.get("user_id"));
-		// 재합산할 구매일자 → 그 날짜로 저장한 sale_id (같은 날짜는 한 번만 재합산)
-		Map<String, Object> saleIdByDate = new java.util.LinkedHashMap<>();
+		// 이미 최종 결재된 문서에서 즉시 매입집계에 반영할 품목
+		List<Map<String, Object>> reflectItems = new ArrayList<>();
 
 		for (Map<String, Object> row : rows) {
 			Map<String, Object> itemParam = new HashMap<>(row);
@@ -325,15 +332,44 @@ public class HeadOfficeService {
 				throw new PersonPurchaseTallyException("품목을 찾을 수 없습니다. 화면을 새로고침해 주세요.");
 			if (item.get("sale_id") != null && !String.valueOf(item.get("sale_id")).trim().isEmpty())
 				throw new PersonPurchaseTallyException(
-					"'" + item.get("item_name") + "' 품목은 이미 반영되었습니다. 화면을 새로고침해 주세요.");
+					"'" + item.get("item_name") + "' 품목은 이미 저장되었습니다. 화면을 새로고침해 주세요.");
 
 			try {
-				String saleDate = String.valueOf(row.get("saleDate"));
-				LocalDate.parse(saleDate);
+				LocalDate.parse(String.valueOf(row.get("saleDate")));
+
+				if (headOfficeMapper.ElectronicPaymentFrReceiptItemSave(itemParam) == 0)
+					throw new IllegalStateException("품목 후첨 정보 저장 실패: " + row.get("item_idx"));
+			} catch (RuntimeException e) {
+				e.printStackTrace();
+				throw new PersonPurchaseTallyException(
+					"구매일자와 영수증 저장 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+			}
+
+			Map<String, Object> reflectItem = new HashMap<>(item);
+			reflectItem.putAll(row);
+			reflectItems.add(reflectItem);
+		}
+
+		if (finalApproved)
+			reflectPersonPurchaseTally(main, reflectItems);
+	}
+
+	// 후첨이 끝난 개인구매(FR) 품목을 개인구매 매입집계에 반영하고 집계표·손익표·예산을 재합산한다.
+	// - 품목마다 매입집계 master 1행 저장 후 구매일자별로 한 번씩 재합산
+	// - 결제수단·부가세·과세구분은 비워 두고 회계팀이 개인구매 관리에서 입력
+	private void reflectPersonPurchaseTally(Map<String, Object> main, List<Map<String, Object>> items) {
+		String accountId = String.valueOf(main.get("account_id"));
+		String userId = String.valueOf(main.get("reg_user_id"));
+		// 재합산할 구매일자 → 그 날짜로 저장한 sale_id (같은 날짜는 한 번만 재합산)
+		Map<String, Object> saleIdByDate = new java.util.LinkedHashMap<>();
+
+		try {
+			for (Map<String, Object> item : items) {
+				String saleDate = String.valueOf(item.get("saleDate"));
 
 				Map<String, Object> tally = new HashMap<>();
 				tally.put("account_id", accountId);
-				tally.put("sale_id", row.get("sale_id"));
+				tally.put("sale_id", item.get("sale_id"));
 				tally.put("type", 1008);
 				tally.put("saleDate", saleDate);
 				tally.put("total", toLong(item.get("qty")) * toLong(item.get("price")));
@@ -343,7 +379,7 @@ public class HeadOfficeService {
 				tally.put("tax", 0);
 				tally.put("totalCash", 0);
 				tally.put("totalCard", 0);
-				tally.put("receipt_image", row.get("receipt_image"));
+				tally.put("receipt_image", item.get("receipt_image"));
 				tally.put("note", item.get("item_name"));
 				tally.put("use_name", item.get("use_name"));
 				tally.put("user_id", userId);
@@ -351,18 +387,9 @@ public class HeadOfficeService {
 				tally.put("buyer", main.get("user_name"));
 				accountService.AccountPurchaseSave(tally);
 
-				if (headOfficeMapper.ElectronicPaymentFrReceiptItemSave(itemParam) == 0)
-					throw new IllegalStateException("품목 후첨 정보 저장 실패: " + row.get("item_idx"));
-
-				saleIdByDate.put(saleDate, row.get("sale_id"));
-			} catch (RuntimeException e) {
-				e.printStackTrace();
-				throw new PersonPurchaseTallyException(
-					"개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+				saleIdByDate.put(saleDate, item.get("sale_id"));
 			}
-		}
 
-		try {
 			// 구매일자별 거래처·개인구매 타입 하루치 집계표/손익표/예산 재합산
 			for (Map.Entry<String, Object> entry : saleIdByDate.entrySet()) {
 				LocalDate date = LocalDate.parse(entry.getKey());
@@ -379,7 +406,7 @@ public class HeadOfficeService {
 		} catch (RuntimeException e) {
 			e.printStackTrace();
 			throw new PersonPurchaseTallyException(
-				"개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+				"개인구매 관리 반영 중 오류가 발생해 처리가 취소되었습니다. 관리자에게 문의해 주세요.");
 		}
 	}
 

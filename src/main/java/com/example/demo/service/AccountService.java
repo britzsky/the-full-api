@@ -1,10 +1,15 @@
 package com.example.demo.service;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,8 +26,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import com.example.demo.mapper.AccountMapper;
 import com.example.demo.mapper.HeadOfficeMapper;
@@ -47,7 +56,9 @@ public class AccountService {
 	// (당일 저녁 기준으로 아직 늦게 확정되는 전일/전전일분이 있을 수 있어 3일치를 매번 같이 재조회한다)
 
 	// 웰스토리 API 게이트웨이 base url (토큰발급: /oauth/2.0/token, 서비스: /fdapi/service/*)
-	private static final String WELSTORY_BASE_URL = "https://welgw.welstory.com";
+	// 운영은 기본값(welgw.welstory.com), 로컬은 application-secret-local.properties에서 품질서버(scp-stg-welgw)로 덮어쓴다
+	@Value("${welstory.api.base-url:https://welgw.welstory.com}")
+	private String WELSTORY_BASE_URL;
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값(실제 로그인 사용자가 없으므로)
 	private static final String WELSTORY_SYNC_USER_ID = "SYSTEM";
 	// 웰스토리 REST 호출 전용 RestTemplate (프로젝트 내 다른 외부 API 연동도 필드로 각자 생성하는 방식과 동일)
@@ -1736,7 +1747,7 @@ public class AccountService {
 	// detail N행(tb_account_purchase_tally_detail, 그날의 전체 품목 라인)으로 저장한다.
 	private int welstorySyncReceiveDetail(String accessToken, String soldTo, String accountId, String payerNm,
 			String reqDeliveryDate) {
-		List<Map<String, Object>> lines = welstoryReceiveDetail(accessToken, soldTo, reqDeliveryDate);
+		List<Map<String, Object>> lines = welstoryReceiveDetail(accessToken, soldTo, accountId, reqDeliveryDate);
 		if (lines.isEmpty()) {
 			return 0;
 		}
@@ -1943,12 +1954,12 @@ public class AccountService {
 	// [제휴사 사업장 입고내역 조회] API(payer-receive-detail) 호출.
 	// soldTo(사업장) + reqDeliveryDate(입고일, YYYYMMDD) 1건 기준으로 그날 입고된 품목 라인 목록을 반환한다.
 	@SuppressWarnings("unchecked")
-	private List<Map<String, Object>> welstoryReceiveDetail(String accessToken, String soldTo,
+	private List<Map<String, Object>> welstoryReceiveDetail(String accessToken, String soldTo, String accountId,
 			String reqDeliveryDate) {
 		Map<String, Object> dataHeader = new HashMap<>();
 		dataHeader.put("soldTo", soldTo);
 		dataHeader.put("reqDeliveryDate", reqDeliveryDate);
-		Map<String, Object> body = welstoryCallApi("payer-receive-detail", accessToken, dataHeader);
+		Map<String, Object> body = welstoryCallApi("payer-receive-detail", accessToken, dataHeader, accountId);
 
 		Object dataBody = body.get("dataBody");
 		if (!(dataBody instanceof Map))
@@ -1968,21 +1979,646 @@ public class AccountService {
 	// Authorization: Bearer {accessToken} + guid 헤더를 싣고, {"dataHeader":...,
 	// "dataBody":{}} 형태의 JSON body로 POST.
 	// (dataBody는 요청에서는 항상 빈 객체 — 모든 조건값은 dataHeader에 들어간다, 웰스토리 API 공통 스펙)
+	// accountId는 입고내역 조회일 때 전문 로그에 남길 거래처 ID (사업장 조회는 null)
 	private Map<String, Object> welstoryCallApi(String path, String accessToken, Map<String, Object> dataHeader) {
+		return welstoryCallApi(path, accessToken, dataHeader, null);
+	}
+
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> welstoryCallApi(String path, String accessToken, Map<String, Object> dataHeader,
+			String accountId) {
+		String guid = welstoryNextGuid();
 		HttpHeaders headers = new HttpHeaders();
 		headers.setContentType(MediaType.APPLICATION_JSON);
 		headers.setBearerAuth(accessToken);
-		headers.set("guid", welstoryNextGuid());
+		headers.set("guid", guid);
 
 		Map<String, Object> payload = new HashMap<>();
 		payload.put("dataHeader", dataHeader);
 		payload.put("dataBody", new HashMap<>());
 
-		ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(WELSTORY_BASE_URL + "/fdapi/service/" + path,
-				HttpMethod.POST, new HttpEntity<>(payload, headers),
-				new ParameterizedTypeReference<Map<String, Object>>() {
-				});
-		Map<String, Object> res = resp.getBody();
+		Map<String, Object> res = null;
+		String errorBody = null;
+		try {
+			ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(WELSTORY_BASE_URL + "/fdapi/service/" + path,
+					HttpMethod.POST, new HttpEntity<>(payload, headers),
+					new ParameterizedTypeReference<Map<String, Object>>() {
+					});
+			res = resp.getBody();
+		} catch (HttpStatusCodeException e) {
+			errorBody = e.getResponseBodyAsString(StandardCharsets.UTF_8);
+			throw e;
+		} finally {
+			welstoryPurchaseApiLog(path, guid, payload, res, errorBody, accountId);
+		}
 		return res != null ? res : Map.of();
+	}
+
+	// 입고 동기화(사업장 조회·입고내역 조회) 호출 전문을 tb_supplier_api_log(type=1)에 저장하는 메서드.
+	// 요청 전문은 guid를 앞에 붙여 항상 저장하고, 응답 전문은 사업장 조회와 실패 응답만 저장한다.
+	// 기록 저장이 실패해도 입고 동기화는 계속 진행되도록 예외를 삼킨다.
+	@SuppressWarnings("unchecked")
+	private void welstoryPurchaseApiLog(String path, String guid, Map<String, Object> payload,
+			Map<String, Object> res, String errorBody, String accountId) {
+		try {
+			String apiType = "payer-rep-soldto".equals(path) ? "SITE" : "ORDER_LIST";
+			Object dataBody = res == null ? null : res.get("dataBody");
+			Map<String, Object> resBody = dataBody instanceof Map ? (Map<String, Object>) dataBody : Map.of();
+			boolean success = "S0000".equals(resBody.get("resCd"));
+			Object data = resBody.get("data");
+
+			Map<String, Object> requestLog = new LinkedHashMap<>();
+			requestLog.put("guid", guid);
+			requestLog.put("dataHeader", payload.get("dataHeader"));
+			requestLog.put("dataBody", payload.get("dataBody"));
+
+			Map<String, Object> logRow = new HashMap<>();
+			logRow.put("type", WELSTORY_TYPE);
+			logRow.put("api_type", apiType);
+			logRow.put("account_id", accountId);
+			logRow.put("request_json", supplierJson.writerWithDefaultPrettyPrinter().writeValueAsString(requestLog));
+			logRow.put("response_json", success && !"SITE".equals(apiType) ? null
+					: (res != null ? supplierJson.writeValueAsString(res) : errorBody));
+			logRow.put("row_count", data instanceof List ? ((List<?>) data).size() : null);
+			logRow.put("success_yn", success ? "Y" : "N");
+			accountMapper.SupplierApiLogSave(logRow);
+		} catch (Exception e) {
+			log.warn("[WelstorySync] 전문 로그 저장 실패: {} {}", path, e.toString());
+		}
+	}
+
+	// ===================== 웰스토리 사업장·판가 전문 기록 =====================
+	//
+	// 전체 흐름 요약
+	// WelstoryPriceSync(순기년도, 순기, soldTo)
+	// -> 제휴사(client1, client2)마다 토큰 발급 -> 사업장 조회(payer-rep-soldto)
+	// -> 사업장(soldTo)마다 해당 순기 전체 판가 조회(payer-allitem-price, 100건씩 페이지)
+	// -> 호출마다 요청 전문(guid+dataHeader+dataBody)과 성공여부·건수를 tb_supplier_api_log(type=1)에 저장 (welstoryLoggedCall)
+	//    응답 원문은 저장하지 않고 실패 응답만 남긴다. 토큰은 Authorization 헤더로만 보내므로 전문에 남지 않는다.
+
+	// tb_account_mapping.type 웰스토리 구분값
+	private static final int WELSTORY_TYPE = 1;
+
+	// 웰스토리 판가 전문 수집 진입점.
+	// year(순기년도 YYYY) + period(순기 2자리)의 전체 판가를 사업장마다 조회해 전문을 저장한다.
+	// soldTo를 넘기면 그 사업장만 조회한다(테스트·재수집용).
+	public Map<String, Object> WelstoryPriceSync(String year, String period, String soldTo) {
+		int success = 0, empty = 0, failed = 0;
+		List<String> failedSites = new ArrayList<>();
+		List<String[]> clients = List.of(new String[] { welstoryClient1Id, welstoryClient1Secret },
+				new String[] { welstoryClient2Id, welstoryClient2Secret });
+		for (String[] client : clients) {
+			if (client[0] == null || client[0].isBlank() || client[1] == null || client[1].isBlank())
+				continue;
+			try {
+				String accessToken = welstoryIssueToken(client[0], client[1]);
+				Map<String, Object> siteHeader = new LinkedHashMap<>();
+				siteHeader.put("pageRow", 100);
+				siteHeader.put("contYn", "N");
+				siteHeader.put("nextKey", "");
+				JsonNode sites = welstoryLoggedCall("SITE", "payer-rep-soldto", accessToken, siteHeader,
+						new LinkedHashMap<>(), null);
+				if (!"S0000".equals(sites.path("dataBody").path("resCd").asText()))
+					throw new IllegalStateException("웰스토리 사업장 조회 실패");
+
+				// 판가는 대표 soldTo(repSoldtoYn=Y)로만 조회되고, 같은 단가코드(pricingCode) 사업장은 대표 판가를 같이 쓴다.
+				// soldTo를 지정했으면 그 사업장의 단가코드를 찾아 해당 대표 soldTo만 조회한다.
+				String targetPricingCode = null;
+				if (soldTo != null && !soldTo.isBlank()) {
+					for (JsonNode site : sites.path("dataBody").path("data"))
+						if (soldTo.equals(site.path("soldTo").asText()))
+							targetPricingCode = site.path("pricingCode").asText("");
+					if (targetPricingCode == null)
+						continue;
+				}
+				for (JsonNode site : sites.path("dataBody").path("data")) {
+					String code = site.path("soldTo").asText("");
+					if (code.isBlank() || !"Y".equals(site.path("repSoldtoYn").asText()))
+						continue;
+					if (targetPricingCode != null && !targetPricingCode.equals(site.path("pricingCode").asText()))
+						continue;
+					try {
+						if (welstoryPriceOneSite(accessToken, code, year, period) > 0)
+							success++;
+						else
+							empty++;
+					} catch (Exception e) {
+						// 사업장 1곳 실패가 나머지 사업장 수집을 막지 않도록 여기서 끊는다 (전문은 welstoryLoggedCall에서 이미 저장됨)
+						failed++;
+						failedSites.add(code);
+						log.error("[WelstoryPriceSync] 판가 수집 실패 soldTo={} {}-{} : {}", code, year, period,
+								e.getMessage());
+					}
+				}
+			} catch (Exception e) {
+				// 제휴사 1곳이 실패해도(토큰 오류 등) 다른 제휴사 처리는 계속한다
+				log.error("[WelstoryPriceSync] client 처리 실패: {} : {}", client[0], e.getMessage());
+			}
+		}
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("success", success);
+		result.put("empty", empty);
+		result.put("failed", failed);
+		result.put("failedSites", String.join(",", failedSites));
+		return result;
+	}
+
+	// 사업장(soldTo) 1곳의 순기 전체 판가를 페이지 끝까지 조회하고, 받은 품목 수를 반환한다.
+	// 첫 요청이 '조회 데이터 없음'(E1103)이면 contYn=N으로 한 번 더 묻고(order-api와 동일), 그래도 없으면 0건.
+	private int welstoryPriceOneSite(String accessToken, String soldTo, String year, String period) {
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("soldTo", soldTo);
+		body.put("periodGroupYear", year);
+		body.put("periodGroup", period);
+		String contYn = "Y", nextKey = "";
+		boolean retried = false;
+		int rows = 0;
+		for (int page = 0; page < 1000; page++) {
+			Map<String, Object> header = new LinkedHashMap<>();
+			header.put("pageRow", 100);
+			header.put("contYn", contYn);
+			header.put("nextKey", nextKey);
+			JsonNode res = welstoryLoggedCall("PRICE", "payer-allitem-price", accessToken, header, body, soldTo);
+			String code = res.path("dataBody").path("resCd").asText("");
+			if (!"S0000".equals(code)) {
+				boolean noData = "E1103".equals(code) || "EE120".equals(code);
+				if (noData && nextKey.isBlank() && !retried) {
+					contYn = "N";
+					retried = true;
+					continue;
+				}
+				if (noData && nextKey.isBlank())
+					return rows;
+				throw new IllegalStateException("웰스토리 판가 조회 오류 resCd=" + code);
+			}
+			rows += res.path("dataBody").path("data").size();
+			contYn = res.path("dataHeader").path("contYn").asText("N");
+			nextKey = res.path("dataHeader").path("nextKey").asText("");
+			if (!"Y".equals(contYn) || nextKey.isBlank())
+				return rows;
+		}
+		throw new IllegalStateException("웰스토리 판가 페이지 수 초과");
+	}
+
+	// 웰스토리 fdapi/service/* 호출 + 전문 기록.
+	// 결과코드와 관계없이 tb_supplier_api_log에 저장하고 응답 JSON을 그대로 돌려준다(성공 판정은 호출자가 resCd로 한다).
+	// 판가는 순기 단위라 deposit_dt에는 응답의 순기 시작일(periodFromDt)을 넣는다.
+	private JsonNode welstoryLoggedCall(String apiType, String path, String accessToken, Map<String, Object> dataHeader,
+			Map<String, Object> dataBody, String soldTo) {
+		String guid = welstoryNextGuid();
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("dataHeader", dataHeader);
+		payload.put("dataBody", dataBody);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+		headers.setBearerAuth(accessToken);
+		headers.set("guid", guid);
+
+		Integer httpStatus = null;
+		String raw = null;
+		String errorMsg = null;
+		long started = System.currentTimeMillis();
+		try {
+			ResponseEntity<byte[]> resp = restTemplate.exchange(WELSTORY_BASE_URL + "/fdapi/service/" + path,
+					HttpMethod.POST, new HttpEntity<>(payload, headers), byte[].class);
+			httpStatus = resp.getStatusCode().value();
+			raw = resp.getBody() == null ? null : new String(resp.getBody(), StandardCharsets.UTF_8);
+		} catch (HttpStatusCodeException e) {
+			httpStatus = e.getStatusCode().value();
+			raw = new String(e.getResponseBodyAsByteArray(), StandardCharsets.UTF_8);
+		} catch (Exception e) {
+			errorMsg = "응답 수신 실패: " + e.getClass().getSimpleName();
+		}
+		long elapsed = System.currentTimeMillis() - started;
+		if (raw != null)
+			raw = raw.replace(accessToken, "***");
+
+		JsonNode res = supplierJson.createObjectNode();
+		try {
+			if (raw != null)
+				res = supplierJson.readTree(raw);
+		} catch (Exception e) {
+			errorMsg = "응답 JSON 형식 아님";
+		}
+		JsonNode resBody = res.path("dataBody");
+		String resCd = resBody.path("resCd").isMissingNode() ? null : resBody.path("resCd").asText();
+		String resMsg = errorMsg != null ? errorMsg : resBody.path("resMsg").asText(null);
+		boolean success = httpStatus != null && httpStatus == 200 && "S0000".equals(resCd);
+		JsonNode data = resBody.path("data");
+		String periodFrom = data.path(0).path("periodFromDt").asText("");
+
+		Map<String, Object> logRow = new HashMap<>();
+		logRow.put("type", WELSTORY_TYPE);
+		logRow.put("api_type", apiType);
+		logRow.put("api_path", "/fdapi/service/" + path);
+		logRow.put("account_id", null);
+		logRow.put("site_code", soldTo);
+		logRow.put("deposit_dt", periodFrom.matches("\\d{8}") ? periodFrom : null);
+		logRow.put("guid", guid);
+		// 웰스토리 guid는 HTTP 헤더로 보내므로 저장용 요청 전문 맨 앞에 붙인다 (실제 전송 본문은 dataHeader·dataBody만)
+		Map<String, Object> requestLog = new LinkedHashMap<>();
+		requestLog.put("guid", guid);
+		requestLog.putAll(payload);
+		try {
+			logRow.put("request_json", supplierJson.writerWithDefaultPrettyPrinter().writeValueAsString(requestLog));
+		} catch (Exception e) {
+			logRow.put("request_json", String.valueOf(requestLog));
+		}
+		// 응답 원문은 사업장 조회(soldTo·대표·단가코드 연결 정보, 수 KB)와 실패 응답만 저장한다
+		logRow.put("response_json", success && !"SITE".equals(apiType) ? null : raw);
+		logRow.put("row_count", data.isArray() ? data.size() : null);
+		logRow.put("http_status", httpStatus);
+		logRow.put("rtn_cd", resCd);
+		logRow.put("rtn_msg", resMsg != null && resMsg.length() > 500 ? resMsg.substring(0, 500) : resMsg);
+		logRow.put("success_yn", success ? "Y" : "N");
+		logRow.put("elapsed_ms", elapsed);
+		accountMapper.SupplierApiLogSave(logRow);
+
+		if (httpStatus == null || raw == null)
+			throw new IllegalStateException("웰스토리 " + apiType + " " + resMsg);
+		return res;
+	}
+
+	// ===================== 아워홈 TOS API 연동 =====================
+	//
+	// 전체 흐름 요약
+	// OurhomePriceSync(납품일, 사업장코드)
+	// -> 사업장 조회(getBusiInfo): 더채움 본부 소속 아워홈 사업장 전체 + 사업장별 발주 가능일
+	// -> 납품일이 발주 가능일인 사업장마다 판가 전체 조회(getGoodList)
+	// -> 호출마다 요청 전문(tokenInfo+params, 토큰은 가림)과 성공여부·건수를 tb_supplier_api_log에 저장 (ourhomeCall)
+	//    응답 원문(판가는 사업장 1곳 약 10MB)은 저장하지 않고, 실패 응답만 원인 확인용으로 남긴다.
+
+	// tb_account_mapping.type 아워홈 구분값
+	private static final int OURHOME_TYPE = 1042;
+	// 판가 한 번에 받는 최대 건수(아워홈 스펙상 최대 10000)
+	private static final int OURHOME_PAGE_ROW = 10000;
+	// 공급사(웰스토리·아워홈) 응답 파싱·요청 전문 직렬화용
+	private final ObjectMapper supplierJson = new ObjectMapper();
+	// guid(yyyyMMddHHmmssSSS + 2자리 seq) 뒤 2자리 채번용 카운터
+	private final AtomicInteger ourhomeGuidSeq = new AtomicInteger(0);
+
+	// 아워홈 API 주소·본부 정보 (application.properties)
+	@Value("${ourhome.api.base-url:}")
+	private String ourhomeBaseUrl;
+	@Value("${ourhome.api.tax-no:}")
+	private String ourhomeTaxNo;
+	@Value("${ourhome.api.head-group-code:}")
+	private String ourhomeHeadGroupCode;
+	// 아워홈 인증값 (application-secret*.properties)
+	@Value("${ourhome.api.service-id:}")
+	private String ourhomeServiceId;
+	@Value("${ourhome.api.client-token:}")
+	private String ourhomeClientToken;
+	@Value("${ourhome.api.encrypt-seed:}")
+	private String ourhomeEncryptSeed;
+
+	// 아워홈 판가 전문 수집 진입점.
+	// depositDt(납품일, YYYYMMDD)가 발주 가능일인 사업장마다 판가 전체를 조회해 전문을 저장한다.
+	// siteCode를 넘기면 그 사업장만 조회한다(테스트·재수집용).
+	public Map<String, Object> OurhomePriceSync(String depositDt, String siteCode) {
+		Map<String, Object> siteParams = new LinkedHashMap<>();
+		siteParams.put("taxNo", ourhomeTaxNo);
+		siteParams.put("headGrpCd", ourhomeHeadGroupCode);
+		siteParams.put("busiplcd", "");
+		JsonNode sites = ourhomeCall("SITE", "/api/chaeum/v3/getBusiInfo", siteParams, null, null);
+
+		int success = 0, skipped = 0, failed = 0;
+		List<String> failedSites = new ArrayList<>();
+		for (JsonNode site : sites.path("result").path("data")) {
+			String code = site.path("busiplCd").asText("");
+			if (siteCode != null && !siteCode.isBlank() && !siteCode.equals(code))
+				continue;
+			// 발주 가능일이 아닌 납품일은 아워홈이 판가를 주지 않으므로 호출하지 않는다
+			if (!Arrays.asList(site.path("depositDt").asText("").split(",")).contains(depositDt)) {
+				skipped++;
+				continue;
+			}
+			try {
+				ourhomePriceOneSite(code, site.path("headGrpCd").asText(ourhomeHeadGroupCode), depositDt);
+				success++;
+			} catch (Exception e) {
+				// 사업장 1곳 실패가 나머지 사업장 수집을 막지 않도록 여기서 끊는다 (전문은 ourhomeCall에서 이미 저장됨)
+				failed++;
+				failedSites.add(code);
+				log.error("[OurhomePriceSync] 판가 수집 실패 site={} date={} : {}", code, depositDt, e.getMessage());
+			}
+		}
+
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("success", success);
+		result.put("skipped", skipped);
+		result.put("failed", failed);
+		result.put("failedSites", String.join(",", failedSites));
+		return result;
+	}
+
+	// 사업장 1곳의 판가 전체를 조회한다. 건수가 10000을 넘으면 nextKey로 다음 페이지를 이어서 받는다.
+	private void ourhomePriceOneSite(String siteCode, String headGroupCode, String depositDt) {
+		String nextKey = "";
+		for (int page = 0; page < 100; page++) {
+			Map<String, Object> params = new LinkedHashMap<>();
+			params.put("headGrpCd", headGroupCode);
+			params.put("busiplcd", siteCode);
+			params.put("depositDt", depositDt);
+			params.put("keyWord", "");
+			params.put("searchType", "A");
+			params.put("onePageRow", OURHOME_PAGE_ROW);
+			params.put("nextYn", nextKey.isEmpty() ? "N" : "Y");
+			params.put("nextKey", nextKey);
+			params.put("estYear", "");
+			params.put("estIndex", "");
+			params.put("queryType", "A");
+			JsonNode result = ourhomeCall("PRICE", "/api/chaeum/v2/getGoodList", params, siteCode, depositDt)
+					.path("result");
+			if (!"Y".equals(result.path("nextYn").asText()))
+				return;
+			String key = result.path("nextKey").asText("");
+			if (key.isBlank() || key.equals(nextKey))
+				throw new IllegalStateException("아워홈 판가 다음 페이지 키 이상");
+			nextKey = key;
+		}
+		throw new IllegalStateException("아워홈 판가 페이지 수 초과");
+	}
+
+	// ===================== 아워홈 입고내역 -> 매입집계 저장 =====================
+	//
+	// 전체 흐름 요약 (웰스토리 WelstoryPurchaseSync와 같은 구조)
+	// OurhomeSyncScheduler(매일 20시 10분 KST)
+	// -> OurhomePurchaseSync() 당일/전일/전전일 3일치
+	// -> 사업장 조회 후 tb_account.ourhome_busiplcd로 매핑된 거래처만 주문 입고내역(getOrderList) 조회
+	// -> 거래처·하루 1 master(tb_account_purchase_tally, type=1042) + 품목 N detail로 저장
+	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
+	//
+	// 같은 거래처·같은 날에 현장에서 직접 입력한 아워홈(1042) 매입이 있으면 금액이 두 번 잡히므로
+	// API 데이터는 저장하지 않고 경고 로그만 남긴다(수기 데이터는 건드리지 않음).
+
+	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값
+	private static final String OURHOME_SYNC_USER_ID = "SYSTEM";
+
+	// 진입점. 오늘/어제/그제(KST) 3일치를 각각 동기화하고 저장된 master 건수 합계를 반환한다.
+	public int OurhomePurchaseSync() {
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		int total = 0;
+		for (int daysBack = 0; daysBack <= 2; daysBack++)
+			total += OurhomePurchaseSync(today.minusDays(daysBack).format(DateTimeFormatter.BASIC_ISO_DATE));
+		return total;
+	}
+
+	// 특정 입고일(YYYYMMDD) 동기화. 수동 재수집(백필)에도 그대로 쓴다.
+	public int OurhomePurchaseSync(String yyyyMMdd) {
+		Map<String, Object> siteParams = new LinkedHashMap<>();
+		siteParams.put("taxNo", ourhomeTaxNo);
+		siteParams.put("headGrpCd", ourhomeHeadGroupCode);
+		siteParams.put("busiplcd", "");
+		JsonNode sites = ourhomeCall("SITE", "/api/chaeum/v3/getBusiInfo", siteParams, null, null);
+
+		int saved = 0;
+		for (JsonNode site : sites.path("result").path("data")) {
+			String siteCode = site.path("busiplCd").asText("");
+			String accountId = siteCode.isBlank() ? null : accountMapper.AccountIdByOurhomeBusiplcd(siteCode);
+			if (accountId == null || accountId.isBlank())
+				continue;
+			try {
+				saved += ourhomeSyncReceiveDetail(site, accountId, yyyyMMdd);
+			} catch (Exception e) {
+				// 사업장 1곳 실패(연결 끊김 등)가 나머지를 막지 않도록 끊는다. 다음 날 "전일"로 다시 조회된다.
+				log.error("[OurhomePurchaseSync] 입고내역 동기화 실패 site={} account={} date={} : {}", siteCode, accountId,
+						yyyyMMdd, e.getMessage());
+			}
+			try {
+				// 연달아 새 연결을 몰아서 맺으면 아워홈이 연결을 끊은 적이 있어 사업장 사이에 간격을 둔다
+				Thread.sleep(300);
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				break;
+			}
+		}
+		return saved;
+	}
+
+	// 사업장 1곳의 입고일 주문 입고내역을 조회해 매입집계 master 1행 + detail N행으로 저장한다.
+	private int ourhomeSyncReceiveDetail(JsonNode site, String accountId, String yyyyMMdd) {
+		String siteCode = site.path("busiplCd").asText();
+		Map<String, Object> params = new LinkedHashMap<>();
+		params.put("headGrpCd", site.path("headGrpCd").asText(ourhomeHeadGroupCode));
+		params.put("busiplcd", siteCode);
+		params.put("depositDt", yyyyMMdd);
+		params.put("goodcd", "");
+		JsonNode result = ourhomeCall("ORDER_LIST", "/api/chaeum/v1/getOrderList", params, siteCode, yyyyMMdd,
+				accountId).path("result");
+
+		// 삭제된 주문 품목은 제외
+		List<JsonNode> lines = new ArrayList<>();
+		for (JsonNode line : result.path("data"))
+			if (!"Y".equals(line.path("delYn").asText()))
+				lines.add(line);
+
+		// sale_id = 거래처ID_입고일_OH (웰스토리 거래처ID_입고일과 겹치지 않게 접미사로 구분, 재실행 시 같은 행 갱신)
+		String saleId = accountId + "_" + yyyyMMdd + "_OH";
+		String saleDate = welstoryToIsoDate(yyyyMMdd);
+
+		Map<String, Object> dup = new HashMap<>();
+		dup.put("account_id", accountId);
+		dup.put("saleDate", saleDate);
+		dup.put("sale_id", saleId);
+		if (accountMapper.OurhomeManualPurchaseCount(dup) > 0) {
+			log.warn("[OurhomePurchaseSync] 현장 수기 입력 아워홈 매입이 있어 API 저장 건너뜀 account={} date={}", accountId,
+					saleDate);
+			return 0;
+		}
+		if (lines.isEmpty())
+			return 0;
+
+		// ---- master(하루 단위) 합계: 아워홈이 품목별로 준 과세공급가·부가세·면세공급가를 그대로 합산 ----
+		// total = 총매출액(부가세 포함) 합, tax = 과세공급가 합, vat = 부가세 합, taxFree = 면세공급가 합
+		long total = 0, vat = 0, tax = 0, taxFree = 0;
+		for (JsonNode line : lines) {
+			total += line.path("salsAmt").asLong();
+			vat += line.path("txtnTxamt").asLong();
+			tax += line.path("txnSplamt").asLong();
+			taxFree += line.path("dfSplamt").asLong();
+		}
+
+		Map<String, Object> master = new HashMap<>();
+		master.put("account_id", accountId);
+		master.put("sale_id", saleId);
+		master.put("type", "1042"); // tb_account_mapping.type 아워홈
+		master.put("saleDate", saleDate);
+		master.put("total", total);
+		master.put("discount", 0);
+		master.put("vat", vat);
+		master.put("taxFree", taxFree);
+		master.put("tax", tax);
+		master.put("use_name", "아워홈");
+		master.put("buyer", site.path("headGrpNm").asText("")); // 본부사업장명: (주)더채움
+		master.put("note", "아워홈 API 연동 (busiplcd=" + siteCode + ")");
+		master.put("user_id", OURHOME_SYNC_USER_ID);
+
+		// ---- detail: 품목 한 줄씩. 금액 계산 방식은 웰스토리와 동일하게 qty=1, unitPrice=amount ----
+		List<Map<String, Object>> details = new ArrayList<>();
+		for (JsonNode line : lines) {
+			long amount = line.path("salsAmt").asLong();
+			long lineVat = line.path("txtnTxamt").asLong();
+			long lineTax = line.path("txnSplamt").asLong();
+			boolean taxable = lineTax > 0 || lineVat > 0;
+			// 아워홈 대분류 '생활용품류'(세제·장갑 등)는 소모품, 나머지는 식재료
+			boolean isCons = "생활용품류".equals(line.path("goodnmClass2").asText());
+			String ordKey = line.path("ordKeyVal").asText();
+
+			Map<String, Object> detail = new HashMap<>();
+			// item_id: 아워홈 주문키+순번으로 만든 하루 내 고유 정수(재실행해도 같은 값)
+			detail.put("item_id", Math.floorMod(
+					(ordKey + "|" + line.path("ordSeq").asText() + "|" + line.path("foSeq").asText()).hashCode(),
+					1_000_000_000));
+			detail.put("sale_id", saleId);
+			detail.put("name", line.path("goodnm").asText("").strip());
+			detail.put("qty", "1");
+			detail.put("amount", amount);
+			detail.put("unitPrice", amount);
+			detail.put("vat", lineVat);
+			detail.put("tax", lineTax); // 과세공급가(면세면 0)
+			detail.put("taxType", taxable ? "1" : "2"); // 1=과세, 2=면세
+			detail.put("itemType", isCons ? "2" : "1"); // 1=식재료, 2=소모품
+			// 규격 + 실제 입고수량/단가 + 아워홈 주문키 (note 컬럼 100자 제한)
+			String note = line.path("goodsz").asText("") + " [수량:" + line.path("clhaqty").asText() + " 단가:"
+					+ line.path("salsUcost").asText() + "] (" + ordKey + ")";
+			detail.put("note", note.length() > 100 ? note.substring(0, 100) : note);
+			detail.put("user_id", OURHOME_SYNC_USER_ID);
+			details.add(detail);
+		}
+
+		LocalDate saleLocalDate = LocalDate.parse(saleDate);
+		master.put("year", saleLocalDate.getYear());
+		master.put("month", saleLocalDate.getMonthValue());
+		// self(프록시 경유)로 호출해야 @Transactional이 걸려 상세 교체~집계표 반영이 한 번에 롤백된다
+		self.OurhomePurchaseSaveOneDay(master, details);
+		return 1;
+	}
+
+	// 아워홈 하루치 매입 저장: master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
+	@Transactional(rollbackFor = Exception.class)
+	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details) {
+		AccountPurchaseSave(master);
+		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
+		for (Map<String, Object> detail : details)
+			AccountPurchaseDetailSave(detail);
+		TallySheetPaymentSave(master);
+	}
+
+	// 아워홈 API 공통 호출부.
+	// tokenInfo(인증) + params(guid 포함)를 POST하고, 성공·실패와 관계없이 전문을 tb_supplier_api_log에 저장한다.
+	// rtnCd가 0이 아니거나 응답을 못 받으면 예외를 던진다. 정상이면 응답 전체 JSON을 반환한다.
+	private JsonNode ourhomeCall(String apiType, String path, Map<String, Object> params, String siteCode,
+			String depositDt) {
+		return ourhomeCall(apiType, path, params, siteCode, depositDt, null);
+	}
+
+	// accountId: 거래처 단위 호출(입고내역)일 때 로그에 남길 거래처 ID
+	private JsonNode ourhomeCall(String apiType, String path, Map<String, Object> params, String siteCode,
+			String depositDt, String accountId) {
+		if (!ourhomeBaseUrl.startsWith("https://") || ourhomeTaxNo.isBlank() || ourhomeHeadGroupCode.isBlank()
+				|| ourhomeClientToken.isBlank() || !ourhomeServiceId.matches("\\d+") || !ourhomeEncryptSeed.matches("-?\\d+"))
+			throw new IllegalStateException("ourhome.api.* 설정이 비어있음 (application-secret*.properties 확인)");
+
+		// guid·senddttm은 아워홈 기준(KST)으로 만든다 (서버가 UTC여도 validCd 검증이 맞도록)
+		ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Seoul"));
+		String senddttm = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+		String guid = now.format(DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS"))
+				+ String.format("%02d", Math.floorMod(ourhomeGuidSeq.getAndIncrement(), 100));
+		Map<String, Object> requestParams = new LinkedHashMap<>(params);
+		requestParams.put("guid", guid);
+
+		Map<String, Object> tokenInfo = new LinkedHashMap<>();
+		tokenInfo.put("extnSvcId", ourhomeServiceId);
+		tokenInfo.put("senddttm", senddttm);
+		tokenInfo.put("clientToken", ourhomeClientToken);
+		tokenInfo.put("validCd", ourhomeValidCode(senddttm));
+		Map<String, Object> payload = new LinkedHashMap<>();
+		payload.put("tokenInfo", tokenInfo);
+		payload.put("params", requestParams);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.setContentType(MediaType.APPLICATION_JSON);
+
+		Integer httpStatus = null;
+		String raw = null;
+		String errorMsg = null;
+		long started = System.currentTimeMillis();
+		try {
+			ResponseEntity<byte[]> resp = restTemplate.exchange(ourhomeBaseUrl + path, HttpMethod.POST,
+					new HttpEntity<>(payload, headers), byte[].class);
+			httpStatus = resp.getStatusCode().value();
+			raw = resp.getBody() == null ? null : new String(resp.getBody(), StandardCharsets.UTF_8);
+		} catch (HttpStatusCodeException e) {
+			// 아워홈은 업무 오류(rtnCd<0)를 4xx 본문으로 돌려주므로 본문을 그대로 받아 사유를 남긴다
+			httpStatus = e.getStatusCode().value();
+			raw = new String(e.getResponseBodyAsByteArray(), StandardCharsets.UTF_8);
+		} catch (Exception e) {
+			errorMsg = "응답 수신 실패: " + e.getClass().getSimpleName();
+		}
+		long elapsed = System.currentTimeMillis() - started;
+		// 오류 응답이 tokenInfo를 echo할 수 있어 저장 전에 클라이언트 토큰을 가린다
+		if (raw != null)
+			raw = raw.replace(ourhomeClientToken, "***");
+
+		JsonNode res = null;
+		try {
+			res = raw == null ? null : supplierJson.readTree(raw);
+		} catch (Exception e) {
+			errorMsg = "응답 JSON 형식 아님";
+		}
+		String rtnCd = res == null || res.path("rtnCd").isMissingNode() ? null : res.path("rtnCd").asText();
+		String rtnMsg = errorMsg != null ? errorMsg : res == null ? null : res.path("rtnMsg").asText(null);
+		boolean success = httpStatus != null && httpStatus == 200 && "0".equals(rtnCd);
+		JsonNode data = res == null ? null : res.path("result").path("data");
+
+		// 저장용 요청 전문: 실제 보낸 tokenInfo + params 구조 그대로, 클라이언트 토큰만 가린다
+		Map<String, Object> tokenLog = new LinkedHashMap<>(tokenInfo);
+		tokenLog.put("clientToken", "***");
+		Map<String, Object> requestLog = new LinkedHashMap<>();
+		requestLog.put("tokenInfo", tokenLog);
+		requestLog.put("params", requestParams);
+
+		Map<String, Object> logRow = new HashMap<>();
+		logRow.put("type", OURHOME_TYPE);
+		logRow.put("api_type", apiType);
+		logRow.put("api_path", path);
+		logRow.put("account_id", accountId);
+		logRow.put("site_code", siteCode);
+		logRow.put("deposit_dt", depositDt);
+		logRow.put("guid", guid);
+		try {
+			logRow.put("request_json", supplierJson.writerWithDefaultPrettyPrinter().writeValueAsString(requestLog));
+		} catch (Exception e) {
+			logRow.put("request_json", String.valueOf(requestLog));
+		}
+		// 응답 원문은 저장하지 않고 결과코드·건수만 남긴다. 실패 응답은 원인 확인용으로 원문을 남긴다(작음)
+		// 응답 원문은 사업장 조회(soldTo·대표·단가코드 연결 정보, 수 KB)와 실패 응답만 저장한다
+		logRow.put("response_json", success && !"SITE".equals(apiType) ? null : raw);
+		logRow.put("row_count", data != null && data.isArray() ? data.size() : null);
+		logRow.put("http_status", httpStatus);
+		logRow.put("rtn_cd", rtnCd);
+		logRow.put("rtn_msg", rtnMsg != null && rtnMsg.length() > 500 ? rtnMsg.substring(0, 500) : rtnMsg);
+		logRow.put("success_yn", success ? "Y" : "N");
+		logRow.put("elapsed_ms", elapsed);
+		accountMapper.SupplierApiLogSave(logRow);
+
+		if (!success)
+			throw new IllegalStateException("아워홈 " + apiType + " 실패 http=" + httpStatus + " rtnCd=" + rtnCd
+					+ " msg=" + rtnMsg);
+		return res;
+	}
+
+	// 아워홈 검증코드(validCd).
+	// ((100-년앞2) + (100-년뒤2) + (100-월) + (100-일)) * (초뒤1||분뒤1||시뒤1) + 외부서비스ID + 암호화시드
+	String ourhomeValidCode(String senddttm) {
+		long sum = (100 - Integer.parseInt(senddttm.substring(0, 2)))
+				+ (100 - Integer.parseInt(senddttm.substring(2, 4)))
+				+ (100 - Integer.parseInt(senddttm.substring(4, 6)))
+				+ (100 - Integer.parseInt(senddttm.substring(6, 8)));
+		long factor = Long.parseLong("" + senddttm.charAt(13) + senddttm.charAt(11) + senddttm.charAt(9));
+		return String.valueOf(sum * factor + Long.parseLong(ourhomeServiceId) + Long.parseLong(ourhomeEncryptSeed));
 	}
 }

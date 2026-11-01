@@ -545,7 +545,7 @@ public class OperateController {
         String accountId = String.valueOf(paramMap.getOrDefault("account_id", "")).trim();
         String mealDate = String.valueOf(paramMap.getOrDefault("meal_date", "")).trim();
         String mealType = String.valueOf(paramMap.getOrDefault("meal_type", "")).trim();
-        if (accountId.isEmpty() || mealDate.isEmpty() || !List.of("일일", "조식", "중식", "석식", "간식").contains(mealType)) {
+        if (accountId.isEmpty() || mealDate.isEmpty() || !"일일".equals(mealType)) {
             obj.addProperty("code", 400);
             obj.addProperty("message", "거래처, 급식일자, 구분을 확인해 주세요.");
             return obj.toString();

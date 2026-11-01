@@ -4373,6 +4373,7 @@
 		LEFT OUTER JOIN tb_account A
 		ON A.account_id = B.account_id
 		WHERE B.del_yn = 'N'
+		  AND B.meal_type = '일일'
 		<choose>
 			<!-- 기간 조회: 월 경계에 걸친 주차(월~토)까지 포함하는 시작일~종료일 -->
 			<when test="start_date != null and start_date != '' and end_date != null and end_date != ''">

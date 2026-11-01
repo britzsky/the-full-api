@@ -75,6 +75,10 @@ public interface AccountMapper {
 	int AccountOverTimeLedgerSave(Map<String, Object> paramMap);										// 출근부 -> 초과관리 저장
 	List<Map<String, Object>> AccountMappingList(String account_id); 									// 현장 -> 집계표 -> 영수증 매장 확인 조회
 	String AccountIdByWelstorySoldTo(String soldTo);													// 회계 -> 웰스토리 account_id 조회
+	String AccountIdByOurhomeBusiplcd(String busiplcd);												// 아워홈 사업장코드로 account_id 조회
+	int OurhomeManualPurchaseCount(Map<String, Object> paramMap);										// 같은 거래처·날짜 수기 입력 아워홈 매입 건수
+	int PurchaseTallyDetailDeleteBySaleId(Map<String, Object> paramMap);								// 매입집계 상세 sale_id 단위 전체 삭제(아워홈 하루치 교체용)
+	int SupplierApiLogSave(Map<String, Object> paramMap);												// 공급사 API 호출 전문 로그 저장(요청 전문·결과코드)
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
 	void AccountPurchaseTallyDelete(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 삭제

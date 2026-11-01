@@ -686,7 +686,7 @@ public class HeadOfficeController {
 		try {
 			iResult = headOfficeService.ElectronicPaymentManageSignSave(payload);
 		} catch (HeadOfficeService.PersonPurchaseTallyException e) {
-			// 개인구매(FR) 최종결재 시 거래처에 개인구매 매핑이 없으면 결재를 취소하고 안내 문구를 내려준다.
+			// 개인구매(FR) 2차 결재를 진행할 수 없으면(매핑 없음/영수증 미첨부/반영 오류) 결재를 취소하고 안내 문구를 내려준다.
 			obj.addProperty("code", 409);
 			obj.addProperty("message", e.getMessage());
 			return obj.toString();
@@ -706,7 +706,7 @@ public class HeadOfficeController {
 	/*
 	 * part		: 현장
      * method 	: PersonPurchaseReceiptSave
-     * comment 	: 현장 -> 구매요청 -> 요청내역 -> 최종 승인된 개인구매 품목들의 구매일자·영수증 일괄 후첨 저장 및 개인구매 관리 반영
+     * comment 	: 현장 -> 구매요청 -> 요청내역 -> 1차 결재가 끝난 개인구매 품목들의 구매일자·영수증 일괄 후첨 저장
      *            (item_idx / saleDate / files 는 같은 순서의 배열, 하나라도 실패하면 전체 취소)
      */
 	@PostMapping("FieldBoard/PersonPurchaseReceiptSave")
@@ -777,7 +777,7 @@ public class HeadOfficeController {
 			e.printStackTrace();
 			deleteUploadedReceipts(uploadedPaths);
 			obj.addProperty("code", 500);
-			obj.addProperty("message", "개인구매 관리 반영 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
+			obj.addProperty("message", "구매일자와 영수증 저장 중 오류가 발생해 저장이 취소되었습니다. 관리자에게 문의해 주세요.");
 			return obj.toString();
 		}
 
