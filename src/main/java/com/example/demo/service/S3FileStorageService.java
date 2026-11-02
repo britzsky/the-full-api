@@ -327,10 +327,17 @@ public class S3FileStorageService {
         return filename.isEmpty() ? "file" : filename;
     }
 
+    // 인코딩된 파일 경로를 원래 경로로 복원한다.
+    // 파일명의 +는 공백으로 바꾸지 않고, 더 풀 수 없는 %가 남으면 그 시점의 값을 그대로 쓴다.
     private String decodeRepeatedly(String value) {
         String decoded = value;
         for (int i = 0; i < 3; i++) {
-            String next = URLDecoder.decode(decoded, StandardCharsets.UTF_8);
+            String next;
+            try {
+                next = URLDecoder.decode(decoded.replace("+", "%2B"), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                break;
+            }
             if (next.equals(decoded)) break;
             decoded = next;
         }

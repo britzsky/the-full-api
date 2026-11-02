@@ -2226,6 +2226,13 @@
 		SELECT account_id FROM tb_account WHERE ourhome_busiplcd = #{busiplcd} LIMIT 1
 	</select>
 
+	<!-- 아워홈 API 연동: 아워홈 사업장코드가 매핑된 거래처 목록 (입고내역 동기화 대상) -->
+	<select id="OurhomeMappedAccountList" resultType="map">
+		SELECT account_id, ourhome_busiplcd
+		  FROM tb_account
+		 WHERE IFNULL(ourhome_busiplcd, '') != ''
+	</select>
+
 	<!-- 같은 거래처·입고일에 API가 아닌 경로(현장 수기 입력 등)로 저장된 아워홈(1042) 매입 건수 -->
 	<select id="OurhomeManualPurchaseCount" parameterType="map" resultType="int">
 		SELECT COUNT(*)

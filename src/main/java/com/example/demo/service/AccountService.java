@@ -2274,19 +2274,30 @@ public class AccountService {
 	@Value("${ourhome.api.encrypt-seed:}")
 	private String ourhomeEncryptSeed;
 
+	// 사업자번호(ourhome.api.tax-no, 쉼표 구분)마다 사업장 조회(getBusiInfo)를 호출해 사업장 목록을 합친다.
+	// 법인(본사·통합·도소매)과 개인(위탁)이 사업자번호가 달라 각각 조회해야 전체 사업장이 나온다.
+	private List<JsonNode> ourhomeSites() {
+		List<JsonNode> sites = new ArrayList<>();
+		for (String taxNo : ourhomeTaxNo.split(",")) {
+			if (taxNo.isBlank())
+				continue;
+			Map<String, Object> siteParams = new LinkedHashMap<>();
+			siteParams.put("taxNo", taxNo.trim());
+			siteParams.put("headGrpCd", ourhomeHeadGroupCode);
+			siteParams.put("busiplcd", "");
+			ourhomeCall("SITE", "/api/chaeum/v3/getBusiInfo", siteParams, null, null).path("result").path("data")
+					.forEach(sites::add);
+		}
+		return sites;
+	}
+
 	// 아워홈 판가 전문 수집 진입점.
 	// depositDt(납품일, YYYYMMDD)가 발주 가능일인 사업장마다 판가 전체를 조회해 전문을 저장한다.
 	// siteCode를 넘기면 그 사업장만 조회한다(테스트·재수집용).
 	public Map<String, Object> OurhomePriceSync(String depositDt, String siteCode) {
-		Map<String, Object> siteParams = new LinkedHashMap<>();
-		siteParams.put("taxNo", ourhomeTaxNo);
-		siteParams.put("headGrpCd", ourhomeHeadGroupCode);
-		siteParams.put("busiplcd", "");
-		JsonNode sites = ourhomeCall("SITE", "/api/chaeum/v3/getBusiInfo", siteParams, null, null);
-
 		int success = 0, skipped = 0, failed = 0;
 		List<String> failedSites = new ArrayList<>();
-		for (JsonNode site : sites.path("result").path("data")) {
+		for (JsonNode site : ourhomeSites()) {
 			String code = site.path("busiplCd").asText("");
 			if (siteCode != null && !siteCode.isBlank() && !siteCode.equals(code))
 				continue;
@@ -2347,7 +2358,7 @@ public class AccountService {
 	// 전체 흐름 요약 (웰스토리 WelstoryPurchaseSync와 같은 구조)
 	// OurhomeSyncScheduler(매일 20시 10분 KST)
 	// -> OurhomePurchaseSync() 당일/전일/전전일 3일치
-	// -> 사업장 조회 후 tb_account.ourhome_busiplcd로 매핑된 거래처만 주문 입고내역(getOrderList) 조회
+	// -> tb_account.ourhome_busiplcd로 매핑된 거래처만 주문 입고내역(getOrderList) 조회 (사업장 조회 생략)
 	// -> 거래처·하루 1 master(tb_account_purchase_tally, type=1042) + 품목 N detail로 저장
 	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
 	//
@@ -2368,20 +2379,13 @@ public class AccountService {
 
 	// 특정 입고일(YYYYMMDD) 동기화. 수동 재수집(백필)에도 그대로 쓴다.
 	public int OurhomePurchaseSync(String yyyyMMdd) {
-		Map<String, Object> siteParams = new LinkedHashMap<>();
-		siteParams.put("taxNo", ourhomeTaxNo);
-		siteParams.put("headGrpCd", ourhomeHeadGroupCode);
-		siteParams.put("busiplcd", "");
-		JsonNode sites = ourhomeCall("SITE", "/api/chaeum/v3/getBusiInfo", siteParams, null, null);
-
 		int saved = 0;
-		for (JsonNode site : sites.path("result").path("data")) {
-			String siteCode = site.path("busiplCd").asText("");
-			String accountId = siteCode.isBlank() ? null : accountMapper.AccountIdByOurhomeBusiplcd(siteCode);
-			if (accountId == null || accountId.isBlank())
-				continue;
+		// 사업장 조회 없이 tb_account.ourhome_busiplcd에 매핑된 사업장만 바로 입고내역을 조회한다
+		for (Map<String, Object> account : accountMapper.OurhomeMappedAccountList()) {
+			String siteCode = String.valueOf(account.get("ourhome_busiplcd")).trim();
+			String accountId = String.valueOf(account.get("account_id"));
 			try {
-				saved += ourhomeSyncReceiveDetail(site, accountId, yyyyMMdd);
+				saved += ourhomeSyncReceiveDetail(siteCode, accountId, yyyyMMdd);
 			} catch (Exception e) {
 				// 사업장 1곳 실패(연결 끊김 등)가 나머지를 막지 않도록 끊는다. 다음 날 "전일"로 다시 조회된다.
 				log.error("[OurhomePurchaseSync] 입고내역 동기화 실패 site={} account={} date={} : {}", siteCode, accountId,
@@ -2399,10 +2403,9 @@ public class AccountService {
 	}
 
 	// 사업장 1곳의 입고일 주문 입고내역을 조회해 매입집계 master 1행 + detail N행으로 저장한다.
-	private int ourhomeSyncReceiveDetail(JsonNode site, String accountId, String yyyyMMdd) {
-		String siteCode = site.path("busiplCd").asText();
+	private int ourhomeSyncReceiveDetail(String siteCode, String accountId, String yyyyMMdd) {
 		Map<String, Object> params = new LinkedHashMap<>();
-		params.put("headGrpCd", site.path("headGrpCd").asText(ourhomeHeadGroupCode));
+		params.put("headGrpCd", ourhomeHeadGroupCode);
 		params.put("busiplcd", siteCode);
 		params.put("depositDt", yyyyMMdd);
 		params.put("goodcd", "");
@@ -2452,7 +2455,7 @@ public class AccountService {
 		master.put("taxFree", taxFree);
 		master.put("tax", tax);
 		master.put("use_name", "아워홈");
-		master.put("buyer", site.path("headGrpNm").asText("")); // 본부사업장명: (주)더채움
+		master.put("buyer", "(주)더채움"); // 본부사업장명(GA709)
 		master.put("note", "아워홈 API 연동 (busiplcd=" + siteCode + ")");
 		master.put("user_id", OURHOME_SYNC_USER_ID);
 
