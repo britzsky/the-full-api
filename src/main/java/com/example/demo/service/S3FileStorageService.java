@@ -323,7 +323,8 @@ public class S3FileStorageService {
 
     private String sanitizeFilename(String value) {
         String filename = value == null ? "file" : value.replace('\\', '/');
-        filename = filename.substring(filename.lastIndexOf('/') + 1).trim().replace("..", "_");
+        // 연속 점은 점 하나로 줄여 "식단표..xlsx" 같은 파일명도 확장자를 유지
+        filename = filename.substring(filename.lastIndexOf('/') + 1).trim().replaceAll("\\.{2,}", ".");
         return filename.isEmpty() ? "file" : filename;
     }
 
