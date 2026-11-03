@@ -1381,6 +1381,45 @@ public class AccountController {
 
 						iResult += accountService.processProfitLossV3(profitMap);
 					}
+					// 어르신사랑(원주)일 때..
+					if (param.get("account_id").toString().equals("20260831133722")) {
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20261103132839");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity1 = 0;
+						iIntegrity1 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("account_id", "20260831133722");
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity1);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
+					if (param.get("account_id").toString().equals("20261103132839")) { // 어르신사랑(원주) 주간보호는 어르신사랑(원주).
+						profitMap.put("daycare_cost", param.getOrDefault("basic_cost", 0));
+						profitMap.put("daycare_emp_cost", param.getOrDefault("employ_cost", 0));
+
+						Object objIntegrity = 0;
+						int iIntegrity = 0;
+						objIntegrity = param.getOrDefault("integrity_cost", 0);
+						iIntegrity = (int) objIntegrity;
+
+						profitMap.put("account_id", "20260831133722");
+						profitMap.put("year", param.get("year"));
+						profitMap.put("month", param.get("month"));
+
+						int iIntegrity2 = 0;
+						iIntegrity2 = accountService.AccountDeadlineBalanceIntegrityCost(profitMap);
+
+						profitMap.put("integrity_cost", iIntegrity + iIntegrity2);
+
+						iResult += accountService.processProfitLossV3(profitMap);
+					}
 					// 청평설악일 때..
 					if (param.get("account_id").toString().equals("20250819193603")) {
 						Object objIntegrity = 0;

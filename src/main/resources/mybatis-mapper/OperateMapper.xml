@@ -2223,6 +2223,7 @@
 			20260122072114,
 			20260122072245,
 			20260122072529,
+			20261103132839,
 			20260122072732,
 			20260219024021 -- 사랑복지센터: 식수/예산을 사랑복지요양원(20250819193615)에 통합 운영 중이라 예산관리 화면에서 제외
  		)
@@ -2324,6 +2325,7 @@
 					20260122072114,
 					20260122072245,
 					20260122072529,
+					20261103132839,
 					20260122072732
 				)
 				<if test='account_id != null'>
@@ -3119,6 +3121,7 @@
 				20260122072114,
 				20260122072245,
 				20260122072529,
+				20261103132839,
 				20260122072732
 			  )
 			<if test='account_id != null'>
@@ -4445,5 +4448,218 @@
 			del_yn = IF(menu_file_path IS NULL AND plate_file_path IS NULL, 'Y', 'N'),
 		</trim>
 	</insert>
+
+	<!-- ══════════════════════════════════════════════════════════════════
+	     근로계약서 (tb_account_contract)
+	     ERP 인사 > 근로계약서에서 작성·저장하고, 채움원 앱 전자계약에서 본인 계약서를 확인한다.
+	     주민등록번호는 계약서 테이블에 두지 않고 tb_account_members.rrn을 조회한다.
+	══════════════════════════════════════════════════════════════════ -->
+
+	<!-- 근로계약서 현황 목록 (거래처·상태·이름 조건, 최근 작성 순) -->
+	<select id="ContractList" parameterType="map" resultType="map">
+		SELECT
+			C.contract_id,
+			C.account_id,
+			A.account_name,
+			C.member_id,
+			C.contract_kind,
+			C.name,
+			DATE_FORMAT(C.contract_start_dt, '%Y-%m-%d') AS contract_start_dt,
+			DATE_FORMAT(C.contract_end_dt, '%Y-%m-%d') AS contract_end_dt,
+			C.total_pay,
+			C.status,
+			DATE_FORMAT(C.reg_dt, '%Y-%m-%d %H:%i') AS reg_dt,
+			DATE_FORMAT(C.view_dt, '%Y-%m-%d %H:%i') AS view_dt,
+			DATE_FORMAT(C.sign_dt, '%Y-%m-%d %H:%i') AS sign_dt
+		FROM tb_account_contract C
+		LEFT JOIN tb_account A
+			ON A.account_id = C.account_id
+		WHERE C.del_yn = 'N'
+		<if test="account_id != null and account_id != ''">
+			AND C.account_id = #{account_id}
+		</if>
+		<if test="status != null and status != ''">
+			AND C.status = #{status}
+		</if>
+		<if test="name != null and name != ''">
+			AND C.name LIKE CONCAT('%', #{name}, '%')
+		</if>
+		ORDER BY C.reg_dt DESC, C.contract_id DESC
+	</select>
+
+	<!-- 근로계약서 1건 상세 (ERP 작성 화면 불러오기, 주민등록번호는 직원 정보에서 조회) -->
+	<select id="ContractDetail" parameterType="map" resultType="map">
+		SELECT
+			C.contract_id,
+			C.account_id,
+			A.account_name,
+			C.member_id,
+			C.contract_kind,
+			C.name,
+			M.rrn,
+			C.address,
+			DATE_FORMAT(C.contract_dt, '%Y-%m-%d') AS contract_dt,
+			DATE_FORMAT(C.contract_start_dt, '%Y-%m-%d') AS contract_start_dt,
+			DATE_FORMAT(C.contract_end_dt, '%Y-%m-%d') AS contract_end_dt,
+			C.day_work_hours, C.month_work_hours, C.week_work_days,
+			C.start_time, C.end_time, C.break_hours,
+			C.ot_hours, C.night_hours, C.holiday_hours,
+			C.job_name, C.work_place,
+			C.total_pay, C.base_pay, C.meal_pay, C.car_pay, C.child_pay,
+			C.annual_leave_pay, C.ot_pay, C.holiday_pay, C.night_pay,
+			C.probation_months,
+			C.status,
+			DATE_FORMAT(C.view_dt, '%Y-%m-%d %H:%i') AS view_dt,
+			DATE_FORMAT(C.sign_dt, '%Y-%m-%d %H:%i') AS sign_dt
+		FROM tb_account_contract C
+		LEFT JOIN tb_account A
+			ON A.account_id = C.account_id
+		LEFT JOIN tb_account_members M
+			ON M.member_id = C.member_id
+			AND M.account_id = C.account_id
+		WHERE C.contract_id = #{contract_id}
+			AND C.del_yn = 'N'
+	</select>
+
+	<!-- 근로계약서 신규 등록 (앱에는 저장 즉시 미확인 상태로 표시) -->
+	<insert id="ContractInsert" parameterType="map" useGeneratedKeys="true" keyProperty="contract_id" keyColumn="contract_id">
+		INSERT INTO tb_account_contract
+		(
+			account_id, member_id, contract_kind, name, address, contract_dt,
+			contract_start_dt, contract_end_dt,
+			day_work_hours, month_work_hours, week_work_days, start_time, end_time, break_hours,
+			ot_hours, night_hours, holiday_hours, job_name, work_place,
+			total_pay, base_pay, meal_pay, car_pay, child_pay,
+			annual_leave_pay, ot_pay, holiday_pay, night_pay, probation_months,
+			reg_user_id, reg_dt, mod_user_id, mod_dt, del_yn
+		)
+		VALUES
+		(
+			#{account_id}, #{member_id}, #{contract_kind}, #{name}, #{address}, #{contract_dt},
+			#{contract_start_dt}, #{contract_end_dt},
+			#{day_work_hours}, #{month_work_hours}, #{week_work_days}, #{start_time}, #{end_time}, #{break_hours},
+			#{ot_hours}, #{night_hours}, #{holiday_hours}, #{job_name}, #{work_place},
+			#{total_pay}, #{base_pay}, #{meal_pay}, #{car_pay}, #{child_pay},
+			#{annual_leave_pay}, #{ot_pay}, #{holiday_pay}, #{night_pay}, #{probation_months},
+			#{user_id}, CONVERT_TZ(NOW(), '+00:00', '+09:00'), #{user_id}, CONVERT_TZ(NOW(), '+00:00', '+09:00'), 'N'
+		)
+	</insert>
+
+	<!-- 근로계약서 수정 (서명완료·삭제 건은 바뀌지 않음) -->
+	<update id="ContractUpdate" parameterType="map">
+		UPDATE tb_account_contract
+		SET
+			account_id = #{account_id},
+			member_id = #{member_id},
+			contract_kind = #{contract_kind},
+			name = #{name},
+			address = #{address},
+			contract_dt = #{contract_dt},
+			contract_start_dt = #{contract_start_dt},
+			contract_end_dt = #{contract_end_dt},
+			day_work_hours = #{day_work_hours},
+			month_work_hours = #{month_work_hours},
+			week_work_days = #{week_work_days},
+			start_time = #{start_time},
+			end_time = #{end_time},
+			break_hours = #{break_hours},
+			ot_hours = #{ot_hours},
+			night_hours = #{night_hours},
+			holiday_hours = #{holiday_hours},
+			job_name = #{job_name},
+			work_place = #{work_place},
+			total_pay = #{total_pay},
+			base_pay = #{base_pay},
+			meal_pay = #{meal_pay},
+			car_pay = #{car_pay},
+			child_pay = #{child_pay},
+			annual_leave_pay = #{annual_leave_pay},
+			ot_pay = #{ot_pay},
+			holiday_pay = #{holiday_pay},
+			night_pay = #{night_pay},
+			probation_months = #{probation_months},
+			mod_user_id = #{user_id},
+			mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		WHERE contract_id = #{contract_id}
+			AND status != '서명완료'
+			AND del_yn = 'N'
+	</update>
+
+	<!-- 근로계약서 삭제 처리 (서명완료 건은 삭제되지 않음) -->
+	<update id="ContractDelete" parameterType="map">
+		UPDATE tb_account_contract
+		SET
+			del_yn = 'Y',
+			mod_user_id = #{user_id},
+			mod_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		WHERE contract_id = #{contract_id}
+			AND status != '서명완료'
+			AND del_yn = 'N'
+	</update>
+
+	<!-- 앱 전자계약: 로그인한 조리사/조리원 본인의 계약서 목록 (거래처 + 직원 이름 + 휴대폰 뒷자리 일치) -->
+	<select id="AppContractList" parameterType="map" resultType="map">
+		SELECT
+			C.contract_id,
+			C.account_id,
+			A.account_name,
+			C.contract_kind,
+			DATE_FORMAT(C.contract_start_dt, '%Y-%m-%d') AS contract_start_dt,
+			DATE_FORMAT(C.contract_end_dt, '%Y-%m-%d') AS contract_end_dt,
+			C.status,
+			DATE_FORMAT(C.reg_dt, '%Y-%m-%d') AS reg_dt,
+			DATE_FORMAT(C.sign_dt, '%Y-%m-%d %H:%i') AS sign_dt
+		FROM tb_account_contract C
+		JOIN tb_account_members M
+			ON M.member_id = C.member_id
+			AND M.account_id = C.account_id
+		LEFT JOIN tb_account A
+			ON A.account_id = C.account_id
+		WHERE C.del_yn = 'N'
+			AND C.account_id = #{account_id}
+			AND M.name = #{user_name}
+			AND RIGHT(REPLACE(REPLACE(M.phone, '-', ''), ' ', ''), 4) = #{phone_last4}
+		ORDER BY C.reg_dt DESC, C.contract_id DESC
+	</select>
+
+	<!-- 앱 전자계약: 본인 계약서 1건 (양식 HTML 생성용, 본인 건이 아니면 조회되지 않음) -->
+	<select id="AppContractDetail" parameterType="map" resultType="map">
+		SELECT
+			C.contract_id,
+			C.contract_kind,
+			C.name,
+			M.rrn,
+			C.address,
+			DATE_FORMAT(C.contract_dt, '%Y-%m-%d') AS contract_dt,
+			DATE_FORMAT(C.contract_start_dt, '%Y-%m-%d') AS contract_start_dt,
+			DATE_FORMAT(C.contract_end_dt, '%Y-%m-%d') AS contract_end_dt,
+			C.day_work_hours, C.month_work_hours, C.week_work_days,
+			C.start_time, C.end_time, C.break_hours,
+			C.ot_hours, C.night_hours, C.holiday_hours,
+			C.job_name, C.work_place,
+			C.total_pay, C.base_pay, C.meal_pay, C.car_pay, C.child_pay,
+			C.annual_leave_pay, C.ot_pay, C.holiday_pay, C.night_pay,
+			C.probation_months,
+			C.status
+		FROM tb_account_contract C
+		JOIN tb_account_members M
+			ON M.member_id = C.member_id
+			AND M.account_id = C.account_id
+		WHERE C.contract_id = #{contract_id}
+			AND C.del_yn = 'N'
+			AND C.account_id = #{account_id}
+			AND M.name = #{user_name}
+			AND RIGHT(REPLACE(REPLACE(M.phone, '-', ''), ' ', ''), 4) = #{phone_last4}
+	</select>
+
+	<!-- 앱 전자계약: 처음 열람한 미확인 계약서를 확인 상태로 바꾸고 확인일시 기록 -->
+	<update id="ContractViewUpdate" parameterType="map">
+		UPDATE tb_account_contract
+		SET
+			status = '확인',
+			view_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+		WHERE contract_id = #{contract_id}
+			AND status = '미확인'
+	</update>
 
 </mapper>
