@@ -2362,8 +2362,8 @@ public class AccountService {
 	// -> 거래처·하루 1 master(tb_account_purchase_tally, type=1042) + 품목 N detail로 저장
 	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
 	//
-	// 같은 거래처·같은 날에 현장에서 직접 입력한 아워홈(1042) 매입이 있으면 금액이 두 번 잡히므로
-	// API 데이터는 저장하지 않고 경고 로그만 남긴다(수기 데이터는 건드리지 않음).
+	// 출고완료(prcsStatYn=Y)·출고수량 > 0인 품목만 매입으로 본다. 입고분이 없으면 기존 API 매입을 지운다.
+	// 같은 거래처·같은 날에 현장에서 직접 입력한 아워홈(1042) 매입이 있으면 삭제하고 API 입고값으로 대체한다.
 
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값
 	private static final String OURHOME_SYNC_USER_ID = "SYSTEM";
@@ -2412,10 +2412,11 @@ public class AccountService {
 		JsonNode result = ourhomeCall("ORDER_LIST", "/api/chaeum/v1/getOrderList", params, siteCode, yyyyMMdd,
 				accountId).path("result");
 
-		// 삭제된 주문 품목은 제외
+		// 실제 입고된 품목만 사용: 삭제 품목 제외, 출고완료(prcsStatYn=Y)이고 출고수량(clhaqty)이 0보다 큰 줄만
 		List<JsonNode> lines = new ArrayList<>();
 		for (JsonNode line : result.path("data"))
-			if (!"Y".equals(line.path("delYn").asText()))
+			if (!"Y".equals(line.path("delYn").asText()) && "Y".equals(line.path("prcsStatYn").asText())
+					&& line.path("clhaqty").asDouble() > 0)
 				lines.add(line);
 
 		// sale_id = 거래처ID_입고일_OH (웰스토리 거래처ID_입고일과 겹치지 않게 접미사로 구분, 재실행 시 같은 행 갱신)
@@ -2426,13 +2427,28 @@ public class AccountService {
 		dup.put("account_id", accountId);
 		dup.put("saleDate", saleDate);
 		dup.put("sale_id", saleId);
-		if (accountMapper.OurhomeManualPurchaseCount(dup) > 0) {
-			log.warn("[OurhomePurchaseSync] 현장 수기 입력 아워홈 매입이 있어 API 저장 건너뜀 account={} date={}", accountId,
-					saleDate);
+
+		LocalDate saleLocalDate = LocalDate.parse(saleDate);
+		if (lines.isEmpty()) {
+			// 입고분이 없으면 이전 동기화로 저장된 API 매입(수량 0·미출고 품목 등)을 지우고 집계표를 다시 맞춘다
+			if (accountMapper.AccountPurchaseTallyTotalBySaleId(dup) != null) {
+				Map<String, Object> master = new HashMap<>();
+				master.put("account_id", accountId);
+				master.put("sale_id", saleId);
+				master.put("type", "1042");
+				master.put("saleDate", saleDate);
+				master.put("year", saleLocalDate.getYear());
+				master.put("month", saleLocalDate.getMonthValue());
+				self.OurhomePurchaseDeleteOneDay(master, List.of(saleId));
+			}
 			return 0;
 		}
-		if (lines.isEmpty())
-			return 0;
+
+		// 같은 날 현장 수기 입력 아워홈 매입은 API 입고값으로 대체하기 위해 저장 시 삭제한다
+		List<String> manualSaleIds = accountMapper.OurhomeManualPurchaseSaleIdList(dup);
+		if (!manualSaleIds.isEmpty())
+			log.warn("[OurhomePurchaseSync] 수기 입력 아워홈 매입을 API 값으로 대체 account={} date={} sale_id={}", accountId,
+					saleDate, manualSaleIds);
 
 		// ---- master(하루 단위) 합계: 아워홈이 품목별로 준 과세공급가·부가세·면세공급가를 그대로 합산 ----
 		// total = 총매출액(부가세 포함) 합, tax = 과세공급가 합, vat = 부가세 합, taxFree = 면세공급가 합
@@ -2492,22 +2508,40 @@ public class AccountService {
 			details.add(detail);
 		}
 
-		LocalDate saleLocalDate = LocalDate.parse(saleDate);
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
-		// self(프록시 경유)로 호출해야 @Transactional이 걸려 상세 교체~집계표 반영이 한 번에 롤백된다
-		self.OurhomePurchaseSaveOneDay(master, details);
+		// self(프록시 경유)로 호출해야 @Transactional이 걸려 수기 삭제~집계표 반영이 한 번에 롤백된다
+		self.OurhomePurchaseSaveOneDay(master, details, manualSaleIds);
 		return 1;
 	}
 
-	// 아워홈 하루치 매입 저장: master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
+	// 아워홈 하루치 매입 저장: 수기 입력분 삭제 -> master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
 	@Transactional(rollbackFor = Exception.class)
-	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details) {
+	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details,
+			List<String> manualSaleIds) {
+		for (String manualSaleId : manualSaleIds)
+			deleteOurhomePurchase(manualSaleId);
 		AccountPurchaseSave(master);
 		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
 		for (Map<String, Object> detail : details)
 			AccountPurchaseDetailSave(detail);
 		TallySheetPaymentSave(master);
+	}
+
+	// 아워홈 하루치 매입 삭제: sale_id별 master·detail 삭제(sp_sync_account_purchase_delete) -> 집계표·손익표·예산 재반영
+	@Transactional(rollbackFor = Exception.class)
+	public void OurhomePurchaseDeleteOneDay(Map<String, Object> master, List<String> saleIds) {
+		for (String saleId : saleIds)
+			deleteOurhomePurchase(saleId);
+		TallySheetPaymentSave(master);
+	}
+
+	// 아워홈(1042) 매입 1건을 master·detail 모두 삭제한다
+	private void deleteOurhomePurchase(String saleId) {
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", saleId);
+		param.put("type", 1042);
+		AccountPurchaseTallyDelete(param);
 	}
 
 	// 아워홈 API 공통 호출부.

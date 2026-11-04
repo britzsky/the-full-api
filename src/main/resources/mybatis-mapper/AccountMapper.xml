@@ -2235,9 +2235,9 @@
 		 WHERE IFNULL(ourhome_busiplcd, '') != ''
 	</select>
 
-	<!-- 같은 거래처·입고일에 API가 아닌 경로(현장 수기 입력 등)로 저장된 아워홈(1042) 매입 건수 -->
-	<select id="OurhomeManualPurchaseCount" parameterType="map" resultType="int">
-		SELECT COUNT(*)
+	<!-- 같은 거래처·입고일에 API가 아닌 경로(현장 수기 입력 등)로 저장된 아워홈(1042) 매입 sale_id 목록 -->
+	<select id="OurhomeManualPurchaseSaleIdList" parameterType="map" resultType="string">
+		SELECT sale_id
 		  FROM tb_account_purchase_tally
 		 WHERE account_id = #{account_id}
 		   AND type = 1042
