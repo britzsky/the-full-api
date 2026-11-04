@@ -2363,7 +2363,7 @@ public class AccountService {
 	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
 	//
 	// 출고완료(prcsStatYn=Y)·출고수량 > 0인 품목만 매입으로 본다. 입고분이 없으면 기존 API 매입을 지운다.
-	// 같은 거래처·같은 날에 현장에서 직접 입력한 아워홈(1042) 매입이 있으면 삭제하고 API 입고값으로 대체한다.
+	// 현장에서 직접 입력한 아워홈(1042) 매입과 관계없이 API 매입은 별도 sale_id(_OH)로 저장한다(수기 데이터는 건드리지 않음).
 
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값
 	private static final String OURHOME_SYNC_USER_ID = "SYSTEM";
@@ -2444,12 +2444,6 @@ public class AccountService {
 			return 0;
 		}
 
-		// 같은 날 현장 수기 입력 아워홈 매입은 API 입고값으로 대체하기 위해 저장 시 삭제한다
-		List<String> manualSaleIds = accountMapper.OurhomeManualPurchaseSaleIdList(dup);
-		if (!manualSaleIds.isEmpty())
-			log.warn("[OurhomePurchaseSync] 수기 입력 아워홈 매입을 API 값으로 대체 account={} date={} sale_id={}", accountId,
-					saleDate, manualSaleIds);
-
 		// ---- master(하루 단위) 합계: 아워홈이 품목별로 준 과세공급가·부가세·면세공급가를 그대로 합산 ----
 		// total = 총매출액(부가세 포함) 합, tax = 과세공급가 합, vat = 부가세 합, taxFree = 면세공급가 합
 		long total = 0, vat = 0, tax = 0, taxFree = 0;
@@ -2510,17 +2504,14 @@ public class AccountService {
 
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
-		// self(프록시 경유)로 호출해야 @Transactional이 걸려 수기 삭제~집계표 반영이 한 번에 롤백된다
-		self.OurhomePurchaseSaveOneDay(master, details, manualSaleIds);
+		// self(프록시 경유)로 호출해야 @Transactional이 걸려 상세 교체~집계표 반영이 한 번에 롤백된다
+		self.OurhomePurchaseSaveOneDay(master, details);
 		return 1;
 	}
 
-	// 아워홈 하루치 매입 저장: 수기 입력분 삭제 -> master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
+	// 아워홈 하루치 매입 저장: master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
 	@Transactional(rollbackFor = Exception.class)
-	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details,
-			List<String> manualSaleIds) {
-		for (String manualSaleId : manualSaleIds)
-			deleteOurhomePurchase(manualSaleId);
+	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details) {
 		AccountPurchaseSave(master);
 		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
 		for (Map<String, Object> detail : details)
