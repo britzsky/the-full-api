@@ -2412,11 +2412,12 @@ public class AccountService {
 		JsonNode result = ourhomeCall("ORDER_LIST", "/api/chaeum/v1/getOrderList", params, siteCode, yyyyMMdd,
 				accountId).path("result");
 
-		// 실제 입고된 품목만 사용: 삭제 품목 제외, 출고완료(prcsStatYn=Y)이고 출고수량(clhaqty)이 0보다 큰 줄만
+		// 실제 입고된 품목만 사용: 삭제 품목 제외, 출고완료(prcsStatYn=Y)이고 출고수량(clhaqty)이 0이 아닌 줄만
+		// 정정 주문(NSS)은 원주문 취소 줄(수량 음수)과 재출고 줄(수량 양수)로 오므로 음수 줄도 함께 넣어 상쇄시킨다
 		List<JsonNode> lines = new ArrayList<>();
 		for (JsonNode line : result.path("data"))
 			if (!"Y".equals(line.path("delYn").asText()) && "Y".equals(line.path("prcsStatYn").asText())
-					&& line.path("clhaqty").asDouble() > 0)
+					&& line.path("clhaqty").asDouble() != 0)
 				lines.add(line);
 
 		// sale_id = 거래처ID_입고일_OH (웰스토리 거래처ID_입고일과 겹치지 않게 접미사로 구분, 재실행 시 같은 행 갱신)
@@ -2444,38 +2445,37 @@ public class AccountService {
 			return 0;
 		}
 
-		// ---- master(하루 단위) 합계: 아워홈이 품목별로 준 과세공급가·부가세·면세공급가를 그대로 합산 ----
-		// total = 총매출액(부가세 포함) 합, tax = 과세공급가 합, vat = 부가세 합, taxFree = 면세공급가 합
+		// master 합계(total = 부가세 포함 합, tax = 과세공급가 합, vat = 부가세 합, taxFree = 면세공급가 합)는
+		// 아래 품목별 마감 단가 환산 결과를 더해서 만든다
 		long total = 0, vat = 0, tax = 0, taxFree = 0;
-		for (JsonNode line : lines) {
-			total += line.path("salsAmt").asLong();
-			vat += line.path("txtnTxamt").asLong();
-			tax += line.path("txnSplamt").asLong();
-			taxFree += line.path("dfSplamt").asLong();
-		}
 
 		Map<String, Object> master = new HashMap<>();
 		master.put("account_id", accountId);
 		master.put("sale_id", saleId);
 		master.put("type", "1042"); // tb_account_mapping.type 아워홈
 		master.put("saleDate", saleDate);
-		master.put("total", total);
 		master.put("discount", 0);
-		master.put("vat", vat);
-		master.put("taxFree", taxFree);
-		master.put("tax", tax);
 		master.put("use_name", "아워홈");
 		master.put("buyer", "(주)더채움"); // 본부사업장명(GA709)
 		master.put("note", "아워홈 API 연동 (busiplcd=" + siteCode + ")");
 		master.put("user_id", OURHOME_SYNC_USER_ID);
 
 		// ---- detail: 품목 한 줄씩. 금액 계산 방식은 웰스토리와 동일하게 qty=1, unitPrice=amount ----
+		// 아워홈 API 단가(salsUcost)는 사업장 마감 단가 그대로 온다.
+		// 금액 = 마감 단가 × 출고수량, 부가세 = 과세 금액의 10%
 		List<Map<String, Object>> details = new ArrayList<>();
 		for (JsonNode line : lines) {
-			long amount = line.path("salsAmt").asLong();
-			long lineVat = line.path("txtnTxamt").asLong();
-			long lineTax = line.path("txnSplamt").asLong();
-			boolean taxable = lineTax > 0 || lineVat > 0;
+			long closeUnit = line.path("salsUcost").asLong();
+			long supply = Math.round(closeUnit * line.path("clhaqty").asDouble());
+			boolean taxable = line.path("txnSplamt").asLong() != 0 || line.path("txtnTxamt").asLong() != 0;
+			// 부가세는 부호와 관계없이 같은 크기로 반올림해 정정 주문의 취소·재출고 줄이 정확히 상쇄되게 한다
+			long lineVat = taxable ? Long.signum(supply) * Math.round(Math.abs(supply) * 0.1) : 0;
+			long lineTax = taxable ? supply : 0;
+			long amount = supply + lineVat;
+			total += amount;
+			vat += lineVat;
+			tax += lineTax;
+			taxFree += taxable ? 0 : supply;
 			// 아워홈 대분류 '생활용품류'(세제·장갑 등)는 소모품, 나머지는 식재료
 			boolean isCons = "생활용품류".equals(line.path("goodnmClass2").asText());
 			String ordKey = line.path("ordKeyVal").asText();
@@ -2487,21 +2487,34 @@ public class AccountService {
 					1_000_000_000));
 			detail.put("sale_id", saleId);
 			detail.put("name", line.path("goodnm").asText("").strip());
-			detail.put("qty", "1");
+			// 화면은 금액을 수량 × 단가(부가세 포함)로 다시 계산하므로, 단가는 부가세 포함 마감 단가로 넣는다.
+			// 마감 단가가 10원 단위라 정수 수량이면 수량 × 단가가 금액과 정확히 같다.
+			// 소수 수량(KG 등)은 1원 오차가 생길 수 있어 수량 1, 단가 = 금액으로 넣는다.
+			double qty = line.path("clhaqty").asDouble();
+			if (qty == Math.rint(qty)) {
+				detail.put("qty", String.valueOf((long) qty));
+				detail.put("unitPrice", taxable ? closeUnit * 11 / 10 : closeUnit);
+			} else {
+				detail.put("qty", "1");
+				detail.put("unitPrice", amount);
+			}
 			detail.put("amount", amount);
-			detail.put("unitPrice", amount);
 			detail.put("vat", lineVat);
 			detail.put("tax", lineTax); // 과세공급가(면세면 0)
 			detail.put("taxType", taxable ? "1" : "2"); // 1=과세, 2=면세
 			detail.put("itemType", isCons ? "2" : "1"); // 1=식재료, 2=소모품
 			// 규격 + 실제 입고수량/단가 + 아워홈 주문키 (note 컬럼 100자 제한)
 			String note = line.path("goodsz").asText("") + " [수량:" + line.path("clhaqty").asText() + " 단가:"
-					+ line.path("salsUcost").asText() + "] (" + ordKey + ")";
+					+ closeUnit + "] (" + ordKey + ")";
 			detail.put("note", note.length() > 100 ? note.substring(0, 100) : note);
 			detail.put("user_id", OURHOME_SYNC_USER_ID);
 			details.add(detail);
 		}
 
+		master.put("total", total);
+		master.put("vat", vat);
+		master.put("taxFree", taxFree);
+		master.put("tax", tax);
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
 		// self(프록시 경유)로 호출해야 @Transactional이 걸려 상세 교체~집계표 반영이 한 번에 롤백된다
