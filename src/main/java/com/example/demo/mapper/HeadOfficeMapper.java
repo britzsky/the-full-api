@@ -52,6 +52,7 @@ public interface HeadOfficeMapper {
 	Map<String, Object> ElectronicPaymentFrReceiptItem(Map<String, Object> paramMap); 				// 현장 -> 구매요청 -> 개인구매(FR) 후첨 대상 품목 조회
 	List<Map<String, Object>> ElectronicPaymentFrReceiptItemList(Map<String, Object> paramMap); 	// 본사 -> 전자결재 관리 -> 개인구매(FR) 2차 결재 시 후첨 품목 전체 조회
 	int ElectronicPaymentFrReceiptItemSave(Map<String, Object> paramMap); 							// 현장 -> 구매요청 -> 개인구매(FR) 품목 구매일자·영수증·sale_id 저장
+	int ElectronicPaymentFrMonthEndAutoReject(Map<String, Object> paramMap); 						// 스케줄러 -> 상신월 말일까지 최종 결재되지 않은 개인구매(FR) 문서 자동 반려
 	int ElectronicPaymentItemBuyYnSave(Map<String, Object> paramMap); 								// 본사 -> 전자결재 관리 -> 구매요청품목 저장
 	int ElectronicPaymentItemPurchaseInfoSave(Map<String, Object> paramMap); 						// 본사 -> 전자결재 관리 -> 구매요청품목 예산포함여부/구매진행여부 저장
 	List<Map<String, Object>> ElectronicPaymentNotificationList(Map<String, Object> paramMap); 		// 본사 -> 전자결재 알림 목록

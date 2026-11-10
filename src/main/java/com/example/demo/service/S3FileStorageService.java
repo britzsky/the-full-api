@@ -104,6 +104,36 @@ public class S3FileStorageService {
         return LEGACY_PREFIX + objectKey;
     }
 
+    // 서버에서 만든 파일(근로계약서 서명본 PDF 등)을 바이트 그대로 저장하고 저장 경로(/image/...)를 반환
+    public String uploadBytes(byte[] bytes, String filename, String contentType, String... pathSegments) throws IOException {
+        if (s3Enabled) requireConfiguredBucket();
+        if (bytes == null || bytes.length == 0) {
+            throw new IllegalArgumentException("저장할 파일 내용이 없습니다.");
+        }
+
+        String prefix = Arrays.stream(pathSegments)
+                .map(this::sanitizeSegment)
+                .filter(segment -> !segment.isEmpty())
+                .collect(Collectors.joining("/"));
+        String objectKey = (prefix.isEmpty() ? "" : prefix + "/")
+                + UUID.randomUUID() + "_" + sanitizeFilename(filename);
+        String physicalKey = physicalKey(objectKey);
+
+        if (!s3Enabled) {
+            Path target = resolveLocalPath(physicalKey);
+            Files.createDirectories(target.getParent());
+            Files.write(target, bytes);
+            return LEGACY_PREFIX + objectKey;
+        }
+
+        s3Client.putObject(PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(physicalKey)
+                .contentType(contentType)
+                .build(), RequestBody.fromBytes(bytes));
+        return LEGACY_PREFIX + objectKey;
+    }
+
     public URL createPresignedGetUrl(String storedPath) {
         return createPresignedGetUrl(storedPath, false);
     }

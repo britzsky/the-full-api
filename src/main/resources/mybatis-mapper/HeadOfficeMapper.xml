@@ -1760,6 +1760,13 @@
 			       END
 			     ELSE NULL
 			   END AS receipt_attach_yn,
+			   <!-- 개인구매(FR) 월말 자동 반려 여부: 스케줄러가 남긴 [자동반려] 의견이 있으면 Y -->
+			   CASE
+			     WHEN IFNULL(ep.tm_comment, '') LIKE '[자동반려]%'
+			       OR IFNULL(ep.payer_comment, '') LIKE '[자동반려]%'
+			     THEN 'Y'
+			     ELSE 'N'
+			   END AS auto_reject_yn,
 			   ep.charge_sign,
 			   CASE
 			     WHEN UPPER(CAST(ep.doc_type AS CHAR)) IN ('FP', 'FR')
@@ -2421,6 +2428,7 @@
 		SELECT UPPER(CAST(ep.doc_type AS CHAR)) AS doc_type,
 			   CAST(ep.status AS CHAR) AS status,
 			   CAST(ep.tm_sign AS CHAR) AS tm_sign,
+			   DATE_FORMAT(ep.reg_dt, '%Y-%m') AS reg_month,
 			   ep.reg_user_id,
 			   drafter.account_id,
 			   drafter.user_name,
@@ -2474,6 +2482,29 @@
 		WHERE payment_id = #{payment_id}
 		  AND idx = #{item_idx}
 		  AND IFNULL(sale_id, '') = ''
+	</update>
+
+	<!--
+		개인구매(FR) 월말 자동 반려
+		- 대상: 지정한 달(#{reg_month}, yyyy-MM)에 상신했는데 말일까지 최종 결재(4)되지 않고 반려되지도 않은 문서
+		- 1차 결재 전이면 1차(tm), 1차 결재 후(후첨 대기·2차 결재 대기)면 2차(payer) 도장을 반려(3)로 남긴다.
+		- MySQL 단일 UPDATE는 SET을 왼쪽부터 적용하므로 payer_*는 원래 tm_sign, tm_dt/tm_comment는 바뀐 tm_sign 기준으로 판단한다.
+	-->
+	<update id="ElectronicPaymentFrMonthEndAutoReject" parameterType="map">
+		UPDATE tb_headoffice_electronic_payment
+		SET payer_sign = CASE WHEN IFNULL(tm_sign, '') = '4' THEN '3' ELSE payer_sign END,
+			payer_dt = CASE WHEN IFNULL(tm_sign, '') = '4' THEN CONVERT_TZ(NOW(), '+00:00', '+09:00') ELSE payer_dt END,
+			payer_comment = CASE WHEN IFNULL(tm_sign, '') = '4' THEN #{comment} ELSE payer_comment END,
+			tm_sign = CASE WHEN IFNULL(tm_sign, '') = '4' THEN tm_sign ELSE '3' END,
+			tm_dt = CASE WHEN tm_sign = '3' THEN CONVERT_TZ(NOW(), '+00:00', '+09:00') ELSE tm_dt END,
+			tm_comment = CASE WHEN tm_sign = '3' THEN #{comment} ELSE tm_comment END,
+			reg_read_dt = NULL,
+			status = 3
+		WHERE UPPER(CAST(doc_type AS CHAR)) = 'FR'
+		  AND DATE_FORMAT(reg_dt, '%Y-%m') = #{reg_month}
+		  AND IFNULL(status, '') NOT IN ('3', '4')
+		  AND IFNULL(tm_sign, '') != '3'
+		  AND IFNULL(payer_sign, '') NOT IN ('3', '4')
 	</update>
 
 	<update id="ElectronicPaymentItemBuyYnSave" parameterType="map">

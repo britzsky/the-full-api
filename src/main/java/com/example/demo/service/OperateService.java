@@ -30,14 +30,17 @@ public class OperateService {
 
 	OperateMapper operateMapper;
 	HeadOfficeMapper headOfficeMapper;
+	S3FileStorageService fileStorageService;
 	private final RestTemplate restTemplate = new RestTemplate();
 
 	@Value("${public-data.holiday.service-key:}")
 	private String holidayServiceKey;
 
-	public OperateService(OperateMapper operateMapper, HeadOfficeMapper headOfficeMapper) {
+	public OperateService(OperateMapper operateMapper, HeadOfficeMapper headOfficeMapper,
+			S3FileStorageService fileStorageService) {
 		this.operateMapper = operateMapper;
 		this.headOfficeMapper = headOfficeMapper;
+		this.fileStorageService = fileStorageService;
 	}
 
 	// 저장 시 사용할 고유 key(현재 일시 기반) 생성 - 거래처/직원/긴급인력 등 여러 화면에서 공용으로 사용
@@ -126,6 +129,16 @@ public class OperateService {
 		return iResult;
 	}
 
+	// 급식사업부 -> 운영관리 -> 집계표 주차별 예산 초과 사유·개선 계획 조회
+	public List<Map<String, Object>> TallySheetWeekOverList(Map<String, Object> paramMap) {
+		return operateMapper.TallySheetWeekOverList(paramMap);
+	}
+
+	// 급식사업부 -> 운영관리 -> 집계표 주차별 예산 초과 사유·개선 계획 저장
+	public int TallySheetWeekOverSave(Map<String, Object> paramMap) {
+		return operateMapper.TallySheetWeekOverSave(paramMap);
+	}
+
 	// 급식사업부 -> 운영관리 -> 기물리스트 저장
 	public int PropertiesSave(Map<String, Object> paramMap) {
 		int iResult = 0;
@@ -162,6 +175,359 @@ public class OperateService {
 	// 현장관리 -> 지점업로드 식단표/식판 사진 경로 저장
 	public int BranchUploadSave(Map<String, Object> paramMap) {
 		return operateMapper.BranchUploadSave(paramMap);
+	}
+
+	// 근로계약서 -> 계약서 현황 목록 조회
+	public List<Map<String, Object>> ContractList(Map<String, Object> paramMap) {
+		return operateMapper.ContractList(paramMap);
+	}
+
+	// 근로계약서 -> 계약서 1건 상세 조회
+	public Map<String, Object> ContractDetail(Map<String, Object> paramMap) {
+		return operateMapper.ContractDetail(paramMap);
+	}
+
+	// 근로계약서 -> 계약서 신규 등록 또는 수정 (서명완료 건은 수정되지 않아 0 반환)
+	public int ContractSave(Map<String, Object> paramMap) {
+		Object contractId = paramMap.get("contract_id");
+		if (contractId == null || String.valueOf(contractId).trim().isEmpty()) {
+			return operateMapper.ContractInsert(paramMap);
+		}
+		return operateMapper.ContractUpdate(paramMap);
+	}
+
+	// 근로계약서 -> 요양원 일괄 작성: 대상자 수만큼 계약서를 한 트랜잭션으로 신규 등록 (한 건이라도 실패하면 전체 취소)
+	@Transactional(rollbackFor = Exception.class)
+	public int ContractBulkSave(List<Map<String, Object>> rows) {
+		int count = 0;
+		for (Map<String, Object> row : rows) {
+			if (operateMapper.ContractInsert(row) != 1) {
+				throw new IllegalStateException("계약서 등록 실패: " + row.get("name"));
+			}
+			count++;
+		}
+		return count;
+	}
+
+	// 근로계약서 -> 선택한 요양원의 파출 직원 목록 (기준월별, 작성 탭 대상 선택용)
+	public List<Map<String, Object>> ContractDispatchMemberList(Map<String, Object> paramMap) {
+		return operateMapper.ContractDispatchMemberList(paramMap);
+	}
+
+	// 근로계약서 -> 계약서 삭제 처리 (서명완료 건은 삭제되지 않아 0 반환)
+	public int ContractDelete(Map<String, Object> paramMap) {
+		return operateMapper.ContractDelete(paramMap);
+	}
+
+	// 앱 전자계약 -> 본인 계약서 목록 조회
+	public List<Map<String, Object>> AppContractList(Map<String, Object> paramMap) {
+		return operateMapper.AppContractList(paramMap);
+	}
+
+	// 앱 홈 -> 서명 전 본인 계약서 수 (홈 전자계약 메뉴 배지용)
+	public int AppContractUnsignedCount(Map<String, Object> paramMap) {
+		return operateMapper.AppContractUnsignedCount(paramMap);
+	}
+
+	// 앱 전자계약 -> 본인 계약서를 양식 HTML로 만들어 반환 (본인 건이 아니면 null, 처음 열면 확인 상태로 변경)
+	// 반환: html = 화면에 보여줄 양식, content_version = 서명 전 계약서의 내용 지문 (서명할 때 다시 보내 내용이 바뀌지 않았는지 확인)
+	public Map<String, Object> AppContractHtml(Map<String, Object> paramMap) {
+		Map<String, Object> row = operateMapper.AppContractDetail(paramMap);
+		if (row == null) {
+			return null;
+		}
+		operateMapper.ContractViewUpdate(row);
+		Map<String, Object> result = new HashMap<>();
+
+		// 서명 완료 건은 저장된 서명본 PDF를 그대로 이미지로 보여준다 (서명이 찍힌 상태로 조회)
+		byte[] stored = readStoredPdf(row.get("pdf_file_path"));
+		if (stored != null) {
+			result.put("html", ContractHtmlBuilder.pdfToHtml(stored));
+			return result;
+		}
+		String clauses = contractClauses(row);
+		// 서명 완료 건인데 PDF를 못 읽은 경우는 DB의 작성일자(서명한 날짜) 그대로 표시
+		if ("서명완료".equals(row.get("status"))) {
+			result.put("html", ContractHtmlBuilder.build(row, clauses));
+			return result;
+		}
+		result.put("content_version", contentVersion(row, clauses));
+
+		// 서명 전 계약서의 작성일자는 지금 보는 날짜(KST)로 표시 (실제 값은 서명할 때 서명한 날짜로 확정)
+		long nowMs = System.currentTimeMillis();
+		row.put("contract_dt", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString());
+		// 보는 중에 자정이 지나면 작성일자를 다음 날로 바꾸는 스크립트 (기기 시계 대신 서버 시각 + 경과 시간 기준)
+		String dateScript = "<script>(function(){var base=" + nowMs + ",t0=Date.now();"
+				+ "function set(i,v){var e=document.getElementById(i);if(e)e.textContent=v;}"
+				+ "function tick(){var d=new Date(base+(Date.now()-t0)+9*3600000);"
+				+ "set('cd_y',d.getUTCFullYear());set('cd_m',d.getUTCMonth()+1);set('cd_d',d.getUTCDate());}"
+				+ "tick();setInterval(tick,30000);})();</script>";
+		result.put("html", ContractHtmlBuilder.build(row, clauses).replace("</body>", dateScript + "</body>"));
+		return result;
+	}
+
+	// 근로자가 보는 계약 내용의 지문 (작성일자·서명 정보를 뺀 양식 HTML의 SHA-256)
+	// ERP에서 계약 내용을 고치거나 조항 양식을 바꾸면 값이 달라져, 열람한 내용과 서명 시점 내용이 같은지 비교하는 데 쓴다
+	private String contentVersion(Map<String, Object> row, String clauses) {
+		Map<String, Object> copy = new HashMap<>(row);
+		copy.put("contract_dt", null);
+		copy.remove("sign_dt");
+		copy.remove("sign_image");
+		try {
+			return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+					.digest(ContractHtmlBuilder.build(copy, clauses).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+	}
+
+	// 저장소에 있는 서명본 PDF 내용 읽기 (경로가 없거나 파일이 없으면 null)
+	private byte[] readStoredPdf(Object pdfPath) {
+		if (pdfPath == null) {
+			return null;
+		}
+		var stored = fileStorageService.streamObject(String.valueOf(pdfPath), false).getBody();
+		if (stored == null) {
+			return null;
+		}
+		try (java.io.InputStream in = stored.getInputStream()) {
+			return in.readAllBytes();
+		} catch (java.io.IOException e) {
+			throw new java.io.UncheckedIOException("서명본 PDF를 읽지 못했습니다: " + pdfPath, e);
+		}
+	}
+
+	// 계약서 구분(cor_type 2 = 개인, 그 외 = 법인)에 맞는 조항 목록 JSON (tb_contract_template, 없으면 빈 목록)
+	private String contractClauses(Map<String, Object> row) {
+		Map<String, Object> template = operateMapper.ContractTemplate(corType(row.get("cor_type")));
+		return template == null ? "[]" : String.valueOf(template.get("clauses"));
+	}
+
+	// 근로계약서 -> ERP 계약서 보기 PDF (서명 완료 건은 저장된 서명본, 서명 전 건은 현재 조항 양식으로 바로 생성)
+	public byte[] ContractViewPdf(Map<String, Object> paramMap) {
+		Map<String, Object> row = operateMapper.ContractDetail(paramMap);
+		if (row == null) {
+			return null;
+		}
+		Map<String, Object> signed = operateMapper.ContractPdfPath(paramMap);
+		byte[] stored = signed == null ? null : readStoredPdf(signed.get("pdf_file_path"));
+		if (stored != null) {
+			return stored;
+		}
+		return ContractHtmlBuilder.toPdf(ContractHtmlBuilder.build(row, contractClauses(row)));
+	}
+
+	// 앱 -> 로그인한 기기의 푸시 토큰 저장 (같은 기기면 로그인한 사람으로 덮어씀)
+	public int AppPushTokenSave(Map<String, Object> paramMap) {
+		return operateMapper.AppPushTokenSave(paramMap);
+	}
+
+	// 앱 -> 로그아웃한 기기의 푸시 토큰 삭제
+	public int AppPushTokenDelete(Map<String, Object> paramMap) {
+		return operateMapper.AppPushTokenDelete(paramMap);
+	}
+
+	// 근로계약서 -> 새로 작성한 계약서의 근로자에게 "근로계약서 도착" 앱 푸시 발송 (반환: 발송 요청이 접수된 기기 수)
+	// Expo 푸시 서비스(FCM/APNs 중계)로 100건씩 보내고, 앱 삭제 등으로 받을 수 없는 토큰은 지운다.
+	// 발송 실패는 계약서 저장 결과에 영향을 주지 않도록 로그만 남긴다.
+	public int ContractPushNotify(List<Object> contractIds) {
+		if (contractIds == null || contractIds.isEmpty()) {
+			return 0;
+		}
+		Map<String, Object> param = new HashMap<>();
+		param.put("contract_ids", contractIds);
+		// 알림 대상 조회가 실패해도 이미 저장된 계약서 결과는 성공으로 돌려준다
+		List<Map<String, Object>> targets;
+		try {
+			targets = operateMapper.ContractPushTargets(param);
+		} catch (Exception e) {
+			System.err.println("근로계약서 푸시 대상 조회 실패: " + e.getMessage());
+			return 0;
+		}
+
+		int accepted = 0;
+		for (int from = 0; from < targets.size(); from += 100) {
+			List<Map<String, Object>> chunk = targets.subList(from, Math.min(from + 100, targets.size()));
+			List<Map<String, Object>> messages = new ArrayList<>();
+			for (Map<String, Object> target : chunk) {
+				Map<String, Object> message = new HashMap<>();
+				message.put("to", target.get("push_token"));
+				message.put("title", "근로계약서가 도착했습니다");
+				message.put("body", target.get("name") + "님, 눌러서 계약서를 확인하고 서명해 주세요.");
+				message.put("sound", "default");
+				// 안드로이드: 앱에서 만든 중요도 높음 채널로 보내 화면 위 팝업으로 표시, 절전 중에도 바로 전달
+				message.put("channelId", "default");
+				message.put("priority", "high");
+				// 앱 아이콘 숫자 배지 = 서명 전 계약서 수 (서명을 마치면 앱에서 0으로 지움)
+				message.put("badge", ((Number) target.get("unsigned_count")).intValue());
+				message.put("data", Map.of("url", "/contract"));
+				messages.add(message);
+			}
+			try {
+				Map<?, ?> response = pushRestTemplate.postForObject(EXPO_PUSH_URL, messages, Map.class);
+				Object tickets = response == null ? null : response.get("data");
+				if (!(tickets instanceof List<?> list)) {
+					continue;
+				}
+				for (int i = 0; i < list.size() && i < chunk.size(); i++) {
+					if (!(list.get(i) instanceof Map<?, ?> ticket)) continue;
+					if ("ok".equals(ticket.get("status"))) {
+						accepted++;
+					} else if (ticket.get("details") instanceof Map<?, ?> details
+							&& "DeviceNotRegistered".equals(details.get("error"))) {
+						// 앱 삭제·알림 해제 등으로 더 이상 받을 수 없는 기기 토큰 정리
+						operateMapper.AppPushTokenDelete(Map.of("push_token", chunk.get(i).get("push_token")));
+					}
+				}
+			} catch (Exception e) {
+				System.err.println("근로계약서 푸시 발송 실패: " + e.getMessage());
+			}
+		}
+		return accepted;
+	}
+
+	// Expo 푸시 발송 주소 (FCM·APNs로 중계)
+	private static final String EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
+	// Expo 푸시 발송 전용 HTTP 클라이언트 (응답이 늦어도 ERP 저장 요청이 오래 멈추지 않도록 연결 3초·응답 5초 제한)
+	private final RestTemplate pushRestTemplate = createPushRestTemplate();
+
+	private static RestTemplate createPushRestTemplate() {
+		org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+		factory.setConnectTimeout(3000);
+		factory.setReadTimeout(5000);
+		return new RestTemplate(factory);
+	}
+
+	// 사용자(甲) 구분 값 정리 (2 = 개인, 그 외·빈 값 = 1 법인)
+	public static int corType(Object value) {
+		return "2".equals(String.valueOf(value).trim()) ? 2 : 1;
+	}
+
+	// 근로계약서 -> 구분별 조항 양식 조회 (조항 JSON, 최종 수정 정보, 그 구분의 서명 전 계약서 수)
+	public Map<String, Object> ContractTemplate(int corType) {
+		Map<String, Object> result = new HashMap<>();
+		Map<String, Object> template = operateMapper.ContractTemplate(corType);
+		result.put("clauses", template == null ? "[]" : template.get("clauses"));
+		result.put("mod_dt", template == null ? null : template.get("mod_dt"));
+		result.put("mod_user_id", template == null ? null : template.get("mod_user_id"));
+		result.put("unsigned_count", operateMapper.ContractUnsignedCount(corType));
+		return result;
+	}
+
+	// 근로계약서 -> 구분별 조항 양식 저장 (그 구분의 서명 전 계약서에 바로 반영)
+	public int ContractTemplateSave(Map<String, Object> paramMap) {
+		return operateMapper.ContractTemplateSave(paramMap);
+	}
+
+	// 앱 전자계약 -> 근로자 서명 처리 (본인 확인 → 서명 이미지를 넣은 PDF 생성·저장 → 서명완료 기록)
+	// 반환: code 200 성공 / 404 본인 계약서 아님 / 409 이미 서명됨 / 412 열람 후 계약 내용이 바뀜
+	public Map<String, Object> AppContractSign(Map<String, Object> paramMap) throws java.io.IOException {
+		Map<String, Object> result = new HashMap<>();
+		Map<String, Object> row = operateMapper.AppContractDetail(paramMap);
+		if (row == null) {
+			result.put("code", 404);
+			result.put("message", "계약서를 찾을 수 없습니다.");
+			return result;
+		}
+		if ("서명완료".equals(row.get("status"))) {
+			result.put("code", 409);
+			result.put("message", "이미 서명이 완료된 계약서입니다.");
+			return result;
+		}
+		// 근로자가 열람한 내용과 지금 내용이 다르면 (열어 둔 사이 ERP 수정·조항 양식 변경) 서명하지 않음
+		String clauses = contractClauses(row);
+		if (!contentVersion(row, clauses).equals(String.valueOf(paramMap.get("content_version")))) {
+			result.put("code", 412);
+			result.put("message", CONTENT_CHANGED_MESSAGE);
+			return result;
+		}
+
+		// 서명일시(KST)는 PDF에 찍히는 값과 DB 기록값을 같게 맞춘다
+		String signDt = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
+				.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+		row.put("sign_dt", signDt);
+		// 작성일자는 서명한 날짜로 찍음 (DB contract_dt도 같은 날짜로 갱신)
+		row.put("contract_dt", signDt.substring(0, 10));
+		row.put("sign_image", paramMap.get("sign_image"));
+
+		// 서명본 PDF 생성 → 저장소(contract/거래처) 저장 → 위변조 확인용 SHA-256 해시
+		byte[] pdf = ContractHtmlBuilder.toPdf(ContractHtmlBuilder.build(row, clauses));
+		String contractId = String.valueOf(row.get("contract_id"));
+		String pdfPath = fileStorageService.uploadBytes(pdf, "labor_contract_" + contractId + ".pdf",
+				"application/pdf", "contract", String.valueOf(row.get("account_id")));
+		String pdfHash;
+		try {
+			pdfHash = java.util.HexFormat.of()
+					.formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(pdf));
+		} catch (java.security.NoSuchAlgorithmException e) {
+			throw new IllegalStateException(e);
+		}
+
+		Map<String, Object> signParam = new HashMap<>();
+		signParam.put("contract_id", contractId);
+		signParam.put("sign_dt", signDt);
+		signParam.put("sign_device", paramMap.get("sign_device"));
+		signParam.put("sign_ip", paramMap.get("sign_ip"));
+		signParam.put("pdf_file_path", pdfPath);
+		signParam.put("pdf_hash", pdfHash);
+		signParam.put("mod_dt", row.get("mod_dt"));
+
+		// 동시에 두 번 눌러 이미 서명됐거나, PDF를 만드는 사이 ERP에서 회수(삭제)·수정된 경우 방금 만든 PDF는 지운다
+		if (operateMapper.ContractSignUpdate(signParam) == 0) {
+			fileStorageService.delete(pdfPath);
+			// 다시 조회해 없으면 회수(404), 서명완료면 중복 서명(409), 그 외는 그 사이 내용 수정(412)
+			Map<String, Object> latest = operateMapper.AppContractDetail(paramMap);
+			if (latest == null) {
+				result.put("code", 404);
+				result.put("message", "회사에서 회수한 계약서입니다.");
+			} else if ("서명완료".equals(latest.get("status"))) {
+				result.put("code", 409);
+				result.put("message", "이미 서명이 완료된 계약서입니다.");
+			} else {
+				result.put("code", 412);
+				result.put("message", CONTENT_CHANGED_MESSAGE);
+			}
+			return result;
+		}
+
+		// 직원 정보(현장 직원관리·채용관리)의 근로계약서 첨부를 방금 만든 서명본 PDF로 덮어씀
+		// 첨부 반영이 실패해도 서명 완료 결과는 유지 (서명본은 계약서 테이블에 이미 저장됨)
+		try {
+			Map<String, Object> fileParam = new HashMap<>();
+			fileParam.put("pdf_file_path", pdfPath);
+			fileParam.put("member_id", row.get("member_id"));
+			fileParam.put("account_id", row.get("account_id"));
+			operateMapper.ContractMemberFileUpdate(fileParam);
+			operateMapper.ContractRecMemberFileUpdate(fileParam);
+		} catch (Exception e) {
+			System.err.println("근로계약서 첨부 반영 실패 contract_id=" + contractId + ": " + e.getMessage());
+		}
+
+		result.put("code", 200);
+		result.put("message", "서명이 완료되었습니다.");
+		return result;
+	}
+
+	// 열람 후 계약 내용이 바뀌어 서명을 막을 때 앱에 보여줄 안내 문구
+	private static final String CONTENT_CHANGED_MESSAGE = "회사에서 계약서 내용을 수정했습니다. 바뀐 내용을 다시 확인한 뒤 서명해 주세요.";
+
+	// 앱 전자계약 -> 본인 서명본 PDF 저장 경로 (본인 건이 아니거나 서명 전이면 null)
+	public String AppContractPdfPath(Map<String, Object> paramMap) {
+		Map<String, Object> row = operateMapper.AppContractDetail(paramMap);
+		if (row == null || row.get("pdf_file_path") == null) {
+			return null;
+		}
+		return String.valueOf(row.get("pdf_file_path"));
+	}
+
+	// 근로계약서 -> 서명본 PDF 저장 경로 (ERP 다운로드용, 서명 전이면 null)
+	public String ContractPdfPath(Map<String, Object> paramMap) {
+		Map<String, Object> row = operateMapper.ContractPdfPath(paramMap);
+		if (row == null || row.get("pdf_file_path") == null) {
+			return null;
+		}
+		return String.valueOf(row.get("pdf_file_path"));
 	}
 
 	// 앱 위생점검 -> 거래처별 카테고리 설정 조회

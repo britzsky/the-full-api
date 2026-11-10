@@ -64,6 +64,9 @@ dependencies {
 	// ✅ WebClient (Spring WebFlux)
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.locationtech.jts:jts-core:1.19.0'
+	// 근로계약서 서명본 PDF 생성 (HTML 양식 → PDF, jsoup으로 HTML을 파싱해 전달)
+	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
+	implementation 'org.jsoup:jsoup:1.17.2'
 	
 }
 

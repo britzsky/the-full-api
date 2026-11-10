@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface OperateMapper {
@@ -23,12 +24,34 @@ public interface OperateMapper {
 	int TallyBeforeMonthSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영관리 -> 이월 집계표 저장
 	int TallySheetNoteSave(Map<String, Object> paramMap);										// 급식사업부 -> 운영관리 -> 집계표 메모 저장(기존 row)
 	int TallySheetNoteInitSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 집계표 메모 저장(row 생성)
+	List<Map<String, Object>> TallySheetWeekOverList(Map<String, Object> paramMap);				// 급식사업부 -> 운영관리 -> 집계표 주차별 예산 초과 사유·개선 계획 조회
+	int TallySheetWeekOverSave(Map<String, Object> paramMap);									// 급식사업부 -> 운영관리 -> 집계표 주차별 예산 초과 사유·개선 계획 저장
 	int PropertiesSave(Map<String, Object> paramMap);											// 급식사업부 -> 운영관리 -> 기물리스트 저장
 	List<Map<String, Object>> PropertiesList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 기물리스트 조회
 	List<Map<String, Object>> HygieneList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 위생관리 조회
 	int HygieneSave(Map<String, Object> paramMap);												// 급식사업부 -> 운영관리 -> 위생관리 저장
 	List<Map<String, Object>> BranchUploadList(Map<String, Object> paramMap);					// 현장관리 -> 지점업로드 월별 식단표·식판 사진 조회
 	int BranchUploadSave(Map<String, Object> paramMap);											// 현장관리 -> 지점업로드 식단표/식판 사진 경로 저장
+	List<Map<String, Object>> ContractList(Map<String, Object> paramMap);						// 인사 -> 근로계약서 현황 목록 조회
+	Map<String, Object> ContractDetail(Map<String, Object> paramMap);							// 인사 -> 근로계약서 1건 상세 조회
+	int ContractInsert(Map<String, Object> paramMap);											// 인사 -> 근로계약서 신규 등록
+	int ContractUpdate(Map<String, Object> paramMap);											// 인사 -> 근로계약서 수정 (서명완료 건 제외)
+	List<Map<String, Object>> ContractDispatchMemberList(Map<String, Object> paramMap);		// 인사 -> 근로계약서 작성용 요양원 파출 직원 목록 (기준월별)
+	int ContractDelete(Map<String, Object> paramMap);											// 인사 -> 근로계약서 삭제 처리 (서명완료 건 제외)
+	List<Map<String, Object>> AppContractList(Map<String, Object> paramMap);					// 앱 전자계약 -> 본인 계약서 목록 조회
+	int AppContractUnsignedCount(Map<String, Object> paramMap);									// 앱 홈 -> 서명 전 본인 계약서 수
+	Map<String, Object> AppContractDetail(Map<String, Object> paramMap);						// 앱 전자계약 -> 본인 계약서 1건 조회 (양식 HTML 생성용)
+	int ContractViewUpdate(Map<String, Object> paramMap);										// 앱 전자계약 -> 처음 열람 시 확인 상태·확인일시 기록
+	int ContractSignUpdate(Map<String, Object> paramMap);										// 앱 전자계약 -> 근로자 서명 완료 기록 (서명본 PDF 경로·해시 포함)
+	int ContractMemberFileUpdate(Map<String, Object> paramMap);								// 앱 전자계약 -> 서명 완료 시 현장 직원관리 근로계약서 첨부를 서명본 PDF로 교체
+	int ContractRecMemberFileUpdate(Map<String, Object> paramMap);							// 앱 전자계약 -> 서명 완료 시 채용관리 근로계약서 첨부를 서명본 PDF로 교체
+	int AppPushTokenSave(Map<String, Object> paramMap);										// 앱 -> 푸시 토큰 저장 (로그인 시, 기기별 1행)
+	int AppPushTokenDelete(Map<String, Object> paramMap);										// 앱 -> 푸시 토큰 삭제 (로그아웃·수신 불가 토큰)
+	List<Map<String, Object>> ContractPushTargets(Map<String, Object> paramMap);				// 근로계약서 -> 알림 대상 푸시 토큰 조회 (contract_ids)
+	Map<String, Object> ContractTemplate(@Param("cor_type") int corType);							// 근로계약서 -> 구분별 조항 양식 조회 (1 법인, 2 개인)
+	int ContractTemplateSave(Map<String, Object> paramMap);										// 근로계약서 -> 구분별 조항 양식 저장
+	int ContractUnsignedCount(@Param("cor_type") int corType);									// 근로계약서 -> 구분별 서명 전 계약서 수 (양식 저장 안내용)
+	Map<String, Object> ContractPdfPath(Map<String, Object> paramMap);							// 근로계약서 -> 서명 완료 계약서 PDF 경로 조회
 	List<Map<String, Object>> HygieneCategoryList(Map<String, Object> paramMap);				// 앱 위생점검 -> 거래처별 카테고리 설정 조회
 	int HygieneCategorySave(Map<String, Object> paramMap);										// 앱 위생점검 -> 카테고리 설정 1건 등록/수정
 	int HygieneCategoryDeleteExcept(Map<String, Object> paramMap);								// 앱 위생점검 -> 저장 목록에 없는 카테고리 삭제 처리

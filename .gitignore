@@ -53,3 +53,6 @@ src/main/java/com/example/demo/controller/TempController.java
 
 AGENTS.md
 CLAUDE.md
+
+# 근로계약서 PDF 인감 이미지 (공개 저장소라 커밋 금지, 서버 src/main/resources/templates/contract/에 직접 복사)
+src/main/resources/templates/contract/seal_*.png

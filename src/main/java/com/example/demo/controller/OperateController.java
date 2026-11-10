@@ -20,6 +20,9 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,7 +38,11 @@ import com.example.demo.service.OperateService;
 import com.example.demo.service.S3FileStorageService;
 import com.example.demo.controller.BudgetNoteCarryOverScheduler;
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 public class OperateController {
@@ -374,6 +381,63 @@ public class OperateController {
 
     /*
      * part : 운영
+     * method : TallySheetWeekOverList
+     * comment : 급식사업부 -> 운영관리 -> 집계표 주차별 식자재 예산 초과 사유·개선 계획 조회
+     */
+    @GetMapping("/Operate/TallySheetWeekOverList")
+    public String TallySheetWeekOverList(@RequestParam Map<String, Object> paramMap) {
+        // 월은 2자리 문자열('01'~'12')로 저장되어 있어 같은 형식으로 맞춤
+        paramMap.put("month", String.format("%02d", Integer.parseInt(String.valueOf(paramMap.get("month")))));
+        List<Map<String, Object>> resultList = operateService.TallySheetWeekOverList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 운영
+     * method : TallySheetWeekOverSave
+     * comment : 급식사업부 -> 운영관리 -> 집계표 주차별 식자재 예산 초과 사유·개선 계획 저장
+     *           작성기한(다음 주 일요일, 주차 시작 주 월요일 + 13일)까지만 저장 가능
+     */
+    @PostMapping("Operate/TallySheetWeekOverSave")
+    public String TallySheetWeekOverSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        try {
+            String accountId = String.valueOf(paramMap.getOrDefault("account_id", "")).trim();
+            LocalDate startDt = LocalDate.parse(String.valueOf(paramMap.get("start_dt")));
+            LocalDate endDt = LocalDate.parse(String.valueOf(paramMap.get("end_dt")));
+            int weekNo = Integer.parseInt(String.valueOf(paramMap.get("week_no")));
+            int monthValue = Integer.parseInt(String.valueOf(paramMap.get("month")));
+            if (accountId.isEmpty() || weekNo < 1) throw new IllegalArgumentException();
+
+            // 작성 가능 기한: 다음 주 일요일(주차 시작 주 월요일 + 13일)까지
+            LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+            LocalDate deadline = startDt.minusDays(startDt.getDayOfWeek().getValue() - 1).plusDays(13);
+            if (today.isAfter(deadline)) {
+                obj.addProperty("code", 400);
+                obj.addProperty("message", "작성 기간이 아닙니다. (작성기한 " + deadline + ")");
+                return obj.toString();
+            }
+
+            paramMap.put("account_id", accountId);
+            paramMap.put("month", String.format("%02d", monthValue));
+            paramMap.put("week_no", weekNo);
+            Object reason = paramMap.get("over_reason");
+            Object plan = paramMap.get("fix_plan");
+            paramMap.put("over_reason", reason == null ? "" : reason.toString());
+            paramMap.put("fix_plan", plan == null ? "" : plan.toString());
+
+            int iResult = operateService.TallySheetWeekOverSave(paramMap);
+            obj.addProperty("code", iResult > 0 ? 200 : 400);
+            obj.addProperty("message", iResult > 0 ? "성공" : "실패");
+        } catch (Exception e) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "요청값이 올바르지 않습니다.");
+        }
+        return obj.toString();
+    }
+
+    /*
+     * part : 운영
      * method : PropertiesSave
      * comment : 급식사업부 -> 운영관리 -> 기물리스트 저장
      */
@@ -562,6 +626,473 @@ public class OperateController {
         }
 
         return obj.toString();
+    }
+
+    /*
+     * part : 인사
+     * method : ContractList
+     * comment : 근로계약서 -> 계약서 현황 목록 조회 (account_id, status, name 조건, 삭제 건 제외)
+     */
+    @GetMapping("Operate/ContractList")
+    public String ContractList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.ContractList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractDetail
+     * comment : 근로계약서 -> 계약서 1건 상세 조회 (ERP 작성 화면 불러오기용, 주민등록번호는 직원 정보에서 조회)
+     */
+    @GetMapping("Operate/ContractDetail")
+    public String ContractDetail(@RequestParam Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.ContractDetail(paramMap);
+        return new Gson().toJson(result == null ? new HashMap<>() : result);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractSave
+     * comment : 근로계약서 -> 계약서 저장 (contract_id 없으면 신규, 있으면 수정 / 서명완료 건은 수정 불가)
+     */
+    @PostMapping("Operate/ContractSave")
+    public String ContractSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        String error = normalizeContract(paramMap);
+        if (error != null) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", error);
+            return obj.toString();
+        }
+
+        // 저장 전에 contract_id가 없으면 신규 등록 (신규만 근로자에게 앱 알림)
+        Object beforeId = paramMap.get("contract_id");
+        boolean isNew = beforeId == null || String.valueOf(beforeId).trim().isEmpty();
+
+        int iResult = operateService.ContractSave(paramMap);
+
+        if (iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+            obj.addProperty("contract_id", String.valueOf(paramMap.get("contract_id")));
+            if (isNew) {
+                obj.addProperty("push_count", operateService.ContractPushNotify(List.of(paramMap.get("contract_id"))));
+            }
+        } else {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "저장하지 못했습니다. 서명이 완료됐거나 회수된 계약서는 수정할 수 없습니다.");
+        }
+
+        return obj.toString();
+    }
+
+    /*
+     * part : 인사
+     * method : ContractBulkSave
+     * comment : 근로계약서 -> 요양원 일괄 작성 (공통 계약 조건 + 대상자 목록을 한 번에 신규 등록, 한 명이라도 실패하면 전체 취소)
+     *           요청: 공통 입력값 + targets [{ member_id, member_type, name, rrn, address, job_name }]
+     */
+    @SuppressWarnings("unchecked")
+    @PostMapping("Operate/ContractBulkSave")
+    public String ContractBulkSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        Object targetsObj = paramMap.remove("targets");
+        List<Map<String, Object>> targets = targetsObj instanceof List ? (List<Map<String, Object>>) targetsObj : List.of();
+        if (targets.isEmpty()) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "계약서를 만들 대상자를 선택해 주세요.");
+            return obj.toString();
+        }
+
+        // 대상자마다 공통 입력값에 개인 정보(성명·주민번호·주소·종사업무)를 덮어써 계약서 1건 구성
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> target : targets) {
+            Map<String, Object> row = new HashMap<>(paramMap);
+            row.putAll(target);
+            row.remove("contract_id");
+            String error = normalizeContract(row);
+            if (error != null) {
+                obj.addProperty("code", 400);
+                obj.addProperty("message", "[" + row.get("name") + "] " + error);
+                return obj.toString();
+            }
+            rows.add(row);
+        }
+
+        try {
+            int count = operateService.ContractBulkSave(rows);
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+            obj.addProperty("count", count);
+            // 등록된 계약서마다 근로자에게 앱 알림 (트랜잭션이 끝난 뒤 발송)
+            List<Object> ids = new ArrayList<>();
+            for (Map<String, Object> row : rows) ids.add(row.get("contract_id"));
+            obj.addProperty("push_count", operateService.ContractPushNotify(ids));
+        } catch (Exception e) {
+            e.printStackTrace();
+            obj.addProperty("code", 500);
+            obj.addProperty("message", "일괄 저장 중 오류가 발생해 저장하지 않았습니다.");
+        }
+        return obj.toString();
+    }
+
+    // 근로계약서 저장 전 필수값 확인과 입력값 정리 (문제가 있으면 안내 문구, 정상이면 null 반환)
+    private String normalizeContract(Map<String, Object> paramMap) {
+        // 거래처·직원·성명·계약 시작일은 계약서 1건을 구성하는 필수값
+        String accountId = String.valueOf(paramMap.getOrDefault("account_id", "")).trim();
+        String memberId = String.valueOf(paramMap.getOrDefault("member_id", "")).trim();
+        String name = String.valueOf(paramMap.getOrDefault("name", "")).trim();
+        String startDt = String.valueOf(paramMap.getOrDefault("contract_start_dt", "")).trim();
+        String kind = String.valueOf(paramMap.getOrDefault("contract_kind", "")).trim();
+        if (accountId.isEmpty() || memberId.isEmpty() || name.isEmpty() || startDt.isEmpty()
+                || !("정규직".equals(kind) || "계약직".equals(kind))) {
+            return "거래처, 직원, 성명, 계약 시작일, 계약 구분을 확인해 주세요.";
+        }
+
+        // 근로자 구분 (직원: tb_account_members, 파출: tb_account_members_dispatch, 없으면 직원)
+        String memberType = String.valueOf(paramMap.getOrDefault("member_type", "")).trim();
+        if (memberType.isEmpty() || "null".equals(memberType)) memberType = "직원";
+        if (!("직원".equals(memberType) || "파출".equals(memberType))) {
+            return "근로자 구분을 확인해 주세요.";
+        }
+        paramMap.put("member_type", memberType);
+
+        // 수기 입력 주민등록번호 (빈 값은 NULL → 직원·파출 정보의 주민번호 사용)
+        String rrn = String.valueOf(paramMap.getOrDefault("rrn", "")).trim();
+        if (rrn.length() > 50) {
+            return "주민등록번호를 확인해 주세요.";
+        }
+        paramMap.put("rrn", rrn.isEmpty() || "null".equals(rrn) ? null : rrn);
+
+        // 빈 문자열·콤마가 섞인 숫자 입력값을 DB 숫자 컬럼에 맞게 정리 (빈 값은 NULL)
+        String[] numberKeys = {
+            "day_work_hours", "month_work_hours", "week_work_days", "break_hours",
+            "ot_hours", "night_hours", "holiday_hours",
+            "total_pay", "base_pay", "meal_pay", "car_pay", "child_pay",
+            "annual_leave_pay", "ot_pay", "holiday_pay", "night_pay", "probation_months"
+        };
+        for (String key : numberKeys) {
+            String value = String.valueOf(paramMap.getOrDefault(key, "")).replace(",", "").trim();
+            paramMap.put(key, value.isEmpty() || "null".equals(value) ? null : value);
+        }
+        // 주 근무일수는 0~7 사이 숫자만 허용 (DB 컬럼 DECIMAL(3,1) 범위 초과·문자 입력 차단)
+        Object weekDays = paramMap.get("week_work_days");
+        if (weekDays != null) {
+            try {
+                double days = Double.parseDouble(String.valueOf(weekDays));
+                if (days < 0 || days > 7) return "주 근무일수를 확인해 주세요. (0~7일)";
+            } catch (NumberFormatException e) {
+                return "주 근무일수를 확인해 주세요. (0~7일)";
+            }
+        }
+        // 날짜 빈 값은 NULL (정규직 종료일)
+        for (String key : new String[] { "contract_end_dt" }) {
+            String value = String.valueOf(paramMap.getOrDefault(key, "")).trim();
+            paramMap.put(key, value.isEmpty() || "null".equals(value) ? null : value);
+        }
+        // 작성일자는 ERP에서 비워 두고 근로자가 앱에서 서명한 날짜로 채움
+        paramMap.put("contract_dt", null);
+        return null;
+    }
+
+    /*
+     * part : 앱
+     * method : AppPushTokenSave
+     * comment : 앱 -> 로그인한 기기의 푸시 토큰 저장 (요청: push_token, login_type staff/cook, user_id 또는 account_id·user_name·phone_last4, platform, device_name)
+     */
+    @PostMapping("Operate/AppPushTokenSave")
+    public String AppPushTokenSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        String token = String.valueOf(paramMap.getOrDefault("push_token", "")).trim();
+        String loginType = String.valueOf(paramMap.getOrDefault("login_type", "")).trim();
+        boolean validToken = token.length() <= 255
+                && (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
+        if (!validToken || !("staff".equals(loginType) || "cook".equals(loginType))) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "푸시 토큰 또는 로그인 구분을 확인해 주세요.");
+            return obj.toString();
+        }
+
+        // 로그인 구분별로 쓰지 않는 식별값은 비움 (staff: user_id, cook: account_id·user_name·phone_last4)
+        Map<String, Object> param = new HashMap<>();
+        param.put("push_token", token);
+        param.put("login_type", loginType);
+        param.put("user_id", "staff".equals(loginType) ? trimOrNull(paramMap.get("user_id"), 100) : null);
+        param.put("account_id", "cook".equals(loginType) ? trimOrNull(paramMap.get("account_id"), 100) : null);
+        param.put("user_name", "cook".equals(loginType) ? trimOrNull(paramMap.get("user_name"), 50) : null);
+        String last4 = "cook".equals(loginType) ? String.valueOf(paramMap.getOrDefault("phone_last4", "")).trim() : "";
+        param.put("phone_last4", last4.length() > 4 ? last4.substring(0, 4) : last4);
+        param.put("platform", trimOrNull(paramMap.get("platform"), 10));
+        param.put("device_name", trimOrNull(paramMap.get("device_name"), 200));
+
+        operateService.AppPushTokenSave(param);
+        obj.addProperty("code", 200);
+        obj.addProperty("message", "성공");
+        return obj.toString();
+    }
+
+    /*
+     * part : 앱
+     * method : AppPushTokenDelete
+     * comment : 앱 -> 로그아웃한 기기의 푸시 토큰 삭제 (요청: push_token)
+     */
+    @PostMapping("Operate/AppPushTokenDelete")
+    public String AppPushTokenDelete(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        operateService.AppPushTokenDelete(paramMap);
+        obj.addProperty("code", 200);
+        obj.addProperty("message", "성공");
+        return obj.toString();
+    }
+
+    // 요청 문자열 값 정리 (앞뒤 공백 제거, 빈 값은 null, 최대 길이까지 자름)
+    private String trimOrNull(Object value, int maxLength) {
+        String text = value == null ? "" : String.valueOf(value).trim();
+        if (text.isEmpty() || "null".equals(text)) return null;
+        return text.length() > maxLength ? text.substring(0, maxLength) : text;
+    }
+
+    /*
+     * part : 인사
+     * method : ContractViewPdf
+     * comment : 근로계약서 -> ERP 계약서 보기 PDF (서명 완료 건은 서명본, 서명 전 건은 현재 조항 양식으로 생성)
+     */
+    @GetMapping("Operate/ContractViewPdf")
+    public ResponseEntity<byte[]> ContractViewPdf(@RequestParam Map<String, Object> paramMap) {
+        byte[] pdf = operateService.ContractViewPdf(paramMap);
+        if (pdf == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_PDF).body(pdf);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractTemplate
+     * comment : 근로계약서 -> 구분별 조항 양식 조회 (요청: cor_type 1 법인 / 2 개인, 응답: { clauses: [{title, body}], mod_dt, mod_user_id, unsigned_count })
+     */
+    @GetMapping("Operate/ContractTemplate")
+    public String ContractTemplate(@RequestParam(value = "cor_type", required = false) String corType) {
+        Map<String, Object> template = operateService.ContractTemplate(OperateService.corType(corType));
+        JsonObject obj = new JsonObject();
+        obj.add("clauses", JsonParser.parseString(String.valueOf(template.get("clauses"))));
+        obj.addProperty("mod_dt", template.get("mod_dt") == null ? null : String.valueOf(template.get("mod_dt")));
+        obj.addProperty("mod_user_id", template.get("mod_user_id") == null ? null : String.valueOf(template.get("mod_user_id")));
+        obj.addProperty("unsigned_count", ((Number) template.get("unsigned_count")).intValue());
+        return obj.toString();
+    }
+
+    /*
+     * part : 인사
+     * method : ContractTemplateSave
+     * comment : 근로계약서 -> 구분별 조항 양식 저장 (요청: cor_type 1 법인 / 2 개인, clauses [{title, body}], user_id / 그 구분의 서명 전 계약서에 바로 반영)
+     */
+    @PostMapping("Operate/ContractTemplateSave")
+    public String ContractTemplateSave(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        // 조항마다 제목은 필수, 본문은 문자열로 정리해서 [{title, body}] JSON으로 저장
+        JsonArray clauses = new JsonArray();
+        Object list = paramMap.get("clauses");
+        if (list instanceof List<?> rows) {
+            for (Object item : rows) {
+                if (!(item instanceof Map<?, ?> clause)) continue;
+                String title = String.valueOf(clause.get("title") == null ? "" : clause.get("title")).trim();
+                String body = String.valueOf(clause.get("body") == null ? "" : clause.get("body")).replace("\r", "");
+                if (title.isEmpty()) {
+                    obj.addProperty("code", 400);
+                    obj.addProperty("message", "조항 제목이 비어 있습니다.");
+                    return obj.toString();
+                }
+                JsonObject row = new JsonObject();
+                row.addProperty("title", title);
+                row.addProperty("body", body);
+                clauses.add(row);
+            }
+        }
+        if (clauses.size() == 0) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "조항이 하나 이상 있어야 합니다.");
+            return obj.toString();
+        }
+
+        Map<String, Object> param = new HashMap<>();
+        param.put("clauses", clauses.toString());
+        param.put("user_id", paramMap.get("user_id"));
+        param.put("cor_type", OperateService.corType(paramMap.get("cor_type")));
+        int iResult = operateService.ContractTemplateSave(param);
+
+        obj.addProperty("code", iResult > 0 ? 200 : 400);
+        obj.addProperty("message", iResult > 0 ? "성공" : "저장하지 못했습니다.");
+        return obj.toString();
+    }
+
+    /*
+     * part : 인사
+     * method : ContractDispatchMemberList
+     * comment : 근로계약서 -> 선택한 요양원의 파출 직원 목록 (account_id, 퇴사 제외, 기준월 최신순)
+     */
+    @GetMapping("Operate/ContractDispatchMemberList")
+    public String ContractDispatchMemberList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.ContractDispatchMemberList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractPushResend
+     * comment : 근로계약서 -> 서명 전 계약서의 근로자에게 "근로계약서 도착" 앱 알림 다시 보내기 (요청: contract_id, 응답: push_count 발송 기기 수)
+     */
+    @PostMapping("Operate/ContractPushResend")
+    public String ContractPushResend(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        Object contractId = paramMap.get("contract_id");
+        if (contractId == null || String.valueOf(contractId).isBlank()) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "계약서를 선택해 주세요.");
+            return obj.toString();
+        }
+        obj.addProperty("code", 200);
+        obj.addProperty("push_count", operateService.ContractPushNotify(List.of(contractId)));
+        return obj.toString();
+    }
+
+    /*
+     * part : 인사
+     * method : ContractDelete
+     * comment : 근로계약서 -> 계약서 삭제 처리 (del_yn = 'Y', 서명완료 건은 삭제 불가)
+     */
+    @PostMapping("Operate/ContractDelete")
+    public String ContractDelete(@RequestBody Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        int iResult = operateService.ContractDelete(paramMap);
+
+        if (iResult > 0) {
+            obj.addProperty("code", 200);
+            obj.addProperty("message", "성공");
+        } else {
+            // 처리되지 않은 이유를 다시 조회해 구분 (없으면 이미 회수된 건, 있으면 그 사이 서명완료된 건)
+            obj.addProperty("code", 400);
+            obj.addProperty("message", operateService.ContractDetail(paramMap) == null
+                    ? "이미 회수된 계약서입니다."
+                    : "근로자가 이미 서명을 완료한 계약서라 회수할 수 없습니다.");
+        }
+
+        return obj.toString();
+    }
+
+    /*
+     * part : 앱
+     * method : AppContractList
+     * comment : 앱 전자계약 -> 로그인한 본인의 계약서 목록 (영양사: user_id → ERP 계정의 거래처 + 이름, 조리사/조리원: account_id + user_name + phone_last4)
+     */
+    @GetMapping("Operate/AppContractList")
+    public String AppContractList(@RequestParam Map<String, Object> paramMap) {
+        List<Map<String, Object>> resultList = operateService.AppContractList(paramMap);
+        return new Gson().toJson(resultList);
+    }
+
+    /*
+     * part : 앱
+     * method : AppContractUnsignedCount
+     * comment : 앱 홈 -> 서명 전 본인 계약서 수 (푸시 알림 대상과 같은 본인 기준, 주민번호 확인 없이 건수만 반환)
+     */
+    @GetMapping("Operate/AppContractUnsignedCount")
+    public String AppContractUnsignedCount(@RequestParam Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("count", operateService.AppContractUnsignedCount(paramMap));
+        return obj.toString();
+    }
+
+    /*
+     * part : 앱
+     * method : AppContractHtml
+     * comment : 앱 전자계약 -> 본인 계약서를 엑셀 양식과 같은 HTML로 반환 (처음 열면 확인 상태로 변경)
+     */
+    @GetMapping("Operate/AppContractHtml")
+    public String AppContractHtml(@RequestParam Map<String, Object> paramMap) {
+        JsonObject obj = new JsonObject();
+
+        Map<String, Object> contract = operateService.AppContractHtml(paramMap);
+        if (contract == null) {
+            obj.addProperty("code", 404);
+            obj.addProperty("message", "계약서를 찾을 수 없습니다.");
+            return obj.toString();
+        }
+
+        obj.addProperty("code", 200);
+        obj.addProperty("html", (String) contract.get("html"));
+        // 서명 전 계약서의 내용 지문 (앱이 서명할 때 그대로 다시 보냄)
+        obj.addProperty("content_version", (String) contract.get("content_version"));
+        return obj.toString();
+    }
+
+    /*
+     * part : 앱
+     * method : AppContractSign
+     * comment : 앱 전자계약 -> 근로자 동의·손가락 서명 저장 (서명 이미지를 넣은 PDF 생성·저장, 서명완료 처리)
+     */
+    @PostMapping("Operate/AppContractSign")
+    public String AppContractSign(@RequestBody Map<String, Object> paramMap, HttpServletRequest request) {
+        JsonObject obj = new JsonObject();
+
+        // 계약 내용 동의·전자문서 교부 동의와 서명 이미지(PNG)는 필수
+        String signImage = String.valueOf(paramMap.getOrDefault("sign_image", ""));
+        if (!"Y".equals(paramMap.get("agree_yn")) || !signImage.startsWith("data:image/png;base64,")) {
+            obj.addProperty("code", 400);
+            obj.addProperty("message", "동의 항목과 서명을 확인해 주세요.");
+            return obj.toString();
+        }
+
+        // 서명 요청 IP (프록시를 거치면 X-Forwarded-For 첫 번째 값)
+        String forwarded = request.getHeader("X-Forwarded-For");
+        String ip = forwarded != null && !forwarded.isBlank() ? forwarded.split(",")[0].trim() : request.getRemoteAddr();
+        paramMap.put("sign_ip", ip.length() > 45 ? ip.substring(0, 45) : ip);
+        String device = String.valueOf(paramMap.getOrDefault("sign_device", ""));
+        paramMap.put("sign_device", device.length() > 200 ? device.substring(0, 200) : device);
+
+        try {
+            Map<String, Object> result = operateService.AppContractSign(paramMap);
+            obj.addProperty("code", (Integer) result.get("code"));
+            obj.addProperty("message", String.valueOf(result.get("message")));
+        } catch (Exception e) {
+            e.printStackTrace();
+            obj.addProperty("code", 500);
+            obj.addProperty("message", "서명 처리 중 오류가 발생했습니다.");
+        }
+        return obj.toString();
+    }
+
+    /*
+     * part : 앱
+     * method : AppContractPdf
+     * comment : 앱 전자계약 -> 본인 서명본 PDF 내려받기 (본인 확인 조건은 AppContractHtml과 동일)
+     */
+    @GetMapping("Operate/AppContractPdf")
+    public ResponseEntity<InputStreamResource> AppContractPdf(@RequestParam Map<String, Object> paramMap) {
+        String pdfPath = operateService.AppContractPdfPath(paramMap);
+        if (pdfPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return fileStorageService.streamObject(pdfPath, true);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractPdf
+     * comment : 근로계약서 -> 서명 완료 계약서 PDF 내려받기 (ERP 계약서 현황용)
+     */
+    @GetMapping("Operate/ContractPdf")
+    public ResponseEntity<InputStreamResource> ContractPdf(@RequestParam Map<String, Object> paramMap) {
+        String pdfPath = operateService.ContractPdfPath(paramMap);
+        if (pdfPath == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return fileStorageService.streamObject(pdfPath, true);
     }
 
     /*

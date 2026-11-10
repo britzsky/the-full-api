@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<!-- A4 엑셀 양식 폭(760px) 그대로 그리고, 휴대폰에서는 화면 폭에 맞춰 축소·확대 -->
+<meta name="viewport" content="width=760">
+<title>근로계약서</title>
+<style>
+  /* 아이폰 WebView가 문단마다 글자를 임의로 키우지 않도록 글자 크기 자동 조정 끔 */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body { margin: 0; padding: 12px; background: #fff; font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; color: #000; }
+  table.ct { width: 736px; border-collapse: collapse; border: 2px solid #000; font-size: 12px; line-height: 1.55; }
+  .ct th, .ct td { border: 1px solid #555; padding: 3px 6px; vertical-align: middle; }
+  .ct th { background: #d9d9d9; font-weight: bold; text-align: center; white-space: nowrap; }
+  .ct td { text-align: left; }
+  .ct .ttl { background: #d9d9d9; text-align: center; font-size: 22px; font-weight: bold; letter-spacing: 12px; padding: 6px; border-top: 2px solid #000; }
+  .ct .c { text-align: center; }
+  .ct .date { text-align: center; font-weight: bold; padding: 8px; }
+  .ct .sign { padding: 12px 6px; }
+  .sub { border-collapse: collapse; margin: 3px 0 3px 18px; }
+  .sub th, .sub td { border: 1px solid #555; padding: 1px 8px; text-align: center; font-size: 11px; }
+  .sub th { background: #f2f2f2; font-weight: normal; }
+  /* 임금표 칸은 내용 폭만큼 (최소 폭을 두면 9칸 합이 조항 칸보다 넓어져 휴대폰에서 양식 전체가 오른쪽으로 밀림) */
+  .sub td { text-align: right; }
+  .ind { padding-left: 14px; }
+  /* 조항 본문 한 줄 (입력한 띄어쓰기 유지, □로 시작하는 줄은 줄바꿈 시 □ 뒤에 맞춰 들여씀) */
+  .ln { white-space: pre-wrap; }
+  .ln.b { padding-left: 1.15em; text-indent: -1.15em; }
+  /* 근로자 서명 이미지 (서명 또는 날인 글자 위에 겹쳐 표시) */
+  .signbox { position: relative; display: inline-block; }
+  .signbox img { position: absolute; right: 0; top: -18px; height: 46px; }
+  .ct table.half { width: 100%; border-collapse: collapse; }
+  .ct .half td { width: 50%; border: none; }
+  .ct .half td.right { border-left: 1px solid #555; }
+  .signinfo { width: 736px; margin-top: 6px; font-size: 11px; color: #333; text-align: right; }
+</style>
+</head>
+<body>
+<table class="ct">
+  <!-- 왼쪽 구분 칸을 뺀 나머지를 반반으로 (업체명|전화, 성명|주민등록번호 등 항목명·값 칸 너비 동일) -->
+  <colgroup><col style="width:110px"><col style="width:100px"><col style="width:213px"><col style="width:100px"><col style="width:213px"></colgroup>
+
+  <!-- 제목 -->
+  <tr><td colspan="5" class="ttl">근 로 계 약 서</td></tr>
+
+  <!-- 사용자(甲) 회사 정보 (업체명·소재지·사업자등록번호는 직원 구분에 따라 법인/개인으로 채움) -->
+  <tr><th rowspan="3">사용자(甲)</th><th>업체명</th><td class="c">{{corp_name}}</td><th>전화</th><td class="c">031-223-7324</td></tr>
+  <tr><th>소재지</th><td colspan="3">{{corp_addr}}</td></tr>
+  <tr><th>대표자</th><td class="c">최희영</td><th>사업자등록번호</th><td class="c">{{corp_bizno}}</td></tr>
+
+  <!-- 근로자(乙) 정보 -->
+  <tr><th rowspan="2">근로자(乙)</th><th>성명</th><td class="c">{{name}}</td><th>주민등록번호</th><td class="c">{{rrn}}</td></tr>
+  <tr><th>주소</th><td colspan="3">{{address}}</td></tr>
+
+  <!-- 조항 행 (DB tb_contract_template의 조항 목록으로 채움, ContractHtmlBuilder.clauseRows) -->
+{{clauses}}
+
+  <!-- 작성일자와 甲·乙 서명란 -->
+  <tr><td colspan="5" class="date">작성일자 : &nbsp;&nbsp;{{contract_year}}년 &nbsp;&nbsp;{{contract_month}}월 &nbsp;&nbsp;{{contract_day}}일</td></tr>
+  <!-- 甲(회사)·乙(근로자) 서명란을 좌우 반반으로 나눈 영역 -->
+  <tr><td colspan="5" style="padding:0">
+    <table class="half"><tr>
+      <td class="sign">甲 : &nbsp;&nbsp;&nbsp;&nbsp;{{corp_name}} &nbsp;&nbsp;&nbsp;&nbsp;최희영 &nbsp;&nbsp;&nbsp;<span class="signbox">(서명 또는 날인){{seal_img}}</span></td>
+      <td class="sign right">乙 : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{name}} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="signbox">(서명 또는 날인){{sign_img}}</span></td>
+    </tr></table>
+  </td></tr>
+</table>
+<!-- 전자서명 정보 (서명 완료 건만 표시) -->
+{{sign_info}}
+</body>
+</html>

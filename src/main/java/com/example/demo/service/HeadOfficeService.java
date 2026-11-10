@@ -1,6 +1,7 @@
 package com.example.demo.service;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -278,6 +279,11 @@ public class HeadOfficeService {
 	// - 거래처에 개인구매(1008) 연결이 없거나 영수증이 빠진 품목이 있으면 결재를 롤백하고 안내한다.
 	@Transactional(rollbackFor = Exception.class)
 	public int ElectronicPaymentManageSignSave(Map<String, Object> paramMap) {
+		// [자동반려] 머리말은 월말 자동 반려 스케줄러 전용이라 결재자가 직접 입력하는 의견에는 쓸 수 없다.
+		Object comment = paramMap.get("comment");
+		if (comment != null && String.valueOf(comment).trim().startsWith("[자동반려]"))
+			throw new PersonPurchaseTallyException("의견은 [자동반려]로 시작할 수 없습니다.");
+
 		int iResult = headOfficeMapper.ElectronicPaymentManageTmSignSave(paramMap);
 		if (iResult > 0)
 			return iResult;
@@ -290,6 +296,11 @@ public class HeadOfficeService {
 		if (iResult > 0 && "4".equals(String.valueOf(paramMap.get("action_status")))) {
 			Map<String, Object> main = headOfficeMapper.ElectronicPaymentFrTallyMain(paramMap);
 			if (main != null && "FR".equals(String.valueOf(main.get("doc_type")))) {
+				// 상신한 달이 지난 개인구매는 2차 결재 불가 (마감된 달의 집계표에 반영되는 것을 막음)
+				String regMonth = String.valueOf(main.get("reg_month"));
+				if (!regMonth.equals(LocalDate.now(ZoneId.of("Asia/Seoul")).toString().substring(0, 7)))
+					throw new PersonPurchaseTallyException(
+						"상신한 달(" + regMonth + ")이 지난 개인구매 문서는 결재할 수 없습니다. 반려 처리해 주세요.");
 				checkPersonPurchaseMapping(main);
 				List<Map<String, Object>> items = headOfficeMapper.ElectronicPaymentFrReceiptItemList(paramMap);
 				for (Map<String, Object> item : items) {
@@ -318,6 +329,11 @@ public class HeadOfficeService {
 		boolean finalApproved = "4".equals(status);
 		if (!finalApproved && (!"4".equals(String.valueOf(main.get("tm_sign"))) || "3".equals(status)))
 			throw new PersonPurchaseTallyException("1차 결재가 완료된 후에 구매일자와 영수증을 첨부할 수 있습니다.");
+		// 후첨은 상신한 달 말일 23:59까지만 가능 (월 마감 후 지난달 매입이 들어가는 것을 막음)
+		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		String regMonth = String.valueOf(main.get("reg_month"));
+		if (!regMonth.equals(today.toString().substring(0, 7)))
+			throw new PersonPurchaseTallyException("상신한 달(" + regMonth + ")이 지나 구매일자와 영수증을 첨부할 수 없습니다.");
 		checkPersonPurchaseMapping(main);
 
 		// 이미 최종 결재된 문서에서 즉시 매입집계에 반영할 품목
@@ -334,9 +350,18 @@ public class HeadOfficeService {
 				throw new PersonPurchaseTallyException(
 					"'" + item.get("item_name") + "' 품목은 이미 저장되었습니다. 화면을 새로고침해 주세요.");
 
+			// 구매일자는 상신한 달 안에서 오늘까지만 허용
+			LocalDate saleDate;
 			try {
-				LocalDate.parse(String.valueOf(row.get("saleDate")));
+				saleDate = LocalDate.parse(String.valueOf(row.get("saleDate")));
+			} catch (RuntimeException e) {
+				throw new PersonPurchaseTallyException("'" + item.get("item_name") + "' 품목의 구매일자 형식이 올바르지 않습니다.");
+			}
+			if (!regMonth.equals(saleDate.toString().substring(0, 7)) || saleDate.isAfter(today))
+				throw new PersonPurchaseTallyException(
+					"'" + item.get("item_name") + "' 품목의 구매일자는 " + regMonth + "월 안에서 오늘까지만 입력할 수 있습니다.");
 
+			try {
 				if (headOfficeMapper.ElectronicPaymentFrReceiptItemSave(itemParam) == 0)
 					throw new IllegalStateException("품목 후첨 정보 저장 실패: " + row.get("item_idx"));
 			} catch (RuntimeException e) {
