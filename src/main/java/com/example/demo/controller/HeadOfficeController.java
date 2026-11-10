@@ -250,7 +250,7 @@ public class HeadOfficeController {
 		List<String> skippedIds = new java.util.ArrayList<>();	// 기존 데이터 존재로 미등록된 account_id 목록
 		List<Map<String, Object>> savedRows = new java.util.ArrayList<>();	// 재계산 대상 rows
 
-		// 거래처별 인건비 저장 (기존 인건비가 0이 아니면 스킵)
+		// 거래처별 인건비 저장 (기존 인건비가 있어도 엑셀 값으로 덮어씀)
 		for (Map<String, Object> paramMap : rows) {
 
 			Map<String, Object> existing = headOfficeService.getProfitLossPersonCost(paramMap);	// DB 기존 인건비 조회
@@ -261,12 +261,6 @@ public class HeadOfficeController {
 			long newPrice = (newPriceObj != null) ? ((Number) newPriceObj).longValue() : 0L;	// 변경 금액
 
 			String accountId = String.valueOf(paramMap.get("account_id"));
-
-			// 기존 인건비가 0이 아닌 경우 → 덮어쓰지 않고 스킵
-			if (orgPrice != 0L) {
-				skippedIds.add(accountId);
-				continue;
-			}
 
 			if (orgPrice != newPrice) {	// 금액 변경 시에만 히스토리 저장
 				Map<String, Object> histParam = new java.util.HashMap<>();
