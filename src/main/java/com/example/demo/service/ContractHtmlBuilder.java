@@ -61,6 +61,7 @@ public final class ContractHtmlBuilder {
 		}
 		html = html.replace("{{start_time}}", text(row.get("start_time")));
 		html = html.replace("{{end_time}}", text(row.get("end_time")));
+		html = html.replace("{{break_times}}", breakTimes(row));
 		html = html.replace("{{job_name}}", text(row.get("job_name")));
 		html = html.replace("{{work_place}}", text(row.get("work_place")));
 
@@ -232,7 +233,15 @@ public final class ContractHtmlBuilder {
 		for (Map<String, Object> clause : clauses) {
 			String title = HtmlUtils.htmlEscape(String.valueOf(clause.getOrDefault("title", ""))).replace("\n", "<br>");
 			rows.append("  <tr><th>").append(title).append("</th><td colspan=\"4\">");
-			for (String line : String.valueOf(clause.getOrDefault("body", "")).split("\n", -1)) {
+			String[] lines = String.valueOf(clause.getOrDefault("body", "")).split("\n", -1);
+			// 조항 안 가장 긴 항목명 폭(em) ("□ 항목 : 내용" 줄의 콜론 위치를 맞추는 기준)
+			double labelWidth = 0;
+			for (String line : lines) {
+				java.util.regex.Matcher m = LABEL_LINE.matcher(line);
+				if (m.matches() && !line.contains("{{sign}}")) labelWidth = Math.max(labelWidth, labelEm(m.group(1)));
+			}
+			for (String line : lines) {
+				java.util.regex.Matcher labelMatch = LABEL_LINE.matcher(line);
 				String trimmed = line.trim();
 				if ("{{ot_table}}".equals(trimmed)) {
 					rows.append(OT_TABLE);
@@ -247,6 +256,16 @@ public final class ContractHtmlBuilder {
 							.append("</div></td>")
 							.append("<td style=\"border:none; padding:0 6px 0 0; text-align:right; white-space:nowrap\">")
 							.append(SIGN_MARK).append("</td></tr></table>");
+				} else if (labelWidth > 0 && labelMatch.matches()) {
+					// "□ 항목" | ": 내용" 테두리 없는 2칸 표 (항목 칸 폭을 조항 안에서 같게 해 콜론 위치 정렬, 긴 내용은 콜론 뒤에 맞춰 줄바꿈)
+					// 칸 폭 고정 (항목 칸 = 조항 안 가장 긴 항목명 + □, 콜론 칸 = 0.8em, 나머지는 내용)
+					rows.append("<table style=\"width:100%; border-collapse:collapse; table-layout:fixed\"><tr>")
+							.append("<td style=\"border:none; padding:0; vertical-align:top; white-space:pre-wrap; width:")
+							.append(String.format(java.util.Locale.ROOT, "%.2f", labelWidth + 1.15)).append("em\">□ ")
+							.append(HtmlUtils.htmlEscape(labelMatch.group(1))).append("</td>")
+							.append("<td style=\"border:none; padding:0; vertical-align:top; white-space:nowrap; width:0.8em\">:</td>")
+							.append("<td style=\"border:none; padding:0; vertical-align:top\"><div class=\"ln\">")
+							.append(HtmlUtils.htmlEscape(labelMatch.group(2))).append("</div></td></tr></table>");
 				} else {
 					String text = HtmlUtils.htmlEscape(line);
 					rows.append("<div class=\"ln").append(trimmed.startsWith("□") ? " b" : "").append("\">")
@@ -256,6 +275,19 @@ public final class ContractHtmlBuilder {
 			rows.append("</td></tr>\n");
 		}
 		return rows.toString();
+	}
+
+	// "□ 항목 : 내용" 줄 판별 (항목명에 콜론·값 자리가 없고 12자 이내, 콜론 앞은 띄어쓰기)
+	// ERP ContractForm.js LABEL_LINE과 같은 규칙
+	private static final java.util.regex.Pattern LABEL_LINE = java.util.regex.Pattern.compile("^\\s*□\\s*([^:{}]{1,12}?)\\s+:\\s*(.*)$");
+
+	// 항목명 표시 폭(em): 한글 1, 띄어쓰기 0.3, 영문·숫자 0.55
+	private static double labelEm(String label) {
+		double sum = 0;
+		for (char ch : label.toCharArray()) {
+			sum += ch == ' ' ? 0.3 : (ch >= 0x21 && ch <= 0x7e) ? 0.55 : 1;
+		}
+		return sum;
 	}
 
 	// 제4조 월평균 연장·야간·휴일근로시간 표
@@ -285,6 +317,25 @@ public final class ContractHtmlBuilder {
 	}
 
 	// 일반 문자열 값 (HTML 이스케이프, null은 빈칸)
+	// 제3조 휴게 시간대 (", ( 12시 00분 ~ 13시 00분 )" 형식, 2회면 두 구간, 입력이 없으면 빈 문자열)
+	// 양식 본문 "총 {{break_hours}}시간{{break_times}}" 뒤에 붙도록 앞에 쉼표를 넣어 돌려준다
+	private static String breakTimes(Map<String, Object> row) {
+		StringBuilder sb = new StringBuilder();
+		for (String n : new String[] { "1", "2" }) {
+			String start = text(row.get("break_start" + n));
+			String end = text(row.get("break_end" + n));
+			if (start.isEmpty() || end.isEmpty()) continue;
+			sb.append(", ( ").append(clock(start)).append(" ~ ").append(clock(end)).append(" )");
+		}
+		return sb.toString();
+	}
+
+	// "12:00" → "12시 00분"
+	private static String clock(String hhmm) {
+		String[] p = hhmm.split(":");
+		return p.length == 2 ? p[0] + "시 " + p[1] + "분" : hhmm;
+	}
+
 	private static String text(Object value) {
 		return value == null ? "" : HtmlUtils.htmlEscape(String.valueOf(value).trim());
 	}

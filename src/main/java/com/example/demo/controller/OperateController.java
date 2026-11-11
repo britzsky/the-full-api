@@ -396,7 +396,7 @@ public class OperateController {
      * part : 운영
      * method : TallySheetWeekOverSave
      * comment : 급식사업부 -> 운영관리 -> 집계표 주차별 식자재 예산 초과 사유·개선 계획 저장
-     *           작성기한(다음 주 일요일, 주차 시작 주 월요일 + 13일)까지만 저장 가능
+     *           작성기한(해당 주 일요일, 주차 시작 주 월요일 + 6일)까지만 저장 가능
      */
     @PostMapping("Operate/TallySheetWeekOverSave")
     public String TallySheetWeekOverSave(@RequestBody Map<String, Object> paramMap) {
@@ -409,9 +409,9 @@ public class OperateController {
             int monthValue = Integer.parseInt(String.valueOf(paramMap.get("month")));
             if (accountId.isEmpty() || weekNo < 1) throw new IllegalArgumentException();
 
-            // 작성 가능 기한: 다음 주 일요일(주차 시작 주 월요일 + 13일)까지
+            // 작성 가능 기한: 해당 주 일요일(주차 시작 주 월요일 + 6일)까지
             LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-            LocalDate deadline = startDt.minusDays(startDt.getDayOfWeek().getValue() - 1).plusDays(13);
+            LocalDate deadline = startDt.minusDays(startDt.getDayOfWeek().getValue() - 1).plusDays(6);
             if (today.isAfter(deadline)) {
                 obj.addProperty("code", 400);
                 obj.addProperty("message", "작성 기간이 아닙니다. (작성기한 " + deadline + ")");
@@ -777,14 +777,50 @@ public class OperateController {
             String value = String.valueOf(paramMap.getOrDefault(key, "")).replace(",", "").trim();
             paramMap.put(key, value.isEmpty() || "null".equals(value) ? null : value);
         }
-        // 주 근무일수는 0~7 사이 숫자만 허용 (DB 컬럼 DECIMAL(3,1) 범위 초과·문자 입력 차단)
-        Object weekDays = paramMap.get("week_work_days");
-        if (weekDays != null) {
+        // 숫자 입력칸별 허용 범위 확인 (DB 컬럼 DECIMAL·INT 범위를 넘거나 숫자가 아니면 어떤 칸인지 안내)
+        // 항목: {컬럼, 화면 이름, 최대값, 단위}  주 근무일수만 업무 기준 0~7일, 나머지는 DB 컬럼 최대값
+        String[][] numberRanges = {
+            { "day_work_hours", "1일 소정근로시간", "999.99", "시간" },
+            { "month_work_hours", "1개월 소정근로시간", "99999.99", "시간" },
+            { "week_work_days", "주 근무일수", "7", "일" },
+            { "break_hours", "휴게시간", "99.99", "시간" },
+            { "ot_hours", "연장근로시간", "9999.99999", "시간" },
+            { "night_hours", "야간근로시간", "9999.99999", "시간" },
+            { "holiday_hours", "휴일근로시간", "9999.99999", "시간" },
+            { "base_pay", "기본급", "2147483647", "원" },
+            { "meal_pay", "식대보조비", "2147483647", "원" },
+            { "car_pay", "차량유지비", "2147483647", "원" },
+            { "child_pay", "육아수당", "2147483647", "원" },
+            { "annual_leave_pay", "연차수당", "2147483647", "원" },
+            { "ot_pay", "연장수당", "2147483647", "원" },
+            { "holiday_pay", "휴일수당", "2147483647", "원" },
+            { "night_pay", "야간수당", "2147483647", "원" },
+            { "total_pay", "월급여액", "2147483647", "원" },
+            { "probation_months", "수습기간", "2147483647", "개월" },
+        };
+        for (String[] range : numberRanges) {
+            Object value = paramMap.get(range[0]);
+            if (value == null) continue;
+            String guide = range[1] + " 값을 확인해 주세요. (입력값: " + value + ", 최대 " + range[2] + range[3] + ")";
             try {
-                double days = Double.parseDouble(String.valueOf(weekDays));
-                if (days < 0 || days > 7) return "주 근무일수를 확인해 주세요. (0~7일)";
+                double number = Double.parseDouble(String.valueOf(value));
+                double max = Double.parseDouble(range[2]);
+                // 주 근무일수는 0~7일, 나머지는 DB 컬럼이 담을 수 있는 범위(±최대값)
+                boolean outOfRange = "week_work_days".equals(range[0]) ? number < 0 || number > max : Math.abs(number) > max;
+                if (outOfRange) return guide;
             } catch (NumberFormatException e) {
-                return "주 근무일수를 확인해 주세요. (0~7일)";
+                return guide;
+            }
+        }
+        // 휴게 시간대 (HH:MM, 빈 값은 NULL, 2차는 휴게 2회일 때만)
+        for (String key : new String[] { "break_start1", "break_end1", "break_start2", "break_end2" }) {
+            String value = String.valueOf(paramMap.getOrDefault(key, "")).trim();
+            if (value.isEmpty() || "null".equals(value)) {
+                paramMap.put(key, null);
+            } else if (!value.matches("([01]?\\d|2[0-3]):[0-5]\\d")) {
+                return "휴게 시간대를 확인해 주세요. (예: 12:00, 입력값: " + value + ")";
+            } else {
+                paramMap.put(key, value);
             }
         }
         // 날짜 빈 값은 NULL (정규직 종료일)
