@@ -52,8 +52,8 @@ public class AccountService {
 
 	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
 	// WelstorySyncScheduler가 매일 18시(KST)에 WelstoryPurchaseSync()를 호출 ->
-	// 제휴사 2곳의 API를 각각 호출해 당일/전일/전전일(3일치) 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
-	// (당일 저녁 기준으로 아직 늦게 확정되는 전일/전전일분이 있을 수 있어 3일치를 매번 같이 재조회한다)
+	// 제휴사 2곳의 API를 각각 호출해 당일/전일/전전일/전전전일(4일치) 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
+	// (당일 저녁 기준으로 아직 늦게 확정되는 전일~전전전일분이 있을 수 있어 4일치를 매번 같이 재조회한다)
 
 	// 웰스토리 API 게이트웨이 base url (토큰발급: /oauth/2.0/token, 서비스: /fdapi/service/*)
 	// 운영은 기본값(welgw.welstory.com), 로컬은 application-secret-local.properties에서 품질서버(scp-stg-welgw)로 덮어쓴다
@@ -926,11 +926,13 @@ public class AccountService {
 		return resultList;
 	}
 
-	// 현장 -> 집계표 -> 매입집계 저장
+	// 현장 -> 집계표 -> 매입집계 저장 (저장 뒤 원가 사본 _cost도 같이 맞춘다)
+	@Transactional(rollbackFor = Exception.class)
 	public int AccountPurchaseSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		Map<String, Object> oldReceiptImages = findAccountPurchaseReceiptImages(paramMap);
 		iResult = accountMapper.AccountPurchaseSave(paramMap);
+		CostSyncAfterMasterWrite(paramMap);
 		if (iResult > 0) {
 			deleteReplacedReceiptImage(
 					asText(oldReceiptImages.get("receipt_image")),
@@ -959,10 +961,12 @@ public class AccountService {
 		return iResult;
 	}
 
-	// 현장 -> 집계표 -> 매입집계 상세 저장
+	// 현장 -> 집계표 -> 매입집계 상세 저장 (저장 뒤 원가 사본 _cost도 같이 맞춘다)
+	@Transactional(rollbackFor = Exception.class)
 	public int AccountPurchaseDetailSave(Map<String, Object> paramMap) {
 		int iResult = 0;
 		iResult = accountMapper.AccountPurchaseDetailSave(paramMap);
+		costSyncAfterDetailWrite(paramMap);
 		if (iResult > 0) {
 			try {
 				// detail paramMap에 total/saleDate가 없을 수 있으므로 DB에서 조회해 보완
@@ -999,13 +1003,282 @@ public class AccountService {
 		if (result != 1) {
 			throw new RuntimeException("❌ sp_sync_corp_card_to_tally_sheet_one_day_v2 프로시저 실패");
 		}
+		// 원가 사본(master·detail)도 같이 삭제
+		accountMapper.CostDetailDeleteBySaleId(paramMap);
+		accountMapper.CostMasterDelete(paramMap);
 
 		return result;
 	}
 
-	// 회계 -> 거래처 자료 입력 상세 삭제
+	// 회계 -> 거래처 자료 입력 상세 삭제 (원가 사본 detail도 삭제하고, 이익률 대상이면 판가 master 합계를 다시 맞춘다)
+	@Transactional(rollbackFor = Exception.class)
 	public int AccountPurchaseTallyDetailDelete(Map<String, Object> paramMap) {
-		return accountMapper.AccountPurchaseTallyDetailDelete(paramMap);
+		int iResult = accountMapper.AccountPurchaseTallyDetailDelete(paramMap);
+		accountMapper.CostDetailDeleteOne(paramMap);
+		Map<String, Object> main = accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
+		if (main != null && isMarginTarget(main.get("type"), main.get("saleDate")))
+			refreshMainSaleMaster(String.valueOf(paramMap.get("sale_id")),
+					marginRate(String.valueOf(main.get("account_id")), main.get("type"), toLocalDate(main.get("saleDate"))));
+		return iResult;
+	}
+
+	// ===================== 매입 원가(_cost) 사본 관리 =====================
+	// tb_account_purchase_tally(_detail) = 판가(이익률 포함), 집계표·예산이 읽는다.
+	// tb_account_purchase_tally_cost(_detail_cost) = 원가(이익률 제외), 회계·손익표가 읽는다.
+	// 판가 테이블에 들어간 매입은 모두 같은 sale_id·item_id로 원가 테이블에도 들어간다.
+	// 두 금액이 다른 것은 이익률 대상(웰스토리 1~4, 입고일 2026-11-01 이후)뿐이다.
+	//
+	// 저장 메서드에 넘기는 amount_basis 값
+	// - "api"  : 공급사 API 저장. 호출부(SupplierPurchaseSaveOneDay)가 두 테이블을 직접 맞춘다
+	// - "sale" : 판가로 입력한 금액(개발팀 집계표 수정). 원가는 판가 / (1 + 이익률)로 되돌린다
+	// - 그 외  : 원가로 입력한 금액(회계 거래처 자료입력 등). 이익률 대상이면 판가를 다시 계산한다
+
+	// 이익률을 적용하기 시작한 입고일
+	private static final LocalDate MARGIN_START_DATE = LocalDate.of(2026, 11, 1);
+	// 이익률을 적용하는 매입 type. 아워홈(1042)은 API 단가에 이미 이익률이 포함되어 추가 적용하지 않는다.
+	private static final java.util.Set<String> MARGIN_TYPES = java.util.Set.of("1", "2", "3", "4");
+	// 이익률 등록이 없을 때 쓰는 기본 이익률(%)
+	private static final java.math.BigDecimal DEFAULT_MARGIN_RATE = java.math.BigDecimal.valueOf(20);
+
+	// 매입 type·입고일이 이익률 대상인지 판단하는 함수
+	private boolean isMarginTarget(Object type, Object saleDate) {
+		if (type == null || !MARGIN_TYPES.contains(String.valueOf(type).trim()))
+			return false;
+		LocalDate date = toLocalDate(saleDate);
+		return date != null && !date.isBefore(MARGIN_START_DATE);
+	}
+
+	// DB 날짜·"YYYY-MM-DD"·"YYYYMMDD" 값을 LocalDate로 바꾸는 함수 (해석 못 하면 null)
+	private LocalDate toLocalDate(Object value) {
+		if (value == null)
+			return null;
+		if (value instanceof java.sql.Date)
+			return ((java.sql.Date) value).toLocalDate();
+		if (value instanceof LocalDate)
+			return (LocalDate) value;
+		String text = String.valueOf(value).trim();
+		if (text.matches("\\d{8}"))
+			text = text.substring(0, 4) + "-" + text.substring(4, 6) + "-" + text.substring(6, 8);
+		try {
+			return LocalDate.parse(text.length() > 10 ? text.substring(0, 10) : text);
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	// 거래처·공급사·입고 연월의 이익률(%)을 조회하는 함수. 웰스토리 1~4는 type 1로 관리하고, 등록이 없으면 20%
+	public java.math.BigDecimal marginRate(String accountId, Object type, LocalDate saleDate) {
+		Map<String, Object> param = new HashMap<>();
+		param.put("account_id", accountId);
+		param.put("margin_type", "1042".equals(String.valueOf(type).trim()) ? 1042 : 1);
+		param.put("rate_year", String.valueOf(saleDate.getYear()));
+		param.put("rate_month", String.format("%02d", saleDate.getMonthValue()));
+		java.math.BigDecimal rate = accountMapper.MarginRateGet(param);
+		return rate == null ? DEFAULT_MARGIN_RATE : rate;
+	}
+
+	// 웰스토리 FAQ "이익률 계산법"으로 판가 단가를 구하는 함수: 원가 단가 × (1 + 이익률/100)
+	// - 원가 단가 110원 이상: 0.1원 자리에서 올리고 1원 자리에서 올림 → 10원 단위로 올린 값
+	// - 원가 단가 110원 미만: 0.1원 자리에서 반올림, 1원 자리는 그대로
+	// 음수(정정 취소 줄)는 절댓값으로 계산하고 부호만 붙인다
+	static long marginSaleUnitPrice(long costUnit, java.math.BigDecimal rate) {
+		long abs = Math.abs(costUnit);
+		java.math.BigDecimal raw = java.math.BigDecimal.valueOf(abs)
+				.multiply(java.math.BigDecimal.valueOf(100).add(rate))
+				.divide(java.math.BigDecimal.valueOf(100), 10, java.math.RoundingMode.HALF_UP);
+		long sale = abs >= 110
+				? raw.divide(java.math.BigDecimal.TEN, 0, java.math.RoundingMode.CEILING).longValue() * 10
+				: raw.setScale(0, java.math.RoundingMode.HALF_UP).longValue();
+		return Long.signum(costUnit) * sale;
+	}
+
+	// 판가 품목 1줄의 공급가·부가세를 구하는 함수: 공급가 = 반올림(판가 단가 × 수량), 과세면 부가세 = 반올림(공급가 × 10%)
+	// 반환: {공급가, 부가세}. 음수 수량은 절댓값으로 반올림해 취소·재출고 줄이 정확히 상쇄되게 한다
+	static long[] marginSaleLine(long saleUnit, double qty, boolean taxable) {
+		double raw = saleUnit * qty;
+		long supply = (long) Math.signum(raw) * Math.round(Math.abs(raw));
+		long vat = taxable ? Long.signum(supply) * Math.round(Math.abs(supply) * 0.1) : 0;
+		return new long[] { supply, vat };
+	}
+
+	// 원가 detail 1줄로 판가 detail 1줄을 만드는 함수 (회계에서 원가로 고친 품목용)
+	// 수량·원가 단가를 알 수 없어 품목 공급가 전체를 단가로 보고 FAQ 규칙을 적용한다.
+	// ponytail: 줄 단위 근사. API 품목은 SupplierPurchaseSaveOneDay가 단가×수량으로 정확히 계산하므로 여기 오지 않는다
+	private Map<String, Object> marginSaleDetailFromCost(Map<String, Object> cost, java.math.BigDecimal rate) {
+		long amount = welstoryAsLong(cost.get("amount"));
+		long vat = welstoryAsLong(cost.get("vat"));
+		long tax = welstoryAsLong(cost.get("tax"));
+		boolean taxable = "1".equals(String.valueOf(cost.get("taxType")).trim());
+		long costSupply = taxable ? (tax != 0 ? tax : amount - vat) : amount;
+		long saleSupply = marginSaleUnitPrice(costSupply, rate);
+		long saleVat = taxable && vat != 0 ? Long.signum(saleSupply) * Math.round(Math.abs(saleSupply) * 0.1) : 0;
+		long saleAmount = saleSupply + saleVat;
+
+		Map<String, Object> sale = new HashMap<>(cost);
+		sale.put("qty", 1);
+		sale.put("unitPrice", saleAmount);
+		sale.put("amount", saleAmount);
+		sale.put("vat", saleVat);
+		sale.put("tax", taxable ? saleSupply : 0);
+		return sale;
+	}
+
+	// 판가 master 금액을 다시 맞추는 함수: 판가 detail이 있으면 그 합계, 없으면 원가 master 금액에 이익률 적용
+	private void refreshMainSaleMaster(String saleId, java.math.BigDecimal rate) {
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", saleId);
+		if (accountMapper.MainDetailCount(param) > 0) {
+			accountMapper.MainMasterAmountsFromDetails(param);
+			return;
+		}
+		Map<String, Object> cost = accountMapper.CostMasterGet(param);
+		if (cost == null)
+			return;
+		long costTax = welstoryAsLong(cost.get("tax"));
+		long costTaxFree = welstoryAsLong(cost.get("taxFree"));
+		long tax = marginSaleUnitPrice(costTax, rate);
+		long taxFree = marginSaleUnitPrice(costTaxFree, rate);
+		long vat = welstoryAsLong(cost.get("vat")) == 0 ? 0 : Long.signum(tax) * Math.round(Math.abs(tax) * 0.1);
+		// 과세·면세 구분 없이 합계만 있는 매입은 합계에 바로 이익률을 적용한다
+		long total = costTax == 0 && costTaxFree == 0
+				? marginSaleUnitPrice(welstoryAsLong(cost.get("total")), rate)
+				: tax + taxFree + vat;
+		param.put("total", total);
+		param.put("vat", vat);
+		param.put("tax", tax);
+		param.put("taxFree", taxFree);
+		accountMapper.MainMasterAmountsUpdate(param);
+	}
+
+	// 판가 테이블에 원가로 들어간 품목(새 품목·방금 고친 품목)을 원가 테이블로 옮기고,
+	// 이익률 대상이면(rate != null) 아직 판가로 바뀌지 않은 품목을 판가로 다시 계산하는 함수
+	private void costSyncDetails(String saleId, Object itemId, java.math.BigDecimal rate) {
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", saleId);
+		List<Integer> copyIds = new ArrayList<>(accountMapper.CostDetailMissingItemIds(param));
+		if (itemId != null && String.valueOf(itemId).trim().matches("-?\\d+")) {
+			int id = Integer.parseInt(String.valueOf(itemId).trim());
+			if (!copyIds.contains(id))
+				copyIds.add(id);
+		}
+		for (Integer id : copyIds) {
+			param.put("item_id", id);
+			accountMapper.CostDetailCopyOneFromMain(param);
+		}
+		if (rate == null)
+			return;
+		// 판가 detail 금액이 원가와 같은 품목 = 원가로 막 들어온 품목 → 판가로 바꾼다 (API 품목은 이미 달라서 건드리지 않음)
+		for (Integer id : accountMapper.MainDetailIdsEqualToCost(param)) {
+			param.put("item_id", id);
+			Map<String, Object> cost = accountMapper.CostDetailGet(param);
+			if (cost != null)
+				accountMapper.AccountPurchaseDetailSave(marginSaleDetailFromCost(cost, rate));
+		}
+	}
+
+	// 판가 master 저장 뒤 원가 사본을 맞추는 함수 (매입 저장 경로 전부에서 호출)
+	public void CostSyncAfterMasterWrite(Map<String, Object> paramMap) {
+		String basis = String.valueOf(paramMap.getOrDefault("amount_basis", ""));
+		String saleId = paramMap.get("sale_id") == null ? "" : String.valueOf(paramMap.get("sale_id")).trim();
+		if ("api".equals(basis) || saleId.isEmpty())
+			return;
+
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", saleId);
+		Map<String, Object> main = accountMapper.AccountPurchaseTallyTotalBySaleId(param);
+		if (main == null)
+			return;
+
+		// 이익률 대상이 아니면 master·detail을 그대로 복사
+		if (!isMarginTarget(main.get("type"), main.get("saleDate"))) {
+			param.put("margin_rate", null);
+			accountMapper.CostMasterCopyFromMain(param);
+			accountMapper.CostDetailDeleteBySaleId(param);
+			accountMapper.CostDetailsCopyFromMain(param);
+			return;
+		}
+
+		java.math.BigDecimal rate = marginRate(String.valueOf(main.get("account_id")), main.get("type"),
+				toLocalDate(main.get("saleDate")));
+		param.put("margin_rate", rate);
+		accountMapper.CostMasterCopyFromMain(param);
+		if ("sale".equals(basis)) {
+			// 판가로 입력한 금액: 원가 master는 판가 / (1 + 이익률)로 되돌린다
+			accountMapper.CostAmountsFromSalePrice(param);
+			return;
+		}
+		// 원가로 입력한 금액: 원가 master는 그대로 두고, 판가 detail·master를 다시 계산한다
+		costSyncDetails(saleId, null, rate);
+		refreshMainSaleMaster(saleId, rate);
+	}
+
+	// 판가 detail 저장 뒤 원가 사본을 맞추는 함수
+	private void costSyncAfterDetailWrite(Map<String, Object> paramMap) {
+		String basis = String.valueOf(paramMap.getOrDefault("amount_basis", ""));
+		String saleId = paramMap.get("sale_id") == null ? "" : String.valueOf(paramMap.get("sale_id")).trim();
+		if ("api".equals(basis) || saleId.isEmpty())
+			return;
+
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", saleId);
+		Map<String, Object> main = accountMapper.AccountPurchaseTallyTotalBySaleId(param);
+		if (main == null || !isMarginTarget(main.get("type"), main.get("saleDate"))) {
+			if (main == null) {
+				// master가 아직 없으면(상세 먼저 저장) 품목만 원가 테이블로 옮기고, 판가 계산은 master 저장 때 한다
+				costSyncDetails(saleId, paramMap.get("item_id"), null);
+			} else {
+				// 이익률 대상이 아니면 detail 전체를 그대로 맞춘다
+				accountMapper.CostDetailDeleteBySaleId(param);
+				accountMapper.CostDetailsCopyFromMain(param);
+			}
+			return;
+		}
+		java.math.BigDecimal rate = marginRate(String.valueOf(main.get("account_id")), main.get("type"),
+				toLocalDate(main.get("saleDate")));
+		costSyncDetails(saleId, paramMap.get("item_id"), rate);
+		refreshMainSaleMaster(saleId, rate);
+	}
+
+	// 공급사 API 하루치 매입 저장: 원가를 판가 테이블에 먼저 저장해 원가 테이블로 복사하고,
+	// 이익률 대상이면 판가로 다시 저장한 뒤 집계표·손익표·예산에 반영한다.
+	// saleMaster/saleDetails가 null이면 이익률 대상이 아니다(두 테이블 금액이 같음).
+	@Transactional(rollbackFor = Exception.class)
+	public void SupplierPurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details,
+			Map<String, Object> saleMaster, List<Map<String, Object>> saleDetails, java.math.BigDecimal rate) {
+		// 1) 원가로 저장 (그날 상세는 통째로 교체해 빠진 품목이 남지 않게 한다)
+		master.put("amount_basis", "api");
+		AccountPurchaseSave(master);
+		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
+		for (Map<String, Object> detail : details) {
+			detail.put("amount_basis", "api");
+			AccountPurchaseDetailSave(detail);
+		}
+		// 2) 원가 테이블로 복사
+		Map<String, Object> param = new HashMap<>();
+		param.put("sale_id", master.get("sale_id"));
+		param.put("margin_rate", saleMaster == null ? null : rate);
+		accountMapper.CostMasterCopyFromMain(param);
+		accountMapper.CostDetailDeleteBySaleId(param);
+		accountMapper.CostDetailsCopyFromMain(param);
+		// 3) 이익률 대상이면 판가 테이블을 판가로 다시 저장
+		if (saleMaster != null) {
+			accountMapper.AccountPurchaseSave(saleMaster);
+			accountMapper.PurchaseTallyDetailDeleteBySaleId(saleMaster);
+			for (Map<String, Object> detail : saleDetails)
+				accountMapper.AccountPurchaseDetailSave(detail);
+		}
+		// 4) 집계표(판가) → 손익표·예산 반영
+		TallySheetPaymentSave(master);
+	}
+
+	// 회계 -> 이익률 목록 조회
+	public List<Map<String, Object>> MarginRateList(Map<String, Object> paramMap) {
+		return accountMapper.MarginRateList(paramMap);
+	}
+
+	// 회계 -> 이익률 저장 (거래처·공급사·연월)
+	public int MarginRateSave(Map<String, Object> paramMap) {
+		return accountMapper.MarginRateSave(paramMap);
 	}
 
 	// 회계 -> 매입마감 sale_id 기준 기존 결제일자 조회
@@ -1227,6 +1500,7 @@ public class AccountService {
 	}
 
 	// 회계 -> 현장 법인카드 결제내역을 매입집계(type=1000)로 동기화
+	@Transactional(rollbackFor = Exception.class)
 	public int AccountCorporateCardPaymentToPurchaseTallySave(Map<String, Object> paramMap) {
 		String saleId = paramMap.get("sale_id") == null ? "" : String.valueOf(paramMap.get("sale_id")).trim();
 		String accountId = paramMap.get("account_id") == null ? "" : String.valueOf(paramMap.get("account_id")).trim();
@@ -1236,7 +1510,9 @@ public class AccountService {
 			return 0;
 		}
 
-		return accountMapper.AccountCorporateCardPaymentToPurchaseTallySave(paramMap);
+		int iResult = accountMapper.AccountCorporateCardPaymentToPurchaseTallySave(paramMap);
+		CostSyncAfterMasterWrite(paramMap);
+		return iResult;
 	}
 
 	// 회계 -> 현장 법인카드 집계표 적용, 손익표, 예산도 함께 적용해야 함.
@@ -1662,7 +1938,7 @@ public class AccountService {
 	//
 	// 전체 흐름 요약
 	// WelstorySyncScheduler(매일 18시 KST)
-	// -> WelstoryPurchaseSync() 당일/전일/전전일 3일치를 각각 제휴사 2곳 순회
+	// -> WelstoryPurchaseSync() 당일/전일/전전일/전전전일 4일치를 각각 제휴사 2곳 순회
 	// -> welstorySyncOneClient(client) client 하나: 토큰발급 -> 사업장(soldTo) 목록조회
 	// -> welstorySyncReceiveDetail(soldTo 하나) 해당 날짜 입고내역 전체 조회
 	// -> AccountPurchaseSave(master 1행) "하루당 1 master" = tb_account_purchase_tally
@@ -1677,13 +1953,13 @@ public class AccountService {
 	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된
 	// master(soldTo/날짜) 건수 합계를 반환
 	// 당일 저녁(18시)에 도는 구조라 대상일은 "오늘"이지만, 늦게 확정되는 주문을 놓치지 않도록
-	// 전일/전전일도 매번 같이 재조회해서 최신 상태로 덮어쓴다 (오늘/어제/그제 총 3일치).
+	// 전일~전전전일도 매번 같이 재조회해서 최신 상태로 덮어쓴다 (오늘~3일 전 총 4일치).
 	// LocalDate.now()가 아니라 Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
 	// 자정 근처(KST 00~09시, UTC로는 전날)에 날짜가 하루 어긋날 수 있다 (guid와 동일한 이유).
 	public int WelstoryPurchaseSync() {
 		LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
 		int total = 0;
-		for (int daysBack = 0; daysBack <= 2; daysBack++) {
+		for (int daysBack = 0; daysBack <= 3; daysBack++) {
 			String targetDate = today.minusDays(daysBack).format(DateTimeFormatter.ofPattern("yyyyMMdd"));
 			total += WelstoryPurchaseSync(targetDate);
 		}
@@ -1793,7 +2069,14 @@ public class AccountService {
 		// 나중에 이 row가 어느 soldTo에서 왔는지 추적할 수 있도록 note에 남겨둠
 		master.put("note", "웰스토리 API 연동 (soldTo=" + soldTo + ")");
 		master.put("user_id", WELSTORY_SYNC_USER_ID);
-		AccountPurchaseSave(master);
+
+		// 이익률 대상(입고일 2026-11-01 이후)이면 품목마다 판가를 따로 계산해 판가 테이블에 넣는다
+		LocalDate saleLocalDate = LocalDate.parse(String.valueOf(master.get("saleDate")));
+		boolean marginTarget = isMarginTarget("1", saleLocalDate);
+		java.math.BigDecimal rate = marginTarget ? marginRate(accountId, "1", saleLocalDate) : null;
+		List<Map<String, Object>> details = new ArrayList<>();
+		List<Map<String, Object>> saleDetails = new ArrayList<>();
+		long saleTotal = 0, saleVat = 0, saleTax = 0, saleTaxFree = 0;
 
 		// ---- detail row 저장: tb_account_purchase_tally_detail (PK = item_id + sale_id)
 		// ----
@@ -1833,17 +2116,40 @@ public class AccountService {
 			detail.put("note", line.get("standard") + " [수량:" + line.get("billQty") + " 단가:" + line.get("unitPrice")
 					+ "] (" + clientOrd + ")");
 			detail.put("user_id", WELSTORY_SYNC_USER_ID);
-			AccountPurchaseDetailSave(detail);
+			details.add(detail);
+
+			if (marginTarget) {
+				// 판가: 원가 단가(unitPrice) × 이익률 → FAQ 반올림 → × 실제 수량(billQty) → 과세면 부가세 10%
+				long saleUnit = marginSaleUnitPrice(welstoryAsLong(line.get("unitPrice")), rate);
+				double billQty = parseQty(line.get("billQty"));
+				long[] sale = marginSaleLine(saleUnit, billQty, taxable);
+				long saleAmount = sale[0] + sale[1];
+				Map<String, Object> saleDetail = new HashMap<>(detail);
+				saleDetail.put("amount", saleAmount);
+				saleDetail.put("unitPrice", saleAmount); // qty=1과 곱해 항상 amount와 일치
+				saleDetail.put("vat", sale[1]);
+				saleDetail.put("tax", taxable ? sale[0] : 0);
+				saleDetails.add(saleDetail);
+				saleTotal += saleAmount;
+				saleVat += sale[1];
+				saleTax += taxable ? sale[0] : 0;
+				saleTaxFree += taxable ? 0 : saleAmount;
+			}
 		}
 
-		// tb_account_purchase_tally(_detail)에만 저장하고 끝나면 집계표(tb_account_tally_sheet)에 반영되지 않는다.
-		// 프론트(AccountPurchaseDeadlineTab)와 동일하게 "상세 저장 -> 마스터 저장" 순서를 지킨 뒤,
-		// AccountController의 일반 저장 경로와 같이 sp_sync_tally_sheet_one_day를 태워 집계표에도 보이게 한다.
-		LocalDate saleLocalDate = LocalDate.parse(String.valueOf(master.get("saleDate")));
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
-		// self(프록시 경유)로 호출해야 @Transactional이 실제로 걸려서, 4단계 중 하나라도 실패하면 전부 롤백된다.
-		self.TallySheetPaymentSave(master);
+		Map<String, Object> saleMaster = null;
+		if (marginTarget) {
+			saleMaster = new HashMap<>(master);
+			saleMaster.put("total", saleTotal);
+			saleMaster.put("vat", saleVat);
+			saleMaster.put("tax", saleTax);
+			saleMaster.put("taxFree", saleTaxFree);
+		}
+		// 원가(_cost)·판가 저장 → 그날 상세 교체 → 집계표·손익표·예산 반영을 한 트랜잭션으로 처리한다.
+		// self(프록시 경유)로 호출해야 @Transactional이 실제로 걸린다.
+		self.SupplierPurchaseSaveOneDay(master, details, saleMaster, marginTarget ? saleDetails : null, rate);
 
 		return 1; // 이 soldTo/날짜에 대해 master 1건 저장(=처리 성공)
 	}
@@ -1874,6 +2180,15 @@ public class AccountService {
 			return Long.parseLong(String.valueOf(v).trim());
 		} catch (NumberFormatException e) {
 			return 0L;
+		}
+	}
+
+	// 웰스토리 수량 문자열("2.500" 등)을 숫자로 바꾸는 함수. 해석 못 하면 0
+	private double parseQty(Object v) {
+		try {
+			return Double.parseDouble(String.valueOf(v).trim());
+		} catch (Exception e) {
+			return 0;
 		}
 	}
 
@@ -2357,7 +2672,7 @@ public class AccountService {
 	//
 	// 전체 흐름 요약 (웰스토리 WelstoryPurchaseSync와 같은 구조)
 	// OurhomeSyncScheduler(매일 20시 10분 KST)
-	// -> OurhomePurchaseSync() 당일/전일/전전일 3일치
+	// -> OurhomePurchaseSync() 당일/전일/전전일/전전전일 4일치
 	// -> tb_account.ourhome_busiplcd로 매핑된 거래처만 주문 입고내역(getOrderList) 조회 (사업장 조회 생략)
 	// -> 거래처·하루 1 master(tb_account_purchase_tally, type=1042) + 품목 N detail로 저장
 	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
@@ -2368,11 +2683,11 @@ public class AccountService {
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값
 	private static final String OURHOME_SYNC_USER_ID = "SYSTEM";
 
-	// 진입점. 오늘/어제/그제(KST) 3일치를 각각 동기화하고 저장된 master 건수 합계를 반환한다.
+	// 진입점. 오늘~3일 전(KST) 4일치를 각각 동기화하고 저장된 master 건수 합계를 반환한다.
 	public int OurhomePurchaseSync() {
 		LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 		int total = 0;
-		for (int daysBack = 0; daysBack <= 2; daysBack++)
+		for (int daysBack = 0; daysBack <= 3; daysBack++)
 			total += OurhomePurchaseSync(today.minusDays(daysBack).format(DateTimeFormatter.BASIC_ISO_DATE));
 		return total;
 	}
@@ -2460,6 +2775,12 @@ public class AccountService {
 		master.put("note", "아워홈 API 연동 (busiplcd=" + siteCode + ")");
 		master.put("user_id", OURHOME_SYNC_USER_ID);
 
+		// 이익률 대상(입고일 2026-11-01 이후)이면 품목마다 판가를 따로 계산해 판가 테이블에 넣는다
+		boolean marginTarget = isMarginTarget("1042", saleLocalDate);
+		java.math.BigDecimal rate = marginTarget ? marginRate(accountId, "1042", saleLocalDate) : null;
+		List<Map<String, Object>> saleDetails = new ArrayList<>();
+		long saleTotal = 0, saleVat = 0, saleTax = 0, saleTaxFree = 0;
+
 		// ---- detail: 품목 한 줄씩. 금액 계산 방식은 웰스토리와 동일하게 qty=1, unitPrice=amount ----
 		// 아워홈 API 단가(salsUcost)는 사업장 마감 단가 그대로 온다.
 		// 금액 = 마감 단가 × 출고수량, 부가세 = 과세 금액의 10%
@@ -2509,6 +2830,24 @@ public class AccountService {
 			detail.put("note", note.length() > 100 ? note.substring(0, 100) : note);
 			detail.put("user_id", OURHOME_SYNC_USER_ID);
 			details.add(detail);
+
+			if (marginTarget) {
+				// 판가: 원가 단가(salsUcost) × 이익률 → FAQ 반올림 → × 출고수량 → 과세면 부가세 10%
+				long[] sale = marginSaleLine(marginSaleUnitPrice(closeUnit, rate), qty, taxable);
+				long saleAmount = sale[0] + sale[1];
+				Map<String, Object> saleDetail = new HashMap<>(detail);
+				// 판가는 단가가 10원 단위가 아닐 수 있어 수량 1, 단가 = 금액으로 넣는다 (화면 수량×단가 재계산과 일치)
+				saleDetail.put("qty", "1");
+				saleDetail.put("unitPrice", saleAmount);
+				saleDetail.put("amount", saleAmount);
+				saleDetail.put("vat", sale[1]);
+				saleDetail.put("tax", taxable ? sale[0] : 0);
+				saleDetails.add(saleDetail);
+				saleTotal += saleAmount;
+				saleVat += sale[1];
+				saleTax += taxable ? sale[0] : 0;
+				saleTaxFree += taxable ? 0 : sale[0];
+			}
 		}
 
 		master.put("total", total);
@@ -2517,19 +2856,17 @@ public class AccountService {
 		master.put("tax", tax);
 		master.put("year", saleLocalDate.getYear());
 		master.put("month", saleLocalDate.getMonthValue());
-		// self(프록시 경유)로 호출해야 @Transactional이 걸려 상세 교체~집계표 반영이 한 번에 롤백된다
-		self.OurhomePurchaseSaveOneDay(master, details);
+		Map<String, Object> saleMaster = null;
+		if (marginTarget) {
+			saleMaster = new HashMap<>(master);
+			saleMaster.put("total", saleTotal);
+			saleMaster.put("vat", saleVat);
+			saleMaster.put("tax", saleTax);
+			saleMaster.put("taxFree", saleTaxFree);
+		}
+		// self(프록시 경유)로 호출해야 @Transactional이 걸려 원가·판가 저장~집계표 반영이 한 번에 롤백된다
+		self.SupplierPurchaseSaveOneDay(master, details, saleMaster, marginTarget ? saleDetails : null, rate);
 		return 1;
-	}
-
-	// 아워홈 하루치 매입 저장: master 저장 -> 그날 상세 전체 교체(주문 수정·삭제 반영) -> 집계표·손익표·예산 반영
-	@Transactional(rollbackFor = Exception.class)
-	public void OurhomePurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details) {
-		AccountPurchaseSave(master);
-		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
-		for (Map<String, Object> detail : details)
-			AccountPurchaseDetailSave(detail);
-		TallySheetPaymentSave(master);
 	}
 
 	// 아워홈 하루치 매입 삭제: sale_id별 master·detail 삭제(sp_sync_account_purchase_delete) -> 집계표·손익표·예산 재반영

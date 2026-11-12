@@ -315,6 +315,9 @@ public class OperateController {
                     updateParam.put("totalCash", total);
                     updateParam.put("user_id", userId);
                     accountMapper.AccountPurchaseTallyTotalUpdate(updateParam);
+                    // 집계표 금액은 판가이므로, 원가 사본(_cost)은 판가 / (1 + 이익률)로 맞춘다
+                    updateParam.put("amount_basis", "sale");
+                    accountService.CostSyncAfterMasterWrite(updateParam);
                 } else {
                     String saleId = LocalDateTime.now().format(saleIdFmt);
                     System.out.println("[syncTallySheet] INSERT new sale_id=" + saleId + " saleDate=" + saleDate
@@ -341,6 +344,8 @@ public class OperateController {
                     purchaseParam.put("cashReceiptType", null);
                     purchaseParam.put("user_id", userId);
                     purchaseParam.put("receipt_type", "");
+                    // 집계표 금액은 판가 (원가 사본은 저장 메서드가 판가 / (1 + 이익률)로 맞춘다)
+                    purchaseParam.put("amount_basis", "sale");
                     accountService.AccountPurchaseSave(purchaseParam);
                 }
             } catch (Exception e) {
@@ -780,13 +785,13 @@ public class OperateController {
         // 숫자 입력칸별 허용 범위 확인 (DB 컬럼 DECIMAL·INT 범위를 넘거나 숫자가 아니면 어떤 칸인지 안내)
         // 항목: {컬럼, 화면 이름, 최대값, 단위}  주 근무일수만 업무 기준 0~7일, 나머지는 DB 컬럼 최대값
         String[][] numberRanges = {
-            { "day_work_hours", "1일 소정근로시간", "999.99", "시간" },
-            { "month_work_hours", "1개월 소정근로시간", "99999.99", "시간" },
+            { "day_work_hours", "1일 소정근로시간", "999.999999", "시간" },
+            { "month_work_hours", "1개월 소정근로시간", "99999.999999", "시간" },
             { "week_work_days", "주 근무일수", "7", "일" },
-            { "break_hours", "휴게시간", "99.99", "시간" },
-            { "ot_hours", "연장근로시간", "9999.99999", "시간" },
-            { "night_hours", "야간근로시간", "9999.99999", "시간" },
-            { "holiday_hours", "휴일근로시간", "9999.99999", "시간" },
+            { "break_hours", "휴게시간", "99.999999", "시간" },
+            { "ot_hours", "연장근로시간", "9999.999999", "시간" },
+            { "night_hours", "야간근로시간", "9999.999999", "시간" },
+            { "holiday_hours", "휴일근로시간", "9999.999999", "시간" },
             { "base_pay", "기본급", "2147483647", "원" },
             { "meal_pay", "식대보조비", "2147483647", "원" },
             { "car_pay", "차량유지비", "2147483647", "원" },
@@ -828,8 +833,15 @@ public class OperateController {
             String value = String.valueOf(paramMap.getOrDefault(key, "")).trim();
             paramMap.put(key, value.isEmpty() || "null".equals(value) ? null : value);
         }
-        // 작성일자는 ERP에서 비워 두고 근로자가 앱에서 서명한 날짜로 채움
-        paramMap.put("contract_dt", null);
+        // 작성일자 (ERP 입력값, 기본은 실입사일 전날 / 비우면 근로자가 앱에서 서명한 날짜로 채움)
+        String contractDt = String.valueOf(paramMap.getOrDefault("contract_dt", "")).trim();
+        if (contractDt.isEmpty() || "null".equals(contractDt)) {
+            paramMap.put("contract_dt", null);
+        } else if (!contractDt.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return "작성일자를 확인해 주세요. (입력값: " + contractDt + ")";
+        } else {
+            paramMap.put("contract_dt", contractDt);
+        }
         return null;
     }
 

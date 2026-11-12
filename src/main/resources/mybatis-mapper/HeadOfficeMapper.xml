@@ -556,6 +556,34 @@
         )
     </insert>
 
+    <!-- 손익표 판가 보기(sale_yn=Y)에서 거래처·연월별 이익률 차액(판가 master 금액 − 원가 master 금액)을 붙이는 조인 조각.
+         대상은 거래처 매핑(tb_account_mapping_v2, del_yn 무관)에 있는 식재료(account_type=0) type 중 웰스토리(1~4)·아워홈(1042)의 2026-11 이후 입고분이다.
+         ProfitLossTotalSave 프로시저가 food_cost에서 빼는 차액과 같은 기준이며, ON 조건은 호출하는 쿼리에서 붙인다. -->
+    <sql id="ProfitLossMarginDiffJoin">
+        LEFT JOIN (
+            SELECT C.account_id AS md_account_id,
+                   YEAR(C.saleDate) AS md_year,
+                   MONTH(C.saleDate) AS md_month,
+                   SUM(IFNULL(P.total, 0) - IFNULL(C.total, 0)) AS margin_diff
+            FROM the_full.tb_account_purchase_tally_cost C
+            JOIN the_full.tb_account_purchase_tally P
+              ON P.sale_id = C.sale_id
+            JOIN the_full.tb_account_mapping_v2 MV
+              ON MV.account_id = C.account_id
+             AND MV.type = C.type
+            JOIN the_full.tb_account_mapping M
+              ON M.type = C.type
+             AND M.account_type = 0
+            WHERE C.type IN (1, 2, 3, 4, 1042)
+              AND C.saleDate >= '2026-11-01'
+              AND C.saleDate >= MAKEDATE(#{year}, 1)
+              AND C.saleDate <![CDATA[<]]> MAKEDATE(#{year} + 1, 1)
+              <if test="month != null and month != ''">
+              AND MONTH(C.saleDate) = #{month}
+              </if>
+            GROUP BY C.account_id, YEAR(C.saleDate), MONTH(C.saleDate)
+        ) MD
+    </sql>
     <select id="ProfitLossTableList" parameterType="map" resultType="hashmap">
     	
 		    <choose>
@@ -695,7 +723,7 @@
 					        SUM(IFNULL(dishwasher, 0)) AS dishwasher,
 					        SUM(IFNULL(cesco, 0)) AS cesco,
 					        SUM(IFNULL(water_puri, 0)) AS water_puri,
-					        SUM(IFNULL(food_cost, 0)) AS food_cost,
+					        SUM(IFNULL(food_cost, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS food_cost,
 					        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 					        SUM(IFNULL(event_cost, 0)) AS event_cost,
 					        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
@@ -710,11 +738,11 @@
 					        SUM(IFNULL(etc_indirect_cost, 0)) AS etc_indirect_cost,
 					        SUM(IFNULL(person_total, 0)) AS person_total,
 					        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
-					        SUM(IFNULL(business_profit, 0)) AS business_profit,
-					        SUM(IFNULL(total_business_profit, 0)) AS total_business_profit,
+					        SUM(IFNULL(business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if>) AS business_profit,
+					        SUM(IFNULL(total_business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if>) AS total_business_profit,
 
 					        SUM(IFNULL(sales_total, 0)) AS sales_total,
-					        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
+					        SUM(IFNULL(purchase_total, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS purchase_total,
 
 					        SUM(IFNULL(living_estimate, 0)) AS living_estimate,
 					        SUM(IFNULL(basic_estimate, 0)) AS basic_estimate,
@@ -722,6 +750,10 @@
 					        MAX(utility_bills_note) AS utility_bills_note,
 					        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 					    FROM the_full.tb_account_managerment_table
+					    <if test='sale_yn == "Y"'>
+					        <include refid="ProfitLossMarginDiffJoin"/>
+					        ON MD.md_account_id = the_full.tb_account_managerment_table.account_id AND MD.md_year = the_full.tb_account_managerment_table.year AND MD.md_month = the_full.tb_account_managerment_table.month
+					    </if>
 					    WHERE year = #{year}
 					    <if test="month != ''">
 				            AND month = #{month}
@@ -790,8 +822,11 @@
 					    ifnull(utility_bills,0) as utility_bills,
 					    ifnull(utility_ratio,0) as utility_ratio,
 					    utility_bills_note,
-					    ifnull(food_cost,0) as food_cost,
-					    ifnull(food_ratio,0) as food_ratio,
+					    ifnull(food_cost,0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if> as food_cost,
+					    <choose>
+					        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(food_ratio,0) ELSE ROUND(IFNULL((IFNULL(food_cost, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 4) END</when>
+					        <otherwise>ifnull(food_ratio,0)</otherwise>
+					    </choose> as food_ratio,
 					    ifnull(etc_cost,0) as etc_cost,
 					    ifnull(etc_ratio,0) as etc_ratio,
 					    ifnull(estimate_total,0) as estimate_total,
@@ -806,16 +841,25 @@
 					    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 4) AS upfront_cost_ratio,
 					    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
 					    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=the_full.tb_account_managerment_table.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
-					    ifnull(purchase_total,0) as purchase_total,
-					    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
+					    ifnull(purchase_total,0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if> as purchase_total,
+					    <choose>
+					        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(purchase_total_ratio,0) ELSE ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) END</when>
+					        <otherwise>ifnull(purchase_total_ratio,0)</otherwise>
+					    </choose> as purchase_total_ratio,
 					    ifnull(person_total,0) as person_total,
 					    ifnull(person_total_ratio,0) as person_total_ratio,
 					    ifnull(indirect_total,0) as indirect_total,
 					    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
-					    ifnull(business_profit,0) as business_profit,
-					    ifnull(business_profit_ratio,0) as business_profit_ratio,
-					    ifnull(total_business_profit,0) as total_business_profit,
-					    ifnull(total_business_profit_ratio,0) as total_business_profit_ratio,
+					    ifnull(business_profit,0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> as business_profit,
+					    <choose>
+					        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(business_profit_ratio,0) ELSE ROUND(IFNULL(sales_total_ratio, 0) - ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) - IFNULL(person_total_ratio, 0) - IFNULL(indirect_total_ratio, 0), 2) END</when>
+					        <otherwise>ifnull(business_profit_ratio,0)</otherwise>
+					    </choose> as business_profit_ratio,
+					    ifnull(total_business_profit,0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> as total_business_profit,
+					    <choose>
+					        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(total_business_profit_ratio,0) ELSE ROUND(IFNULL(sales_total_ratio, 0) - ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) - IFNULL(person_total_ratio, 0) - IFNULL(indirect_total_ratio, 0) + IFNULL(payback_ratio, 0), 2) END</when>
+					        <otherwise>ifnull(total_business_profit_ratio,0)</otherwise>
+					    </choose> as total_business_profit_ratio,
 					    ifnull(event_cost,0) as event_cost,
 					    ifnull(event_ratio,0) as event_ratio,
 					    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -828,6 +872,10 @@
 					    ifnull(return_cost,0) as return_cost,
 					    ifnull(return_ratio,0) as return_ratio
 					FROM the_full.tb_account_managerment_table
+					<if test='sale_yn == "Y"'>
+					    <include refid="ProfitLossMarginDiffJoin"/>
+					    ON MD.md_account_id = the_full.tb_account_managerment_table.account_id AND MD.md_year = the_full.tb_account_managerment_table.year AND MD.md_month = the_full.tb_account_managerment_table.month
+					</if>
 					WHERE 
 						year = #{year}
 						<if test="month != ''">
@@ -990,7 +1038,7 @@
 				        SUM(IFNULL(dishwasher, 0)) AS dishwasher,
 				        SUM(IFNULL(cesco, 0)) AS cesco,
 				        SUM(IFNULL(water_puri, 0)) AS water_puri,
-				        SUM(IFNULL(food_cost, 0)) AS food_cost,
+				        SUM(IFNULL(food_cost, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS food_cost,
 				        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 				        SUM(IFNULL(event_cost, 0)) AS event_cost,
 				        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
@@ -1006,11 +1054,11 @@
 				        SUM(IFNULL(person_total, 0)) AS person_total,
 				        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
 				        -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
-				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0) END) AS business_profit,
-				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0) END) AS total_business_profit,
+				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END) AS business_profit,
+				        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END) AS total_business_profit,
 
 				        SUM(IFNULL(sales_total, 0)) AS sales_total,
-				        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
+				        SUM(IFNULL(purchase_total, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS purchase_total,
 
 				        SUM(IFNULL(living_estimate, 0)) AS living_estimate,
 				        SUM(IFNULL(basic_estimate, 0)) AS basic_estimate,
@@ -1018,6 +1066,10 @@
 				        MAX(utility_bills_note) AS utility_bills_note,
 				        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 				    FROM the_full.tb_account_managerment_table
+				    <if test='sale_yn == "Y"'>
+				        <include refid="ProfitLossMarginDiffJoin"/>
+				        ON MD.md_account_id = the_full.tb_account_managerment_table.account_id AND MD.md_year = the_full.tb_account_managerment_table.year AND MD.md_month = the_full.tb_account_managerment_table.month
+				    </if>
 				    WHERE year = #{year}
 				    <if test="month != ''">
 				        AND month = #{month}
@@ -1087,8 +1139,11 @@
 				    ifnull(utility_bills,0) as utility_bills,
 				    ifnull(utility_ratio,0) as utility_ratio,
 				    utility_bills_note,
-				    ifnull(food_cost,0) as food_cost,
-				    ifnull(food_ratio,0) as food_ratio,
+				    ifnull(food_cost,0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if> as food_cost,
+				    <choose>
+				        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(food_ratio,0) ELSE ROUND(IFNULL((IFNULL(food_cost, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 4) END</when>
+				        <otherwise>ifnull(food_ratio,0)</otherwise>
+				    </choose> as food_ratio,
 				    ifnull(etc_cost,0) as etc_cost,
 				    ifnull(etc_ratio,0) as etc_ratio,
 				    ifnull(estimate_total,0) as estimate_total,
@@ -1103,17 +1158,30 @@
 				    ROUND(IFNULL(upfront_cost / NULLIF(sales_total,0) * 100, 0), 4) AS upfront_cost_ratio,
 				    CASE WHEN upfront_cost>0 THEN (SELECT ROUND(ai.upfront_cost / NULLIF(PERIOD_DIFF(DATE_FORMAT(ai.contract_end,'%Y%m'),DATE_FORMAT(ai.contract_start,'%Y%m'))+1,0),0) FROM the_full.tb_account_info ai WHERE ai.account_id=T.account_id LIMIT 1) ELSE 0 END AS upfront_monthly_deprec,
 				    CASE WHEN upfront_cost>0 THEN (SELECT ai.upfront_cost FROM the_full.tb_account_info ai WHERE ai.account_id=T.account_id LIMIT 1) ELSE 0 END AS upfront_original_cost,
-				    ifnull(purchase_total,0) as purchase_total,
-				    ifnull(purchase_total_ratio,0) as purchase_total_ratio,
+				    ifnull(purchase_total,0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if> as purchase_total,
+				    <choose>
+				        <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(purchase_total_ratio,0) ELSE ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) END</when>
+				        <otherwise>ifnull(purchase_total_ratio,0)</otherwise>
+				    </choose> as purchase_total_ratio,
 				    ifnull(person_total,0) as person_total,
 				    ifnull(person_total_ratio,0) as person_total_ratio,
 				    ifnull(indirect_total,0) as indirect_total,
 				    ifnull(indirect_total_ratio,0) as indirect_total_ratio,
 				    -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
-				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(business_profit,0) END as business_profit,
-				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(business_profit_ratio,0) END as business_profit_ratio,
-				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(total_business_profit,0) END as total_business_profit,
-				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(total_business_profit_ratio,0) END as total_business_profit_ratio,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(business_profit,0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END as business_profit,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE
+				        <choose>
+				            <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(business_profit_ratio,0) ELSE ROUND(IFNULL(sales_total_ratio, 0) - ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) - IFNULL(person_total_ratio, 0) - IFNULL(indirect_total_ratio, 0), 2) END</when>
+				            <otherwise>ifnull(business_profit_ratio,0)</otherwise>
+				        </choose>
+				    END as business_profit_ratio,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE ifnull(total_business_profit,0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END as total_business_profit,
+				    CASE WHEN ifnull(basic_cost,0) = 0 AND ifnull(basic_cost2,0) = 0 THEN 0 ELSE
+				        <choose>
+				            <when test='sale_yn == "Y"'>CASE WHEN IFNULL(MD.margin_diff, 0) = 0 THEN ifnull(total_business_profit_ratio,0) ELSE ROUND(IFNULL(sales_total_ratio, 0) - ROUND(IFNULL((IFNULL(purchase_total, 0) + MD.margin_diff) / NULLIF(sales_total, 0) * 100, 0), 2) - IFNULL(person_total_ratio, 0) - IFNULL(indirect_total_ratio, 0) + IFNULL(payback_ratio, 0), 2) END</when>
+				            <otherwise>ifnull(total_business_profit_ratio,0)</otherwise>
+				        </choose>
+				    END as total_business_profit_ratio,
 				    ifnull(event_cost,0) as event_cost,
 				    ifnull(event_ratio,0) as event_ratio,
 				    DATE_FORMAT(update_dt, '%Y-%m-%d') AS update_dt,
@@ -1128,6 +1196,10 @@
 				FROM the_full.tb_account_managerment_table T
 				JOIN the_full.tb_account T2
 				ON T2.account_id = T.account_id
+				<if test='sale_yn == "Y"'>
+				    <include refid="ProfitLossMarginDiffJoin"/>
+				    ON MD.md_account_id = T.account_id AND MD.md_year = T.year AND MD.md_month = T.month
+				</if>
 				WHERE year = #{year}
 				<if test="month != ''">
 		            AND T.month = #{month}
@@ -1285,7 +1357,7 @@
 		        SUM(IFNULL(dishwasher, 0)) AS dishwasher,
 		        SUM(IFNULL(cesco, 0)) AS cesco,
 		        SUM(IFNULL(water_puri, 0)) AS water_puri,
-		        SUM(IFNULL(food_cost, 0)) AS food_cost,
+		        SUM(IFNULL(food_cost, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS food_cost,
 		        SUM(IFNULL(etc_cost, 0)) AS etc_cost,
 		        SUM(IFNULL(event_cost, 0)) AS event_cost,
 		        SUM(IFNULL(not_budget_cost, 0)) AS not_budget_cost,
@@ -1299,11 +1371,11 @@
 		        SUM(IFNULL(person_total, 0)) AS person_total,
 		        SUM(IFNULL(indirect_total, 0)) AS indirect_total,
 		        -- 일반식비 입금 전(basic_cost·basic_cost2 모두 0)인 달은 영업이익/총 영업이익에 포함하지 않는다
-		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0) END) AS business_profit,
-		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0) END) AS total_business_profit,
+		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END) AS business_profit,
+		        SUM(CASE WHEN IFNULL(basic_cost, 0) = 0 AND IFNULL(basic_cost2, 0) = 0 THEN 0 ELSE IFNULL(total_business_profit, 0)<if test='sale_yn == "Y"'> - IFNULL(MD.margin_diff, 0)</if> END) AS total_business_profit,
 
 		        SUM(IFNULL(sales_total, 0)) AS sales_total,
-		        SUM(IFNULL(purchase_total, 0)) AS purchase_total,
+		        SUM(IFNULL(purchase_total, 0)<if test='sale_yn == "Y"'> + IFNULL(MD.margin_diff, 0)</if>) AS purchase_total,
 		        
 		        -- 식수 추정치: 일수 30/단가 5000 고정값으로 재계산하면 거래처별 실제 단가·월별 일수와 달라지므로,
 		        -- 프로시저가 매달 정확히 계산해 저장한 DB 값(living_estimate/basic_estimate)을 그대로 합산한다.
@@ -1313,6 +1385,10 @@
 		        MAX(utility_bills_note) AS utility_bills_note,
 		        MAX(DATE_FORMAT(update_dt, '%Y-%m-%d')) AS update_dt
 		    FROM the_full.tb_account_managerment_table
+		    <if test='sale_yn == "Y"'>
+		        <include refid="ProfitLossMarginDiffJoin"/>
+		        ON MD.md_account_id = the_full.tb_account_managerment_table.account_id AND MD.md_year = the_full.tb_account_managerment_table.year AND MD.md_month = the_full.tb_account_managerment_table.month
+		    </if>
 		    WHERE year = #{year}
 		    <if test="month != ''">
 		        AND month = #{month}

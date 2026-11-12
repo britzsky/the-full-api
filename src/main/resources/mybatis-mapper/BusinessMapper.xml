@@ -416,7 +416,6 @@
 	<select id="BusinessMemberList" parameterType="map" resultType="hashmap">
 		SELECT u.user_id,
 		       u.user_name,
-		       u.password,
 		       u.user_type,
 		       u.account_id,
 		       u.position,

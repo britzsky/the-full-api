@@ -21,7 +21,7 @@ public class OurhomeSyncScheduler {
 		this.accountService = accountService;
 	}
 
-	// 매일 20시 10분(KST) 아워홈 입고내역(당일/전일/전전일)을 조회하여 tb_account_purchase_tally(_detail)에 저장.
+	// 매일 20시 10분(KST) 아워홈 입고내역(당일/전일/전전일/전전전일)을 조회하여 tb_account_purchase_tally(_detail)에 저장.
 	// 웰스토리 동기화(20시)와 시간이 겹치지 않게 10분 뒤에 돈다. 로컬은 ourhome.sync.cron=- 로 끈다.
 	@Scheduled(cron = "${ourhome.sync.cron:0 10 20 * * *}", zone = "Asia/Seoul")
 	public void runOurhomePurchaseSync() {

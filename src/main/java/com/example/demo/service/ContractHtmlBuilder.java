@@ -293,7 +293,8 @@ public final class ContractHtmlBuilder {
 	// 제4조 월평균 연장·야간·휴일근로시간 표
 	private static final String OT_TABLE = "<table class=\"sub\" style=\"margin-left:90px\">"
 			+ "<tr><th>월평균</th><th>연장근로</th><th>야간근로</th><th>휴일근로</th></tr>"
-			+ "<tr><th>근로시간</th><td class=\"c\">{{ot_hours}}</td><td class=\"c\">{{night_hours}}</td><td class=\"c\">{{holiday_hours}}</td></tr>"
+			// 값 칸 폭 고정 (소수점 6자리 값이어도 세 칸 너비가 같게)
+			+ "<tr><th>근로시간</th><td class=\"c\" style=\"width:80px\">{{ot_hours}}</td><td class=\"c\" style=\"width:80px\">{{night_hours}}</td><td class=\"c\" style=\"width:80px\">{{holiday_hours}}</td></tr>"
 			+ "</table>";
 
 	// 제7조 월급여액 및 임금 구성항목 표

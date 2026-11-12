@@ -3162,6 +3162,34 @@ public class AccountController {
 
 	/*
 	 * part : 회계
+	 * method : MarginRateList
+	 * comment : 회계 -> 웰스토리·아워홈 매입 이익률 목록 조회 (rate_year 필수, account_id·type 선택)
+	 */
+	@GetMapping("Account/MarginRateList")
+	public String MarginRateList(@RequestParam Map<String, Object> paramMap) {
+		return new Gson().toJson(accountService.MarginRateList(paramMap));
+	}
+
+	/*
+	 * part : 회계
+	 * method : MarginRateSave
+	 * comment : 회계 -> 웰스토리(type 1)·아워홈(type 1042) 거래처·연월별 이익률 저장
+	 *           저장한 이익률은 이후 동기화분부터 적용된다. 이미 받은 달에 적용하려면 그 달 날짜별 수동 재수집을 돌린다.
+	 */
+	@PostMapping("Account/MarginRateSave")
+	public String MarginRateSave(@RequestBody List<Map<String, Object>> paramList) {
+		int iResult = 0;
+		for (Map<String, Object> paramMap : paramList)
+			iResult += accountService.MarginRateSave(paramMap);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", iResult > 0 ? 200 : 400);
+		obj.addProperty("message", iResult > 0 ? "성공" : "실패");
+		return obj.toString();
+	}
+
+	/*
+	 * part : 회계
 	 * method : AccountPurchaseTallyV2List
 	 * comment : 회계 -> 매입(본사용) 조회
 	 */
@@ -3540,7 +3568,7 @@ public class AccountController {
 	}
 
 	// 웰스토리 SW-FD 주문API 입고내역 수동 동기화(백필용).
-	// date 파라미터 없이 호출하면 오늘자, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
+	// date 파라미터 없이 호출하면 당일/전일/전전일/전전전일, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
 	// 스케줄러가 매일 17시에 자동으로 돌리는 것과 완전히 같은 로직(AccountService.WelstoryPurchaseSync)을 그대로 타므로,
 	// 이미 저장된 날짜를 다시 호출해도 sale_id/item_id 기준 UPDATE만 되고 중복 저장되지 않는다.
 	@PostMapping("/Account/WelstoryPurchaseSyncManual")
@@ -3557,7 +3585,7 @@ public class AccountController {
 	}
 
 	// 아워홈 주문 입고내역 수동 동기화(백필용).
-	// date 없이 호출하면 당일/전일/전전일, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
+	// date 없이 호출하면 당일/전일/전전일/전전전일, "YYYYMMDD"를 넘기면 그 날짜의 입고내역을 다시 조회해서 저장한다.
 	// 스케줄러와 같은 로직(AccountService.OurhomePurchaseSync)이라 재실행해도 sale_id 기준으로 갱신만 된다.
 	@PostMapping("/Account/OurhomePurchaseSyncManual")
 	public String OurhomePurchaseSyncManual(@RequestParam(required = false) String date) {

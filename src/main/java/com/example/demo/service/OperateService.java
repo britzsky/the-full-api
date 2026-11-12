@@ -253,7 +253,12 @@ public class OperateService {
 		}
 		result.put("content_version", contentVersion(row, clauses));
 
-		// 서명 전 계약서의 작성일자는 지금 보는 날짜(KST)로 표시 (실제 값은 서명할 때 서명한 날짜로 확정)
+		// ERP에서 작성일자를 정해 둔 계약서는 그 날짜 그대로 표시
+		if (row.get("contract_dt") != null && !String.valueOf(row.get("contract_dt")).isBlank()) {
+			result.put("html", ContractHtmlBuilder.build(row, clauses));
+			return result;
+		}
+		// 작성일자가 비어 있는 서명 전 계약서는 지금 보는 날짜(KST)로 표시 (실제 값은 서명할 때 서명한 날짜로 확정)
 		long nowMs = System.currentTimeMillis();
 		row.put("contract_dt", java.time.LocalDate.now(java.time.ZoneId.of("Asia/Seoul")).toString());
 		// 보는 중에 자정이 지나면 작성일자를 다음 날로 바꾸는 스크립트 (기기 시계 대신 서버 시각 + 경과 시간 기준)
@@ -266,11 +271,10 @@ public class OperateService {
 		return result;
 	}
 
-	// 근로자가 보는 계약 내용의 지문 (작성일자·서명 정보를 뺀 양식 HTML의 SHA-256)
-	// ERP에서 계약 내용을 고치거나 조항 양식을 바꾸면 값이 달라져, 열람한 내용과 서명 시점 내용이 같은지 비교하는 데 쓴다
+	// 근로자가 보는 계약 내용의 지문 (서명 정보를 뺀 양식 HTML의 SHA-256, ERP에서 정한 작성일자는 포함)
+	// ERP에서 계약 내용·작성일자를 고치거나 조항 양식을 바꾸면 값이 달라져, 열람한 내용과 서명 시점 내용이 같은지 비교하는 데 쓴다
 	private String contentVersion(Map<String, Object> row, String clauses) {
 		Map<String, Object> copy = new HashMap<>(row);
-		copy.put("contract_dt", null);
 		copy.remove("sign_dt");
 		copy.remove("sign_image");
 		try {
@@ -447,8 +451,10 @@ public class OperateService {
 		String signDt = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
 				.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
 		row.put("sign_dt", signDt);
-		// 작성일자는 서명한 날짜로 찍음 (DB contract_dt도 같은 날짜로 갱신)
-		row.put("contract_dt", signDt.substring(0, 10));
+		// 작성일자: ERP에서 정한 날짜, 비어 있으면 서명한 날짜 (DB contract_dt도 같은 기준으로 갱신)
+		if (row.get("contract_dt") == null || String.valueOf(row.get("contract_dt")).isBlank()) {
+			row.put("contract_dt", signDt.substring(0, 10));
+		}
 		row.put("sign_image", paramMap.get("sign_image"));
 
 		// 서명본 PDF 생성 → 저장소(contract/거래처) 저장 → 위변조 확인용 SHA-256 해시

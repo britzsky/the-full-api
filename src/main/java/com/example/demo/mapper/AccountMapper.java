@@ -87,6 +87,25 @@ public interface AccountMapper {
 	Map<String, Object> AccountPurchaseTallyTotalBySaleId(Map<String, Object> paramMap);				// 회계 -> 매입마감 sale_id 기준 total/saleDate 조회
 	Map<String, Object> AccountPurchaseTallyBySaleDateAndType(Map<String, Object> paramMap);			// 집계표 동기화 시 account_id+saleDate+type 기준 기존 row 조회
 	int AccountPurchaseTallyTotalUpdate(Map<String, Object> paramMap);									// 집계표 동기화 시 기존 row total UPDATE
+
+	// 매입 원가(_cost) 사본·이익률
+	java.math.BigDecimal MarginRateGet(Map<String, Object> paramMap);									// 거래처·공급사·연월 이익률 조회
+	List<Map<String, Object>> MarginRateList(Map<String, Object> paramMap);								// 이익률 목록 조회
+	int MarginRateSave(Map<String, Object> paramMap);													// 이익률 저장
+	int CostMasterCopyFromMain(Map<String, Object> paramMap);											// 판가 master → 원가 master 복사
+	int CostDetailsCopyFromMain(Map<String, Object> paramMap);											// 판가 detail 전체 → 원가 detail 복사
+	int CostDetailCopyOneFromMain(Map<String, Object> paramMap);										// 판가 detail 1건 → 원가 detail 복사
+	List<Integer> CostDetailMissingItemIds(Map<String, Object> paramMap);								// 원가 detail에 아직 없는 item_id 목록
+	List<Integer> MainDetailIdsEqualToCost(Map<String, Object> paramMap);								// 판가 detail이 원가와 같은(미환산) item_id 목록
+	Map<String, Object> CostMasterGet(Map<String, Object> paramMap);									// 원가 master 조회
+	Map<String, Object> CostDetailGet(Map<String, Object> paramMap);									// 원가 detail 1건 조회
+	int CostMasterDelete(Map<String, Object> paramMap);													// 원가 master 삭제
+	int CostDetailDeleteBySaleId(Map<String, Object> paramMap);											// 원가 detail sale_id 단위 삭제
+	int CostDetailDeleteOne(Map<String, Object> paramMap);												// 원가 detail 1건 삭제
+	int CostAmountsFromSalePrice(Map<String, Object> paramMap);											// 판가로 저장된 원가 master 금액을 원가로 환산
+	int MainMasterAmountsFromDetails(Map<String, Object> paramMap);										// 판가 master 금액을 판가 detail 합계로 맞춤
+	int MainMasterAmountsUpdate(Map<String, Object> paramMap);											// 판가 master 금액 직접 갱신
+	int MainDetailCount(Map<String, Object> paramMap);													// 판가 detail 수
 	String AccountPurchaseReceiptImageBySaleId(Map<String, Object> paramMap);							// 현장 -> 매입집계 영수증 경로 조회
 	Map<String, Object> AccountPurchaseReceiptImagesBySaleId(Map<String, Object> paramMap);				// 현장 -> 매입집계 영수증(1~3) 경로 조회
 	List<Map<String, Object>> AccountPurchaseTallyList(Map<String, Object> paramMap); 					// 회계 -> 매입 -> 매입마감 조회

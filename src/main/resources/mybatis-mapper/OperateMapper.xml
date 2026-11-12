@@ -8,6 +8,129 @@
 		SELECT DATE_FORMAT(NOW(6), '%Y%m%d%H%i%s%f')
 	</select>
 	
+	<!-- 집계표 원가 보기(cost_yn=Y)에서 tb_account_tally_sheet 대신 쓰는 일자별 금액 테이블
+	     - 웰스토리(type 1~4)·아워홈(1042) 칸에서 그날 판가-원가 차액을 뺀 값
+	     - 칸 값이 그날 판가 master total 합계와 같을 때만 뺌(집계표 칸을 직접 지운 날 등은 그대로), 0 미만으로 내려가지 않음
+	     - 그 밖의 type은 차액 행이 없어 집계표 값 그대로 -->
+	<sql id="TallySheetCostViewTable">
+		(SELECT t.account_id,
+				t.type,
+				t.count_year,
+				t.count_month,
+				CASE WHEN d.s1 = t.day_1 THEN GREATEST(t.day_1 - d.d1, 0) ELSE t.day_1 END AS day_1,
+				CASE WHEN d.s2 = t.day_2 THEN GREATEST(t.day_2 - d.d2, 0) ELSE t.day_2 END AS day_2,
+				CASE WHEN d.s3 = t.day_3 THEN GREATEST(t.day_3 - d.d3, 0) ELSE t.day_3 END AS day_3,
+				CASE WHEN d.s4 = t.day_4 THEN GREATEST(t.day_4 - d.d4, 0) ELSE t.day_4 END AS day_4,
+				CASE WHEN d.s5 = t.day_5 THEN GREATEST(t.day_5 - d.d5, 0) ELSE t.day_5 END AS day_5,
+				CASE WHEN d.s6 = t.day_6 THEN GREATEST(t.day_6 - d.d6, 0) ELSE t.day_6 END AS day_6,
+				CASE WHEN d.s7 = t.day_7 THEN GREATEST(t.day_7 - d.d7, 0) ELSE t.day_7 END AS day_7,
+				CASE WHEN d.s8 = t.day_8 THEN GREATEST(t.day_8 - d.d8, 0) ELSE t.day_8 END AS day_8,
+				CASE WHEN d.s9 = t.day_9 THEN GREATEST(t.day_9 - d.d9, 0) ELSE t.day_9 END AS day_9,
+				CASE WHEN d.s10 = t.day_10 THEN GREATEST(t.day_10 - d.d10, 0) ELSE t.day_10 END AS day_10,
+				CASE WHEN d.s11 = t.day_11 THEN GREATEST(t.day_11 - d.d11, 0) ELSE t.day_11 END AS day_11,
+				CASE WHEN d.s12 = t.day_12 THEN GREATEST(t.day_12 - d.d12, 0) ELSE t.day_12 END AS day_12,
+				CASE WHEN d.s13 = t.day_13 THEN GREATEST(t.day_13 - d.d13, 0) ELSE t.day_13 END AS day_13,
+				CASE WHEN d.s14 = t.day_14 THEN GREATEST(t.day_14 - d.d14, 0) ELSE t.day_14 END AS day_14,
+				CASE WHEN d.s15 = t.day_15 THEN GREATEST(t.day_15 - d.d15, 0) ELSE t.day_15 END AS day_15,
+				CASE WHEN d.s16 = t.day_16 THEN GREATEST(t.day_16 - d.d16, 0) ELSE t.day_16 END AS day_16,
+				CASE WHEN d.s17 = t.day_17 THEN GREATEST(t.day_17 - d.d17, 0) ELSE t.day_17 END AS day_17,
+				CASE WHEN d.s18 = t.day_18 THEN GREATEST(t.day_18 - d.d18, 0) ELSE t.day_18 END AS day_18,
+				CASE WHEN d.s19 = t.day_19 THEN GREATEST(t.day_19 - d.d19, 0) ELSE t.day_19 END AS day_19,
+				CASE WHEN d.s20 = t.day_20 THEN GREATEST(t.day_20 - d.d20, 0) ELSE t.day_20 END AS day_20,
+				CASE WHEN d.s21 = t.day_21 THEN GREATEST(t.day_21 - d.d21, 0) ELSE t.day_21 END AS day_21,
+				CASE WHEN d.s22 = t.day_22 THEN GREATEST(t.day_22 - d.d22, 0) ELSE t.day_22 END AS day_22,
+				CASE WHEN d.s23 = t.day_23 THEN GREATEST(t.day_23 - d.d23, 0) ELSE t.day_23 END AS day_23,
+				CASE WHEN d.s24 = t.day_24 THEN GREATEST(t.day_24 - d.d24, 0) ELSE t.day_24 END AS day_24,
+				CASE WHEN d.s25 = t.day_25 THEN GREATEST(t.day_25 - d.d25, 0) ELSE t.day_25 END AS day_25,
+				CASE WHEN d.s26 = t.day_26 THEN GREATEST(t.day_26 - d.d26, 0) ELSE t.day_26 END AS day_26,
+				CASE WHEN d.s27 = t.day_27 THEN GREATEST(t.day_27 - d.d27, 0) ELSE t.day_27 END AS day_27,
+				CASE WHEN d.s28 = t.day_28 THEN GREATEST(t.day_28 - d.d28, 0) ELSE t.day_28 END AS day_28,
+				CASE WHEN d.s29 = t.day_29 THEN GREATEST(t.day_29 - d.d29, 0) ELSE t.day_29 END AS day_29,
+				CASE WHEN d.s30 = t.day_30 THEN GREATEST(t.day_30 - d.d30, 0) ELSE t.day_30 END AS day_30,
+				CASE WHEN d.s31 = t.day_31 THEN GREATEST(t.day_31 - d.d31, 0) ELSE t.day_31 END AS day_31
+		FROM tb_account_tally_sheet t
+		-- 거래처·type별 일자 판가 합계(sN)와 판가-원가 차액(dN)을 일자 컬럼으로 펼친 서브쿼리
+		LEFT OUTER JOIN (
+			SELECT P.account_id,
+				P.type,
+				SUM(CASE WHEN DAY(P.saleDate) = 1 THEN P.total ELSE 0 END) AS s1,
+				SUM(CASE WHEN DAY(P.saleDate) = 1 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d1,
+				SUM(CASE WHEN DAY(P.saleDate) = 2 THEN P.total ELSE 0 END) AS s2,
+				SUM(CASE WHEN DAY(P.saleDate) = 2 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d2,
+				SUM(CASE WHEN DAY(P.saleDate) = 3 THEN P.total ELSE 0 END) AS s3,
+				SUM(CASE WHEN DAY(P.saleDate) = 3 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d3,
+				SUM(CASE WHEN DAY(P.saleDate) = 4 THEN P.total ELSE 0 END) AS s4,
+				SUM(CASE WHEN DAY(P.saleDate) = 4 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d4,
+				SUM(CASE WHEN DAY(P.saleDate) = 5 THEN P.total ELSE 0 END) AS s5,
+				SUM(CASE WHEN DAY(P.saleDate) = 5 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d5,
+				SUM(CASE WHEN DAY(P.saleDate) = 6 THEN P.total ELSE 0 END) AS s6,
+				SUM(CASE WHEN DAY(P.saleDate) = 6 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d6,
+				SUM(CASE WHEN DAY(P.saleDate) = 7 THEN P.total ELSE 0 END) AS s7,
+				SUM(CASE WHEN DAY(P.saleDate) = 7 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d7,
+				SUM(CASE WHEN DAY(P.saleDate) = 8 THEN P.total ELSE 0 END) AS s8,
+				SUM(CASE WHEN DAY(P.saleDate) = 8 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d8,
+				SUM(CASE WHEN DAY(P.saleDate) = 9 THEN P.total ELSE 0 END) AS s9,
+				SUM(CASE WHEN DAY(P.saleDate) = 9 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d9,
+				SUM(CASE WHEN DAY(P.saleDate) = 10 THEN P.total ELSE 0 END) AS s10,
+				SUM(CASE WHEN DAY(P.saleDate) = 10 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d10,
+				SUM(CASE WHEN DAY(P.saleDate) = 11 THEN P.total ELSE 0 END) AS s11,
+				SUM(CASE WHEN DAY(P.saleDate) = 11 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d11,
+				SUM(CASE WHEN DAY(P.saleDate) = 12 THEN P.total ELSE 0 END) AS s12,
+				SUM(CASE WHEN DAY(P.saleDate) = 12 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d12,
+				SUM(CASE WHEN DAY(P.saleDate) = 13 THEN P.total ELSE 0 END) AS s13,
+				SUM(CASE WHEN DAY(P.saleDate) = 13 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d13,
+				SUM(CASE WHEN DAY(P.saleDate) = 14 THEN P.total ELSE 0 END) AS s14,
+				SUM(CASE WHEN DAY(P.saleDate) = 14 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d14,
+				SUM(CASE WHEN DAY(P.saleDate) = 15 THEN P.total ELSE 0 END) AS s15,
+				SUM(CASE WHEN DAY(P.saleDate) = 15 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d15,
+				SUM(CASE WHEN DAY(P.saleDate) = 16 THEN P.total ELSE 0 END) AS s16,
+				SUM(CASE WHEN DAY(P.saleDate) = 16 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d16,
+				SUM(CASE WHEN DAY(P.saleDate) = 17 THEN P.total ELSE 0 END) AS s17,
+				SUM(CASE WHEN DAY(P.saleDate) = 17 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d17,
+				SUM(CASE WHEN DAY(P.saleDate) = 18 THEN P.total ELSE 0 END) AS s18,
+				SUM(CASE WHEN DAY(P.saleDate) = 18 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d18,
+				SUM(CASE WHEN DAY(P.saleDate) = 19 THEN P.total ELSE 0 END) AS s19,
+				SUM(CASE WHEN DAY(P.saleDate) = 19 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d19,
+				SUM(CASE WHEN DAY(P.saleDate) = 20 THEN P.total ELSE 0 END) AS s20,
+				SUM(CASE WHEN DAY(P.saleDate) = 20 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d20,
+				SUM(CASE WHEN DAY(P.saleDate) = 21 THEN P.total ELSE 0 END) AS s21,
+				SUM(CASE WHEN DAY(P.saleDate) = 21 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d21,
+				SUM(CASE WHEN DAY(P.saleDate) = 22 THEN P.total ELSE 0 END) AS s22,
+				SUM(CASE WHEN DAY(P.saleDate) = 22 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d22,
+				SUM(CASE WHEN DAY(P.saleDate) = 23 THEN P.total ELSE 0 END) AS s23,
+				SUM(CASE WHEN DAY(P.saleDate) = 23 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d23,
+				SUM(CASE WHEN DAY(P.saleDate) = 24 THEN P.total ELSE 0 END) AS s24,
+				SUM(CASE WHEN DAY(P.saleDate) = 24 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d24,
+				SUM(CASE WHEN DAY(P.saleDate) = 25 THEN P.total ELSE 0 END) AS s25,
+				SUM(CASE WHEN DAY(P.saleDate) = 25 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d25,
+				SUM(CASE WHEN DAY(P.saleDate) = 26 THEN P.total ELSE 0 END) AS s26,
+				SUM(CASE WHEN DAY(P.saleDate) = 26 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d26,
+				SUM(CASE WHEN DAY(P.saleDate) = 27 THEN P.total ELSE 0 END) AS s27,
+				SUM(CASE WHEN DAY(P.saleDate) = 27 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d27,
+				SUM(CASE WHEN DAY(P.saleDate) = 28 THEN P.total ELSE 0 END) AS s28,
+				SUM(CASE WHEN DAY(P.saleDate) = 28 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d28,
+				SUM(CASE WHEN DAY(P.saleDate) = 29 THEN P.total ELSE 0 END) AS s29,
+				SUM(CASE WHEN DAY(P.saleDate) = 29 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d29,
+				SUM(CASE WHEN DAY(P.saleDate) = 30 THEN P.total ELSE 0 END) AS s30,
+				SUM(CASE WHEN DAY(P.saleDate) = 30 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d30,
+				SUM(CASE WHEN DAY(P.saleDate) = 31 THEN P.total ELSE 0 END) AS s31,
+				SUM(CASE WHEN DAY(P.saleDate) = 31 THEN P.total - IFNULL(C.total, P.total) ELSE 0 END) AS d31
+			FROM tb_account_purchase_tally P
+			LEFT OUTER JOIN tb_account_purchase_tally_cost C
+			ON C.sale_id = P.sale_id
+			WHERE P.type IN (1, 2, 3, 4, 1042)
+			<![CDATA[
+			AND P.saleDate >= STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d')
+			AND P.saleDate < DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH)
+			]]>
+			GROUP BY P.account_id, P.type
+		) d
+		ON d.account_id = t.account_id
+		AND d.type = t.type
+		WHERE t.count_year = #{year}
+		AND t.count_month = #{month})
+	</sql>
+
 	<select id="TallySheetList" parameterType="map" resultType="hashmap">
 		SELECT (SELECT case when add_yn = 'Y' then add_name else name end as name FROM tb_account_mapping WHERE type = amv.type) as name, 
 			amv.type,
@@ -46,7 +169,12 @@
 			ifnull(FORMAT(ats.day_30, 0), 0) as day_30,
 			ifnull(FORMAT(ats.day_31, 0), 0) as day_31
 		FROM tb_account_mapping_v2 amv  
-		LEFT OUTER JOIN tb_account_tally_sheet ats
+		LEFT OUTER JOIN
+		<choose>
+			<!-- 원가 보기: 웰스토리·아워홈 차액을 뺀 일자별 금액 -->
+			<when test='cost_yn == "Y"'><include refid="TallySheetCostViewTable"/> ats</when>
+			<otherwise>tb_account_tally_sheet ats</otherwise>
+		</choose>
 		ON ats.account_id = amv.account_id
         AND ats.type = amv.type
 		AND ats.count_year = #{year}
@@ -99,7 +227,12 @@
 			ifnull(FORMAT(ats.day_31, 0), 0) as day_31
 		FROM tb_account_mapping_v2 amv
 		JOIN tb_account a ON a.account_id = amv.account_id AND a.del_yn = 'N'
-		LEFT OUTER JOIN tb_account_tally_sheet ats
+		LEFT OUTER JOIN
+		<choose>
+			<!-- 원가 보기: 웰스토리·아워홈 차액을 뺀 일자별 금액 -->
+			<when test='cost_yn == "Y"'><include refid="TallySheetCostViewTable"/> ats</when>
+			<otherwise>tb_account_tally_sheet ats</otherwise>
+		</choose>
 		ON ats.account_id = amv.account_id
 		AND ats.type = amv.type
 		AND ats.count_year = #{year}
@@ -2240,11 +2373,39 @@
 			   abm.food_budget,
 			   abm.budget_total,
 			   abm.day_budget,
+			   <choose>
+			   <!-- 원가 보기: 사용금액에서 웰스토리·아워홈 차액을 빼고, 예산부여가 있으면 사용비율을 다시 계산 -->
+			   <when test='cost_yn == "Y"'>
+			   <![CDATA[
+			   CASE WHEN abm.day_use_amount IS NOT NULL AND IFNULL(bd.diff, 0) <> 0
+			   		THEN abm.day_use_amount - bd.diff
+			   		ELSE abm.day_use_amount END AS day_use_amount,
+			   CASE WHEN abm.day_use_amount IS NOT NULL AND IFNULL(bd.diff, 0) <> 0 AND abm.budget_grant > 0
+			   		THEN ROUND((abm.day_use_amount - bd.diff) / abm.budget_grant * 100, 2)
+			   		ELSE abm.use_ratio END AS use_ratio,
+			   ]]>
+			   </when>
+			   <otherwise>
 			   abm.day_use_amount,
 			   abm.use_ratio,
+			   </otherwise>
+			   </choose>
 			   abm.note,
 			   abm.budget_grant,
+			   <choose>
+			   <!-- 원가 보기: 일 사용비율 = 원가 사용금액 / 일 예산(일 예산 0이면 0) -->
+			   <when test='cost_yn == "Y"'>
+			   <![CDATA[
+			   CASE WHEN abm.day_use_amount IS NOT NULL AND IFNULL(bd.diff, 0) <> 0 AND abm.budget_grant > 0
+			   		THEN CASE WHEN IFNULL(abm.day_budget, 0) = 0 THEN 0
+			   				  ELSE ROUND((abm.day_use_amount - bd.diff) / abm.day_budget * 100, 2) END
+			   		ELSE abm.day_use_ratio END AS day_use_ratio,
+			   ]]>
+			   </when>
+			   <otherwise>
 			   abm.day_use_ratio,
+			   </otherwise>
+			   </choose>
 			   abm.existing_budget,
 			   abm.diff_amount,
 			   abm.first_sales,
@@ -2275,6 +2436,26 @@
 		ON asb.account_id = a.account_id
 		AND asb.year  = #{year}
 		AND asb.month = LPAD(#{month}, 2, '0')
+		<if test='cost_yn == "Y"'>
+		-- 원가 보기: 거래처별 해당 연월 웰스토리(type 1~4)·아워홈(1042) 판가-원가 차액 합계(매핑 무관)
+		LEFT OUTER JOIN (
+			SELECT P.account_id,
+				SUM(P.total - C.total) AS diff
+			FROM tb_account_purchase_tally_cost C
+			JOIN tb_account_purchase_tally P
+			ON P.sale_id = C.sale_id
+			WHERE P.type IN (1, 2, 3, 4, 1042)
+			<![CDATA[
+			AND P.saleDate >= STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d')
+			AND P.saleDate < DATE_ADD(STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%m-%d'), INTERVAL 1 MONTH)
+			]]>
+			<if test='account_id !=null'>
+			AND P.account_id = #{account_id}
+			</if>
+			GROUP BY P.account_id
+		) bd
+		ON bd.account_id = a.account_id
+		</if>
 		WHERE a.account_id NOT IN
  		(
  			20260122065002,
@@ -4887,7 +5068,8 @@
 		UPDATE tb_account_contract
 		SET
 			status = '서명완료',
-			contract_dt = DATE(#{sign_dt}),
+			<!-- 작성일자: ERP에서 정한 날짜 우선, 비어 있으면 서명한 날짜 -->
+			contract_dt = COALESCE(contract_dt, DATE(#{sign_dt})),
 			agree_yn = 'Y',
 			sign_dt = #{sign_dt},
 			sign_device = #{sign_device},

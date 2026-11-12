@@ -2446,6 +2446,9 @@
 	</select>
 
 	<select id="AccountPurchaseTallyList" parameterType="map" resultType="hashmap">
+		<!-- cost_yn=Y(회계 화면)면 원가 테이블, 아니면 판가 테이블을 읽는다. 테이블 이름은 아래 고정 문자열 중에서만 고른다 -->
+		<bind name="ptTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_cost" : "tb_account_purchase_tally"'/>
+		<bind name="ptdTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_detail_cost" : "tb_account_purchase_tally_detail"'/>
 		SELECT apt.account_id,
 			   a.account_name,
 		       apt.type,
@@ -2470,7 +2473,7 @@
 		       apt.bizNo,
 		       am.ceo_name,
 		       apt.sale_id
-		FROM tb_account_purchase_tally apt
+		FROM ${ptTbl} apt
 		JOIN tb_account a
 			ON a.account_id = apt.account_id
 		LEFT JOIN tb_account_mapping am
@@ -2503,6 +2506,9 @@
 	<!-- 매입집계(TallyTab) 전용: 사업장+구매처(타입)+연월 기준으로 상세를 합산 -->
 	<!-- account_id/type/year/month 전부 선택 조건 - 전체 조회 가능 -->
 	<select id="AccountPurchaseTallyForTallyTab" parameterType="map" resultType="hashmap">
+		<!-- cost_yn=Y(회계 화면)면 원가 테이블, 아니면 판가 테이블을 읽는다. 테이블 이름은 아래 고정 문자열 중에서만 고른다 -->
+		<bind name="ptTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_cost" : "tb_account_purchase_tally"'/>
+		<bind name="ptdTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_detail_cost" : "tb_account_purchase_tally_detail"'/>
 		SELECT src.account_id,
 		       a.account_name,
 		       src.type,
@@ -2551,7 +2557,7 @@
 		           IFNULL(ds.scenic_vat, 0) AS scenic_vat,
 		           IFNULL(ds.scenic_taxFree, 0) AS scenic_taxFree,
 		           IFNULL(ds.scenic_total, 0) AS scenic_total
-		    FROM tb_account_purchase_tally apt
+		    FROM ${ptTbl} apt
 		    LEFT JOIN (
 		        SELECT apt2.sale_id,
 		               COUNT(aptd.item_id) AS detail_count,
@@ -2576,8 +2582,8 @@
 		                               WHEN aptd.itemType = '3' AND aptd.taxType = '2' THEN aptd.amount
 		                               WHEN aptd.itemType = '3' AND aptd.taxType = '3' THEN aptd.amount
 		                               ELSE 0 END), 0) AS scenic_total
-		        FROM tb_account_purchase_tally apt2
-		        JOIN tb_account_purchase_tally_detail aptd
+		        FROM ${ptTbl} apt2
+		        JOIN ${ptdTbl} aptd
 		            ON aptd.sale_id = apt2.sale_id
 		        WHERE apt2.type NOT IN (1000, 1002, 1003)
 		        <if test="account_id != null and account_id != '' and account_id != '0'">
@@ -2859,6 +2865,9 @@
 	</select>
 	
 	<select id="AccountPurchaseDetailList_tmp" parameterType="map" resultType="hashmap">
+		<!-- cost_yn=Y(회계 화면)면 원가 테이블, 아니면 판가 테이블을 읽는다. 테이블 이름은 아래 고정 문자열 중에서만 고른다 -->
+		<bind name="ptTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_cost" : "tb_account_purchase_tally"'/>
+		<bind name="ptdTbl" value='cost_yn == "Y" ? "tb_account_purchase_tally_detail_cost" : "tb_account_purchase_tally_detail"'/>
 		SELECT apt.account_id, 
 			   aptd.sale_id,
 			   aptd.item_id,
@@ -2876,9 +2885,9 @@
 			   apt.receipt_image2,
 			   apt.receipt_image3
 		FROM tb_account a
-		JOIN tb_account_purchase_tally apt
+		JOIN ${ptTbl} apt
 		ON apt.account_id = a.account_id
-		JOIN tb_account_purchase_tally_detail aptd
+		JOIN ${ptdTbl} aptd
 		ON aptd.sale_id = apt.sale_id
 		WHERE aptd.sale_id = #{sale_id}
 		ORDER BY apt.saleDate ASC, apt.sale_id ASC, aptd.item_id ASC
@@ -3985,6 +3994,198 @@
 		mod_id=#{user_id}
 		WHERE sale_id = #{sale_id}
 	</delete>
+
+	<!-- ===================== 매입 원가(_cost) 사본 =====================
+	     tb_account_purchase_tally(_detail)  = 판가(이익률 포함) : 집계표·예산 기준
+	     tb_account_purchase_tally_cost(_detail_cost) = 원가(이익률 제외) : 회계·손익표 기준
+	     두 테이블은 sale_id / item_id+sale_id가 1:1로 같다. -->
+
+	<!-- 거래처·공급사·연월 이익률(%) 조회. 행이 없으면 NULL (서비스에서 기본 20% 적용) -->
+	<select id="MarginRateGet" parameterType="map" resultType="java.math.BigDecimal">
+		SELECT margin_rate
+		FROM tb_account_margin_rate
+		WHERE account_id = #{account_id}
+		  AND type       = #{margin_type}
+		  AND rate_year  = #{rate_year}
+		  AND rate_month = #{rate_month}
+		LIMIT 1
+	</select>
+
+	<!-- 이익률 목록 조회 (연도 필수, 거래처·공급사 선택) -->
+	<select id="MarginRateList" parameterType="map" resultType="hashmap">
+		SELECT r.account_id,
+		       a.account_name,
+		       r.type,
+		       r.rate_year,
+		       r.rate_month,
+		       r.margin_rate,
+		       r.note
+		FROM tb_account_margin_rate r
+		LEFT JOIN tb_account a
+		  ON a.account_id = r.account_id
+		WHERE r.rate_year = #{rate_year}
+		<if test="account_id != null and account_id != ''">
+		  AND r.account_id = #{account_id}
+		</if>
+		<if test="type != null and type != ''">
+		  AND r.type = #{type}
+		</if>
+		ORDER BY a.account_name, r.type, r.rate_month
+	</select>
+
+	<!-- 거래처·공급사·연월 이익률 저장 (있으면 수정) -->
+	<insert id="MarginRateSave" parameterType="map">
+		INSERT INTO tb_account_margin_rate
+			(account_id, type, rate_year, rate_month, margin_rate, note, user_id, reg_dt)
+		VALUES
+			(#{account_id}, #{type}, #{rate_year}, #{rate_month}, #{margin_rate}, #{note}, #{user_id}, CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+		ON DUPLICATE KEY UPDATE
+			margin_rate = #{margin_rate},
+			note        = #{note},
+			mod_id      = #{user_id},
+			mod_dt      = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+	</insert>
+
+	<!-- 판가 master 1건을 원가 master로 그대로 복사 (margin_rate는 적용 이익률, 대상이 아니면 NULL) -->
+	<insert id="CostMasterCopyFromMain" parameterType="map">
+		REPLACE INTO tb_account_purchase_tally_cost
+		SELECT t.*, #{margin_rate}
+		FROM tb_account_purchase_tally t
+		WHERE t.sale_id = #{sale_id}
+	</insert>
+
+	<!-- 판가 detail 전체를 원가 detail로 복사 (앞서 CostDetailDeleteBySaleId로 비운 뒤 호출) -->
+	<insert id="CostDetailsCopyFromMain" parameterType="map">
+		INSERT INTO tb_account_purchase_tally_detail_cost
+		SELECT d.*
+		FROM tb_account_purchase_tally_detail d
+		WHERE d.sale_id = #{sale_id}
+	</insert>
+
+	<!-- 판가 detail 1건을 원가 detail로 복사 -->
+	<insert id="CostDetailCopyOneFromMain" parameterType="map">
+		REPLACE INTO tb_account_purchase_tally_detail_cost
+		SELECT d.*
+		FROM tb_account_purchase_tally_detail d
+		WHERE d.sale_id = #{sale_id}
+		  AND d.item_id = #{item_id}
+	</insert>
+
+	<!-- 판가 detail에는 있고 원가 detail에는 아직 없는 item_id 목록 (회계에서 새로 넣은 품목) -->
+	<select id="CostDetailMissingItemIds" parameterType="map" resultType="int">
+		SELECT d.item_id
+		FROM tb_account_purchase_tally_detail d
+		WHERE d.sale_id = #{sale_id}
+		  AND NOT EXISTS (
+		      SELECT 1
+		      FROM tb_account_purchase_tally_detail_cost c
+		      WHERE c.sale_id = d.sale_id
+		        AND c.item_id = d.item_id
+		  )
+	</select>
+
+	<!-- 판가 detail 금액이 원가 detail과 같은(아직 판가로 바꾸지 않은) 품목 item_id 목록 -->
+	<select id="MainDetailIdsEqualToCost" parameterType="map" resultType="int">
+		SELECT d.item_id
+		FROM tb_account_purchase_tally_detail d
+		JOIN tb_account_purchase_tally_detail_cost c
+		  ON c.sale_id = d.sale_id
+		 AND c.item_id = d.item_id
+		WHERE d.sale_id = #{sale_id}
+		  AND IFNULL(d.amount, 0) = IFNULL(c.amount, 0)
+		  AND IFNULL(d.amount, 0) != 0
+	</select>
+
+	<!-- 원가 master 1건 조회 -->
+	<select id="CostMasterGet" parameterType="map" resultType="hashmap">
+		SELECT *, DATE_FORMAT(saleDate, '%Y-%m-%d') AS saleDateText
+		FROM tb_account_purchase_tally_cost
+		WHERE sale_id = #{sale_id}
+		LIMIT 1
+	</select>
+
+	<!-- 원가 detail 1건 조회 -->
+	<select id="CostDetailGet" parameterType="map" resultType="hashmap">
+		SELECT *
+		FROM tb_account_purchase_tally_detail_cost
+		WHERE sale_id = #{sale_id}
+		  AND item_id = #{item_id}
+		LIMIT 1
+	</select>
+
+	<!-- 원가 master 삭제 -->
+	<delete id="CostMasterDelete" parameterType="map">
+		DELETE FROM tb_account_purchase_tally_cost
+		WHERE sale_id = #{sale_id}
+	</delete>
+
+	<!-- 원가 detail을 sale_id 단위로 전체 삭제 -->
+	<delete id="CostDetailDeleteBySaleId" parameterType="map">
+		DELETE FROM tb_account_purchase_tally_detail_cost
+		WHERE sale_id = #{sale_id}
+	</delete>
+
+	<!-- 원가 detail 1건 삭제 -->
+	<delete id="CostDetailDeleteOne" parameterType="map">
+		DELETE FROM tb_account_purchase_tally_detail_cost
+		WHERE sale_id = #{sale_id}
+		  AND item_id = #{item_id}
+	</delete>
+
+	<!-- 판가로 저장된 금액을 원가로 되돌림 (개발팀이 집계표에서 판가를 직접 고친 경우): 금액 / (1 + 이익률) 반올림 -->
+	<update id="CostAmountsFromSalePrice" parameterType="map">
+		UPDATE tb_account_purchase_tally_cost
+		SET total     = ROUND(IFNULL(total, 0)     * 100 / (100 + #{margin_rate})),
+		    totalCash = ROUND(IFNULL(totalCash, 0) * 100 / (100 + #{margin_rate})),
+		    totalCard = ROUND(IFNULL(totalCard, 0) * 100 / (100 + #{margin_rate})),
+		    vat       = ROUND(IFNULL(vat, 0)       * 100 / (100 + #{margin_rate})),
+		    tax       = ROUND(IFNULL(tax, 0)       * 100 / (100 + #{margin_rate})),
+		    taxFree   = ROUND(IFNULL(taxFree, 0)   * 100 / (100 + #{margin_rate}))
+		WHERE sale_id = #{sale_id}
+	</update>
+
+	<!-- 판가 master 금액을 판가 detail 합계로 다시 맞춤.
+	     현금·카드 금액은 기존 합계와 같았던 쪽만 새 합계로 바꾼다 (SET은 왼쪽부터 적용되므로 total을 마지막에 바꾼다) -->
+	<update id="MainMasterAmountsFromDetails" parameterType="map">
+		UPDATE tb_account_purchase_tally t
+		JOIN (
+		    SELECT sale_id,
+		           SUM(IFNULL(amount, 0)) AS s_total,
+		           SUM(IFNULL(vat, 0))    AS s_vat,
+		           SUM(IFNULL(tax, 0))    AS s_tax,
+		           SUM(CASE WHEN taxType = 1 THEN 0 ELSE IFNULL(amount, 0) END) AS s_taxFree
+		    FROM tb_account_purchase_tally_detail
+		    WHERE sale_id = #{sale_id}
+		    GROUP BY sale_id
+		) s
+		  ON s.sale_id = t.sale_id
+		SET t.totalCash = CASE WHEN IFNULL(t.totalCash, 0) = IFNULL(t.total, 0) AND IFNULL(t.totalCash, 0) != 0 THEN s.s_total ELSE t.totalCash END,
+		    t.totalCard = CASE WHEN IFNULL(t.totalCard, 0) = IFNULL(t.total, 0) AND IFNULL(t.totalCard, 0) != 0 THEN s.s_total ELSE t.totalCard END,
+		    t.vat       = s.s_vat,
+		    t.tax       = s.s_tax,
+		    t.taxFree   = s.s_taxFree,
+		    t.total     = s.s_total
+		WHERE t.sale_id = #{sale_id}
+	</update>
+
+	<!-- 판가 master 금액 직접 갱신 (detail 없는 매입의 판가 반영용) -->
+	<update id="MainMasterAmountsUpdate" parameterType="map">
+		UPDATE tb_account_purchase_tally
+		SET totalCash = CASE WHEN IFNULL(totalCash, 0) = IFNULL(total, 0) AND IFNULL(totalCash, 0) != 0 THEN #{total} ELSE totalCash END,
+		    totalCard = CASE WHEN IFNULL(totalCard, 0) = IFNULL(total, 0) AND IFNULL(totalCard, 0) != 0 THEN #{total} ELSE totalCard END,
+		    vat       = #{vat},
+		    tax       = #{tax},
+		    taxFree   = #{taxFree},
+		    total     = #{total}
+		WHERE sale_id = #{sale_id}
+	</update>
+
+	<!-- 판가 detail 수 (0이면 master 금액으로 판가 계산) -->
+	<select id="MainDetailCount" parameterType="map" resultType="int">
+		SELECT COUNT(*)
+		FROM tb_account_purchase_tally_detail
+		WHERE sale_id = #{sale_id}
+	</select>
 
 	<!-- 회계 월 마감 수정권한 조회 -->
 	<select id="MonthLockOverrideGet" parameterType="map" resultType="hashmap">
