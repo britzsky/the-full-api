@@ -515,6 +515,82 @@ public class OperateService {
 		return result;
 	}
 
+	// 웹 서명 링크 열쇠에 쓰는 글자 (헷갈리는 0·O·1·l·I 제외)
+	private static final String WEB_TOKEN_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+	private static final java.security.SecureRandom WEB_TOKEN_RANDOM = new java.security.SecureRandom();
+
+	// 근로계약서 -> 문자로 보낼 웹 서명 링크 열쇠 발급 (만료 전이고 잠기지 않은 링크가 있으면 그대로 다시 씀)
+	// 반환: code 200 + token·expire_dt / 404 계약서 없음 / 409 이미 서명됨
+	public Map<String, Object> ContractWebLink(Map<String, Object> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		Map<String, Object> info = operateMapper.ContractWebLinkInfo(paramMap);
+		if (info == null) {
+			result.put("code", 404);
+			result.put("message", "계약서를 찾을 수 없습니다.");
+			return result;
+		}
+		if ("서명완료".equals(info.get("status"))) {
+			result.put("code", 409);
+			result.put("message", "이미 서명이 완료된 계약서입니다.");
+			return result;
+		}
+		// 이미 보낸 링크가 아직 쓸 수 있으면 같은 링크를 다시 복사하게 해서, 먼저 보낸 문자도 계속 쓸 수 있게 한다
+		if (!"Y".equals(info.get("link_valid_yn"))) {
+			StringBuilder token = new StringBuilder();
+			for (int i = 0; i < 12; i++) {
+				token.append(WEB_TOKEN_CHARS.charAt(WEB_TOKEN_RANDOM.nextInt(WEB_TOKEN_CHARS.length())));
+			}
+			Map<String, Object> updateParam = new HashMap<>();
+			updateParam.put("contract_id", paramMap.get("contract_id"));
+			updateParam.put("web_token", token.toString());
+			operateMapper.ContractWebLinkUpdate(updateParam);
+			info = operateMapper.ContractWebLinkInfo(paramMap);
+		}
+		result.put("code", 200);
+		result.put("token", info.get("web_token"));
+		result.put("expire_dt", info.get("expire_dt"));
+		return result;
+	}
+
+	// 웹 서명 링크 -> 링크 열쇠와 주민번호 앞 6자리로 본인 확인 (통과하면 paramMap에 contract_id·web_token을 채움)
+	// 반환: code 200 통과 / 401 주민번호 불일치(실패 횟수 증가) / 410 만료·잠김·없는 링크
+	public Map<String, Object> WebContractIdentify(String token, Map<String, Object> paramMap) {
+		Map<String, Object> result = new HashMap<>();
+		Map<String, Object> tokenParam = new HashMap<>();
+		tokenParam.put("web_token", token);
+		Map<String, Object> tokenRow = token != null && token.matches("[A-Za-z0-9]{12}")
+				? operateMapper.WebContractToken(tokenParam) : null;
+		int failCnt = tokenRow == null ? 0 : ((Number) tokenRow.get("web_fail_cnt")).intValue();
+		if (tokenRow == null || failCnt >= 5) {
+			result.put("code", 410);
+			result.put("message", "만료되었거나 사용할 수 없는 링크입니다.\n회사 담당자에게 새 링크를 요청해 주세요.");
+			return result;
+		}
+
+		// 앱 본인 확인 키(user_id 등)는 빼고 링크 열쇠 기준으로만 조회
+		paramMap.remove("user_id");
+		paramMap.put("web_token", token);
+		paramMap.put("contract_id", tokenRow.get("contract_id"));
+		if (operateMapper.AppContractDetail(paramMap) == null) {
+			operateMapper.WebContractFailUpdate(tokenRow);
+			int remain = 4 - failCnt;
+			result.put("code", remain > 0 ? 401 : 410);
+			result.put("message", remain > 0
+					? "주민번호 앞 6자리가 맞지 않습니다. (남은 횟수 " + remain + "회)"
+					: "주민번호 확인을 5번 틀려 링크가 잠겼습니다.\n회사 담당자에게 새 링크를 요청해 주세요.");
+			return result;
+		}
+		result.put("code", 200);
+		return result;
+	}
+
+	// 웹 서명 링크 -> 서명 화면 HTML (templates/contract/web_sign.html, 주민번호 확인·열람·동의·서명을 한 장에서 처리)
+	public String WebContractPage() throws java.io.IOException {
+		try (java.io.InputStream in = new org.springframework.core.io.ClassPathResource("templates/contract/web_sign.html").getInputStream()) {
+			return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+		}
+	}
+
 	// 열람 후 계약 내용이 바뀌어 서명을 막을 때 앱에 보여줄 안내 문구
 	private static final String CONTENT_CHANGED_MESSAGE = "회사에서 계약서 내용을 수정했습니다. 바뀐 내용을 다시 확인한 뒤 서명해 주세요.";
 

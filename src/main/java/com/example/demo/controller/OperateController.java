@@ -25,6 +25,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -1127,6 +1128,63 @@ public class OperateController {
             return ResponseEntity.notFound().build();
         }
         return fileStorageService.streamObject(pdfPath, true);
+    }
+
+    /*
+     * part : 인사
+     * method : ContractWebLink
+     * comment : 근로계약서 -> 문자로 보낼 웹 서명 링크 열쇠 발급 (7일 유효, 쓸 수 있는 링크가 있으면 그대로 반환)
+     */
+    @PostMapping("Operate/ContractWebLink")
+    public String ContractWebLink(@RequestBody Map<String, Object> paramMap) {
+        return new Gson().toJson(operateService.ContractWebLink(paramMap));
+    }
+
+    /*
+     * part : 웹 서명
+     * method : WebContractPage
+     * comment : 문자로 받은 링크(/sign/열쇠)를 열면 보이는 서명 화면 (앱 없이 주민번호 앞 6자리 확인 후 열람·서명)
+     */
+    @GetMapping(value = "sign/{token}", produces = "text/html;charset=UTF-8")
+    public String WebContractPage() throws IOException {
+        return operateService.WebContractPage();
+    }
+
+    /*
+     * part : 웹 서명
+     * method : WebContractHtml
+     * comment : 웹 서명 화면 -> 링크 열쇠·주민번호 앞 6자리 확인 후 계약서 HTML 반환 (응답은 앱 AppContractHtml과 같음)
+     */
+    @PostMapping("sign/{token}/html")
+    public String WebContractHtml(@PathVariable("token") String token, @RequestBody Map<String, Object> paramMap) {
+        String denied = webContractDenied(token, paramMap);
+        return denied != null ? denied : AppContractHtml(paramMap);
+    }
+
+    /*
+     * part : 웹 서명
+     * method : WebContractSign
+     * comment : 웹 서명 화면 -> 동의·손가락 서명 저장 (본인 확인 후 앱 AppContractSign과 같은 서명 처리)
+     */
+    @PostMapping("sign/{token}/sign")
+    public String WebContractSign(@PathVariable("token") String token, @RequestBody Map<String, Object> paramMap,
+            HttpServletRequest request) {
+        String denied = webContractDenied(token, paramMap);
+        if (denied != null) {
+            return denied;
+        }
+        // 서명 기기 기록: 앱 서명과 구분되게 '웹 링크' + 브라우저 정보
+        paramMap.put("sign_device", "웹 링크 / " + paramMap.getOrDefault("sign_device", ""));
+        return AppContractSign(paramMap, request);
+    }
+
+    // 웹 서명 본인 확인 실패 시 화면에 돌려줄 응답 (통과하면 null)
+    private String webContractDenied(String token, Map<String, Object> paramMap) {
+        Map<String, Object> result = operateService.WebContractIdentify(token, paramMap);
+        if (Integer.valueOf(200).equals(result.get("code"))) {
+            return null;
+        }
+        return new Gson().toJson(result);
     }
 
     /*

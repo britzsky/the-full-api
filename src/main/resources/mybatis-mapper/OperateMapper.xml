@@ -4701,6 +4701,12 @@
 		(
 			SELECT member_id, account_id, name, phone, rrn, cor_type
 			FROM tb_account_members
+			<!-- 유틸·통합 직원은 매핑된 거래처로도 계약서를 쓰므로 매핑 거래처 기준 행을 더함 (ERP 직원 목록 AccountMemberAllList와 같은 기준, UNION으로 중복 제거) -->
+			UNION
+			SELECT A.member_id, UM.account_id, A.name, A.phone, A.rrn, A.cor_type
+			FROM tb_account_util_member_mapping UM
+			JOIN tb_account_members A
+				ON A.member_id = UM.member_id
 			UNION ALL
 			<!-- 파출 직원은 구분(cor_type)이 없어 계약서 인감은 법인으로 찍힘 -->
 			SELECT D.member_id, D.account_id, D.name, D.phone, D.rrn, NULL AS cor_type
@@ -5031,6 +5037,14 @@
 		WHERE C.contract_id = #{contract_id}
 			AND C.del_yn = 'N'
 			<choose>
+				<!-- 문자로 받은 웹 서명 링크: 링크 열쇠가 같고, 만료 전이며, 주민번호 확인 실패 5회 미만인 계약서 -->
+				<when test="web_token != null and web_token != ''">
+					AND C.web_token = #{web_token}
+					<![CDATA[
+					AND C.web_token_expire_dt > CONVERT_TZ(NOW(), '+00:00', '+09:00')
+					AND C.web_fail_cnt < 5
+					]]>
+				</when>
 				<!-- 본사/영양사 로그인: ERP 계정(tb_user)의 거래처·이름과 같은 직원 정보 기준 (직원 정보 user_id는 등록자 아이디라 쓰지 않음) -->
 				<when test="user_id != null and user_id != ''">
 					AND EXISTS (
@@ -5052,6 +5066,54 @@
 			AND #{birth6} REGEXP '^[0-9]{6}$'
 			AND LEFT(REPLACE(REPLACE(IFNULL(COALESCE(NULLIF(C.rrn, ''), M.rrn), ''), '-', ''), ' ', ''), 6) = #{birth6}
 	</select>
+
+	<!-- 웹 서명 링크: 계약서의 현재 링크 상태 조회 (link_valid_yn: 만료 전이고 잠기지 않은 링크가 있으면 Y) -->
+	<select id="ContractWebLinkInfo" parameterType="map" resultType="map">
+		SELECT
+			contract_id,
+			status,
+			web_token,
+			DATE_FORMAT(web_token_expire_dt, '%Y-%m-%d') AS expire_dt,
+			<![CDATA[
+			CASE WHEN web_token IS NOT NULL
+				AND web_token_expire_dt > CONVERT_TZ(NOW(), '+00:00', '+09:00')
+				AND web_fail_cnt < 5
+			THEN 'Y' ELSE 'N' END AS link_valid_yn
+			]]>
+		FROM tb_account_contract
+		WHERE contract_id = #{contract_id}
+			AND del_yn = 'N'
+	</select>
+
+	<!-- 웹 서명 링크: 새 링크 열쇠 발급 (7일 유효, 주민번호 확인 실패 횟수 초기화, 서명 전 계약서만) -->
+	<update id="ContractWebLinkUpdate" parameterType="map">
+		UPDATE tb_account_contract
+		SET
+			web_token = #{web_token},
+			web_token_expire_dt = DATE_ADD(CONVERT_TZ(NOW(), '+00:00', '+09:00'), INTERVAL 7 DAY),
+			web_fail_cnt = 0
+		WHERE contract_id = #{contract_id}
+			AND del_yn = 'N'
+			AND status != '서명완료'
+	</update>
+
+	<!-- 웹 서명 링크: 링크 열쇠로 만료 전 계약서 조회 (잠김 여부는 web_fail_cnt로 판단) -->
+	<select id="WebContractToken" parameterType="map" resultType="map">
+		SELECT
+			contract_id,
+			web_fail_cnt
+		FROM tb_account_contract
+		WHERE web_token = #{web_token}
+			AND del_yn = 'N'
+			AND web_token_expire_dt > CONVERT_TZ(NOW(), '+00:00', '+09:00')
+	</select>
+
+	<!-- 웹 서명 링크: 주민번호 앞 6자리 확인 실패 횟수 1 증가 (5회가 되면 링크 잠김) -->
+	<update id="WebContractFailUpdate" parameterType="map">
+		UPDATE tb_account_contract
+		SET web_fail_cnt = web_fail_cnt + 1
+		WHERE contract_id = #{contract_id}
+	</update>
 
 	<!-- 앱 전자계약: 처음 열람한 미확인 계약서를 확인 상태로 바꾸고 확인일시 기록 -->
 	<update id="ContractViewUpdate" parameterType="map">

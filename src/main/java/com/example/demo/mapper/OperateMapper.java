@@ -41,6 +41,10 @@ public interface OperateMapper {
 	List<Map<String, Object>> AppContractList(Map<String, Object> paramMap);					// 앱 전자계약 -> 본인 계약서 목록 조회
 	int AppContractUnsignedCount(Map<String, Object> paramMap);									// 앱 홈 -> 서명 전 본인 계약서 수
 	Map<String, Object> AppContractDetail(Map<String, Object> paramMap);						// 앱 전자계약 -> 본인 계약서 1건 조회 (양식 HTML 생성용)
+	Map<String, Object> ContractWebLinkInfo(Map<String, Object> paramMap);						// 웹 서명 링크 -> 계약서의 현재 링크 상태 조회
+	int ContractWebLinkUpdate(Map<String, Object> paramMap);									// 웹 서명 링크 -> 새 링크 열쇠 발급 (7일 유효)
+	Map<String, Object> WebContractToken(Map<String, Object> paramMap);						// 웹 서명 링크 -> 링크 열쇠로 만료 전 계약서 조회
+	int WebContractFailUpdate(Map<String, Object> paramMap);									// 웹 서명 링크 -> 주민번호 확인 실패 횟수 증가
 	int ContractViewUpdate(Map<String, Object> paramMap);										// 앱 전자계약 -> 처음 열람 시 확인 상태·확인일시 기록
 	int ContractSignUpdate(Map<String, Object> paramMap);										// 앱 전자계약 -> 근로자 서명 완료 기록 (서명본 PDF 경로·해시 포함)
 	int ContractMemberFileUpdate(Map<String, Object> paramMap);								// 앱 전자계약 -> 서명 완료 시 현장 직원관리 근로계약서 첨부를 서명본 PDF로 교체

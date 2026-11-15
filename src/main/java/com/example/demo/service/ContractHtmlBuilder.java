@@ -258,10 +258,11 @@ public final class ContractHtmlBuilder {
 							.append(SIGN_MARK).append("</td></tr></table>");
 				} else if (labelWidth > 0 && labelMatch.matches()) {
 					// "□ 항목" | ": 내용" 테두리 없는 2칸 표 (항목 칸 폭을 조항 안에서 같게 해 콜론 위치 정렬, 긴 내용은 콜론 뒤에 맞춰 줄바꿈)
-					// 칸 폭 고정 (항목 칸 = 조항 안 가장 긴 항목명 + □, 콜론 칸 = 0.8em, 나머지는 내용)
+					// 칸 폭 고정 (항목 칸 = 조항 안 가장 긴 항목명 + "□ " 여유 1.9em, 콜론 칸 = 0.8em, 나머지는 내용)
+					// 항목 칸은 줄바꿈하지 않음 (휴대폰 글꼴은 한글·□ 폭이 넓어 "소정근로시/간"처럼 꺾이던 문제 방지)
 					rows.append("<table style=\"width:100%; border-collapse:collapse; table-layout:fixed\"><tr>")
-							.append("<td style=\"border:none; padding:0; vertical-align:top; white-space:pre-wrap; width:")
-							.append(String.format(java.util.Locale.ROOT, "%.2f", labelWidth + 1.15)).append("em\">□ ")
+							.append("<td style=\"border:none; padding:0; vertical-align:top; white-space:pre; width:")
+							.append(String.format(java.util.Locale.ROOT, "%.2f", labelWidth + 1.9)).append("em\">□ ")
 							.append(HtmlUtils.htmlEscape(labelMatch.group(1))).append("</td>")
 							.append("<td style=\"border:none; padding:0; vertical-align:top; white-space:nowrap; width:0.8em\">:</td>")
 							.append("<td style=\"border:none; padding:0; vertical-align:top\"><div class=\"ln\">")
