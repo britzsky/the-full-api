@@ -374,6 +374,7 @@
 			SELECT sale_id, SUM(amount) as amt
 			FROM tb_account_purchase_tally_detail
 			WHERE itemType = '3'
+			AND budget_yn = 'N'
 			GROUP BY sale_id
 		) d ON d.sale_id = apt.sale_id
 		WHERE apt.saleDate >= STR_TO_DATE(CONCAT(#{year}, '-', #{month}, '-01'), '%Y-%c-%d')

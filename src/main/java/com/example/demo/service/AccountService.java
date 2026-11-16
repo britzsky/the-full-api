@@ -1259,14 +1259,21 @@ public class AccountService {
 	@Transactional(rollbackFor = Exception.class)
 	public void SupplierPurchaseSaveOneDay(Map<String, Object> master, List<Map<String, Object>> details,
 			Map<String, Object> saleMaster, List<Map<String, Object>> saleDetails, java.math.BigDecimal rate) {
+		// 0) 회계에서 예산미포함(Y)으로 표시한 품목은 재수집 뒤에도 Y로 남긴다 (item_id는 재수집해도 같은 값)
+		java.util.Set<Integer> budgetExcludedIds = new java.util.HashSet<>(
+				accountMapper.PurchaseDetailBudgetExcludedItemIds(master));
 		// 1) 원가로 저장 (그날 상세는 통째로 교체해 빠진 품목이 남지 않게 한다)
 		master.put("amount_basis", "api");
 		AccountPurchaseSave(master);
 		accountMapper.PurchaseTallyDetailDeleteBySaleId(master);
 		for (Map<String, Object> detail : details) {
 			detail.put("amount_basis", "api");
+			markBudgetExcluded(detail, budgetExcludedIds);
 			AccountPurchaseDetailSave(detail);
 		}
+		// Y 품목이 있으면 master 합계를 Y를 뺀 상세 합계로 다시 맞춘다 (Java 합계에는 Y 품목이 들어 있음)
+		if (!budgetExcludedIds.isEmpty())
+			accountMapper.MainMasterAmountsFromDetails(master);
 		// 2) 원가 테이블로 복사
 		Map<String, Object> param = new HashMap<>();
 		param.put("sale_id", master.get("sale_id"));
@@ -1278,11 +1285,24 @@ public class AccountService {
 		if (saleMaster != null) {
 			accountMapper.AccountPurchaseSave(saleMaster);
 			accountMapper.PurchaseTallyDetailDeleteBySaleId(saleMaster);
-			for (Map<String, Object> detail : saleDetails)
+			for (Map<String, Object> detail : saleDetails) {
+				markBudgetExcluded(detail, budgetExcludedIds);
 				accountMapper.AccountPurchaseDetailSave(detail);
+			}
+			if (!budgetExcludedIds.isEmpty())
+				accountMapper.MainMasterAmountsFromDetails(saleMaster);
 		}
 		// 4) 집계표(판가) → 손익표·예산 반영
 		TallySheetPaymentSave(master);
+	}
+
+	// 재수집 상세 1건이 기존 예산미포함(Y) 품목이면 budget_yn='Y'를 넣는 함수
+	private void markBudgetExcluded(Map<String, Object> detail, java.util.Set<Integer> budgetExcludedIds) {
+		if (budgetExcludedIds.isEmpty())
+			return;
+		String itemId = String.valueOf(detail.get("item_id")).trim();
+		if (itemId.matches("-?\\d+") && budgetExcludedIds.contains(Integer.parseInt(itemId)))
+			detail.put("budget_yn", "Y");
 	}
 
 	// 회계 -> 이익률 목록 조회

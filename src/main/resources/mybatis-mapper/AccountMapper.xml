@@ -2241,6 +2241,14 @@
 		 WHERE sale_id = #{sale_id}
 	</delete>
 
+	<!-- 예산미포함(Y)으로 표시된 품목 item_id 목록 (공급사 재수집으로 상세를 다시 넣을 때 Y를 되살리는 기준) -->
+	<select id="PurchaseDetailBudgetExcludedItemIds" parameterType="map" resultType="int">
+		SELECT item_id
+		  FROM tb_account_purchase_tally_detail
+		 WHERE sale_id = #{sale_id}
+		   AND budget_yn = 'Y'
+	</select>
+
 	<!-- 공급사(웰스토리·아워홈) API 호출 전문 저장: 요청 전문(tokenInfo+params)과 결과코드·건수, 실패 시 응답 원문 -->
 	<insert id="SupplierApiLogSave" parameterType="map">
 		INSERT INTO tb_supplier_api_log
@@ -2386,6 +2394,7 @@
 	        taxType,
 	        itemType,
 	        note,
+	        budget_yn,
 	        user_id,
 	        reg_dt
 	    </trim>
@@ -2402,6 +2411,7 @@
 	        #{taxType},
 	        #{itemType},
 	        #{note},
+	        IFNULL(NULLIF(#{budget_yn}, ''), 'N'),
 	        #{user_id},
 	        DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
@@ -2416,6 +2426,8 @@
 	        taxType=#{taxType},
 	        itemType=#{itemType},
 	        note=#{note},
+	        <!-- 예산미포함 여부: 값을 넘기지 않는 저장 경로(OCR·API·개인구매)는 기존 값을 유지 -->
+	        budget_yn = IFNULL(NULLIF(#{budget_yn}, ''), budget_yn),
 	        mod_id=#{user_id},
 	        mod_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
 	    </trim>
@@ -2585,6 +2597,7 @@
 		        FROM ${ptTbl} apt2
 		        JOIN ${ptdTbl} aptd
 		            ON aptd.sale_id = apt2.sale_id
+		            AND aptd.budget_yn = 'N'
 		        WHERE apt2.type NOT IN (1000, 1002, 1003)
 		        <if test="account_id != null and account_id != '' and account_id != '0'">
 		            AND apt2.account_id = #{account_id}
@@ -2844,6 +2857,7 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
+			   aptd.budget_yn,
 			   apt.receipt_image,
 			   apt.receipt_image2,
 			   apt.receipt_image3
@@ -2881,6 +2895,7 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
+			   aptd.budget_yn,
 			   apt.receipt_image,
 			   apt.receipt_image2,
 			   apt.receipt_image3
@@ -2986,6 +3001,7 @@
 			   aptd.amount, 
 			   aptd.taxType, 
 			   aptd.itemType,
+			   aptd.budget_yn,
 			   apt.receipt_image,
 			   apt.receipt_image2,
 			   apt.receipt_image3
@@ -4156,6 +4172,7 @@
 		           SUM(CASE WHEN taxType = 1 THEN 0 ELSE IFNULL(amount, 0) END) AS s_taxFree
 		    FROM tb_account_purchase_tally_detail
 		    WHERE sale_id = #{sale_id}
+		      AND budget_yn = 'N'
 		    GROUP BY sale_id
 		) s
 		  ON s.sale_id = t.sale_id

@@ -78,6 +78,7 @@ public interface AccountMapper {
 	String AccountIdByOurhomeBusiplcd(String busiplcd);												// 아워홈 사업장코드로 account_id 조회
 	List<Map<String, Object>> OurhomeMappedAccountList();												// 아워홈 사업장코드가 매핑된 거래처 목록
 	int PurchaseTallyDetailDeleteBySaleId(Map<String, Object> paramMap);								// 매입집계 상세 sale_id 단위 전체 삭제(아워홈 하루치 교체용)
+	List<Integer> PurchaseDetailBudgetExcludedItemIds(Map<String, Object> paramMap);					// 예산미포함(Y) 품목 item_id 목록(재수집 시 Y 유지용)
 	int SupplierApiLogSave(Map<String, Object> paramMap);												// 공급사 API 호출 전문 로그 저장(요청 전문·결과코드)
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
