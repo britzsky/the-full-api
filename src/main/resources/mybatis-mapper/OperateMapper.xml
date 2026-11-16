@@ -1251,7 +1251,24 @@
         ON t.member_id = am.member_id
         WHERE am.account_id = #{account_id}
         AND del_yn = 'N'
-        ORDER BY am.position_type, t.doc_type_id
+        ORDER BY 
+        	CASE am.position_type WHEN 1 THEN 1
+				WHEN 2 THEN 2
+				WHEN 3 THEN 3
+				WHEN 4 THEN 4
+				WHEN 5 THEN 5
+				WHEN 6 THEN 6
+				WHEN 7 THEN 7
+				ELSE 99
+			END,
+        	CASE
+				WHEN am.account_id = '20250819193632'
+					AND am.member_id = '20260123085804162515037' THEN 0
+				WHEN am.account_id = '20250819193632'
+					AND am.member_id = '20260123085804162515030' THEN 1
+				ELSE 2
+			END,
+        	t.doc_type_id
 	</select>
 	
 	<select id="AccountTypeForFileList" parameterType="map" resultType="hashmap">
