@@ -52,11 +52,13 @@ public class AccountService {
 
 	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
 	// WelstorySyncScheduler가 매일 18시(KST)에 WelstoryPurchaseSync()를 호출 ->
-	// 제휴사 2곳의 API를 각각 호출해 당일/전일/전전일/전전전일(4일치) 입고내역을 tb_account_purchase_tally(_detail)에 저장한다.
+	// 제휴사 2곳의 API를 각각 호출해 당일/전일/전전일/전전전일(4일치) 입고내역을
+	// tb_account_purchase_tally(_detail)에 저장한다.
 	// (당일 저녁 기준으로 아직 늦게 확정되는 전일~전전전일분이 있을 수 있어 4일치를 매번 같이 재조회한다)
 
 	// 웰스토리 API 게이트웨이 base url (토큰발급: /oauth/2.0/token, 서비스: /fdapi/service/*)
-	// 운영은 기본값(welgw.welstory.com), 로컬은 application-secret-local.properties에서 품질서버(scp-stg-welgw)로 덮어쓴다
+	// 운영은 기본값(welgw.welstory.com), 로컬은 application-secret-local.properties에서
+	// 품질서버(scp-stg-welgw)로 덮어쓴다
 	@Value("${welstory.api.base-url:https://welgw.welstory.com}")
 	private String WELSTORY_BASE_URL;
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값(실제 로그인 사용자가 없으므로)
@@ -1018,7 +1020,8 @@ public class AccountService {
 		Map<String, Object> main = accountMapper.AccountPurchaseTallyTotalBySaleId(paramMap);
 		if (main != null && isMarginTarget(main.get("type"), main.get("saleDate")))
 			refreshMainSaleMaster(String.valueOf(paramMap.get("sale_id")),
-					marginRate(String.valueOf(main.get("account_id")), main.get("type"), toLocalDate(main.get("saleDate"))));
+					marginRate(String.valueOf(main.get("account_id")), main.get("type"),
+							toLocalDate(main.get("saleDate"))));
 		return iResult;
 	}
 
@@ -1029,9 +1032,9 @@ public class AccountService {
 	// 두 금액이 다른 것은 이익률 대상(웰스토리 1~4·아워홈 1042, 입고일 2026-11-01 이후)뿐이다.
 	//
 	// 저장 메서드에 넘기는 amount_basis 값
-	// - "api"  : 공급사 API 저장. 호출부(SupplierPurchaseSaveOneDay)가 두 테이블을 직접 맞춘다
+	// - "api" : 공급사 API 저장. 호출부(SupplierPurchaseSaveOneDay)가 두 테이블을 직접 맞춘다
 	// - "sale" : 판가로 입력한 금액(개발팀 집계표 수정). 원가는 판가 / (1 + 이익률)로 되돌린다
-	// - 그 외  : 원가로 입력한 금액(회계 거래처 자료입력 등). 이익률 대상이면 판가를 다시 계산한다
+	// - 그 외 : 원가로 입력한 금액(회계 거래처 자료입력 등). 이익률 대상이면 판가를 다시 계산한다
 
 	// 이익률을 적용하기 시작한 입고일
 	private static final LocalDate MARGIN_START_DATE = LocalDate.of(2026, 11, 1);
@@ -1092,6 +1095,16 @@ public class AccountService {
 		return Long.signum(costUnit) * sale;
 	}
 
+	// 아워홈 판가 단가를 구하는 함수: 원가 단가 × (1 + 이익률/100)을 10원 단위로 반올림 (웰스토리는 올림이라 다름)
+	// 예) 3,220 × 1.2 = 3,864 → 3,860
+	static long ourhomeSaleUnitPrice(long costUnit, java.math.BigDecimal rate) {
+		long abs = Math.abs(costUnit);
+		long sale = java.math.BigDecimal.valueOf(abs)
+				.multiply(java.math.BigDecimal.valueOf(100).add(rate))
+				.divide(java.math.BigDecimal.valueOf(1000), 0, java.math.RoundingMode.HALF_UP).longValue() * 10;
+		return Long.signum(costUnit) * sale;
+	}
+
 	// 판가 품목 1줄의 공급가·부가세를 구하는 함수: 공급가 = 반올림(판가 단가 × 수량), 과세면 부가세 = 반올림(공급가 × 10%)
 	// 반환: {공급가, 부가세}. 음수 수량은 절댓값으로 반올림해 취소·재출고 줄이 정확히 상쇄되게 한다
 	static long[] marginSaleLine(long saleUnit, double qty, boolean taxable) {
@@ -1103,7 +1116,8 @@ public class AccountService {
 
 	// 원가 detail 1줄로 판가 detail 1줄을 만드는 함수 (회계에서 원가로 고친 품목용)
 	// 수량·원가 단가를 알 수 없어 품목 공급가 전체를 단가로 보고 FAQ 규칙을 적용한다.
-	// ponytail: 줄 단위 근사. API 품목은 SupplierPurchaseSaveOneDay가 단가×수량으로 정확히 계산하므로 여기 오지 않는다
+	// ponytail: 줄 단위 근사. API 품목은 SupplierPurchaseSaveOneDay가 단가×수량으로 정확히 계산하므로 여기
+	// 오지 않는다
 	private Map<String, Object> marginSaleDetailFromCost(Map<String, Object> cost, java.math.BigDecimal rate) {
 		long amount = welstoryAsLong(cost.get("amount"));
 		long vat = welstoryAsLong(cost.get("vat"));
@@ -1769,7 +1783,8 @@ public class AccountService {
 	public int AccountRecordLockSave(Map<String, Object> paramMap) {
 		int iResult = accountMapper.AccountRecordLockSave(paramMap);
 		// 월 잠금 해제는 전체 거래처 기준이므로 거래처별로 남아 있던 월 잠금도 함께 해제
-		if ("M".equals(String.valueOf(paramMap.get("lock_type"))) && "N".equals(String.valueOf(paramMap.get("lock_yn")))) {
+		if ("M".equals(String.valueOf(paramMap.get("lock_type")))
+				&& "N".equals(String.valueOf(paramMap.get("lock_yn")))) {
 			accountMapper.AccountRecordMonthLockClear(paramMap);
 		}
 		return iResult;
@@ -2315,7 +2330,8 @@ public class AccountService {
 		Map<String, Object> res = null;
 		String errorBody = null;
 		try {
-			ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(WELSTORY_BASE_URL + "/fdapi/service/" + path,
+			ResponseEntity<Map<String, Object>> resp = restTemplate.exchange(
+					WELSTORY_BASE_URL + "/fdapi/service/" + path,
 					HttpMethod.POST, new HttpEntity<>(payload, headers),
 					new ParameterizedTypeReference<Map<String, Object>>() {
 					});
@@ -2368,8 +2384,9 @@ public class AccountService {
 	// WelstoryPriceSync(순기년도, 순기, soldTo)
 	// -> 제휴사(client1, client2)마다 토큰 발급 -> 사업장 조회(payer-rep-soldto)
 	// -> 사업장(soldTo)마다 해당 순기 전체 판가 조회(payer-allitem-price, 100건씩 페이지)
-	// -> 호출마다 요청 전문(guid+dataHeader+dataBody)과 성공여부·건수를 tb_supplier_api_log(type=1)에 저장 (welstoryLoggedCall)
-	//    응답 원문은 저장하지 않고 실패 응답만 남긴다. 토큰은 Authorization 헤더로만 보내므로 전문에 남지 않는다.
+	// -> 호출마다 요청 전문(guid+dataHeader+dataBody)과 성공여부·건수를
+	// tb_supplier_api_log(type=1)에 저장 (welstoryLoggedCall)
+	// 응답 원문은 저장하지 않고 실패 응답만 남긴다. 토큰은 Authorization 헤더로만 보내므로 전문에 남지 않는다.
 
 	// tb_account_mapping.type 웰스토리 구분값
 	private static final int WELSTORY_TYPE = 1;
@@ -2477,7 +2494,8 @@ public class AccountService {
 	}
 
 	// 웰스토리 fdapi/service/* 호출 + 전문 기록.
-	// 결과코드와 관계없이 tb_supplier_api_log에 저장하고 응답 JSON을 그대로 돌려준다(성공 판정은 호출자가 resCd로 한다).
+	// 결과코드와 관계없이 tb_supplier_api_log에 저장하고 응답 JSON을 그대로 돌려준다(성공 판정은 호출자가 resCd로
+	// 한다).
 	// 판가는 순기 단위라 deposit_dt에는 응답의 순기 시작일(periodFromDt)을 넣는다.
 	private JsonNode welstoryLoggedCall(String apiType, String path, String accessToken, Map<String, Object> dataHeader,
 			Map<String, Object> dataBody, String soldTo) {
@@ -2562,8 +2580,9 @@ public class AccountService {
 	// OurhomePriceSync(납품일, 사업장코드)
 	// -> 사업장 조회(getBusiInfo): 더채움 본부 소속 아워홈 사업장 전체 + 사업장별 발주 가능일
 	// -> 납품일이 발주 가능일인 사업장마다 판가 전체 조회(getGoodList)
-	// -> 호출마다 요청 전문(tokenInfo+params, 토큰은 가림)과 성공여부·건수를 tb_supplier_api_log에 저장 (ourhomeCall)
-	//    응답 원문(판가는 사업장 1곳 약 10MB)은 저장하지 않고, 실패 응답만 원인 확인용으로 남긴다.
+	// -> 호출마다 요청 전문(tokenInfo+params, 토큰은 가림)과 성공여부·건수를 tb_supplier_api_log에 저장
+	// (ourhomeCall)
+	// 응답 원문(판가는 사업장 1곳 약 10MB)은 저장하지 않고, 실패 응답만 원인 확인용으로 남긴다.
 
 	// tb_account_mapping.type 아워홈 구분값
 	private static final int OURHOME_TYPE = 1042;
@@ -2678,7 +2697,8 @@ public class AccountService {
 	// -> 집계표·손익표·예산 반영(TallySheetPaymentSave)
 	//
 	// 출고완료(prcsStatYn=Y)·출고수량 > 0인 품목만 매입으로 본다. 입고분이 없으면 기존 API 매입을 지운다.
-	// 현장에서 직접 입력한 아워홈(1042) 매입과 관계없이 API 매입은 별도 sale_id(_OH)로 저장한다(수기 데이터는 건드리지 않음).
+	// 현장에서 직접 입력한 아워홈(1042) 매입과 관계없이 API 매입은 별도 sale_id(_OH)로 저장한다(수기 데이터는 건드리지
+	// 않음).
 
 	// 스케줄러가 자동 저장할 때 user_id/mod_id 컬럼에 남길 고정값
 	private static final String OURHOME_SYNC_USER_ID = "SYSTEM";
@@ -2832,8 +2852,8 @@ public class AccountService {
 			details.add(detail);
 
 			if (marginTarget) {
-				// 판가: 원가 단가(salsUcost) × 이익률 → FAQ 반올림 → × 출고수량 → 과세면 부가세 10%
-				long[] sale = marginSaleLine(marginSaleUnitPrice(closeUnit, rate), qty, taxable);
+				// 판가: 원가 단가(salsUcost) × 이익률 → 10원 단위 반올림 → × 출고수량 → 과세면 부가세 10%
+				long[] sale = marginSaleLine(ourhomeSaleUnitPrice(closeUnit, rate), qty, taxable);
 				long saleAmount = sale[0] + sale[1];
 				Map<String, Object> saleDetail = new HashMap<>(detail);
 				// 판가는 단가가 10원 단위가 아닐 수 있어 수량 1, 단가 = 금액으로 넣는다 (화면 수량×단가 재계산과 일치)
@@ -2869,7 +2889,8 @@ public class AccountService {
 		return 1;
 	}
 
-	// 아워홈 하루치 매입 삭제: sale_id별 master·detail 삭제(sp_sync_account_purchase_delete) -> 집계표·손익표·예산 재반영
+	// 아워홈 하루치 매입 삭제: sale_id별 master·detail 삭제(sp_sync_account_purchase_delete) ->
+	// 집계표·손익표·예산 재반영
 	@Transactional(rollbackFor = Exception.class)
 	public void OurhomePurchaseDeleteOneDay(Map<String, Object> master, List<String> saleIds) {
 		for (String saleId : saleIds)
@@ -2886,7 +2907,8 @@ public class AccountService {
 	}
 
 	// 아워홈 API 공통 호출부.
-	// tokenInfo(인증) + params(guid 포함)를 POST하고, 성공·실패와 관계없이 전문을 tb_supplier_api_log에 저장한다.
+	// tokenInfo(인증) + params(guid 포함)를 POST하고, 성공·실패와 관계없이 전문을 tb_supplier_api_log에
+	// 저장한다.
 	// rtnCd가 0이 아니거나 응답을 못 받으면 예외를 던진다. 정상이면 응답 전체 JSON을 반환한다.
 	private JsonNode ourhomeCall(String apiType, String path, Map<String, Object> params, String siteCode,
 			String depositDt) {
@@ -2897,7 +2919,8 @@ public class AccountService {
 	private JsonNode ourhomeCall(String apiType, String path, Map<String, Object> params, String siteCode,
 			String depositDt, String accountId) {
 		if (!ourhomeBaseUrl.startsWith("https://") || ourhomeTaxNo.isBlank() || ourhomeHeadGroupCode.isBlank()
-				|| ourhomeClientToken.isBlank() || !ourhomeServiceId.matches("\\d+") || !ourhomeEncryptSeed.matches("-?\\d+"))
+				|| ourhomeClientToken.isBlank() || !ourhomeServiceId.matches("\\d+")
+				|| !ourhomeEncryptSeed.matches("-?\\d+"))
 			throw new IllegalStateException("ourhome.api.* 설정이 비어있음 (application-secret*.properties 확인)");
 
 		// guid·senddttm은 아워홈 기준(KST)으로 만든다 (서버가 UTC여도 validCd 검증이 맞도록)
@@ -2990,7 +3013,8 @@ public class AccountService {
 	}
 
 	// 아워홈 검증코드(validCd).
-	// ((100-년앞2) + (100-년뒤2) + (100-월) + (100-일)) * (초뒤1||분뒤1||시뒤1) + 외부서비스ID + 암호화시드
+	// ((100-년앞2) + (100-년뒤2) + (100-월) + (100-일)) * (초뒤1||분뒤1||시뒤1) + 외부서비스ID +
+	// 암호화시드
 	String ourhomeValidCode(String senddttm) {
 		long sum = (100 - Integer.parseInt(senddttm.substring(0, 2)))
 				+ (100 - Integer.parseInt(senddttm.substring(2, 4)))

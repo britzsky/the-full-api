@@ -14,14 +14,13 @@ class MarginPriceTest {
 
 	private static final BigDecimal R20 = BigDecimal.valueOf(20);
 
-	// 아워홈은 추가 이익률에서 제외하고 웰스토리의 적용 시작일은 유지한다.
+	// 웰스토리(1~4)·아워홈(1042) 모두 입고일 2026-11-01부터 이익률 대상
 	@Test
 	void 공급사별_추가_이익률_적용_대상() throws Exception {
 		AccountService service = org.mockito.Mockito.mock(AccountService.class, org.mockito.Mockito.CALLS_REAL_METHODS);
 		java.lang.reflect.Method method = AccountService.class.getDeclaredMethod("isMarginTarget", Object.class, Object.class);
 		method.setAccessible(true);
-		assertFalse((Boolean) method.invoke(service, "1042", "2026-11-12"));
-		for (String type : new String[] { "1", "2", "3", "4" }) {
+		for (String type : new String[] { "1", "2", "3", "4", "1042" }) {
 			assertTrue((Boolean) method.invoke(service, type, "2026-11-01"));
 			assertFalse((Boolean) method.invoke(service, type, "2026-10-31"));
 		}
@@ -46,6 +45,25 @@ class MarginPriceTest {
 		assertEquals(120, AccountService.marginSaleUnitPrice(100, R20));
 		assertEquals(109, AccountService.marginSaleUnitPrice(95, BigDecimal.valueOf(15))); // 109.25 → 109
 		assertEquals(131, AccountService.marginSaleUnitPrice(109, R20)); // 130.8 → 131
+	}
+
+	// 아워홈: 10원 단위 반올림 (사랑복지요양원 2026-11-02 발주 화면 합계 62,306원 대조)
+	@Test
+	void 아워홈은_10원_단위로_반올림한다() {
+		assertEquals(3860, AccountService.ourhomeSaleUnitPrice(3220, R20)); // 2종혼합야채 3,864 → 3,860
+		assertEquals(7780, AccountService.ourhomeSaleUnitPrice(6480, R20)); // 꿀유자차 7,776 → 7,780
+		assertEquals(11980, AccountService.ourhomeSaleUnitPrice(9980, R20)); // 계란 11,976 → 11,980
+		long total = 0;
+		for (long[] l : new long[][] { AccountService.marginSaleLine(3860, 5, true),
+				AccountService.marginSaleLine(7780, 2, true), AccountService.marginSaleLine(11980, 2, false) })
+			total += l[0] + l[1];
+		assertEquals(62306, total);
+		// 2026-11-13 발주 (화면 합계 165,088원)
+		assertEquals(6910, AccountService.ourhomeSaleUnitPrice(5760, R20)); // 새우젓 6,912 → 6,910
+		assertEquals(8300, AccountService.ourhomeSaleUnitPrice(6920, R20)); // 참나물 8,304 → 8,300
+		assertEquals(2650, AccountService.ourhomeSaleUnitPrice(2210, R20)); // 아이순 2,652 → 2,650
+		assertEquals(8820, AccountService.ourhomeSaleUnitPrice(7350, R20)); // 도라지 (KG 1.8)
+		assertArrayEquals(new long[] { 15876, 0 }, AccountService.marginSaleLine(8820, 1.8, false));
 	}
 
 	// 판가 단가 × 수량 → 공급가, 과세면 부가세 10%
