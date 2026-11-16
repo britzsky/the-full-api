@@ -1026,7 +1026,7 @@ public class AccountService {
 	// tb_account_purchase_tally(_detail) = 판가(이익률 포함), 집계표·예산이 읽는다.
 	// tb_account_purchase_tally_cost(_detail_cost) = 원가(이익률 제외), 회계·손익표가 읽는다.
 	// 판가 테이블에 들어간 매입은 모두 같은 sale_id·item_id로 원가 테이블에도 들어간다.
-	// 두 금액이 다른 것은 이익률 대상(웰스토리 1~4, 입고일 2026-11-01 이후)뿐이다.
+	// 두 금액이 다른 것은 이익률 대상(웰스토리 1~4·아워홈 1042, 입고일 2026-11-01 이후)뿐이다.
 	//
 	// 저장 메서드에 넘기는 amount_basis 값
 	// - "api"  : 공급사 API 저장. 호출부(SupplierPurchaseSaveOneDay)가 두 테이블을 직접 맞춘다
@@ -1035,8 +1035,8 @@ public class AccountService {
 
 	// 이익률을 적용하기 시작한 입고일
 	private static final LocalDate MARGIN_START_DATE = LocalDate.of(2026, 11, 1);
-	// 이익률을 적용하는 매입 type. 아워홈(1042)은 API 단가에 이미 이익률이 포함되어 추가 적용하지 않는다.
-	private static final java.util.Set<String> MARGIN_TYPES = java.util.Set.of("1", "2", "3", "4");
+	// 이익률을 적용하는 매입 type (웰스토리 1~4, 아워홈 1042)
+	private static final java.util.Set<String> MARGIN_TYPES = java.util.Set.of("1", "2", "3", "4", "1042");
 	// 이익률 등록이 없을 때 쓰는 기본 이익률(%)
 	private static final java.math.BigDecimal DEFAULT_MARGIN_RATE = java.math.BigDecimal.valueOf(20);
 
