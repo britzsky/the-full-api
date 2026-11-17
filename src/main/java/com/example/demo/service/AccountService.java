@@ -2438,13 +2438,15 @@ public class AccountService {
 			{ "newCntrc", "신규계약" }, { "stopType", "STOP여부" } };
 
 	// 웰스토리 판가 CSV 추출 진입점(수동 실행용).
-	// 판가 수집과 같은 흐름으로 제휴사 2곳의 대표 사업장 판가를 받아, 서버 실행 폴더 아래
-	// welstory-export/welstory_price_{년도}_{순기}.csv 에 쓴다. 엑셀 한글 깨짐 방지를 위해 UTF-8 BOM을 붙인다.
+	// 판가 수집과 같은 흐름으로 제휴사 2곳의 대표 사업장 판가를 받아, JVM 임시 폴더(java.io.tmpdir) 아래
+	// welstory-export/welstory_price_{년도}_{순기}.csv 에 쓴다.
+	// 운영은 tomcat 계정·실행 폴더 '/'라 실행 폴더에는 쓸 수 없고, Tomcat 임시 폴더($CATALINA_BASE/temp)는 쓸 수 있다.
+	// 엑셀 한글 깨짐 방지를 위해 UTF-8 BOM을 붙인다.
 	public Map<String, Object> WelstoryPriceExport(String year, String period, String soldTo) {
 		// 파일명에 들어가는 값이라 숫자 형식만 허용한다(경로 조작 방지)
 		if (year == null || !year.matches("\\d{4}") || period == null || !period.matches("\\d{2}"))
 			throw new IllegalArgumentException("year는 4자리, period는 2자리 숫자여야 합니다.");
-		Path file = Paths.get("welstory-export", "welstory_price_" + year + "_" + period + ".csv").toAbsolutePath();
+		Path file = Paths.get(System.getProperty("java.io.tmpdir"), "welstory-export", "welstory_price_" + year + "_" + period + ".csv").toAbsolutePath();
 		try {
 			Files.createDirectories(file.getParent());
 			try (Writer csv = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
@@ -2552,10 +2554,11 @@ public class AccountService {
 		int rows = 0;
 		for (int page = 0; page < 1000; page++) {
 			Map<String, Object> header = new LinkedHashMap<>();
-			header.put("pageRow", 100);
+			// CSV 추출은 호출 수를 줄이려고 한 번에 1000행(가이드 최대 10000), 정기 수집은 검증된 100행
+			header.put("pageRow", csv != null ? 1000 : 100);
 			header.put("contYn", contYn);
 			header.put("nextKey", nextKey);
-			JsonNode res = welstoryLoggedCall("PRICE", "payer-allitem-price", accessToken, header, body, soldTo);
+			JsonNode res = welstoryPriceCallWithRetry(accessToken, header, body, soldTo);
 			String code = res.path("dataBody").path("resCd").asText("");
 			if (!"S0000".equals(code)) {
 				boolean noData = "E1103".equals(code) || "EE120".equals(code);
@@ -2583,6 +2586,28 @@ public class AccountService {
 				return rows;
 		}
 		throw new IllegalStateException("웰스토리 판가 페이지 수 초과");
+	}
+
+	// 판가 1페이지 조회. 응답 자체를 못 받은 통신 오류만 같은 페이지로 최대 3번까지 다시 요청한다(5초, 10초 대기).
+	// 조회 요청이라 같은 nextKey로 다시 보내도 데이터가 중복되지 않는다. 웰스토리가 준 오류 응답(resCd)은 재시도하지 않는다.
+	private JsonNode welstoryPriceCallWithRetry(String accessToken, Map<String, Object> header,
+			Map<String, Object> body, String soldTo) {
+		for (int attempt = 1;; attempt++) {
+			try {
+				return welstoryLoggedCall("PRICE", "payer-allitem-price", accessToken, header, body, soldTo);
+			} catch (IllegalStateException e) {
+				if (attempt >= 3)
+					throw e;
+				log.warn("[WelstoryPriceSync] soldTo={} nextKey={} 재시도 {}회: {}", soldTo, header.get("nextKey"),
+						attempt, e.getMessage());
+				try {
+					Thread.sleep(5000L * attempt);
+				} catch (InterruptedException ie) {
+					Thread.currentThread().interrupt();
+					throw e;
+				}
+			}
+		}
 	}
 
 	// 웰스토리 fdapi/service/* 호출 + 전문 기록.
@@ -2614,7 +2639,9 @@ public class AccountService {
 			httpStatus = e.getStatusCode().value();
 			raw = new String(e.getResponseBodyAsByteArray(), StandardCharsets.UTF_8);
 		} catch (Exception e) {
-			errorMsg = "응답 수신 실패: " + e.getClass().getSimpleName();
+			// 연결 끊김·응답 본문 읽기 실패 등 HTTP 응답 자체를 못 받은 경우. 원인 확인용으로 예외 메시지까지 남긴다
+			errorMsg = "응답 수신 실패: " + e.getClass().getSimpleName() + " " + e.getMessage();
+			log.warn("[Welstory] {} {} 응답 수신 실패 guid={}", apiType, path, guid, e);
 		}
 		long elapsed = System.currentTimeMillis() - started;
 		if (raw != null)
