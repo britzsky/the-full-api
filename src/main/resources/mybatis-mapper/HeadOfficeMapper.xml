@@ -2199,6 +2199,7 @@
 			   R.payment_type_detail,
 			   R.request_dt,
 			   R.saleDate,
+			   R.buyer,
 			   R.receipt_image,
 			   R.sale_id
 		FROM (
@@ -2227,8 +2228,9 @@
 				   NULL AS payment_type,
 				   NULL AS payment_type_detail,
 				   NULL AS request_dt,
-				   <!-- 개인구매(FR) 결재 후 후첨한 구매일자/영수증/매입집계 반영 키 -->
+				   <!-- 개인구매(FR) 결재 후 후첨한 구매일자/구매자/영수증/매입집계 반영 키 -->
 				   DATE_FORMAT(pr.saleDate, '%Y-%m-%d') AS saleDate,
+				   pr.buyer,
 				   pr.receipt_image,
 				   pr.sale_id
 			FROM tb_headoffice_purchase_request pr
@@ -2264,6 +2266,7 @@
 				   NULL AS payment_type_detail,
 				   NULL AS request_dt,
 				   NULL AS saleDate,
+				   NULL AS buyer,
 				   NULL AS receipt_image,
 				   NULL AS sale_id
 			FROM tb_headoffice_draft d
@@ -2299,6 +2302,7 @@
 				   pd.payment_type_detail AS payment_type_detail,
 				   DATE_FORMAT(pd.request_dt, '%Y-%m-%d %H:%i:%s') AS request_dt,
 				   NULL AS saleDate,
+				   NULL AS buyer,
 				   NULL AS receipt_image,
 				   NULL AS sale_id
 			FROM tb_headoffice_payment_doc pd
@@ -2542,6 +2546,7 @@
 			   use_name,
 			   sale_id,
 			   DATE_FORMAT(saleDate, '%Y-%m-%d') AS saleDate,
+			   buyer,
 			   receipt_image
 		FROM tb_headoffice_purchase_request
 		WHERE payment_id = #{payment_id}
@@ -2549,10 +2554,11 @@
 		FOR UPDATE
 	</select>
 
-	<!-- 개인구매(FR) 품목에 구매일자·영수증·매입집계 sale_id를 저장 (이미 후첨된 품목은 제외) -->
+	<!-- 개인구매(FR) 품목에 구매일자·구매자·영수증·매입집계 sale_id를 저장 (이미 후첨된 품목은 제외) -->
 	<update id="ElectronicPaymentFrReceiptItemSave" parameterType="map">
 		UPDATE tb_headoffice_purchase_request
 		SET saleDate = DATE_FORMAT(#{saleDate}, '%Y-%m-%d'),
+			buyer = #{buyer},
 			receipt_image = #{receipt_image},
 			sale_id = #{sale_id}
 		WHERE payment_id = #{payment_id}

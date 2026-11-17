@@ -700,8 +700,8 @@ public class HeadOfficeController {
 	/*
 	 * part		: 현장
      * method 	: PersonPurchaseReceiptSave
-     * comment 	: 현장 -> 구매요청 -> 요청내역 -> 1차 결재가 끝난 개인구매 품목들의 구매일자·영수증 일괄 후첨 저장
-     *            (item_idx / saleDate / files 는 같은 순서의 배열, 하나라도 실패하면 전체 취소)
+     * comment 	: 현장 -> 구매요청 -> 요청내역 -> 1차 결재가 끝난 개인구매 품목들의 구매일자·구매자·영수증 일괄 후첨 저장
+     *            (item_idx / saleDate / buyer / files 는 같은 순서의 배열, 하나라도 실패하면 전체 취소)
      */
 	@PostMapping("FieldBoard/PersonPurchaseReceiptSave")
 	public String PersonPurchaseReceiptSave(
@@ -709,6 +709,7 @@ public class HeadOfficeController {
 		@RequestParam("user_id") String userId,
 		@RequestParam("item_idx") List<String> itemIdxList,
 		@RequestParam("saleDate") List<String> saleDateList,
+		@RequestParam(value = "buyer", required = false) List<String> buyerList,
 		@RequestParam("files") MultipartFile[] files
 	) {
 		JsonObject obj = new JsonObject();
@@ -716,15 +717,17 @@ public class HeadOfficeController {
 		int count = itemIdxList == null ? 0 : itemIdxList.size();
 		boolean invalid = count == 0
 			|| saleDateList == null || saleDateList.size() != count
+			|| buyerList == null || buyerList.size() != count
 			|| files == null || files.length != count;
 		if (!invalid) {
 			for (int i = 0; i < count; i++) {
-				if (asText(saleDateList.get(i)).isEmpty() || files[i] == null || files[i].isEmpty()) invalid = true;
+				if (asText(saleDateList.get(i)).isEmpty() || asText(buyerList.get(i)).isEmpty()
+					|| files[i] == null || files[i].isEmpty()) invalid = true;
 			}
 		}
 		if (invalid) {
 			obj.addProperty("code", 400);
-			obj.addProperty("message", "모든 품목의 구매일자와 영수증을 입력해 주세요.");
+			obj.addProperty("message", "모든 품목의 구매일자, 구매자, 영수증을 입력해 주세요.");
 			return obj.toString();
 		}
 
@@ -743,6 +746,7 @@ public class HeadOfficeController {
 				Map<String, Object> row = new HashMap<>();
 				row.put("item_idx", asText(itemIdxList.get(i)));
 				row.put("saleDate", asText(saleDateList.get(i)));
+				row.put("buyer", asText(buyerList.get(i)));
 				row.put("sale_id", saleId);
 				row.put("receipt_image", receiptImage);
 				rows.add(row);

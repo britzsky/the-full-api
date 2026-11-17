@@ -314,8 +314,8 @@ public class HeadOfficeService {
 		return iResult;
 	}
 
-	// 현장 -> 구매요청 -> 1차 결재가 끝난 개인구매(FR) 문서의 품목들에 구매일자·영수증을 일괄 후첨한다.
-	// - 품목에 saleDate/receipt_image/sale_id 저장(이후 수정 불가), 매입집계 반영은 2차 결재 시 처리
+	// 현장 -> 구매요청 -> 1차 결재가 끝난 개인구매(FR) 문서의 품목들에 구매일자·구매자·영수증을 일괄 후첨한다.
+	// - 품목에 saleDate/buyer/receipt_image/sale_id 저장(이후 수정 불가), 매입집계 반영은 2차 결재 시 처리
 	// - 이미 최종 결재된 문서는 2차 결재 시점이 지났으므로 후첨 즉시 매입집계에 반영
 	// - 한 품목이라도 실패하면 전체 롤백 (일부만 저장되지 않음)
 	@Transactional(rollbackFor = Exception.class)
@@ -409,7 +409,10 @@ public class HeadOfficeService {
 				tally.put("use_name", item.get("use_name"));
 				tally.put("user_id", userId);
 				tally.put("receipt_type", "UNKNOWN");
-				tally.put("buyer", main.get("user_name"));
+				// 후첨 때 입력한 구매자, 구매자 없이 저장된 이전 품목은 기안자 이름
+				Object buyer = item.get("buyer");
+				tally.put("buyer", buyer == null || String.valueOf(buyer).trim().isEmpty()
+					? main.get("user_name") : String.valueOf(buyer).trim());
 				accountService.AccountPurchaseSave(tally);
 
 				saleIdByDate.put(saleDate, item.get("sale_id"));
