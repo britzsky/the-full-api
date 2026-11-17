@@ -3618,6 +3618,25 @@ public class AccountController {
 		return obj.toString();
 	}
 
+	// 웰스토리 순기 전체 판가를 서버 CSV 파일로 추출(수동 실행용, EC2에서 localhost로 호출).
+	// 응답의 file이 생성된 CSV 절대경로, rows가 기록한 판가 행 수.
+	@PostMapping("/Account/WelstoryPriceExportManual")
+	public String WelstoryPriceExportManual(@RequestParam String year, @RequestParam String period,
+			@RequestParam(required = false) String soldTo) {
+		Map<String, Object> result = accountService.WelstoryPriceExport(year, period, soldTo);
+
+		JsonObject obj = new JsonObject();
+		obj.addProperty("code", 200);
+		obj.addProperty("message", "성공");
+		obj.addProperty("file", (String) result.get("file"));
+		obj.addProperty("rows", (Integer) result.get("rows"));
+		obj.addProperty("success", (Integer) result.get("success"));
+		obj.addProperty("empty", (Integer) result.get("empty"));
+		obj.addProperty("failed", (Integer) result.get("failed"));
+		obj.addProperty("failedSites", (String) result.get("failedSites"));
+		return obj.toString();
+	}
+
 	// 아워홈 판가 전문 수동 수집(테스트·재수집용).
 	// date(납품일, YYYYMMDD)가 발주 가능일인 아워홈 사업장마다 판가 전체를 조회해 tb_supplier_api_log에 저장한다.
 	// siteCode(아워홈 사업장코드)를 넘기면 그 사업장만 조회한다.

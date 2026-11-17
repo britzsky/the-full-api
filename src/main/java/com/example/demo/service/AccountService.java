@@ -1,6 +1,12 @@
 package com.example.demo.service;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.io.Writer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -2415,7 +2421,61 @@ public class AccountService {
 	// year(순기년도 YYYY) + period(순기 2자리)의 전체 판가를 사업장마다 조회해 전문을 저장한다.
 	// soldTo를 넘기면 그 사업장만 조회한다(테스트·재수집용).
 	public Map<String, Object> WelstoryPriceSync(String year, String period, String soldTo) {
-		int success = 0, empty = 0, failed = 0;
+		return welstoryPriceCollect(year, period, soldTo, null);
+	}
+
+	// 웰스토리 판가 CSV 컬럼 순서: {응답 필드명, 엑셀 머리글}. 가이드 "제휴사사업장별 전체 판가조회" 응답 항목 기준
+	private static final String[][] WELSTORY_PRICE_CSV_COLUMNS = { { "payerCode", "제휴사코드" },
+			{ "soldTo", "사업장코드" }, { "periodGroupYear", "순기년도" }, { "periodGroup", "순기" },
+			{ "periodFromDt", "순기시작일" }, { "periodToDt", "순기종료일" }, { "centerCode", "센터코드" },
+			{ "itemCode", "품목코드" }, { "itemName", "품목명" }, { "standard", "규격" }, { "unit", "단위" },
+			{ "price", "판가" }, { "taxCode", "과세여부" }, { "classA", "대분류" }, { "classB", "중분류" },
+			{ "classC", "소분류" }, { "classD", "세부분류" }, { "closeCode", "마감코드" }, { "leadTime", "리드타임" },
+			{ "minQntty", "최소발주량" }, { "orderIncrs", "발주증가량" }, { "decYN", "소수점발주" },
+			{ "deliveryType", "배송구분" }, { "origin", "원산지" }, { "rawMaterialOrigin1", "원재료원산지1" },
+			{ "rawMaterialOrigin2", "원재료원산지2" }, { "strgTmprt", "보관온도" }, { "useDt", "사용기한" },
+			{ "size", "크기" }, { "weight", "중량" }, { "boxVolume", "박스CBM" }, { "boxInnCnt", "박스당개입수" },
+			{ "newCntrc", "신규계약" }, { "stopType", "STOP여부" } };
+
+	// 웰스토리 판가 CSV 추출 진입점(수동 실행용).
+	// 판가 수집과 같은 흐름으로 제휴사 2곳의 대표 사업장 판가를 받아, 서버 실행 폴더 아래
+	// welstory-export/welstory_price_{년도}_{순기}.csv 에 쓴다. 엑셀 한글 깨짐 방지를 위해 UTF-8 BOM을 붙인다.
+	public Map<String, Object> WelstoryPriceExport(String year, String period, String soldTo) {
+		// 파일명에 들어가는 값이라 숫자 형식만 허용한다(경로 조작 방지)
+		if (year == null || !year.matches("\\d{4}") || period == null || !period.matches("\\d{2}"))
+			throw new IllegalArgumentException("year는 4자리, period는 2자리 숫자여야 합니다.");
+		Path file = Paths.get("welstory-export", "welstory_price_" + year + "_" + period + ".csv").toAbsolutePath();
+		try {
+			Files.createDirectories(file.getParent());
+			try (Writer csv = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+				csv.write('﻿');
+				StringBuilder header = new StringBuilder();
+				for (String[] col : WELSTORY_PRICE_CSV_COLUMNS)
+					header.append(header.length() == 0 ? "" : ",").append(col[1]);
+				csv.write(header.append("\r\n").toString());
+				Map<String, Object> result = welstoryPriceCollect(year, period, soldTo, csv);
+				result.put("file", file.toString());
+				return result;
+			}
+		} catch (IOException e) {
+			throw new UncheckedIOException("웰스토리 판가 CSV 저장 실패: " + file, e);
+		}
+	}
+
+	// 판가 응답 1행을 CSV 한 줄로 변환한다. 모든 값을 큰따옴표로 감싸 쉼표·줄바꿈이 들어간 품목명도 깨지지 않게 한다.
+	private static String welstoryPriceCsvLine(JsonNode row) {
+		StringBuilder line = new StringBuilder();
+		for (String[] col : WELSTORY_PRICE_CSV_COLUMNS) {
+			JsonNode v = row.path(col[0]);
+			String text = v.isMissingNode() || v.isNull() ? "" : v.asText();
+			line.append(line.length() == 0 ? "" : ",").append('"').append(text.replace("\"", "\"\"")).append('"');
+		}
+		return line.append("\r\n").toString();
+	}
+
+	// 판가 수집 공통 흐름. csv가 null이면 전문 기록만 하고(WelstoryPriceSync), 있으면 받은 판가 행을 CSV에도 쓴다.
+	private Map<String, Object> welstoryPriceCollect(String year, String period, String soldTo, Writer csv) {
+		int success = 0, empty = 0, failed = 0, rowsTotal = 0;
 		List<String> failedSites = new ArrayList<>();
 		List<String[]> clients = List.of(new String[] { welstoryClient1Id, welstoryClient1Secret },
 				new String[] { welstoryClient2Id, welstoryClient2Secret });
@@ -2450,7 +2510,9 @@ public class AccountService {
 					if (targetPricingCode != null && !targetPricingCode.equals(site.path("pricingCode").asText()))
 						continue;
 					try {
-						if (welstoryPriceOneSite(accessToken, code, year, period) > 0)
+						int rows = welstoryPriceOneSite(accessToken, code, year, period, csv);
+						rowsTotal += rows;
+						if (rows > 0)
 							success++;
 						else
 							empty++;
@@ -2473,12 +2535,14 @@ public class AccountService {
 		result.put("empty", empty);
 		result.put("failed", failed);
 		result.put("failedSites", String.join(",", failedSites));
+		result.put("rows", rowsTotal);
 		return result;
 	}
 
 	// 사업장(soldTo) 1곳의 순기 전체 판가를 페이지 끝까지 조회하고, 받은 품목 수를 반환한다.
 	// 첫 요청이 '조회 데이터 없음'(E1103)이면 contYn=N으로 한 번 더 묻고(order-api와 동일), 그래도 없으면 0건.
-	private int welstoryPriceOneSite(String accessToken, String soldTo, String year, String period) {
+	// csv가 있으면 페이지를 받을 때마다 바로 써서 전체 판가를 메모리에 쌓지 않는다.
+	private int welstoryPriceOneSite(String accessToken, String soldTo, String year, String period, Writer csv) {
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("soldTo", soldTo);
 		body.put("periodGroupYear", year);
@@ -2505,6 +2569,14 @@ public class AccountService {
 				throw new IllegalStateException("웰스토리 판가 조회 오류 resCd=" + code);
 			}
 			rows += res.path("dataBody").path("data").size();
+			if (csv != null) {
+				try {
+					for (JsonNode row : res.path("dataBody").path("data"))
+						csv.write(welstoryPriceCsvLine(row));
+				} catch (IOException e) {
+					throw new UncheckedIOException(e);
+				}
+			}
 			contYn = res.path("dataHeader").path("contYn").asText("N");
 			nextKey = res.path("dataHeader").path("nextKey").asText("");
 			if (!"Y".equals(contYn) || nextKey.isBlank())
