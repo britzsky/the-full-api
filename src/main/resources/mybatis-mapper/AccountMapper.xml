@@ -2896,6 +2896,7 @@
 			   aptd.taxType, 
 			   aptd.itemType,
 			   aptd.budget_yn,
+			   aptd.note,
 			   apt.receipt_image,
 			   apt.receipt_image2,
 			   apt.receipt_image3
