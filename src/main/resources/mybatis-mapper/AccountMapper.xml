@@ -433,10 +433,10 @@
 		SELECT 'nor' as gubun,
 			T2.account_id,
 			T.member_id,
-			T3.position,
-			T3.position_type,
-			T3.cor_type,
-			T3.name,
+			IFNULL(T3.position, RM.position) AS position,
+			IFNULL(T3.position_type, RM.position_type) AS position_type,
+			IFNULL(T3.cor_type, RM.cor_type) AS cor_type,
+			IFNULL(T3.name, RM.name) AS name,
 			T.record_year,
 			T.record_month,
 			T.record_date,
@@ -455,9 +455,14 @@
 		AND T2.record_year = T.record_year
 		AND T2.record_month = T.record_month
 		AND T2.record_date = T.record_date
-		JOIN tb_account_members T3
+		LEFT JOIN tb_account_members T3
 		ON T3.member_id = T.member_id
+		-- 채용관리(tb_account_rec_management)에서 파출 매핑된 인원 정보
+		LEFT JOIN tb_account_rec_management RM
+		ON RM.member_id = T.member_id
+		AND RM.account_id = T.account_id
 		WHERE T2.type = 6
+		AND (T3.member_id IS NOT NULL OR RM.member_id IS NOT NULL)
 		AND T.dispatch_account_id = #{account_id}
 		AND T2.record_year = #{year}
 		AND T2.record_month = #{month}
@@ -698,6 +703,7 @@
           subquery.account_number,
             subquery.dispatch_account,
             subquery.note,
+          subquery.position_type,
           subquery.del_yn
       FROM (
           SELECT
@@ -709,6 +715,8 @@
               T.account_number,
                 T.dispatch_account,
                 T.note,
+              -- 파출 등록 시 선택한 직책(4: 조리사, 5: 조리원)
+              T.position_type,
               IFNULL(SUM(CASE WHEN T2.is_present = 'Y' THEN 1 ELSE 0 END), 0) AS work_cnt,
                 IFNULL(SUM(CASE WHEN T2.is_present = 'Y' THEN T2.salary ELSE 0 END),0) as salary,
               T.del_yn
@@ -724,7 +732,7 @@
          <if test="del_yn != null">
             AND T.del_yn = #{del_yn}
          </if>
-          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.dispatch_account, T.note, T.del_yn
+          GROUP BY T.member_id, T.account_id, T.name, T.phone, T.rrn, T.account_number, T.dispatch_account, T.note, T.position_type, T.del_yn
       ) AS subquery
       ORDER BY subquery.member_id
    </select>
@@ -3738,24 +3746,28 @@
 			T.member_id,
 			T.account_id,
 			T.dispatch_account_id,
-			T3.name,
+			IFNULL(T3.name, RM.name) AS name,
 			T2.account_name AS origin_account_name,
 			(SELECT account_name FROM tb_account WHERE account_id = T.dispatch_account_id) AS dispatch_account_name,
 			CONCAT(T.record_year, '-', T.record_month, '-', T.record_date) as record_date,
-			IFNULL(TR.start_time, T3.start_time) AS start_time,
-			IFNULL(TR.end_time, T3.end_time) AS end_time,
+			IFNULL(TR.start_time, IFNULL(T3.start_time, RM.start_time)) AS start_time,
+			IFNULL(TR.end_time, IFNULL(T3.end_time, RM.end_time)) AS end_time,
 			IFNULL(TR.type, 6) AS type,
-			CASE WHEN T3.position_type = 1 THEN '영양사'
-             	WHEN T3.position_type = 2 THEN '조리팀장'
-                 WHEN T3.position_type = 3 THEN '조리장'
-                 WHEN T3.position_type = 4 THEN '조리사'
-                 WHEN T3.position_type = 5 THEN '조리원'
+			CASE WHEN IFNULL(T3.position_type, RM.position_type) = 1 THEN '영양사'
+             	WHEN IFNULL(T3.position_type, RM.position_type) = 2 THEN '조리팀장'
+                 WHEN IFNULL(T3.position_type, RM.position_type) = 3 THEN '조리장'
+                 WHEN IFNULL(T3.position_type, RM.position_type) = 4 THEN '조리사'
+                 WHEN IFNULL(T3.position_type, RM.position_type) = 5 THEN '조리원'
                  ELSE '유틸' END AS position
 		FROM tb_account_member_dispatch_mapping T
 		JOIN tb_account T2
 		ON T2.account_id = T.account_id
-		JOIN tb_account_members T3
+		LEFT JOIN tb_account_members T3
 		ON T3.member_id = T.member_id
+		-- 채용관리(tb_account_rec_management)에서 파출 매핑된 인원 정보
+		LEFT JOIN tb_account_rec_management RM
+		ON RM.member_id = T.member_id
+		AND RM.account_id = T.account_id
 		LEFT JOIN tb_account_record TR
 		ON TR.account_id = T.dispatch_account_id
 		AND TR.member_id = T.member_id
@@ -3764,6 +3776,7 @@
 		AND TR.record_date = T.record_date
 		AND TR.type = 6
 		WHERE 1=1
+		AND (T3.member_id IS NOT NULL OR RM.member_id IS NOT NULL)
 		AND IFNULL(T.del_yn, 'N') = IFNULL(NULLIF(#{del_yn}, ''), 'N')
 		<if test="member_id != null and member_id != ''">
 			AND T.member_id = #{member_id}
