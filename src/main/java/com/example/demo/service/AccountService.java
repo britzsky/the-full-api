@@ -28,10 +28,12 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -57,7 +59,7 @@ public class AccountService {
 	private final AccountService self;
 
 	// ===================== 웰스토리 SW-FD 주문API 연동 (필드) =====================
-	// WelstorySyncScheduler가 매일 18시(KST)에 WelstoryPurchaseSync()를 호출 ->
+	// WelstorySyncScheduler가 매일 20시(KST)에 WelstoryPurchaseSync()를 호출 ->
 	// 제휴사 2곳의 API를 각각 호출해 당일/전일/전전일/전전전일(4일치) 입고내역을
 	// tb_account_purchase_tally(_detail)에 저장한다.
 	// (당일 저녁 기준으로 아직 늦게 확정되는 전일~전전전일분이 있을 수 있어 4일치를 매번 같이 재조회한다)
@@ -1978,7 +1980,7 @@ public class AccountService {
 	// ===================== 웰스토리 SW-FD 주문API 연동 (로직) =====================
 	//
 	// 전체 흐름 요약
-	// WelstorySyncScheduler(매일 18시 KST)
+	// WelstorySyncScheduler(매일 20시 KST)
 	// -> WelstoryPurchaseSync() 당일/전일/전전일/전전전일 4일치를 각각 제휴사 2곳 순회
 	// -> welstorySyncOneClient(client) client 하나: 토큰발급 -> 사업장(soldTo) 목록조회
 	// -> welstorySyncReceiveDetail(soldTo 하나) 해당 날짜 입고내역 전체 조회
@@ -1993,7 +1995,7 @@ public class AccountService {
 	// 진입점. 스케줄러가 이 메서드 하나만 호출한다.
 	// client1(주식회사 더채움), client2(더채움 위탁급식) 순서로 각각 동기화하고, 저장(=신규/갱신)된
 	// master(soldTo/날짜) 건수 합계를 반환
-	// 당일 저녁(18시)에 도는 구조라 대상일은 "오늘"이지만, 늦게 확정되는 주문을 놓치지 않도록
+	// 당일 저녁(20시)에 도는 구조라 대상일은 "오늘"이지만, 늦게 확정되는 주문을 놓치지 않도록
 	// 전일~전전전일도 매번 같이 재조회해서 최신 상태로 덮어쓴다 (오늘~3일 전 총 4일치).
 	// LocalDate.now()가 아니라 Asia/Seoul 기준으로 날짜를 뽑는다 — 서버(UTC)의 LocalDate.now()를 쓰면
 	// 자정 근처(KST 00~09시, UTC로는 전날)에 날짜가 하루 어긋날 수 있다 (guid와 동일한 이유).
@@ -2033,11 +2035,20 @@ public class AccountService {
 		}
 		int saved = 0;
 		try {
-			// 토큰은 이 client 동기화 1회 실행 동안만 재사용(30일 유효하지만 매번 재발급해도 문제는 없음, 단순화를 위해 매 실행마다 새로
-			// 받음)
+			// 토큰은 tb_welstory_token에 저장된 값을 쓰고, 첫 호출(사업장 조회)에서 거부되면 새로 받아 한 번 더 조회한다
 			String accessToken = welstoryIssueToken(clientId, clientSecret);
+			List<Map<String, Object>> soldToRows;
+			try {
+				soldToRows = welstoryListSoldTo(accessToken);
+			} catch (HttpStatusCodeException e) {
+				if (e.getStatusCode().value() != 401
+						&& !welstoryTokenRejected(e.getResponseBodyAsString(StandardCharsets.UTF_8)))
+					throw e;
+				accessToken = welstoryReissueToken(clientId, clientSecret, accessToken);
+				soldToRows = welstoryListSoldTo(accessToken);
+			}
 
-			for (Map<String, Object> soldToRow : welstoryListSoldTo(accessToken)) {
+			for (Map<String, Object> soldToRow : soldToRows) {
 				String soldTo = String.valueOf(soldToRow.get("soldTo"));
 				// tb_account.welstory_soldto = soldTo 로 등록해둔 거래처(account_id)를 찾는다.
 				// (welstory_soldto_mapping.sql로 미리 채워둔 매핑 — 신규 사업장은 아직 매핑이 없어서 여기서 걸러짐)
@@ -2256,10 +2267,73 @@ public class AccountService {
 		return ts + String.format("%02d", seq);
 	}
 
-	// OAuth 접근토큰 발급. "Token 발급 요청" 시트 스펙상 client_id/secret/scope/grant_type을
-	// (http body가 아니라) query parameter로 실어 POST 호출해야 한다.
-	// 토큰은 30일간 유효(expires_in=2592000)하지만 여기서는 매 동기화 실행마다 새로 발급받아 단순하게 처리한다.
+	// 저장된 토큰을 만료 하루 전까지 쓰고, 그 뒤에는 새로 발급한다 (토큰 유효기간 30일)
+	private static final long WELSTORY_TOKEN_MARGIN_SECONDS = 24 * 60 * 60;
+
+	// client별 접근토큰 조회. tb_welstory_token(the-full-api·order-api 공용)에 쓸 수 있는 토큰이 있으면 그대로 쓰고,
+	// 없거나 만료가 가까우면 행을 잠근 트랜잭션 안에서 새로 발급해 저장한다.
 	private String welstoryIssueToken(String clientId, String clientSecret) {
+		Map<String, Object> row = accountMapper.WelstoryTokenSelect(clientId);
+		if (welstoryTokenUsable(row))
+			return String.valueOf(row.get("access_token"));
+		return self.WelstoryTokenRefresh(clientId, clientSecret, null);
+	}
+
+	// 웰스토리가 토큰을 거부했을 때(EGW00121 유효하지 않은 token, EGW00123 만료된 token) 새로 발급받는다.
+	private String welstoryReissueToken(String clientId, String clientSecret, String rejectedToken) {
+		log.warn("[Welstory] 토큰 거부 응답, 재발급 후 재시도 clientId={}", clientId);
+		return self.WelstoryTokenRefresh(clientId, clientSecret, rejectedToken);
+	}
+
+	// 웰스토리 토큰 거부 응답 여부. 만료 토큰은 HTTP 500 + resCd EGW00123으로 온다.
+	private static boolean welstoryTokenRejected(String body) {
+		return body != null && (body.contains("EGW00121") || body.contains("EGW00123"));
+	}
+
+	// 저장된 토큰이 만료 하루 전보다 앞서 있으면 사용 가능
+	private static boolean welstoryTokenUsable(Map<String, Object> row) {
+		if (row == null || row.get("access_token") == null || row.get("expires_at") == null)
+			return false;
+		long now = java.time.Instant.now().getEpochSecond();
+		return ((Number) row.get("expires_at")).longValue() - WELSTORY_TOKEN_MARGIN_SECONDS > now;
+	}
+
+	// 토큰 재발급 트랜잭션. SELECT ... FOR UPDATE로 client 행을 잠근 뒤 다시 확인해서,
+	// 그 사이 다른 서버(order-api 등)가 이미 새로 받았으면 그 토큰을 쓰고, 아니면 발급해 저장한다.
+	// rejectedToken: 웰스토리가 거부한 토큰. 저장된 토큰이 이 값과 같으면 만료 전이라도 새로 받는다.
+	// 행이 아직 없는 첫 발급은 잠글 행이 없어 두 서버가 동시에 받을 수 있다 (마지막 저장값이 남는다).
+	@Transactional(rollbackFor = Exception.class)
+	public String WelstoryTokenRefresh(String clientId, String clientSecret, String rejectedToken) {
+		Map<String, Object> row = accountMapper.WelstoryTokenSelectForUpdate(clientId);
+		if (welstoryTokenUsable(row) && !String.valueOf(row.get("access_token")).equals(rejectedToken))
+			return String.valueOf(row.get("access_token"));
+
+		Map<String, Object> res = welstoryRequestToken(clientId, clientSecret);
+		String token = String.valueOf(res.get("access_token"));
+		long issuedAt = java.time.Instant.now().getEpochSecond();
+		// expires_in은 숫자(2592000)로 오지만 문자열("2592000")로 와도 읽는다. 둘 다 아니면 1시간으로 본다
+		Object rawExpiresIn = res.get("expires_in");
+		long expiresIn = 3600;
+		if (rawExpiresIn instanceof Number)
+			expiresIn = ((Number) rawExpiresIn).longValue();
+		else if (rawExpiresIn != null && String.valueOf(rawExpiresIn).trim().matches("\\d+"))
+			expiresIn = Long.parseLong(String.valueOf(rawExpiresIn).trim());
+
+		Map<String, Object> save = new HashMap<>();
+		save.put("client_id", clientId);
+		save.put("access_token", token);
+		save.put("issued_at", issuedAt);
+		save.put("expires_at", issuedAt + expiresIn);
+		save.put("issued_by", "the-full-api");
+		accountMapper.WelstoryTokenSave(save);
+		log.info("[Welstory] 접근토큰 새로 발급 clientId={} expiresIn={}", clientId, expiresIn);
+		return token;
+	}
+
+	// OAuth 접근토큰 발급 API 호출. "Token 발급 요청" 시트 스펙상 client_id/secret/scope/grant_type을
+	// (http body가 아니라) query parameter로 실어 POST 호출해야 한다.
+	// 응답: access_token, expires_in(초, 30일 = 2592000)
+	private Map<String, Object> welstoryRequestToken(String clientId, String clientSecret) {
 		String url = UriComponentsBuilder.fromHttpUrl(WELSTORY_BASE_URL + "/oauth/2.0/token")
 				.queryParam("client_id", clientId)
 				.queryParam("client_secret", clientSecret)
@@ -2276,7 +2350,7 @@ public class AccountService {
 			// client_id/secret이 잘못됐거나(오류코드 9202 등), IP가 화이트리스트에 없으면 여기서 걸림
 			throw new IllegalStateException("웰스토리 토큰 발급 실패: " + res);
 		}
-		return String.valueOf(res.get("access_token"));
+		return res;
 	}
 
 	// [제휴사별 사업장 조회] API(payer-rep-soldto) 호출.
@@ -2289,6 +2363,11 @@ public class AccountService {
 		dataHeader.put("contYn", "N"); // 최초 조회이므로 "다음 페이지 없음" 기본값
 		dataHeader.put("nextKey", "");
 		Map<String, Object> body = welstoryCallApi("payer-rep-soldto", accessToken, dataHeader);
+		// HTTP 200인데 본문에 토큰 오류(EGW00121/EGW00123)가 온 경우도 401로 던져,
+		// welstorySyncOneClient의 토큰 재발급·재조회 흐름을 타게 한다
+		if (welstoryTokenRejected(String.valueOf(body)))
+			throw new HttpClientErrorException(HttpStatus.UNAUTHORIZED, "token rejected",
+					String.valueOf(body).getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8);
 
 		Object dataBody = body.get("dataBody");
 		if (!(dataBody instanceof Map)) {
@@ -2492,6 +2571,12 @@ public class AccountService {
 				siteHeader.put("nextKey", "");
 				JsonNode sites = welstoryLoggedCall("SITE", "payer-rep-soldto", accessToken, siteHeader,
 						new LinkedHashMap<>(), null);
+				// 저장된 토큰이 거부되면 새로 받아 사업장 조회를 한 번 더 한다
+				if (welstoryTokenRejected(sites.toString())) {
+					accessToken = welstoryReissueToken(client[0], client[1], accessToken);
+					sites = welstoryLoggedCall("SITE", "payer-rep-soldto", accessToken, siteHeader,
+							new LinkedHashMap<>(), null);
+				}
 				if (!"S0000".equals(sites.path("dataBody").path("resCd").asText()))
 					throw new IllegalStateException("웰스토리 사업장 조회 실패");
 

@@ -2257,6 +2257,34 @@
 			(#{type}, #{api_type}, #{account_id}, #{request_json}, #{response_json}, #{row_count}, #{success_yn}, CONVERT_TZ(NOW(), '+00:00', '+09:00'))
 	</insert>
 
+	<!-- 웰스토리 연동: client별로 저장된 접근토큰과 만료 시각(epoch 초) 조회 -->
+	<select id="WelstoryTokenSelect" parameterType="string" resultType="map">
+		SELECT client_id, access_token, issued_at, expires_at
+		  FROM tb_welstory_token
+		 WHERE client_id = #{clientId}
+	</select>
+
+	<!-- 웰스토리 연동: 재발급 전 행을 잠가 the-full-api·order-api가 동시에 새로 발급하지 않게 한다 -->
+	<select id="WelstoryTokenSelectForUpdate" parameterType="string" resultType="map">
+		SELECT client_id, access_token, issued_at, expires_at
+		  FROM tb_welstory_token
+		 WHERE client_id = #{clientId}
+		   FOR UPDATE
+	</select>
+
+	<!-- 웰스토리 연동: 새로 발급한 접근토큰 저장 (client별 1행, 있으면 덮어쓴다) -->
+	<insert id="WelstoryTokenSave" parameterType="map">
+		INSERT INTO tb_welstory_token
+			(client_id, access_token, issued_at, expires_at, issued_by)
+		VALUES
+			(#{client_id}, #{access_token}, #{issued_at}, #{expires_at}, #{issued_by})
+		ON DUPLICATE KEY UPDATE
+			access_token = VALUES(access_token),
+			issued_at = VALUES(issued_at),
+			expires_at = VALUES(expires_at),
+			issued_by = VALUES(issued_by)
+	</insert>
+
 	<insert id="AccountPurchaseSave" parameterType="map">
 		INSERT INTO tb_account_purchase_tally
 	    <trim prefix="(" suffix=")" suffixOverrides=",">

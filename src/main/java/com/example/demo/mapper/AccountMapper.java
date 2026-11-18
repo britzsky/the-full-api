@@ -80,6 +80,9 @@ public interface AccountMapper {
 	int PurchaseTallyDetailDeleteBySaleId(Map<String, Object> paramMap);								// 매입집계 상세 sale_id 단위 전체 삭제(아워홈 하루치 교체용)
 	List<Integer> PurchaseDetailBudgetExcludedItemIds(Map<String, Object> paramMap);					// 예산미포함(Y) 품목 item_id 목록(재수집 시 Y 유지용)
 	int SupplierApiLogSave(Map<String, Object> paramMap);												// 공급사 API 호출 전문 로그 저장(요청 전문·결과코드)
+	Map<String, Object> WelstoryTokenSelect(String clientId);											// 웰스토리 client별 저장된 접근토큰 조회
+	Map<String, Object> WelstoryTokenSelectForUpdate(String clientId);									// 웰스토리 접근토큰 재발급 전 행 잠금 조회
+	int WelstoryTokenSave(Map<String, Object> paramMap);												// 웰스토리 접근토큰 저장(client별 1행 덮어쓰기)
 	int AccountPurchaseSave(Map<String, Object> paramMap);												// 현장 -> 집계표 -> 매입집계 저장
 	int AccountPurchaseDetailSave(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 상세 저장
 	void AccountPurchaseTallyDelete(Map<String, Object> paramMap);										// 현장 -> 집계표 -> 매입집계 삭제
