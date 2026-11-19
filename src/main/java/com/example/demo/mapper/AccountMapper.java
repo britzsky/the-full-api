@@ -43,6 +43,8 @@ public interface AccountMapper {
 	int AccountCoordinateSave(Map<String, Object> paramMap);											// 거래처 -> 거래처 주소 좌표 저장
 	int AccountDietPriceHistorySave(Map<String, Object> paramMap);										// 거래처 -> 거래처 상세 -> 식단가 변경내역 저장
 	List<Map<String, Object>>AccountDietPriceHistoryList(Map<String, Object> paramMap);					// 거래처 -> 거래처 상세 -> 식단가 변경내역 조회
+	List<Map<String, Object>> AccountDietPriceYearList(Map<String, Object> paramMap);					// 거래처 -> 거래처 상세 -> 연도별 식단가 최신값 조회
+	int AccountDietPriceYearSave(Map<String, Object> paramMap);											// 거래처 -> 거래처 상세 -> 연도별 식단가 이력 저장
 	int AccountUpfrontHistorySave(Map<String, Object> paramMap);										// 거래처 -> 초기투자비용 변경이력 저장
 	List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap);					// 거래처 -> 초기투자비용 현재값 조회
 	List<Map<String, Object>> AccountBusinessImgList(Map<String, Object> paramMap); 					// 거래처 -> 거래처 상세 이미지 조회

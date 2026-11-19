@@ -892,6 +892,18 @@ public class AccountController {
 
 	/*
 	 * part : 영업
+	 * method : AccountDietPriceYearList
+	 * comment : 거래처 -> 거래처 상세 -> 선택 연도의 최신 식단가 조회 (없으면 빈 배열)
+	 */
+	@GetMapping("Account/AccountDietPriceYearList")
+	public String AccountDietPriceYearList(@RequestParam Map<String, Object> paramMap) {
+		List<Map<String, Object>> resultList = accountService.AccountDietPriceYearList(paramMap);
+
+		return new Gson().toJson(resultList);
+	}
+
+	/*
+	 * part : 영업
 	 * method : AccountMemberRecordSave
 	 * comment : 거래처 -> 거래처 상세 저장
 	 */
@@ -1032,6 +1044,19 @@ public class AccountController {
 		}
 
 		iResult += accountService.AccountInfoSave(payloadMap);
+
+		// 연도별 식단가 이력 저장: 화면에서 선택한 연도의 식단가 항목(추가 식단가 포함)을 거래처 기준으로 저장
+		// 거래처 정보 저장 뒤, 손익표 재계산(연도별 단가를 읽음) 앞에서 실행
+		Object dietYearObj = payload.get("dietYearData");
+		if (dietYearObj instanceof Map && formData != null) {
+			Map<String, Object> dietYearData = new HashMap<>((Map<String, Object>) dietYearObj);
+			Object priceYear = dietYearData.get("price_year");
+			if (priceYear != null && !priceYear.toString().isEmpty()) {
+				dietYearData.put("account_id", formData.get("account_id"));
+				dietYearData.put("user_id", formData.get("user_id"));
+				iResult += accountService.AccountDietPriceYearSave(dietYearData);
+			}
+		}
 
 		// 마지막: 저장 성공 후 ProfitLossTotalSave 프로시저 호출 (현재 년/월 기준)
 		if (iResult > 0) {

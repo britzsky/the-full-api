@@ -603,6 +603,17 @@ public class AccountService {
 		return iResult;
 	}
 
+	// 거래처 -> 거래처상세 -> 선택 연도의 최신 식단가 조회
+	public List<Map<String, Object>> AccountDietPriceYearList(Map<String, Object> paramMap) {
+		return accountMapper.AccountDietPriceYearList(paramMap);
+	}
+
+	// 거래처 -> 거래처상세 -> 연도별 식단가 이력 저장
+	// 가격이 하나라도 다르면 새 이력 행을 추가하고, 모두 같으면 추가 식단가 이름·사용자·수정일시만 갱신한다 (UNIQUE 키 기준)
+	public int AccountDietPriceYearSave(Map<String, Object> paramMap) {
+		return accountMapper.AccountDietPriceYearSave(paramMap);
+	}
+
 	// 거래처 -> 초기투자비용 현재값 조회
 	public List<Map<String, Object>> AccountUpfrontHistoryList(Map<String, Object> paramMap) {
 		List<Map<String, Object>> resultList = new ArrayList<>();

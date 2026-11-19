@@ -1513,6 +1513,71 @@
 		WHERE T.account_id = #{account_id}
 	</select>
 
+	<!-- 거래처 상세 식단가 표: 선택 연도에서 가장 최근에 저장된 식단가 1행 조회 -->
+	<select id="AccountDietPriceYearList" parameterType="map" resultType="hashmap">
+		SELECT account_id,
+			   price_year,
+			   diet_price,
+			   elderly,
+			   snack,
+			   employ,
+			   before_diet_price,
+			   IF(after_dt = '1000-01-01 00:00:00', '', DATE_FORMAT(after_dt, '%Y-%m-%d')) AS after_dt,
+			   extra_diet1_name,
+			   extra_diet1_price,
+			   extra_diet2_name,
+			   extra_diet2_price,
+			   extra_diet3_name,
+			   extra_diet3_price,
+			   extra_diet4_name,
+			   extra_diet4_price,
+			   extra_diet5_name,
+			   extra_diet5_price,
+			   basic_price
+		FROM tb_account_dietprice_year_history
+		WHERE account_id = #{account_id}
+		  AND price_year = #{price_year}
+		ORDER BY update_dt DESC, idx DESC
+		LIMIT 1
+	</select>
+
+	<!-- 연도별 식단가 이력 저장: UNIQUE 키(거래처·연도·식단가 7개·추가 식단가 가격 5개)로 가격이 하나라도 다르면 새 이력 행, 모두 같으면 추가 식단가 이름·사용자·수정일시만 갱신 (빈 숫자 0, 빈 문자 '', 빈 인상시점 1000-01-01) -->
+	<insert id="AccountDietPriceYearSave" parameterType="map">
+		INSERT INTO tb_account_dietprice_year_history
+		(account_id, price_year, diet_price, elderly, snack, employ, before_diet_price, after_dt, basic_price, extra_diet1_name, extra_diet1_price, extra_diet2_name, extra_diet2_price, extra_diet3_name, extra_diet3_price, extra_diet4_name, extra_diet4_price, extra_diet5_name, extra_diet5_price, user_id, reg_dt, update_dt)
+		VALUES
+		(#{account_id},
+		 #{price_year},
+		 IFNULL(#{diet_price}, 0),
+		 IFNULL(#{elderly}, 0),
+		 IFNULL(#{snack}, 0),
+		 IFNULL(#{employ}, ''),
+		 IFNULL(#{before_diet_price}, 0),
+		 IFNULL(STR_TO_DATE(NULLIF(#{after_dt}, ''), '%Y-%m-%d'), '1000-01-01 00:00:00'),
+		 IFNULL(#{basic_price}, 0),
+		 NULLIF(#{extra_diet1_name}, ''),
+		 IFNULL(#{extra_diet1_price}, 0),
+		 NULLIF(#{extra_diet2_name}, ''),
+		 IFNULL(#{extra_diet2_price}, 0),
+		 NULLIF(#{extra_diet3_name}, ''),
+		 IFNULL(#{extra_diet3_price}, 0),
+		 NULLIF(#{extra_diet4_name}, ''),
+		 IFNULL(#{extra_diet4_price}, 0),
+		 NULLIF(#{extra_diet5_name}, ''),
+		 IFNULL(#{extra_diet5_price}, 0),
+		 #{user_id},
+		 CONVERT_TZ(NOW(), '+00:00', '+09:00'),
+		 CONVERT_TZ(NOW(), '+00:00', '+09:00'))
+		ON DUPLICATE KEY UPDATE
+		extra_diet1_name = VALUES(extra_diet1_name),
+		extra_diet2_name = VALUES(extra_diet2_name),
+		extra_diet3_name = VALUES(extra_diet3_name),
+		extra_diet4_name = VALUES(extra_diet4_name),
+		extra_diet5_name = VALUES(extra_diet5_name),
+		user_id = #{user_id},
+		update_dt = CONVERT_TZ(NOW(), '+00:00', '+09:00')
+	</insert>
+
 	<insert id="AccountUpfrontHistorySave" parameterType="map">
 		INSERT INTO tb_account_upfront_history
 		(account_id, price, before_price, update_dt, user_id, status)
