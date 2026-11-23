@@ -1,6 +1,8 @@
 package com.example.demo.service;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -154,12 +156,7 @@ public class S3FileStorageService {
                 .bucket(bucket)
                 .key(physicalKey(objectKey));
         if (download) {
-            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
-                    .replace("\r", "")
-                    .replace("\n", "");
-            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
-                    .replace("+", "%20");
-            getRequest.responseContentDisposition("attachment; filename*=UTF-8''" + encodedFilename);
+            getRequest.responseContentDisposition(contentDisposition(objectFilename(objectKey), true));
         }
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(presignedUrlDuration)
@@ -168,28 +165,49 @@ public class S3FileStorageService {
         return s3Presigner.presignGetObject(presignRequest).url();
     }
 
-    /**
-     * S3 오브젝트를 302 리다이렉트가 아니라 서버가 직접 받아 그대로 스트리밍한다.
-     * 브라우저 navigation(주소창 이동, a 태그 클릭)이 아니라 fetch()로 바이트를 직접 읽어야 하는
-     * 화면(첨부파일 zip 일괄 다운로드, PDF/엑셀 미리보기, 파일시스템 저장 등)에서는 302 응답이
-     * S3로 리다이렉트되는 순간 브라우저가 S3 오리진에 대해 CORS 검사를 하게 되는데, S3 버킷에
-     * 프론트 오리진을 허용하는 CORS 설정이 없으면 그 요청이 전부 실패한다.
-     * same-origin 응답으로 그대로 흘려보내면 이 문제 자체가 발생하지 않는다.
-     */
+    /** 저장 경로에서 원본 파일을 찾아 브라우저가 API 응답으로 직접 읽을 수 있게 스트리밍한다. */
     public ResponseEntity<InputStreamResource> streamObject(String storedPath, boolean download) {
-        String objectKey = toObjectKey(storedPath);
+        if (storedPath == null || !storedPath.startsWith(LEGACY_PREFIX)) {
+            return streamObjectKey(toObjectKey(storedPath), download);
+        }
+        // 파일명에 포함된 %20도 실제 키의 일부일 수 있으므로 저장 경로를 먼저 사용한다.
+        String objectKey = validateObjectKey(storedPath.substring(LEGACY_PREFIX.length()).replace('\\', '/'));
+        String legacyKey;
+        // 이전 화면에서 이중 인코딩한 링크를 처리하기 위해 대체 키를 만든다.
+        try {
+            legacyKey = toObjectKey(storedPath);
+        } catch (IllegalArgumentException e) {
+            return streamObjectKey(objectKey, download);
+        }
+        if (objectKey.equals(legacyKey)) return streamObjectKey(objectKey, download);
 
+        // 저장 경로 그대로의 키를 먼저 찾고, 없으면 디코딩한 대체 키로 다시 찾는다.
+        try {
+            var response = streamObjectKey(objectKey, download);
+            if (response.getStatusCode().value() != 404) return response;
+        } catch (S3Exception e) {
+            // 버킷 목록 권한이 없으면 S3는 키가 없을 때도 403을 반환할 수 있다.
+            if (e.statusCode() != 403) throw e;
+            var response = streamObjectKey(legacyKey, download);
+            if (response.getStatusCode().value() == 404) throw e;
+            return response;
+        }
+        return streamObjectKey(legacyKey, download);
+    }
+
+    // HTTP 경로의 인코딩만 한 번 풀고 파일명에 실제로 포함된 % 문자를 보존한다.
+    public ResponseEntity<InputStreamResource> streamRequestObject(String requestPath, boolean download) {
+        return streamObject(decodePath(requestPath), download);
+    }
+
+    // 확정된 오브젝트 키로 로컬 저장소 또는 S3에서 파일을 읽어 응답 헤더와 함께 내려주는 메서드
+    private ResponseEntity<InputStreamResource> streamObjectKey(String objectKey, boolean download) {
+        // S3를 쓰지 않는 로컬 환경은 로컬 업로드 폴더에서 파일을 읽는다.
         if (!s3Enabled) {
             Path localPath = resolveLocalPath(physicalKey(objectKey));
             if (!Files.exists(localPath)) {
                 return ResponseEntity.notFound().build();
             }
-            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
-                    .replace("\r", "")
-                    .replace("\n", "");
-            String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
-                    .replace("+", "%20");
-
             HttpHeaders headers = new HttpHeaders();
             MediaType mediaType;
             try {
@@ -206,12 +224,8 @@ public class S3FileStorageService {
             } catch (IOException ignored) {
                 // content-length는 부가 정보라 실패해도 스트리밍 자체는 계속한다.
             }
-            headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                    (download ? "attachment" : "inline") + "; filename*=UTF-8''" + encodedFilename);
-
             try {
-                return ResponseEntity.ok().headers(headers)
-                        .body(new InputStreamResource(Files.newInputStream(localPath)));
+                return streamWithFilename(Files.newInputStream(localPath), objectKey, mediaType, headers, download);
             } catch (IOException e) {
                 throw new IllegalStateException("로컬 파일을 읽을 수 없습니다: " + localPath, e);
             }
@@ -231,12 +245,6 @@ public class S3FileStorageService {
         }
         GetObjectResponse meta = s3Object.response();
 
-        String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1)
-                .replace("\r", "")
-                .replace("\n", "");
-        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
-                .replace("+", "%20");
-
         HttpHeaders headers = new HttpHeaders();
         MediaType mediaType;
         try {
@@ -250,10 +258,38 @@ public class S3FileStorageService {
         if (meta.contentLength() != null) {
             headers.setContentLength(meta.contentLength());
         }
-        headers.set(HttpHeaders.CONTENT_DISPOSITION,
-                (download ? "attachment" : "inline") + "; filename*=UTF-8''" + encodedFilename);
+        return streamWithFilename(s3Object, objectKey, mediaType, headers, download);
+    }
 
-        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(s3Object));
+    // 응답에 표시할 파일명을 복원하고, 형식 판별에 사용한 바이트까지 포함해 원본을 전송한다.
+    private ResponseEntity<InputStreamResource> streamWithFilename(InputStream input, String objectKey,
+            MediaType mediaType, HttpHeaders headers, boolean download) {
+        // 형식 판별로 앞부분을 읽은 뒤 처음으로 되돌릴 수 있도록 버퍼 스트림으로 감싼다.
+        BufferedInputStream content = new BufferedInputStream(input);
+        try {
+            String filename = DownloadFileFormat.resolveFilename(objectFilename(objectKey), mediaType, content);
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(filename, download));
+            return ResponseEntity.ok().headers(headers).body(new InputStreamResource(content));
+        } catch (IOException e) {
+            try {
+                content.close();
+            } catch (IOException closeError) {
+                e.addSuppressed(closeError);
+            }
+            throw new IllegalStateException("다운로드할 파일을 읽을 수 없습니다.", e);
+        }
+    }
+
+    // 오브젝트 키의 마지막 구간을 파일명으로 쓰고, 헤더 주입을 막기 위해 줄바꿈 문자를 제거한다.
+    private String objectFilename(String objectKey) {
+        return objectKey.substring(objectKey.lastIndexOf('/') + 1).replace("\r", "").replace("\n", "");
+    }
+
+    // 다운로드(attachment) 또는 미리보기(inline)용 Content-Disposition 값을 한글 파일명 인코딩으로 만든다.
+    private String contentDisposition(String filename, boolean download) {
+        String encodedFilename = URLEncoder.encode(filename, StandardCharsets.UTF_8)
+                .replace("+", "%20").replace("*", "%2A");
+        return (download ? "attachment" : "inline") + "; filename*=UTF-8''" + encodedFilename;
     }
 
     public StoredObjectMetadata metadata(String storedPath) {
@@ -325,10 +361,16 @@ public class S3FileStorageService {
         if (imageIndex >= 0) normalized = normalized.substring(imageIndex + LEGACY_PREFIX.length());
         else if (normalized.startsWith("image/")) normalized = normalized.substring("image/".length());
         while (normalized.startsWith("/")) normalized = normalized.substring(1);
-        if (normalized.isBlank() || normalized.contains("../") || normalized.equals("..")) {
+        return validateObjectKey(normalized);
+    }
+
+    // 상위 폴더 이동(../), 절대 경로, 역슬래시가 들어간 키를 막아 저장소 밖 파일 접근을 차단한다.
+    private String validateObjectKey(String objectKey) {
+        if (objectKey.isBlank() || objectKey.startsWith("/") || objectKey.contains("\\")
+                || objectKey.contains("../") || objectKey.endsWith("/..") || objectKey.equals("..")) {
             throw new IllegalArgumentException("허용되지 않는 파일 경로입니다.");
         }
-        return normalized;
+        return objectKey;
     }
 
     private String sanitizeSegment(String value) {
@@ -365,7 +407,7 @@ public class S3FileStorageService {
         for (int i = 0; i < 3; i++) {
             String next;
             try {
-                next = URLDecoder.decode(decoded.replace("+", "%2B"), StandardCharsets.UTF_8);
+                next = decodePath(decoded);
             } catch (IllegalArgumentException e) {
                 break;
             }
@@ -373,6 +415,11 @@ public class S3FileStorageService {
             decoded = next;
         }
         return decoded;
+    }
+
+    // URL 인코딩을 한 번만 푸는 메서드 (파일명의 +는 공백으로 바꾸지 않는다)
+    private String decodePath(String path) {
+        return URLDecoder.decode(path.replace("+", "%2B"), StandardCharsets.UTF_8);
     }
 
     private void requireConfiguredBucket() {

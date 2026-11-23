@@ -28,14 +28,13 @@ public class S3ImageController {
         return streamFromS3(request, true);
     }
 
-    // 302 리다이렉트 대신 서버가 S3 오브젝트를 직접 받아 그대로 스트리밍한다.
-    // (JS fetch()로 바이트를 읽어야 하는 zip 일괄 다운로드/미리보기 blob 로드가
-    //  S3 리다이렉트 이후 CORS에 막히는 문제를 근본적으로 없애기 위함 — S3FileStorageService.streamObject 참고)
+    // 미리보기와 ZIP 다운로드에서 API 응답으로 원본 파일을 읽을 수 있게 한다.
     private ResponseEntity<InputStreamResource> streamFromS3(HttpServletRequest request, boolean download) {
+        // 인코딩된 요청 경로를 서비스에 전달해 파일명 속 % 문자를 보존한다.
         String requestPath = request.getRequestURI();
         int imageIndex = requestPath.indexOf("/image/");
         if (imageIndex < 0) return ResponseEntity.notFound().build();
         String storedPath = requestPath.substring(imageIndex);
-        return fileStorageService.streamObject(storedPath, download);
+        return fileStorageService.streamRequestObject(storedPath, download);
     }
 }

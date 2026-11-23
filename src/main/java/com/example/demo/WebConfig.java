@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -58,7 +59,7 @@ public class WebConfig implements WebMvcConfigurer {
 				)
 				.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
 				.allowedHeaders("Authorization", "x-refresh-token", "Content-Type")
-				.exposedHeaders("Authorization", "x-refresh-token")
+				.exposedHeaders("Authorization", "x-refresh-token", HttpHeaders.CONTENT_DISPOSITION)
 				.allowCredentials(true)
 				.maxAge(3600);
 	}
