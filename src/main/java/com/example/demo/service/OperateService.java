@@ -7,6 +7,8 @@ import java.util.Map;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneId;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -15,6 +17,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.w3c.dom.Document;
@@ -155,16 +158,49 @@ public class OperateService {
 
 	// 급식사업부 -> 운영관리 -> 위생관리 조회
 	public List<Map<String, Object>> HygieneList(Map<String, Object> paramMap) {
-		List<Map<String, Object>> resultList = new ArrayList<>();
-		resultList = operateMapper.HygieneList(paramMap);
-		return resultList;
+		return operateMapper.HygieneList(paramMap);
 	}
 
-	// 급식사업부 -> 운영관리 -> 위생관리 저장
-	public int HygieneSave(Map<String, Object> paramMap) {
-		int iResult = 0;
-		iResult = operateMapper.HygieneSave(paramMap);
-		return iResult;
+	// 본사 월별 점검 결과와 함께 수정한 조치 항목을 한 번에 저장합니다.
+	@Transactional
+	public void saveHygieneInspections(List<Map<String, Object>> rows) {
+		LocalDate inspectionDate = LocalDate.now(ZoneId.of("Asia/Seoul"));
+		LocalDate monthStart = inspectionDate.withDayOfMonth(1);
+		if (rows.isEmpty()) throw new IllegalArgumentException("저장할 점검 내용이 없습니다.");
+		for (Map<String, Object> row : rows) {
+			if ("Y".equals(row.get("inspection_yn")) && !"Y".equals(row.get("del_yn"))) {
+				Boolean headOfficeUser = operateMapper.lockHygieneAccount(row);
+				if (headOfficeUser == null) {
+					throw new IllegalArgumentException("점검할 거래처를 확인해 주세요.");
+				}
+				if (!headOfficeUser) {
+					throw new IllegalArgumentException("본사 계정만 점검완료를 처리할 수 있습니다.");
+				}
+				if (!YearMonth.from(inspectionDate).toString().equals(row.get("inspection_month"))) {
+					throw new IllegalArgumentException("점검완료는 현재 월에 등록할 수 있습니다.");
+				}
+				row.put("inspectionDate", inspectionDate);
+				row.put("monthStart", monthStart);
+				row.put("nextMonthStart", monthStart.plusMonths(1));
+				operateMapper.HygieneInspectionSave(row);
+			} else {
+				if (!"Y".equals(row.get("del_yn"))) {
+					boolean before = row.get("idx") == null || row.containsKey("problem_image") || row.containsKey("problem_note");
+					if (before && !(StringUtils.hasText((String) row.get("problem_image"))
+							&& StringUtils.hasText((String) row.get("problem_note")))) {
+						throw new IllegalArgumentException("조치 전 사진과 전달 메모를 모두 입력해 주세요.");
+					}
+					if (StringUtils.hasText((String) row.get("clean_image"))
+							!= StringUtils.hasText((String) row.get("clean_note"))
+							|| row.containsKey("clean_image") != row.containsKey("clean_note")) {
+						throw new IllegalArgumentException("조치 후 사진과 조치 메모를 모두 입력해 주세요.");
+					}
+				}
+				if (operateMapper.HygieneSave(row) == 0) {
+					throw new IllegalArgumentException("점검 항목을 다시 조회해 주세요.");
+				}
+			}
+		}
 	}
 
 	// 현장관리 -> 지점업로드 월별 식단표·식판 사진 조회

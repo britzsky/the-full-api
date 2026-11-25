@@ -688,6 +688,8 @@
 	
 	<select id="HygieneList" parameterType="map" resultType="hashmap">
 		SELECT idx,
+	        inspection_yn,
+	        reg_user_id,
 	        account_id,
 	        category_key,
 	        problem_image,
@@ -701,95 +703,100 @@
 		FROM tb_account_hygiene_management
 		WHERE account_id = #{account_id}
 		AND del_yn = 'N'
+		<if test='include_inspections != "Y"'>
+			AND inspection_yn = 'N'
+		</if>
 		<if test="month != null and month != ''">
             AND DATE_FORMAT(reg_dt, '%Y-%m') = CONCAT(#{year},'-',#{month})
         </if>
 	</select>
 	
-	<insert id="HygieneSave" parameterType="map">
+	<!-- 월별 중복 등록을 막기 위해 거래처 행을 잠그고 등록자의 본사 계정 여부를 확인합니다. -->
+	<select id="lockHygieneAccount" parameterType="map" resultType="boolean">
+		SELECT EXISTS (
+			SELECT 1 FROM tb_user
+			WHERE user_id = #{reg_user_id} AND user_type IN ('1', '2') AND del_yn = 'N'
+		)
+		FROM tb_account
+		WHERE account_id = #{account_id}
+		FOR UPDATE
+	</select>
+
+	<insert id="HygieneInspectionSave" parameterType="map">
 		INSERT INTO tb_account_hygiene_management
-    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        idx,
-	        account_id,
-	        <if test="category_key != null and category_key != ''">category_key,</if>
-	        problem_image,
-	        problem_note,
-	        clean_image,
-	        clean_note,
-	        note,
-	        <if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
-	        <if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
-	        <if test="reg_user_id != null and reg_user_id != ''">reg_user_id,</if>
-	        <if test="mod_user_id != null and mod_user_id != ''">mod_user_id,</if>
-	        del_yn,
-	        <if test='del_yn == "Y"'>del_dt</if>
-	    </trim>
-	    
-	    VALUES
-	    
-	    <trim prefix="(" suffix=")" suffixOverrides=",">
-	        #{idx},
-	        #{account_id},
-	        <if test="category_key != null and category_key != ''">#{category_key},</if>
-	        #{problem_image},
-	        #{problem_note},
-	        #{clean_image},
-	        #{clean_note},
-	        #{note},
-	        <if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
-	        <if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
-	        <if test="reg_user_id != null and reg_user_id != ''">#{reg_user_id},</if>
-	        <if test="mod_user_id != null and mod_user_id != ''">#{mod_user_id},</if>
-	    	#{del_yn},
-	    	<if test='del_yn == "Y"'>DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</if>
-	    </trim>
-	    
-	    ON DUPLICATE KEY UPDATE
-	    <trim suffixOverrides=",">
-	        <if test="idx != null">
-	            idx=#{idx},
-	        </if>
-	        <if test="account_id != null">
-	            account_id=#{account_id},
-	        </if>
-	        <if test="category_key != null and category_key != ''">
-	            category_key=#{category_key},
-	        </if>
-	        <if test="problem_image != null">
-	            problem_image=#{problem_image},
-	        </if>
-	        <if test="problem_note != null">
-	            problem_note=#{problem_note},
-	        </if>
-	        <if test="clean_image != null">
-	            clean_image=#{clean_image},
-	        </if>
-	        <if test="clean_note != null">
-	            clean_note=#{clean_note},
-	        </if>
-	        <if test="note != null">
-	            note=#{note},
-	        </if>
-	        <if test="mod_dt != null and mod_dt != ''">
-	            mod_dt=#{mod_dt},
-	        </if>
-	        <if test="reg_dt != null and reg_dt != ''">
-	            reg_dt=#{reg_dt},
-	        </if>
-	        <if test="reg_user_id != null and reg_user_id != ''">
-	            reg_user_id=#{reg_user_id},
-	        </if>
-	        <if test="mod_user_id != null and mod_user_id != ''">
-	            mod_user_id=#{mod_user_id},
-	        </if>
-	        <if test="del_yn != null and del_yn != ''">
-	            del_yn=#{del_yn},
-	        </if>
-	        <if test='del_yn == "Y"'>
-	        	del_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
-	        </if>
-	    </trim>
+			(account_id, category_key, inspection_yn, reg_dt, reg_user_id, del_yn,
+			 problem_image, problem_note, clean_image, clean_note, note)
+		SELECT #{account_id}, #{category_key}, 'Y', #{inspectionDate}, #{reg_user_id}, 'N', '', '', '', '', ''
+		WHERE NOT EXISTS (
+			SELECT 1 FROM tb_account_hygiene_management
+			WHERE account_id = #{account_id} AND category_key = #{category_key}
+			  AND inspection_yn = 'Y' AND del_yn = 'N'
+			  AND reg_dt >= #{monthStart} AND reg_dt &lt; #{nextMonthStart}
+		)
+	</insert>
+
+	<insert id="HygieneSave" parameterType="map">
+		<choose>
+			<when test='del_yn == "Y"'>
+				UPDATE tb_account_hygiene_management
+				SET del_yn='Y', del_dt=DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')
+				<if test="mod_user_id != null and mod_user_id != ''">, mod_user_id=#{mod_user_id}</if>
+				WHERE idx=#{idx} AND account_id=#{account_id} AND del_yn='N'
+			</when>
+			<when test="idx != null">
+				UPDATE tb_account_hygiene_management
+				<set>
+					<if test="category_key != null and category_key != ''">category_key=#{category_key},</if>
+					<if test="problem_image != null">problem_image=#{problem_image},</if>
+					<if test="problem_note != null">problem_note=#{problem_note},</if>
+					<if test="_parameter.containsKey('clean_image')">clean_image=COALESCE(#{clean_image}, ''),</if>
+					<if test="_parameter.containsKey('clean_note')">clean_note=COALESCE(#{clean_note}, ''),</if>
+					<if test="note != null">note=#{note},</if>
+					<if test="mod_dt != null and mod_dt != ''">mod_dt=#{mod_dt},</if>
+					<if test="reg_dt != null and reg_dt != ''">reg_dt=#{reg_dt},</if>
+					<if test="reg_user_id != null and reg_user_id != ''">reg_user_id=#{reg_user_id},</if>
+					<if test="mod_user_id != null and mod_user_id != ''">mod_user_id=#{mod_user_id},</if>
+					del_yn='N'
+				</set>
+				WHERE idx=#{idx} AND account_id=#{account_id} AND del_yn='N'
+			</when>
+			<otherwise>
+				INSERT INTO tb_account_hygiene_management
+				<trim prefix="(" suffix=")" suffixOverrides=",">
+					idx,
+					account_id,
+					<if test="category_key != null and category_key != ''">category_key,</if>
+					problem_image,
+					problem_note,
+					clean_image,
+					clean_note,
+					note,
+					<if test="mod_dt != null and mod_dt != ''">mod_dt,</if>
+					<if test="reg_dt != null and reg_dt != ''">reg_dt,</if>
+					<if test="reg_user_id != null and reg_user_id != ''">reg_user_id,</if>
+					<if test="mod_user_id != null and mod_user_id != ''">mod_user_id,</if>
+					del_yn,
+					<if test='del_yn == "Y"'>del_dt</if>
+				</trim>
+				VALUES
+				<trim prefix="(" suffix=")" suffixOverrides=",">
+					#{idx},
+					#{account_id},
+					<if test="category_key != null and category_key != ''">#{category_key},</if>
+					#{problem_image},
+					#{problem_note},
+					COALESCE(#{clean_image}, ''),
+					COALESCE(#{clean_note}, ''),
+					COALESCE(#{note}, ''),
+					<if test="mod_dt != null and mod_dt != ''">DATE_FORMAT(#{mod_dt}, '%Y-%m-%d'),</if>
+					<if test="reg_dt != null and reg_dt != ''">DATE_FORMAT(#{reg_dt}, '%Y-%m-%d'),</if>
+					<if test="reg_user_id != null and reg_user_id != ''">#{reg_user_id},</if>
+					<if test="mod_user_id != null and mod_user_id != ''">#{mod_user_id},</if>
+					#{del_yn},
+					<if test='del_yn == "Y"'>DATE_FORMAT(CONVERT_TZ(NOW(), '+00:00', '+09:00'), '%Y-%m-%d')</if>
+				</trim>
+			</otherwise>
+		</choose>
 	</insert>
 	
 	<!-- 앱 위생점검: 거래처별 카테고리 설정 조회 (표시 순서 기준) -->
@@ -845,6 +852,7 @@
 	<!-- 등록(조치 전)·조치(조치 후) 일자와 사용자명 포함, 등록일자 → 등록 순서 정렬 -->
 	<select id="HygieneCheckList" parameterType="map" resultType="hashmap">
 		SELECT m.idx,
+	        m.inspection_yn,
 	        IFNULL(m.category_key, '') AS category_key,
 	        IFNULL(m.problem_image, '') AS problem_image,
 	        IFNULL(m.problem_note, '') AS problem_note,
@@ -862,6 +870,9 @@
 		LEFT JOIN tb_user mu ON mu.user_id = m.mod_user_id
 		WHERE m.account_id = #{account_id}
 		AND m.del_yn = 'N'
+		<if test='include_inspections != "Y"'>
+			AND m.inspection_yn = 'N'
+		</if>
 		ORDER BY m.reg_dt, m.idx
 	</select>
 
@@ -1233,8 +1244,24 @@
 		       DATE_FORMAT(t.expiry_dt, '%Y-%m-%d') as expiry_dt,
                t.file_path,
                t.note
-		FROM tb_account_members am
-		LEFT OUTER JOIN 
+		FROM (
+			-- 현장 직원(tb_account_members) 대상 인원
+			SELECT account_id, member_id, name, position, position_type
+			FROM tb_account_members
+			WHERE account_id = #{account_id}
+			AND del_yn = 'N'
+			UNION ALL
+			-- 채용관리에서 채용 진행중(use_yn='D')인 인원 (현장 직원에 같은 member_id가 있으면 제외)
+			SELECT rm.account_id, rm.member_id, rm.name, rm.position, rm.position_type
+			FROM tb_account_rec_management rm
+			WHERE rm.account_id = #{account_id}
+			AND rm.use_yn = 'D'
+			AND NOT EXISTS (
+				SELECT 1 FROM tb_account_members m
+				WHERE m.member_id = rm.member_id
+			)
+		) am
+		LEFT OUTER JOIN
         (
         SELECT amf.member_id,
 			   amf.doc_id,
@@ -1250,9 +1277,7 @@
 		ON amft.doc_type_id = amf.doc_type_id
 		) t
         ON t.member_id = am.member_id
-        WHERE am.account_id = #{account_id}
-        AND del_yn = 'N'
-        ORDER BY 
+        ORDER BY
         	CASE am.position_type WHEN 1 THEN 1
 				WHEN 2 THEN 2
 				WHEN 3 THEN 3

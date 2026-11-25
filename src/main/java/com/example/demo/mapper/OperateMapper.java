@@ -29,6 +29,8 @@ public interface OperateMapper {
 	int PropertiesSave(Map<String, Object> paramMap);											// 급식사업부 -> 운영관리 -> 기물리스트 저장
 	List<Map<String, Object>> PropertiesList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 기물리스트 조회
 	List<Map<String, Object>> HygieneList(Map<String, Object> paramMap);						// 급식사업부 -> 운영관리 -> 위생관리 조회
+	Boolean lockHygieneAccount(Map<String, Object> paramMap);
+	int HygieneInspectionSave(Map<String, Object> paramMap);
 	int HygieneSave(Map<String, Object> paramMap);												// 급식사업부 -> 운영관리 -> 위생관리 저장
 	List<Map<String, Object>> BranchUploadList(Map<String, Object> paramMap);					// 현장관리 -> 지점업로드 월별 식단표·식판 사진 조회
 	int BranchUploadSave(Map<String, Object> paramMap);											// 현장관리 -> 지점업로드 식단표/식판 사진 경로 저장

@@ -564,31 +564,14 @@ public class OperateController {
      * method : HygieneSave
      * comment : 급식사업부 -> 운영관리 -> 위생관리 저장
      */
-    @PostMapping("Operate/HygieneSave")
-    private String HygieneSave(@RequestBody List<Map<String, Object>> paramList) {
-
-        int iResult = 0;
-
-        for (Map<String, Object> paramMap : paramList) {
-
-            System.out.println("idx ==== " + paramMap.get("idx"));
-            System.out.println("account_id ==== " + paramMap.get("account_id").toString());
-            System.out.println("del_yn ==== " + paramMap.get("del_yn").toString());
-
-            iResult += operateService.HygieneSave(paramMap);
+    @PostMapping({"Operate/HygieneInspectionSave", "Operate/HygieneSave"})
+    public Map<String, Object> saveHygieneInspections(@RequestBody List<Map<String, Object>> rows) {
+        try {
+            operateService.saveHygieneInspections(rows);
+            return Map.of("code", 200, "message", "저장되었습니다.");
+        } catch (IllegalArgumentException ex) {
+            return Map.of("code", 400, "message", ex.getMessage());
         }
-
-        JsonObject obj = new JsonObject();
-
-        if (iResult > 0) {
-            obj.addProperty("code", 200);
-            obj.addProperty("message", "성공");
-        } else {
-            obj.addProperty("code", 400);
-            obj.addProperty("message", "실패");
-        }
-
-        return obj.toString();
     }
 
     /*
